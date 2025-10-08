@@ -1,24 +1,31 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import TenstackProvider from "@/utils/Providers/TenstackProvider";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import ToastManager from "toastify-react-native";
+import "./global.css";
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+export const unstable_settings = { anchor: "(tabs)" };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+    return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <TenstackProvider>
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                    }}
+                >
+                    <Stack.Screen name="index" />
+                    <Stack.Screen options={{ presentation: "modal" }} name="(auth)" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen options={{ presentation: "modal" }} name="(modals)" />
+                </Stack>
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+                <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
+                <ToastManager />
+            </TenstackProvider>
+        </GestureHandlerRootView>
+    );
 }
