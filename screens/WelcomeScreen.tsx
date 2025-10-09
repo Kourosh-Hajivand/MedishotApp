@@ -6,13 +6,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { BaseButton, BaseText } from "../components";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared.js";
-
 export const WelcomeScreen: React.FC = () => {
     const router = useRouter();
     const video = React.useRef<Video>(null);
 
     const handleContinue = () => {
-        router.push("/(auth)/signup");
+        router.push("/(auth)/select-role");
     };
 
     return (
@@ -31,6 +30,7 @@ export const WelcomeScreen: React.FC = () => {
                             AI-powered tools for better patient photo management.
                         </BaseText>
                     </View>
+
                     <BaseButton ButtonStyle="Filled" size="Large" label="Continue" className="!rounded-2xl" onPress={handleContinue} />
                 </View>
             </View>

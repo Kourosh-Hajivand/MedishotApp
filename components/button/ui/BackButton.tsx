@@ -6,7 +6,7 @@ import { BaseText } from "../../text/BaseText";
 
 export const BackButton = ({ onPress }: { onPress: () => void }) => {
     return (
-        <TouchableOpacity onPress={onPress} className="flex-row  items-center gap-2">
+        <TouchableOpacity onPress={onPress} className="flex-row px-2  items-center gap-2">
             <ChevronLeftIcon strokeWidth={0} />
             <BaseText type="Body" color="system.blue" weight={"400"}>
                 Back

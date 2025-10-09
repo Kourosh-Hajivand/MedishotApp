@@ -1,130 +1,226 @@
 import axios from 'axios';
-
-import {Patient} from './models/ResponseModels';
-import {CreatePatientRequest} from './models/RequestModels';
-import {UpdatePatientRequest} from './models/RequestModels';
-import {routes} from '@/routes/routes';
 import axiosInstance from '../AxiosInstans';
-import {Status} from '@/models/enums';
+import {AxiosResponse} from 'axios';
+import {routes} from '../../routes/routes';
+import {CreatePatientRequest, UpdatePatientRequest} from './models/RequestModels';
+import {
+  PatientListResponse,
+  PatientDetailResponse,
+  ApiResponse,
+} from './models/ResponseModels';
 
 const {
   baseUrl,
-  patient: {create, list, getById, update, delete: deleteRoute},
+  patients: {list, create, getById, update, delete: deleteRoute},
 } = routes;
 
 const PatientService = {
-  CreatePatient: async (
-    practiceId: string | number,
-    payload: CreatePatientRequest,
-  ): Promise<Patient> => {
+  // Patient Management
+  getPatients: async (
+    page: number = 1,
+    perPage: number = 15,
+  ): Promise<PatientListResponse> => {
     try {
-      const response = await axiosInstance.post<Patient>(
-        baseUrl + create(practiceId),
-        payload,
-      );
-      if (response.status === Status.Ok || response.status === Status.Created) {
-        return response.data;
-      }
-      throw new Error(`Request failed with status ${response.status}`);
-    } catch (error) {
-      console.error('Error in CreatePatient:', error);
-      if (axios.isAxiosError(error) && error.response) {
-        throw new Error(
-          error.response.data.message || 'Unknown error occurred',
-        );
-      }
-      throw error;
-    }
-  },
-
-  GetPatients: async (practiceId: string | number): Promise<Patient[]> => {
-    try {
-      const response = await axiosInstance.get<Patient[]>(
-        baseUrl + list(practiceId),
-      );
-      if (response.status === Status.Ok) {
-        return response.data;
-      }
-      throw new Error(`Request failed with status ${response.status}`);
+      const response: AxiosResponse<PatientListResponse> =
+        await axiosInstance.get(baseUrl + list(), {
+          params: {page, per_page: perPage},
+        });
+      return response.data;
     } catch (error) {
       console.error('Error in GetPatients:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
-          error.response.data.message || 'Unknown error occurred',
+          error.response.data.message || 'Get patients failed',
         );
       }
       throw error;
     }
   },
 
-  GetPatientById: async (
-    practiceId: string | number,
-    patientId: string | number,
-  ): Promise<Patient> => {
+  createPatient: async (
+    payload: CreatePatientRequest,
+  ): Promise<PatientDetailResponse> => {
     try {
-      const response = await axiosInstance.get<Patient>(
-        baseUrl + getById(practiceId, patientId),
-      );
-      if (response.status === Status.Ok) {
-        return response.data;
+      const formData = new FormData();
+      
+      formData.append('first_name', payload.first_name);
+      formData.append('last_name', payload.last_name);
+
+      if (payload.birth_date) {
+        formData.append('birth_date', payload.birth_date);
       }
-      throw new Error(`Request failed with status ${response.status}`);
+      if (payload.gender) {
+        formData.append('gender', payload.gender);
+      }
+      if (payload.national_id) {
+        formData.append('national_id', payload.national_id);
+      }
+      if (payload.email) {
+        formData.append('email', payload.email);
+      }
+
+      if (payload.numbers) {
+        payload.numbers.forEach((number, index) => {
+          formData.append(`numbers[${index}][type]`, number.type);
+          formData.append(`numbers[${index}][value]`, number.value);
+        });
+      }
+
+      if (payload.addresses) {
+        payload.addresses.forEach((address, index) => {
+          formData.append(`addresses[${index}][type]`, address.type);
+          Object.entries(address.value).forEach(([key, value]) => {
+            if (value) {
+              formData.append(`addresses[${index}][value][${key}]`, value);
+            }
+          });
+        });
+      }
+
+      if (payload.links) {
+        payload.links.forEach((link, index) => {
+          formData.append(`links[${index}][type]`, link.type);
+          formData.append(`links[${index}][value]`, link.value);
+        });
+      }
+
+      if (payload.metadata) {
+        Object.entries(payload.metadata).forEach(([key, value]) => {
+          if (value) {
+            formData.append(`metadata[${key}]`, value);
+          }
+        });
+      }
+
+      if (payload.image) {
+        formData.append('image', payload.image);
+      }
+
+      const response: AxiosResponse<PatientDetailResponse> =
+        await axiosInstance.post(baseUrl + create(), formData, {
+          headers: {'Content-Type': 'multipart/form-data'},
+        });
+      return response.data;
+    } catch (error) {
+      console.error('Error in CreatePatient:', error);
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(
+          error.response.data.message || 'Create patient failed',
+        );
+      }
+      throw error;
+    }
+  },
+
+  getPatientById: async (
+    patientId: string | number,
+  ): Promise<PatientDetailResponse> => {
+    try {
+      const response: AxiosResponse<PatientDetailResponse> =
+        await axiosInstance.get(baseUrl + getById(patientId));
+      return response.data;
     } catch (error) {
       console.error('Error in GetPatientById:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
-          error.response.data.message || 'Unknown error occurred',
+          error.response.data.message || 'Get patient failed',
         );
       }
       throw error;
     }
   },
 
-  UpdatePatient: async (
-    practiceId: string | number,
+  updatePatient: async (
     patientId: string | number,
     payload: UpdatePatientRequest,
-  ): Promise<Patient> => {
+  ): Promise<PatientDetailResponse> => {
     try {
-      const response = await axiosInstance.put<Patient>(
-        baseUrl + update(practiceId, patientId),
-        payload,
-      );
-      if (response.status === Status.Ok) {
-        return response.data;
+      const formData = new FormData();
+
+      if (payload.first_name) {
+        formData.append('first_name', payload.first_name);
       }
-      throw new Error(`Request failed with status ${response.status}`);
+      if (payload.last_name) {
+        formData.append('last_name', payload.last_name);
+      }
+      if (payload.birth_date) {
+        formData.append('birth_date', payload.birth_date);
+      }
+      if (payload.gender) {
+        formData.append('gender', payload.gender);
+      }
+      if (payload.national_id) {
+        formData.append('national_id', payload.national_id);
+      }
+      if (payload.email) {
+        formData.append('email', payload.email);
+      }
+
+      if (payload.numbers) {
+        payload.numbers.forEach((number, index) => {
+          formData.append(`numbers[${index}][type]`, number.type);
+          formData.append(`numbers[${index}][value]`, number.value);
+        });
+      }
+
+      if (payload.addresses) {
+        payload.addresses.forEach((address, index) => {
+          formData.append(`addresses[${index}][type]`, address.type);
+          Object.entries(address.value).forEach(([key, value]) => {
+            if (value) {
+              formData.append(`addresses[${index}][value][${key}]`, value);
+            }
+          });
+        });
+      }
+
+      if (payload.links) {
+        payload.links.forEach((link, index) => {
+          formData.append(`links[${index}][type]`, link.type);
+          formData.append(`links[${index}][value]`, link.value);
+        });
+      }
+
+      if (payload.metadata) {
+        Object.entries(payload.metadata).forEach(([key, value]) => {
+          if (value) {
+            formData.append(`metadata[${key}]`, value);
+          }
+        });
+      }
+
+      if (payload.image) {
+        formData.append('image', payload.image);
+      }
+
+      const response: AxiosResponse<PatientDetailResponse> =
+        await axiosInstance.put(baseUrl + update(patientId), formData, {
+          headers: {'Content-Type': 'multipart/form-data'},
+        });
+      return response.data;
     } catch (error) {
       console.error('Error in UpdatePatient:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
-          error.response.data.message || 'Unknown error occurred',
+          error.response.data.message || 'Update patient failed',
         );
       }
       throw error;
     }
   },
 
-  DeletePatient: async (
-    practiceId: string | number,
+  deletePatient: async (
     patientId: string | number,
-  ): Promise<void> => {
+  ): Promise<ApiResponse<string>> => {
     try {
-      const response = await axiosInstance.delete<void>(
-        baseUrl + deleteRoute(practiceId, patientId),
-      );
-      if (
-        response.status === Status.Ok ||
-        response.status === Status.NoContent
-      ) {
-        return;
-      }
-      throw new Error(`Request failed with status ${response.status}`);
+      const response: AxiosResponse<ApiResponse<string>> =
+        await axiosInstance.delete(baseUrl + deleteRoute(patientId));
+      return response.data;
     } catch (error) {
       console.error('Error in DeletePatient:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
-          error.response.data.message || 'Unknown error occurred',
+          error.response.data.message || 'Delete patient failed',
         );
       }
       throw error;

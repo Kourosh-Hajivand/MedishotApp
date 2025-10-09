@@ -1,4 +1,5 @@
 // import { BlurView } from "@react-native-community/blur";
+import { BlurView } from "expo-blur";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Dimensions, FlatList, StyleSheet, View } from "react-native";
@@ -144,11 +145,11 @@ export const SelectRoleScreen: React.FC = () => {
     return (
         <SafeAreaView style={[styles.container]} className="flex-1 items-center justify-between pb-[30%]">
             {/* Animated background */}
-            <Animated.View style={[StyleSheet.absoluteFillObject, backgroundStyle]} />
-            {/* <BlurView style={StyleSheet.absoluteFill} blurType="materialLight" blurAmount={0} reducedTransparencyFallbackColor="white" /> */}
 
-            {/* Blurred circle behind icons */}
-            <Animated.View style={styles.blurCircle}>{/* <BlurView style={StyleSheet.absoluteFill} blurType="light" blurAmount={35} reducedTransparencyFallbackColor="white" /> */}</Animated.View>
+            <View style={StyleSheet.absoluteFill}>
+                <Animated.View style={[styles.radialOverlay, backgroundStyle, { opacity: 0.3 }]} />
+                <BlurView style={StyleSheet.absoluteFill} intensity={100} tint="light" experimentalBlurMethod="dimezisBlurView" />
+            </View>
 
             {/* Title */}
             <View style={styles.titleContainer} className="absolute top-[12%]">
@@ -268,6 +269,16 @@ const styles = StyleSheet.create({
         width: "100%",
         paddingHorizontal: spacing["10"],
         marginTop: spacing["10"],
+    },
+    radialOverlay: {
+        position: "absolute",
+        top: height / 2 - 380,
+        left: width / 2 - 350,
+        width: 700,
+        height: 700,
+        borderRadius: 350,
+        opacity: 0.7,
+        transform: [{ scale: 1 }],
     },
 });
 

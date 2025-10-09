@@ -37,7 +37,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
     });
 
     return (
-        <View style={styles.container} className="w-full gap-1">
+        <View style={styles.container} className="w-full gap-0">
             <Controller
                 control={control}
                 name={name}
@@ -75,7 +75,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                 {/* Placeholder */}
                                 {!value && !!label && (
                                     <View style={styles.placeholder}>
-                                        <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute left-4">
+                                        <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
                                             {label}
                                         </BaseText>
                                         {optional && (
@@ -128,7 +128,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
 
                         {/* Error or Info */}
                         {(!!error || haveBorder) && (
-                            <View style={styles.errorContainer} className="h-5 flex-row items-center gap-1 px-1">
+                            <View style={styles.errorContainer} className="h-5  flex-row items-center gap-1 px-1">
                                 {!!error && (
                                     <BaseText color="system.red" type="Caption2">
                                         {error}

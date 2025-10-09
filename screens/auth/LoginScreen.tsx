@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { BaseButton, BaseText, ControlledInput } from "../../components";
 import { QueryKeys } from "../../models/enums";
@@ -33,6 +34,7 @@ export const LoginScreen: React.FC = () => {
             password: "",
         },
     });
+    const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
     const {
         mutate: login,
@@ -55,43 +57,47 @@ export const LoginScreen: React.FC = () => {
     };
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: "white" }}>
             <ScrollView style={styles.scrollView} contentContainerClassName="flex-1">
-                <View style={styles.content} className="flex-1 px-10 py-[10%]">
-                    <View style={styles.mainContent} className="flex-1 items-center justify-start">
-                        <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
-                            Welcome Back
-                        </BaseText>
+                <View style={styles.content} className="flex-1 px-10 ">
+                    <View className="flex-1 items-center justify-between gap-10">
+                        <View style={{ paddingTop: insets.top + 40 }} className="w-full flex-1 items-center justify-start">
+                            <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
+                                Welcome Back
+                            </BaseText>
 
-                        <View style={styles.formContainer} className="mt-20 w-full ">
-                            <View className="gap-4">
-                                <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} />
-                                <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="password" error={errors.password?.message} />
-                                {error?.message && (
-                                    <BaseText color="system.red" type="Caption2" className="mt-2">
-                                        {error?.message}
-                                    </BaseText>
-                                )}
-                                <TouchableOpacity style={styles.forgotPassword} disabled className="flex-row items-center justify-between">
-                                    <BaseText type="Subhead" color="system.blue" weight="400">
-                                        Forgot password?
+                            <View className="w-full mt-[40px]">
+                                <View className="gap-4">
+                                    <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} />
+                                    <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="password" error={errors.password?.message} />
+                                    {error?.message && (
+                                        <BaseText color="system.red" type="Caption2" className="mt-2">
+                                            {error?.message}
+                                        </BaseText>
+                                    )}
+                                    <TouchableOpacity style={styles.forgotPassword} disabled className="flex-row items-center justify-between">
+                                        <BaseText type="Subhead" color="system.blue" weight="400">
+                                            Forgot password?
+                                        </BaseText>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+                        <View className="w-full flex-1  items-center bg-blue-50 justify-center">
+                            <BaseButton onPress={handleSubmit(onSubmit)} disabled={isPending} size="Large" ButtonStyle="Filled" className=" w-full" label={isPending ? "Logging in..." : "Log In"} />
+                            <View style={styles.socialContainer} className="mt-16 w-full gap-4">
+                                <AuthWithSocial isLogin={true} />
+                            </View>
+                            <View style={styles.signUpContainer} className="mt-16 flex-row items-center gap-1">
+                                <BaseText type="Callout" color="labels.secondary">
+                                    Don't have an account?
+                                </BaseText>
+                                <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
+                                    <BaseText type="Callout" color="system.blue">
+                                        Sign up
                                     </BaseText>
                                 </TouchableOpacity>
                             </View>
-                            <BaseButton onPress={handleSubmit(onSubmit)} disabled={isPending} size="Large" ButtonStyle="Filled" className="mt-24" style={{ marginTop: spacing["24"] }} label={isPending ? "Logging in..." : "Log In"} />
-                        </View>
-                        <View style={styles.socialContainer} className="mt-16 w-full gap-4">
-                            <AuthWithSocial isLogin={true} />
-                        </View>
-                        <View style={styles.signUpContainer} className="mt-16 flex-row items-center gap-1">
-                            <BaseText type="Callout" color="labels.secondary">
-                                Don't have an account?
-                            </BaseText>
-                            <TouchableOpacity onPress={() => router.push("/(auth)/signup")}>
-                                <BaseText type="Callout" color="system.blue">
-                                    Sign up
-                                </BaseText>
-                            </TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -110,17 +116,6 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
-        paddingHorizontal: spacing["10"],
-        paddingVertical: "10%",
-    },
-    mainContent: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "flex-start",
-    },
-    formContainer: {
-        width: "100%",
-        marginTop: 80,
     },
 
     forgotPassword: {
@@ -130,7 +125,7 @@ const styles = StyleSheet.create({
     },
     socialContainer: {
         width: "100%",
-        marginTop: 64,
+        marginTop: 40,
     },
     signUpContainer: {
         flexDirection: "row",

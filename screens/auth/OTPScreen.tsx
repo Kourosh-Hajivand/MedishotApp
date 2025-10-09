@@ -1,10 +1,10 @@
-import {View, Text} from 'react-native';
-import React from 'react';
+import React from "react";
+import { Text, View } from "react-native";
 
 export default function OTPScreen() {
-  return (
-    <View>
-      <Text>OTPScreen</Text>
-    </View>
-  );
+    return (
+        <View>
+            <Text>OTPScreen</Text>
+        </View>
+    );
 }

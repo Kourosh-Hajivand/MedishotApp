@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { QueryKeys } from "../../models/enums";
 import { getTokens, removeTokens } from "../helper/tokenStorage";
-import { AuthService } from "../service/AuthService";
+import { useGetMe } from "./useAuthService";
 
 export const useAuth = () => {
     const queryClient = useQueryClient();
@@ -9,11 +9,8 @@ export const useAuth = () => {
         queryKey: [QueryKeys.tokens],
         queryFn: getTokens,
     });
-    const { data: profile, isLoading: isProfileLoading } = useQuery({
-        queryKey: [QueryKeys.profile],
-        queryFn: () => AuthService.getProfile(),
-        enabled: !!tokens?.accessToken,
-    });
+
+    const { data: me, isLoading: isMeLoading } = useGetMe();
     const logout = () => {
         removeTokens();
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
@@ -23,8 +20,8 @@ export const useAuth = () => {
     return {
         isAuthenticated: tokens?.accessToken ? true : false,
         isLoading: isTokensLoading,
-        profile: profile?.data,
-        isProfileLoading,
+        profile: me?.data,
+        isProfileLoading: isMeLoading,
         logout,
     };
 };

@@ -1,44 +1,52 @@
 export const routes = {
-  baseUrl: 'https://api.medishots.com/api/v1/',
+    baseUrl: "https://api.medishots.com/api/v1/",
 
-  auth: {
-    login: () => 'auth/login',
-    register: () => 'auth/register',
-    profile: () => 'auth/profile',
+    auth: {
+        login: () => "auth/login",
+        initiateRegistration: () => "auth/initiate-registration",
+        completeRegistration: () => "auth/complete-registration",
+        logout: () => "auth/logout",
+        me: () => "auth/me",
+        updateProfile: () => "auth/update-profile",
 
-    google: () => 'auth/google',
-    googleCallback: () => 'auth/google/callback',
+        google: () => "auth/oauth/google/redirect",
+        googleCallback: () => "auth/oauth/google/callback",
 
-    apple: () => 'auth/apple',
-    appleCallback: () => 'auth/apple/callback',
-  },
+        apple: () => "auth/oauth/apple/redirect",
+        appleCallback: () => "auth/oauth/apple/callback",
+        appleConfig: () => "auth/oauth/apple/config",
+    },
 
-  users: {
-    getUserById: (id: string | number) => `users/${id}`,
-  },
+    practises: {
+        list: () => "practises",
+        create: () => "practises",
+        getById: (id: string | number) => `practises/${id}`,
+        update: (id: string | number) => `practises/${id}`,
+        delete: (id: string | number) => `practises/${id}`,
 
-  practice: {
-    create: () => 'practices',
-    list: () => 'practices',
-    getById: (id: string | number) => `practices/${id}`,
-    update: (id: string | number) => `practices/${id}`,
-    delete: (id: string | number) => `practices/${id}`,
-    addMember: (id: string | number) => `practices/${id}/members`,
-  },
+        // Members
+        getMembers: (practiseId: string | number) => `practises/${practiseId}/members`,
+        addMember: (practiseId: string | number) => `practises/${practiseId}/members`,
+        updateMemberRole: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}/role`,
+        removeMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}`,
+        leave: (practiseId: string | number) => `practises/${practiseId}/leave`,
+        transferOwnership: (practiseId: string | number) => `practises/${practiseId}/transfer-ownership`,
+    },
 
-  patient: {
-    create: (practicesId: string | number) =>
-      `practices/${practicesId}/patients`,
-    list: (practicesId: string | number) => `practices/${practicesId}/patients`,
-    getById: (practicesId: string | number, patientsId: string | number) =>
-      `practices/${practicesId}/patients/${patientsId}`,
-    update: (practicesId: string | number, patientsId: string | number) =>
-      `practices/${practicesId}/patients/${patientsId}`,
-    delete: (practicesId: string | number, patientsId: string | number) =>
-      `practices/${practicesId}/patients/${patientsId}`,
-  },
+    patients: {
+        list: () => "patients",
+        create: () => "patients",
+        getById: (patientId: string | number) => `patients/${patientId}`,
+        update: (patientId: string | number) => `patients/${patientId}`,
+        delete: (patientId: string | number) => `patients/${patientId}`,
 
-  media: {
-    upload: () => '/media/upload',
-  },
+        // Media
+        getMedia: (patientId: string | number) => `patients/media/${patientId}`,
+        uploadMedia: (patientId: string | number) => `patients/media/${patientId}`,
+        deleteMedia: (patientId: string | number, mediaId: string | number) => `patients/media/${patientId}/${mediaId}`,
+    },
+
+    media: {
+        tempUpload: () => "temp-upload",
+    },
 };
