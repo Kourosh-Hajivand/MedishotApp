@@ -1,5 +1,5 @@
 export const routes = {
-    baseUrl: "https://api.medishots.com/api/v1/",
+    baseUrl: "https://medishot-back-laravel-black-sun-8585.fly.dev/api/v1/",
 
     auth: {
         login: () => "auth/login",

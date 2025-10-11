@@ -1,15 +1,23 @@
+import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
 import { CompleteRegistrationBody, InitiateRegistrationBody, LoginBody, UpdateProfileBody } from "@/utils/service/models/RequestModels";
 import { AppleConfigResponse, CompleteRegistrationResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, UpdateProfileResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
+import { getTokens } from "../helper/tokenStorage";
 
 // ============= Query Hooks (GET) =============
 
 export const useGetMe = (enabled: boolean = true): UseQueryResult<MeResponse, Error> => {
+    const { data: tokens } = useQuery({
+        queryKey: [QueryKeys.tokens],
+        queryFn: getTokens,
+    });
+
+    const isAuthenticated = !!tokens?.accessToken;
     return useQuery({
         queryKey: ["GetMe"],
         queryFn: () => AuthService.me(),
-        enabled,
+        enabled: isAuthenticated && enabled,
     });
 };
 

@@ -74,9 +74,9 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                             >
                                 {/* Placeholder */}
                                 {!value && !!label && (
-                                    <View style={styles.placeholder}>
+                                    <View style={styles.placeholder} className="flex-row items-center">
                                         <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
-                                            {label}
+                                            {label} {optional && `(Optional)`}
                                         </BaseText>
                                         {optional && (
                                             <BaseText type="Caption1" color={haveBorder ? "text-secondary" : "labels.tertiary"}>

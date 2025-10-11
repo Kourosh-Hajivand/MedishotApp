@@ -3,23 +3,21 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { ScrollView, StyleSheet, View } from "react-native";
-// import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import Animated, { useAnimatedKeyboard, useAnimatedStyle, withTiming } from "react-native-reanimated";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
+
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
-import { BaseButton, BaseText, ControlledInput } from "../../components";
+import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
 import { usPhoneRegex } from "../../utils/helper/HelperFunction";
 import { storeTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
+import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
 import { PracticeService } from "../../utils/service/PracticeService";
 import { CreatePracticeDto } from "../../utils/service/models/RequestModels";
-
-import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
 
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
@@ -34,23 +32,16 @@ type FormData = z.infer<typeof schema>;
 
 export const CreatePracticeScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
-    const keyboard = useAnimatedKeyboard();
-    const buttonAnimatedStyle = useAnimatedStyle(() => {
-        const height = keyboard.height.value || 0;
-
-        const translateY = height > 0 ? -(height + -60) : 0;
-        return { transform: [{ translateY: withTiming(translateY, { duration: 0 }) }] };
-    });
+    const queryClient = useQueryClient();
     const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
     const token = params.token as string;
     const practiceType = params.practiceType ? JSON.parse(params.practiceType as string) : undefined;
-    const queryClient = useQueryClient();
 
     const {
         control,
         handleSubmit,
         watch,
-        formState: { errors, isSubmitting },
+        formState: { errors },
         setValue,
     } = useForm<FormData>({
         resolver: zodResolver(schema),
@@ -58,7 +49,7 @@ export const CreatePracticeScreen: React.FC = () => {
             practiceName: "",
             website: "",
             phoneNumber: "",
-            specialty: practiceType.title,
+            specialty: practiceType?.title || "",
             address: "",
             zipCode: "",
         },
@@ -72,19 +63,15 @@ export const CreatePracticeScreen: React.FC = () => {
         query: debouncedValue ?? " ",
         language: "en",
     });
-
-    const { data } = useGetSearchDetail(Search?.suggestions[0]?.mapbox_id);
+    const { data } = useGetSearchDetail(Search?.suggestions?.[0]?.mapbox_id);
 
     useEffect(() => {
         if (data?.features?.[0]) {
-            console.log("data search detail", data);
             const place = data.features[0];
             const fullAddress = place.properties?.place_formatted || place.properties?.full_address;
             setValue("address", fullAddress);
         }
     }, [data, setValue]);
-
-    const contentBottomPadding = insets.bottom + spacing["16"];
 
     const {
         mutate: createPractice,
@@ -104,130 +91,84 @@ export const CreatePracticeScreen: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         createPractice({
             name: data.practiceName,
-            description: ".....",
             metadata: {
                 website: data.website,
                 email: "",
                 phone: data.phoneNumber,
                 address: data.address,
             },
-            practiceType: practiceType.id,
+            type: practiceType.id,
         });
     };
 
     return (
-        <SafeAreaView style={styles.container} className="flex-1 bg-white">
-            <View style={{ flex: 1 }}>
-                <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingBottom: contentBottomPadding }} showsVerticalScrollIndicator={false}>
-                    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                        <View style={styles.avatarContainer} className="items-center justify-center gap-10">
-                            <View style={styles.avatarWrapper} className="relative h-[90px] w-[90px] items-center justify-center rounded-full bg-system-gray2">
-                                <AvatarIcon width={50} height={50} strokeWidth={0} />
-                                <View style={styles.plusButton} className="absolute bottom-0 right-0 rounded-full border border-white bg-system-blue p-1">
-                                    <PlusIcon width={14} height={14} strokeWidth={0} />
-                                </View>
-                            </View>
-
-                            {/* Title */}
-                            <View style={styles.titleContainer} className="items-center gap-1">
-                                <BaseText type="Title1" weight="700" color="system.black">
-                                    Create New Practice
-                                </BaseText>
-                                <BaseText type="Body" color="labels.secondary" align="center" weight={"400"}>
-                                    Start by creating your practice.
-                                </BaseText>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
+            <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                {/* Header */}
+                <View style={styles.avatarContainer}>
+                    <ImagePickerWrapper>
+                        <View style={styles.avatarWrapper}>
+                            <AvatarIcon width={50} height={50} strokeWidth={0} />
+                            <View style={styles.plusButton}>
+                                <PlusIcon width={14} height={14} strokeWidth={0} />
                             </View>
                         </View>
+                    </ImagePickerWrapper>
+                    <View style={styles.titleContainer}>
+                        <BaseText type="Title1" weight="700" color="system.black">
+                            Create New Practice
+                        </BaseText>
+                        <BaseText type="Body" color="labels.secondary" align="center">
+                            Start by creating your practice.
+                        </BaseText>
+                    </View>
+                </View>
 
-                        <View style={styles.formContainer} className="gap-4">
-                            <View style={styles.formRow} className="mt-8 flex-row items-center gap-2 overflow-hidden border-b border-system-gray5 py-2">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Practice Name
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="practiceName" label="Practice Name" haveBorder={false} className="!w-full !flex-1" error={errors.practiceName?.message} />
-                                </View>
-                            </View>
-                            <View style={styles.formRow} className="flex-row items-center gap-2 overflow-hidden border-b border-system-gray5 pb-3">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Website
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="website" label="Website" optional autoCapitalize="none" haveBorder={false} error={errors.website?.message} />
-                                </View>
-                            </View>
-                            <View style={styles.formRow} className="flex-row items-center gap-2 overflow-hidden border-b border-system-gray5 pb-3">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Phone Number
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="phoneNumber" label="Phone Number" className="!w-full !flex-1" keyboardType="phone-pad" haveBorder={false} error={errors.phoneNumber?.message} />
-                                </View>
-                            </View>
-                            <View style={styles.formRow} className="flex-row items-center gap-2 overflow-hidden border-b border-system-gray5 pb-3">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Specialty
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="specialty" label="Specialty" disabled className="!w-full !flex-1" haveBorder={false} error={errors.specialty?.message} />
-                                </View>
-                            </View>
-                            <View style={[styles.formRow]} className=" flex-row items-center gap-2 overflow-hidden border-b border-system-gray5 pb-3">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Zip Code
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="zipCode" label="Zip Code" className="!w-full !flex-1" haveBorder={false} error={errors.zipCode?.message} />
-                                </View>
-                            </View>
-                            <View style={[styles.formRow, styles.lastFormRow]} className=" flex-row items-center gap-2 overflow-hidden pb-3">
-                                <BaseText type="Title3" weight={"500"} color="system.black" style={{ width: 140, marginTop: spacing["3"] }} className="w-[140px]">
-                                    Address
-                                </BaseText>
-                                <View style={{ flex: 1 }}>
-                                    <ControlledInput control={control} name="address" label="Address" className="!w-full !flex-1" haveBorder={false} error={errors.address?.message} />
-                                </View>
-                            </View>
-                        </View>
-                        {error?.message && (
-                            <BaseText color="system.red" type="Caption2" className="mt-2">
-                                {error?.message}
+                {/* Form */}
+                <View style={styles.formContainer}>
+                    {[
+                        { name: "practiceName", label: "Practice Name" },
+                        { name: "website", label: "Website", optional: true },
+                        { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
+                        { name: "specialty", label: "Specialty", disabled: true },
+                        { name: "zipCode", label: "Zip Code" },
+                        { name: "address", label: "Address" },
+                    ].map((f, i) => (
+                        <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
+                            <BaseText type="Title3" weight="500" color="system.black" style={styles.label}>
+                                {f.label}
                             </BaseText>
-                        )}
-                    </ScrollView>
-                </ScrollView>
-                <Animated.View
-                    style={[
-                        styles.fixedButtonContainer,
-                        buttonAnimatedStyle,
-                        {
-                            left: spacing["4"],
-                            right: spacing["4"],
-                            bottom: insets.bottom,
-                        },
-                    ]}
-                    pointerEvents="box-none"
-                >
-                    <BaseButton label="Next" ButtonStyle="Filled" size="Large" disabled={isPending} onPress={handleSubmit(onSubmit)} isLoading={isPending} />
-                </Animated.View>
+                            <View style={styles.inputWrapper}>
+                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} disabled={f.disabled} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                            </View>
+                        </View>
+                    ))}
+
+                    {error?.message && (
+                        <BaseText color="system.red" type="Caption2" className="mt-2">
+                            {error?.message}
+                        </BaseText>
+                    )}
+                </View>
+            </ScrollView>
+
+            {/* Fixed bottom button */}
+            <View style={[styles.buttonContainer, { paddingBottom: insets.bottom || 20 }]}>
+                <BaseButton label="Next" ButtonStyle="Filled" size="Large" disabled={isPending} isLoading={isPending} onPress={handleSubmit(onSubmit)} />
             </View>
-        </SafeAreaView>
+        </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
     scrollView: {
         flex: 1,
         paddingHorizontal: spacing["6"],
     },
+
     avatarContainer: {
-        gap: spacing["6"],
+        marginTop: spacing["10"],
         alignItems: "center",
-        justifyContent: "center",
     },
     avatarWrapper: {
         width: 90,
@@ -249,35 +190,29 @@ const styles = StyleSheet.create({
         borderColor: colors.system.white,
     },
     titleContainer: {
-        gap: spacing["1"],
+        marginTop: spacing["4"],
         alignItems: "center",
     },
     formContainer: {
         marginTop: spacing["10"],
-        gap: spacing["0"],
     },
     formRow: {
-        borderBottomWidth: 1,
-        borderBottomColor: colors.system.gray5,
         flexDirection: "row",
         alignItems: "flex-start",
-        paddingVertical: spacing["2"],
-        overflow: "hidden",
-        gap: spacing["2"],
-        marginTop: spacing["0"],
+        paddingVertical: spacing["3"],
+        borderBottomWidth: 1,
+        borderBottomColor: colors.system.gray5,
     },
-    lastFormRow: {
-        borderBottomWidth: 0,
+    label: {
+        width: 140,
+        marginTop: spacing["2"],
     },
-
-    gradientOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        bottom: 0,
-        height: "100%",
-        width: "100%",
+    inputWrapper: {
+        flex: 1,
     },
-    fixedButtonContainer: {
-        position: "absolute",
+    buttonContainer: {
+        backgroundColor: colors.background,
+        paddingHorizontal: spacing["4"],
     },
 });
 

@@ -4,15 +4,12 @@ import { StorageKeys } from "../../models/enums";
 /**
  * Store Access and Refresh Tokens securely
  */
-export const storeTokens = async (
-    accessToken: string,
-    // refreshToken?: string
-): Promise<void> => {
+export const storeTokens = async (accessToken: string, refreshToken?: string): Promise<void> => {
     try {
         await SecureStore.setItemAsync(StorageKeys.token, accessToken);
-        // if (refreshToken) {
-        //   await SecureStore.setItemAsync(StorageKeys.refreshToken, refreshToken);
-        // }
+        if (refreshToken) {
+            await SecureStore.setItemAsync(StorageKeys.refreshToken, refreshToken);
+        }
     } catch (error) {
         console.error("Error storing tokens:", error);
         throw new Error("Failed to store tokens");
@@ -24,18 +21,18 @@ export const storeTokens = async (
  */
 export const getTokens = async (): Promise<{
     accessToken: string | null;
-    // refreshToken: string | null;
+    refreshToken: string | null;
 }> => {
     try {
         const accessToken = await SecureStore.getItemAsync(StorageKeys.token);
-        // const refreshToken = await SecureStore.getItemAsync(StorageKeys.refreshToken);
+        const refreshToken = await SecureStore.getItemAsync(StorageKeys.refreshToken);
         return {
             accessToken,
-            // refreshToken,
+            refreshToken,
         };
     } catch (error) {
         console.error("Error retrieving tokens:", error);
-        return { accessToken: null };
+        return { accessToken: null, refreshToken: null };
     }
 };
 
@@ -45,7 +42,7 @@ export const getTokens = async (): Promise<{
 export const removeTokens = async (): Promise<void> => {
     try {
         await SecureStore.deleteItemAsync(StorageKeys.token);
-        // await SecureStore.deleteItemAsync(StorageKeys.refreshToken);
+        await SecureStore.deleteItemAsync(StorageKeys.refreshToken);
     } catch (error) {
         console.error("Error removing tokens:", error);
         throw new Error("Failed to remove tokens");
