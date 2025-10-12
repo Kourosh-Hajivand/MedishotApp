@@ -8,6 +8,8 @@ export const routes = {
         logout: () => "auth/logout",
         me: () => "auth/me",
         updateProfile: () => "auth/update-profile",
+        forgetPassword: () => "auth/forget-password",
+        resetPassword: () => "auth/reset-password",
 
         google: () => "auth/oauth/google/redirect",
         googleCallback: () => "auth/oauth/google/callback",

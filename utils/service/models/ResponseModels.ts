@@ -79,6 +79,14 @@ export interface UpdateProfileResponse {
     data: People;
 }
 
+export interface ForgetPasswordResponse {
+    message: string;
+}
+
+export interface ResetPasswordResponse {
+    message: string;
+}
+
 // ============= OAuth Responses =============
 export interface OAuthRedirectResponse {
     redirect_url: string;

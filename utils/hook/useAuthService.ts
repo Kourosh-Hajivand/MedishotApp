@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
-import { CompleteRegistrationBody, InitiateRegistrationBody, LoginBody, UpdateProfileBody } from "@/utils/service/models/RequestModels";
-import { AppleConfigResponse, CompleteRegistrationResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, UpdateProfileResponse } from "@/utils/service/models/ResponseModels";
+import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody } from "@/utils/service/models/RequestModels";
+import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { getTokens } from "../helper/tokenStorage";
 
@@ -140,6 +140,30 @@ export const useAppleCallback = (onSuccess?: (data: LoginResponse) => void, onEr
         mutationFn: (code: string) => AuthService.appleCallback(code),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useForgetPassword = (onSuccess?: (data: ForgetPasswordResponse) => void, onError?: (error: Error) => void): UseMutationResult<ForgetPasswordResponse, Error, ForgetPasswordBody> => {
+    return useMutation({
+        mutationFn: (data: ForgetPasswordBody) => AuthService.forgetPassword(data),
+        onSuccess: (data) => {
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useResetPassword = (onSuccess?: (data: ResetPasswordResponse) => void, onError?: (error: Error) => void): UseMutationResult<ResetPasswordResponse, Error, ResetPasswordBody> => {
+    return useMutation({
+        mutationFn: (data: ResetPasswordBody) => AuthService.resetPassword(data),
+        onSuccess: (data) => {
             onSuccess?.(data);
         },
         onError: (error) => {
