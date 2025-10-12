@@ -9,9 +9,10 @@ interface AvatarProps {
     imageUrl?: string;
     size?: number;
     haveRing?: boolean;
+    rounded?: number;
 }
 
-export default function Avatar({ name, imageUrl, size = 48, haveRing = false }: AvatarProps) {
+export default function Avatar({ name, imageUrl, size = 48, haveRing = false, rounded = 99 }: AvatarProps) {
     const initials = name
         .split(" ")
         .slice(0, 2)
@@ -23,7 +24,7 @@ export default function Avatar({ name, imageUrl, size = 48, haveRing = false }: 
     }
 
     return (
-        <View style={[styles.container, { width: size, height: size }]} className={haveRing ? `p-[2.5px] border-2 border-system-blue rounded-full` : ""}>
+        <View style={[styles.container, { width: size, height: size, borderRadius: rounded, overflow: "hidden" }]} className={haveRing ? `p-[2.5px] border-2 border-system-blue ` : ""}>
             <LinearGradient colors={["#C7C7CC", "#8E8E93"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.gradient}>
                 <Text className="text-white font-semibold" style={[styles.text, { fontSize: size * (haveRing ? 0.3 : 0.4) }]}>
                     {initials}
@@ -45,7 +46,7 @@ const styles = StyleSheet.create({
     gradient: {
         width: "100%",
         height: "100%",
-        borderRadius: 99,
+
         overflow: "hidden",
         justifyContent: "center",
         alignItems: "center",

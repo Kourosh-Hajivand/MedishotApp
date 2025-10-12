@@ -2,6 +2,7 @@ import Logo from "./Logo.svg";
 export { default as AvatarIcon } from "./Avatar.svg";
 export { default as CameraIcon } from "./Camera.svg";
 export { default as ChevronLeftIcon } from "./ChevronLeft.svg";
+export { default as ChevronRightIcon } from "./ChevronRight.svg";
 export { default as ClearIcon } from "./Clear.svg";
 export { default as DictationIcon } from "./Dictation.svg";
 export { default as EyeInvisibleIcon } from "./EyeInvisible.svg";

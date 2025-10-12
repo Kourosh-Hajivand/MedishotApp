@@ -1,79 +1,74 @@
-import React, { useState } from "react";
-import { Modal, StyleSheet, TouchableOpacity, View } from "react-native";
-// import {WebView} from 'react-native-webview';
-import { SafeAreaView } from "react-native-safe-area-context";
+import { storeTokens } from "@/utils/helper/tokenStorage";
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import React, { useEffect } from "react";
+import { StyleSheet, View } from "react-native";
 import { AppleIcon, GoogleIcon } from "../../../assets/icons";
 import { OutlineButton } from "../../../components";
 import { BaseText } from "../../../components/text/BaseText";
-import { routes } from "../../../routes/routes";
 import { spacing } from "../../../styles/spaces";
-// import {appleAuth} from '@invertase/react-native-apple-authentication';
+
+WebBrowser.maybeCompleteAuthSession();
+
 export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
-    const [webviewUrl, setWebviewUrl] = useState<string | null>(null);
+    // ✅ Google Auth Config
+    const [request, response, promptAsync] = Google.useAuthRequest({
+        androidClientId: "166893799275-p2drth8lmt6jj5qo5rk1s9vmdfaiut3b.apps.googleusercontent.com",
+        iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
+        webClientId: "166893799275-938aoan8338a9ogk67sk09pbu5gm1rpc.apps.googleusercontent.com",
+    });
 
-    const {
-        baseUrl,
-        auth: { apple, google },
-    } = routes;
+    // (اختیاری) اتصال به mutation سمت سرور
 
-    // const handleAppleSignIn = async () => {
-    //   try {
-    //     const response = await appleAuth.performRequest({
-    //       requestedOperation: appleAuth.Operation.LOGIN,
-    //       requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
-    //     });
+    // ✅ وقتی لاگین گوگل موفق شد
+    useEffect(() => {
+        if (response?.type === "success") {
+            const { authentication } = response;
+            console.log("✅ Google access token:", authentication?.accessToken);
 
-    //     const {identityToken, user, email, fullName} = response;
+            // در صورت نیاز ارسال به بک‌اند:
+            // socialLogin({ provider: "google", token: authentication?.accessToken });
 
-    //     if (!identityToken) {
-    //       throw new Error('Apple Sign-In failed - no identity token returned');
-    //     }
+            // یا ذخیره‌ی مستقیم در local storage
+            storeTokens(authentication?.accessToken || "");
+        }
+    }, [response]);
 
-    //     console.log('✅ Apple Sign-In success:', {
-    //       identityToken,
-    //       user,
-    //       email,
-    //       fullName,
-    //     });
-    //   } catch (error) {
-    //     console.log('❌ Apple Sign-In error:', error);
-    //   }
-    // };
+    // ✅ Apple login handler
+    const handleAppleLogin = async () => {
+        try {
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
+            });
+            console.log("✅ Apple identity token:", credential.identityToken);
+
+            // ارسال به سرور یا ذخیره
+            // socialLogin({ provider: "apple", token: credential.identityToken });
+            storeTokens(credential.identityToken || "");
+        } catch (e: any) {
+            if (e.code === "ERR_CANCELED") return;
+            console.error("❌ Apple login error:", e);
+        }
+    };
 
     return (
         <View style={styles.container}>
-            <OutlineButton onPress={() => {}}>
+            {/* 🍎 APPLE */}
+            <OutlineButton onPress={handleAppleLogin}>
                 <AppleIcon strokeWidth={0} />
                 <BaseText type="Headline" color="system.black" weight="500">
                     {isLogin ? "Sign in with Apple" : "Sign up with Apple"}
                 </BaseText>
             </OutlineButton>
-            <OutlineButton onPress={() => setWebviewUrl(baseUrl + google())}>
+
+            {/* 🔥 GOOGLE */}
+            <OutlineButton disabled={!request} onPress={() => promptAsync()}>
                 <GoogleIcon strokeWidth={0} />
                 <BaseText type="Headline" color="system.black" weight="500">
                     {isLogin ? "Sign in with Google" : "Sign up with Google"}
                 </BaseText>
             </OutlineButton>
-
-            <Modal visible={!!webviewUrl} animationType="slide" style={{ flex: 1 }}>
-                <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-                    <TouchableOpacity onPress={() => setWebviewUrl(null)} style={{ paddingHorizontal: 20, paddingVertical: 10 }}>
-                        <View>
-                            <BaseText type="Body" weight={400} color="system.blue">
-                                Cancel
-                            </BaseText>
-                        </View>
-                    </TouchableOpacity>
-
-                    {/* {webviewUrl && (
-            <WebView
-              style={{flex: 1}}
-              source={{uri: webviewUrl}}
-              startInLoadingState
-            />
-          )} */}
-                </SafeAreaView>
-            </Modal>
         </View>
     );
 };

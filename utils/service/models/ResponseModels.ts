@@ -41,7 +41,7 @@ export interface LoginResponse {
     message: string;
     data: {
         token: string;
-        poeple: People;
+        people: People;
     };
 }
 
@@ -59,7 +59,7 @@ export interface CompleteRegistrationResponse {
     message: string;
     data: {
         token: string;
-        poeple: People;
+        people: People;
     };
 }
 

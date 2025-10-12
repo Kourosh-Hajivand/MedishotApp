@@ -12,15 +12,15 @@ export default function TabsLayout() {
     return (
         <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <CustomTabBar {...(props as any)} onAddPress={handleAddPatient} />} initialRouteName="patients">
             <Tabs.Screen
-                name="patients"
+                name="Album"
                 options={{
-                    tabBarLabel: "Patients",
+                    tabBarLabel: "Album",
                 }}
             />
             <Tabs.Screen
-                name="album"
+                name="Patients"
                 options={{
-                    tabBarLabel: "Album",
+                    tabBarLabel: "Patients",
                 }}
             />
         </Tabs>

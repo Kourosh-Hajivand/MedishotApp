@@ -47,17 +47,13 @@ export default function OTPScreen() {
 
     const { mutate: verifyCode, isPending: isVerifying } = useCompleteRegistration(
         async (response) => {
-            // ذخیره توکن
             await storeTokens(response.data.token);
 
-            // چک کردن اینکه آیا first_name و last_name وجود دارد
-            const hasCompletedProfile = response.data.poeple.first_name && response.data.poeple.last_name;
+            const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
 
             if (hasCompletedProfile) {
-                // اگر پروفایل کامل است، به select-role می‌رویم
                 router.push("/(auth)/select-role");
             } else {
-                // اگر پروفایل کامل نیست، به completeProfile می‌رویم
                 router.push("/(auth)/completeProfile");
             }
         },

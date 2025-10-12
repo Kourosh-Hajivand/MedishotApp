@@ -45,8 +45,10 @@ export const LoginScreen: React.FC = () => {
 
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
-
-        const hasCompletedProfile = response.data.poeple.first_name && response.data.poeple.last_name;
+        console.log("====================================");
+        console.log(response.data);
+        console.log("====================================");
+        const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
 
         if (!hasCompletedProfile) {
             router.replace("/(auth)/completeProfile");

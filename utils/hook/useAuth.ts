@@ -18,7 +18,7 @@ export const useAuth = () => {
     };
 
     return {
-        isAuthenticated: tokens?.accessToken ? true : false,
+        isAuthenticated: isTokensLoading ? null : tokens?.accessToken ? true : false,
         isLoading: isTokensLoading,
         profile: me?.data,
         isProfileLoading: isMeLoading,

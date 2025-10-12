@@ -1,31 +1,34 @@
+import HeaderWithMenu from "@/components/ui/HeaderWithMenu";
+import { useGetPatients } from "@/utils/hook/usePatient";
 import React, { useRef, useState } from "react";
 import { Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { GestureEvent, PanGestureHandler, PanGestureHandlerEventPayload, State } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SearchGlyphIcon } from "../assets/icons/index.ts";
-import { BaseButton, BaseText, SearchBox } from "../components";
+import { SearchGlyphIcon } from "../assets/icons/index";
+import { BaseText, SearchBox } from "../components";
 import Avatar from "../components/avatar";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared";
-import { patients } from "../utils/data/PatientsData";
 import log from "../utils/helper/logger";
-import { useAuth } from "../utils/hook/useAuth.ts";
-
-const groupedPatients = patients.reduce(
-    (acc, patient) => {
-        const letter = patient.name[0].toUpperCase();
-        if (!acc[letter]) acc[letter] = [];
-        acc[letter].push(patient);
-        return acc;
-    },
-    {} as Record<string, { name: string }[]>,
-);
+import { useAuth } from "../utils/hook/useAuth";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export const PatientsScreen: React.FC = () => {
     const { logout, profile } = useAuth();
-    log.debug(profile);
+
+    const { data: patients } = useGetPatients();
+
+    const groupedPatients = patients?.data.data.reduce(
+        (acc, patient) => {
+            const letter = patient.full_name[0].toUpperCase();
+            if (!acc[letter]) acc[letter] = [];
+            acc[letter].push(patient);
+            return acc;
+        },
+        {} as Record<string, { full_name: string }[]>,
+    );
+    log.debug(patients);
     const [search, setSearch] = useState("");
     const [stickyEnabled, setStickyEnabled] = useState(true);
     const scrollViewRef = useRef<SectionList>(null);
@@ -38,13 +41,13 @@ export const PatientsScreen: React.FC = () => {
     });
     const [activeLetter, setActiveLetter] = useState<string | null>(null);
     const [gestureStartY, setGestureStartY] = useState(0);
-    const filteredGroupedPatients = Object.keys(groupedPatients).reduce(
+    const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
         (acc, letter) => {
-            const items = groupedPatients[letter].filter((p) => p.name.toLowerCase().includes(search.toLowerCase()));
-            if (items.length > 0) acc[letter] = items;
+            const items = groupedPatients?.[letter].filter((p) => p.full_name.toLowerCase().includes(search.toLowerCase()));
+            if (items && items.length > 0) acc[letter] = items;
             return acc;
         },
-        {} as typeof groupedPatients,
+        {} as Record<string, { full_name: string }[]>,
     );
 
     const sections = Object.keys(filteredGroupedPatients)
@@ -174,25 +177,7 @@ export const PatientsScreen: React.FC = () => {
                     className="gap-4"
                 >
                     <View style={styles.headerTop} className="flex-row items-center justify-between px-4">
-                        <View style={styles.userContainer} className="w-fit flex-row items-center gap-2 self-start rounded-full px-1 py-1 pr-4">
-                            <Avatar name={profile?.email ?? ""} size={30} />
-                            <BaseText lineBreakMode="tail" numberOfLines={1} type="Body" weight={400} style={{ maxWidth: 200 }} color="labels.secondary">
-                                {profile?.email}
-                            </BaseText>
-                        </View>
-                        {/* <TouchableOpacity
-              style={styles.menuButton}
-              className="w-7 h-7 rounded-full flex items-center justify-center">
-              <ThreeDotsIcon width={14} height={14} strokeWidth={0} />
-            </TouchableOpacity> */}
-                        <BaseButton
-                            label="Logout"
-                            ButtonStyle="Plain"
-                            size="Small"
-                            onPress={() => {
-                                logout();
-                            }}
-                        />
+                        <HeaderWithMenu />
                     </View>
                     <View style={styles.titleContainer} className="gap-3 px-4 pb-4">
                         <BaseText type="LargeTitle" weight={700} color="labels.primary">
@@ -217,9 +202,9 @@ export const PatientsScreen: React.FC = () => {
                                 contentContainerStyle={styles.sectionListContent}
                                 renderItem={({ item, index, section }) => (
                                     <View key={`${section.title}-${index}`} style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]} className={`flex-row items-center gap-3 py-2 ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}>
-                                        <Avatar haveRing name={item.name} size={36} />
+                                        <Avatar haveRing name={item.full_name} size={36} />
                                         <BaseText type="Callout" weight={500} color="labels.primary">
-                                            {item.name}
+                                            {item.full_name}
                                         </BaseText>
                                     </View>
                                 )}
@@ -231,7 +216,7 @@ export const PatientsScreen: React.FC = () => {
                                     </View>
                                 )}
                             />
-                        ) : (
+                        ) : search.length > 0 ? (
                             <View style={styles.noResults} className="flex-1 items-center justify-center">
                                 <SearchGlyphIcon width={40} height={40} strokeWidth={0} style={{ marginBottom: 10 }} />
                                 <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.primary" weight={500}>
@@ -239,6 +224,12 @@ export const PatientsScreen: React.FC = () => {
                                 </BaseText>
                                 <BaseText type="Caption1" color="labels.secondary" weight={500}>
                                     Check the spelling or try a new search.
+                                </BaseText>
+                            </View>
+                        ) : (
+                            <View style={styles.noResults} className="flex-1 items-center justify-center">
+                                <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.secondary" weight={500}>
+                                    No patients found
                                 </BaseText>
                             </View>
                         )}
