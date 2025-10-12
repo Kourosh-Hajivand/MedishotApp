@@ -1,3 +1,4 @@
+import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto } from "@/utils/service/models/RequestModels";
 import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse } from "@/utils/service/models/ResponseModels";
@@ -37,6 +38,8 @@ export const useCreatePractice = (onSuccess?: (data: PracticeDetailResponse) => 
         mutationFn: (data: CreatePracticeDto) => PracticeService.createPractice(data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
             onSuccess?.(data);
         },
         onError: (error) => {

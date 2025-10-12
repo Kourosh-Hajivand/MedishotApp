@@ -15,7 +15,7 @@ export default function AuthLayout() {
                     headerTitle: "",
                     headerShadowVisible: true,
                     headerTransparent: true,
-                    presentation: "transparentModal",
+                    // presentation: "transparentModal",
                     headerStyle: {
                         backgroundColor: "transparent",
                     },
@@ -25,6 +25,10 @@ export default function AuthLayout() {
                 <Stack.Screen name="signup" />
                 <Stack.Screen name="select-role" />
                 <Stack.Screen name="create-practice" />
+                <Stack.Screen name="reset-password" />
+                <Stack.Screen name="otp" />
+                <Stack.Screen name="new-password" />
+                <Stack.Screen name="complete-profile" />
             </Stack>
         </BottomSheetModalProvider>
     );

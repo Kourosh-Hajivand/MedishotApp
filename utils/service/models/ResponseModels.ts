@@ -1,3 +1,5 @@
+import { PracticeType } from "@/utils/data/SPECIALTIES";
+
 // ============= Base Response =============
 export interface ApiResponse<T = any> {
     success: boolean;
@@ -119,7 +121,7 @@ export interface PracticeMetadata {
 export interface Practice {
     id: number;
     name: string;
-    type: string;
+    type: PracticeType;
     image?: Media;
     metadata?: PracticeMetadata;
     created_at: string;

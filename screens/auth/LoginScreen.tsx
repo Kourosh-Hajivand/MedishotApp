@@ -1,18 +1,17 @@
+import { storeTokens } from "@/utils/helper/tokenStorage";
+import { useLogin } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AxiosError } from "axios";
+import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { BaseButton, BaseText, ControlledInput } from "../../components";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared.js";
-import { AuthService } from "../../utils/service";
-import { LoginResponse } from "../../utils/service/models/ResponseModels";
 import { AuthWithSocial } from "./components/AuthWithSocial";
 
 const loginSchema = z.object({
@@ -36,20 +35,24 @@ export const LoginScreen: React.FC = () => {
     });
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
+
     const {
         mutate: login,
         isPending,
         error,
-    } = useMutation({
-        mutationFn: (data: LoginFormData) => AuthService.login(data),
-        onSuccess: async (data: LoginResponse) => {
-            queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
-            queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+    } = useLogin(async (response) => {
+        await storeTokens(response.data.token);
+
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+
+        const hasCompletedProfile = response.data.poeple.first_name && response.data.poeple.last_name;
+
+        if (!hasCompletedProfile) {
+            router.replace("/(auth)/completeProfile");
+        } else {
             router.replace("/(tabs)/patients");
-        },
-        onError: (error: AxiosError) => {
-            console.log((error?.response?.data as any)?.message);
-        },
+        }
     });
 
     const onSubmit = async (data: LoginFormData) => {
@@ -57,38 +60,38 @@ export const LoginScreen: React.FC = () => {
     };
 
     return (
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: "white" }}>
-            <ScrollView style={styles.scrollView} contentContainerClassName="flex-1">
-                <View style={styles.content} className="flex-1 px-10 ">
-                    <View className="flex-1 items-center justify-between gap-10">
-                        <View style={{ paddingTop: insets.top + 40 }} className="w-full flex-1 items-center justify-start">
-                            <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
-                                Welcome Back
-                            </BaseText>
+        <ScrollView style={styles.scrollView} contentContainerStyle={{ flex: 1, backgroundColor: colors.background }}>
+            <View style={styles.content} className="flex-1 px-10 ">
+                <View className="flex-1 items-center justify-between gap-10">
+                    <View style={{ paddingTop: insets.top + 40 }} className="w-full flex-1 items-center justify-start">
+                        <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
+                            Welcome Back
+                        </BaseText>
 
-                            <View className="w-full mt-[40px]">
-                                <View className="gap-4">
-                                    <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} />
-                                    <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="password" error={errors.password?.message} />
-                                    {error?.message && (
-                                        <BaseText color="system.red" type="Caption2" className="mt-2">
-                                            {error?.message}
-                                        </BaseText>
-                                    )}
-                                    <TouchableOpacity style={styles.forgotPassword} disabled className="flex-row items-center justify-between">
-                                        <BaseText type="Subhead" color="system.blue" weight="400">
-                                            Forgot password?
-                                        </BaseText>
-                                    </TouchableOpacity>
-                                </View>
+                        <View className="w-full mt-[40px]">
+                            <View className="gap-0">
+                                <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} />
+                                <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="password" error={errors.password?.message} />
+                                {error?.message && (
+                                    <BaseText color="system.red" type="Caption2" className="mt-2">
+                                        {error?.message}
+                                    </BaseText>
+                                )}
+                                <TouchableOpacity style={styles.forgotPassword} disabled className="flex-row items-center justify-between">
+                                    <BaseText type="Subhead" color="system.blue" weight="400">
+                                        Forgot password?
+                                    </BaseText>
+                                </TouchableOpacity>
                             </View>
                         </View>
-                        <View className="w-full flex-1  items-center bg-blue-50 justify-center">
-                            <BaseButton onPress={handleSubmit(onSubmit)} disabled={isPending} size="Large" ButtonStyle="Filled" className=" w-full" label={isPending ? "Logging in..." : "Log In"} />
-                            <View style={styles.socialContainer} className="mt-16 w-full gap-4">
+                    </View>
+                    <View className="w-full flex-1  items-center  justify-center gap-10">
+                        <BaseButton onPress={handleSubmit(onSubmit)} disabled={isPending} size="Large" ButtonStyle="Filled" className=" w-full" label={isPending ? "Logging in..." : "Log In"} />
+                        <View className="gap-10 w-full items-center justify-center ">
+                            <View style={styles.socialContainer} className="w-full gap-4">
                                 <AuthWithSocial isLogin={true} />
                             </View>
-                            <View style={styles.signUpContainer} className="mt-16 flex-row items-center gap-1">
+                            <View style={styles.signUpContainer} className="flex-row items-center gap-1">
                                 <BaseText type="Callout" color="labels.secondary">
                                     Don't have an account?
                                 </BaseText>
@@ -101,8 +104,8 @@ export const LoginScreen: React.FC = () => {
                         </View>
                     </View>
                 </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+            </View>
+        </ScrollView>
     );
 };
 
@@ -125,13 +128,13 @@ const styles = StyleSheet.create({
     },
     socialContainer: {
         width: "100%",
-        marginTop: 40,
+        marginTop: 0,
     },
     signUpContainer: {
         flexDirection: "row",
         alignItems: "center",
         gap: spacing["1"],
-        marginTop: 64,
+        marginTop: 0,
     },
 });
 

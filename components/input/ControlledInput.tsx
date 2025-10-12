@@ -78,11 +78,11 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                         <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
                                             {label} {optional && `(Optional)`}
                                         </BaseText>
-                                        {optional && (
+                                        {/* {optional && (
                                             <BaseText type="Caption1" color={haveBorder ? "text-secondary" : "labels.tertiary"}>
                                                 {`(Optional)`}
                                             </BaseText>
-                                        )}
+                                        )} */}
                                     </View>
                                 )}
 

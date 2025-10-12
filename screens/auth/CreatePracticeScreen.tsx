@@ -1,12 +1,12 @@
+import { useCreatePractice } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
 import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
 import { QueryKeys } from "../../models/enums";
@@ -16,8 +16,7 @@ import { usPhoneRegex } from "../../utils/helper/HelperFunction";
 import { storeTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
-import { PracticeService } from "../../utils/service/PracticeService";
-import { CreatePracticeDto } from "../../utils/service/models/RequestModels";
+import { useTempUpload } from "../../utils/hook/useMedia";
 
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
@@ -36,6 +35,9 @@ export const CreatePracticeScreen: React.FC = () => {
     const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
     const token = params.token as string;
     const practiceType = params.practiceType ? JSON.parse(params.practiceType as string) : undefined;
+
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
 
     const {
         control,
@@ -73,17 +75,43 @@ export const CreatePracticeScreen: React.FC = () => {
         }
     }, [data, setValue]);
 
+    const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
+        (response) => {
+            setUploadedFilename(response.filename);
+            console.log("Image uploaded successfully:", response.filename);
+        },
+        (error) => {
+            console.error("Error uploading image:", error.message);
+        },
+    );
+
+    const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
+        setSelectedImage(result.uri);
+
+        // تبدیل URI به File object برای آپلود
+        try {
+            const filename = result.uri.split("/").pop() || "image.jpg";
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : "image/jpeg";
+
+            const file = {
+                uri: result.uri,
+                type: type,
+                name: filename,
+            } as any;
+
+            uploadImage(file);
+        } catch (error) {
+            console.error("Error preparing image for upload:", error);
+        }
+    };
+
     const {
         mutate: createPractice,
         isPending,
         error,
-    } = useMutation({
-        mutationFn: (data: CreatePracticeDto) => PracticeService.createPractice(data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
-            queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
-            router.replace("/(tabs)/patients");
-        },
+    } = useCreatePractice(() => {
+        router.replace("/(tabs)/patients");
     });
 
     const onSubmit = (data: FormData) => {
@@ -98,20 +126,18 @@ export const CreatePracticeScreen: React.FC = () => {
                 address: data.address,
             },
             type: practiceType.id,
+            image: uploadedFilename || undefined,
         });
     };
 
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
             <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {/* Header */}
                 <View style={styles.avatarContainer}>
-                    <ImagePickerWrapper>
+                    <ImagePickerWrapper onImageSelected={handleImageSelected}>
                         <View style={styles.avatarWrapper}>
-                            <AvatarIcon width={50} height={50} strokeWidth={0} />
-                            <View style={styles.plusButton}>
-                                <PlusIcon width={14} height={14} strokeWidth={0} />
-                            </View>
+                            {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
+                            <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
                         </View>
                     </ImagePickerWrapper>
                     <View style={styles.titleContainer}>
@@ -167,7 +193,6 @@ const styles = StyleSheet.create({
     },
 
     avatarContainer: {
-        marginTop: spacing["10"],
         alignItems: "center",
     },
     avatarWrapper: {
@@ -178,6 +203,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         position: "relative",
+    },
+    avatarImage: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 45,
     },
     plusButton: {
         position: "absolute",

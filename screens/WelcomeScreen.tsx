@@ -13,7 +13,7 @@ export const WelcomeScreen: React.FC = () => {
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
 
     const handleContinue = () => {
-        router.push("/(auth)/create-practice");
+        router.push("/(auth)/login");
     };
     const renderBackdrop = useCallback((props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
 
