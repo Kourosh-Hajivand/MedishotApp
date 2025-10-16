@@ -1,5 +1,3 @@
-import { PracticeType } from "@/utils/data/SPECIALTIES";
-
 // ============= Base Response =============
 export interface ApiResponse<T = any> {
     success: boolean;
@@ -129,7 +127,7 @@ export interface PracticeMetadata {
 export interface Practice {
     id: number;
     name: string;
-    type: PracticeType;
+    type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology";
     image?: Media;
     metadata?: PracticeMetadata;
     created_at: string;

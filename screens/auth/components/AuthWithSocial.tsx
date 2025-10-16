@@ -15,8 +15,15 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
     // ✅ Google Auth Config
     const [request, response, promptAsync] = Google.useAuthRequest({
         iosClientId: "166893799275-938aoan8338a9ogk67sk09pbu5gm1rpc.apps.googleusercontent.com",
-        // scopes: ["profile", "email",],
+        webClientId: "166893799275-p2drth8lmt6jj5qo5rk1s9vmdfaiut3b.apps.googleusercontent.com",
+        scopes: ["profile", "email", "openid"],
+        responseType: "code",
+        shouldAutoExchangeCode: true,
+        // codeChallengeMethod: CodeChallengeMethod.Plain,
+        usePKCE: false,
+        // codeChallenge: "1234567890",
     });
+    console.log("🔗 Google Auth URL:", request?.url);
 
     // (اختیاری) اتصال به mutation سمت سرور
 
@@ -74,8 +81,6 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
         </View>
     );
 };
-
-AuthWithSocial.displayName = "AuthWithSocial";
 
 const styles = StyleSheet.create({
     container: {
