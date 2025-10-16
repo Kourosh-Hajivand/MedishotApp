@@ -1,14 +1,19 @@
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Dimensions, Image, ScrollView, StyleSheet, View } from "react-native";
-// import DocumentScanner from "react-native-document-scanner-plugin";
+import DocumentScanner from "react-native-document-scanner-plugin";
 import { SafeAreaView } from "react-native-safe-area-context";
-// import TextRecognition from "react-native-text-recognition";
+import TextRecognition from "react-native-text-recognition";
 import { BaseButton, BaseText } from "../components";
+import { AddPatientStackParamList } from "../navigation/AddPatientModalNavigator";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared";
 
 export const AddPatientFormScreen: React.FC = () => {
+    const navigation = useNavigation<NativeStackNavigationProp<AddPatientStackParamList>>();
+
     const screenWidth = Dimensions.get("window").width;
     const imageWidth = screenWidth * 0.7;
     const imageHeight = screenWidth * 0.6;
@@ -16,28 +21,28 @@ export const AddPatientFormScreen: React.FC = () => {
     const [scannedImage, setScannedImage] = useState<string | null>(null);
     const [extractedText, setExtractedText] = useState<string | null>(null);
 
-    // const scanDocument = async () => {
-    //     try {
-    //         const { scannedImages } = await DocumentScanner.scanDocument({
-    //             maxNumDocuments: 1,
-    //         });
+    const scanDocument = async () => {
+        try {
+            const { scannedImages } = await DocumentScanner.scanDocument({
+                maxNumDocuments: 1,
+            });
 
-    //         if (scannedImages && scannedImages.length > 0) {
-    //             const imagePath = scannedImages[0];
-    //             setScannedImage(imagePath);
+            if (scannedImages && scannedImages.length > 0) {
+                const imagePath = scannedImages[0];
+                setScannedImage(imagePath);
 
-    //             const path = imagePath.replace("file://", "");
+                const path = imagePath.replace("file://", "");
 
-    //             const lines = await TextRecognition.recognize(path);
-    //             const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
-    //             setExtractedText(fullText);
-    //             console.log("OCR:", fullText);
-    //         }
-    //     } catch (error) {
-    //         console.error("Document scan or OCR failed:", error);
-    //         // setExtractedText('OCR failed. Please try a clearer scan.');
-    //     }
-    // };
+                const lines = await TextRecognition.recognize(path);
+                const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
+                setExtractedText(fullText);
+                console.log("OCR:", fullText);
+            }
+        } catch (error) {
+            console.error("Document scan or OCR failed:", error);
+            // setExtractedText('OCR failed. Please try a clearer scan.');
+        }
+    };
 
     return (
         <SafeAreaView style={styles.container} className="flex-1 items-center justify-between bg-white">
@@ -63,7 +68,7 @@ export const AddPatientFormScreen: React.FC = () => {
             </View>
 
             <View style={styles.buttonContainer} className="mb-[10%] w-full gap-4 px-10">
-                <BaseButton label="Scan The ID" size="Large" ButtonStyle="Filled" />
+                <BaseButton label="Scan The ID" size="Large" ButtonStyle="Filled" onPress={scanDocument} />
                 <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(modals)/add-patient/photo")} />
             </View>
         </SafeAreaView>

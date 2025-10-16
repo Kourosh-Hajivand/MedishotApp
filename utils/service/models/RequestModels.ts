@@ -24,9 +24,12 @@ export interface ForgetPasswordBody {
     email: string;
 }
 
-export interface ResetPasswordBody {
+export interface VerifyOtpCodeBody {
     email: string;
-    token: string;
+    code: string;
+}
+
+export interface ResetPasswordBody {
     password: string;
     password_confirmation: string;
 }

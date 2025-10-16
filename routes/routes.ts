@@ -9,6 +9,7 @@ export const routes = {
         me: () => "auth/me",
         updateProfile: () => "auth/update-profile",
         forgetPassword: () => "auth/forget-password",
+        verifyOtpCode: () => "auth/verify-otp-code",
         resetPassword: () => "auth/reset-password",
 
         google: () => "auth/oauth/google/redirect",

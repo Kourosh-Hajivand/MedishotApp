@@ -45,9 +45,6 @@ export const LoginScreen: React.FC = () => {
 
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
-        console.log("====================================");
-        console.log(response.data);
-        console.log("====================================");
         const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
 
         if (!hasCompletedProfile) {
@@ -79,7 +76,7 @@ export const LoginScreen: React.FC = () => {
                                         {error?.message}
                                     </BaseText>
                                 )}
-                                <TouchableOpacity style={styles.forgotPassword} disabled className="flex-row items-center justify-between">
+                                <TouchableOpacity style={styles.forgotPassword} onPress={() => router.push("/(auth)/reset-password")} className="flex-row items-center justify-between">
                                     <BaseText type="Subhead" color="system.blue" weight="400">
                                         Forgot password?
                                     </BaseText>

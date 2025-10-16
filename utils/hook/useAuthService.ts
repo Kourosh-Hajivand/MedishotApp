@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
-import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody } from "@/utils/service/models/RequestModels";
-import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse } from "@/utils/service/models/ResponseModels";
+import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
+import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { getTokens } from "../helper/tokenStorage";
 
@@ -160,10 +160,29 @@ export const useForgetPassword = (onSuccess?: (data: ForgetPasswordResponse) => 
     });
 };
 
+export const useVerifyOtpCode = (onSuccess?: (data: VerifyOtpCodeResponse) => void, onError?: (error: Error) => void): UseMutationResult<VerifyOtpCodeResponse, Error, VerifyOtpCodeBody> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: VerifyOtpCodeBody) => AuthService.verifyOtpCode(data),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
 export const useResetPassword = (onSuccess?: (data: ResetPasswordResponse) => void, onError?: (error: Error) => void): UseMutationResult<ResetPasswordResponse, Error, ResetPasswordBody> => {
+    const queryClient = useQueryClient();
+
     return useMutation({
         mutationFn: (data: ResetPasswordBody) => AuthService.resetPassword(data),
         onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
             onSuccess?.(data);
         },
         onError: (error) => {

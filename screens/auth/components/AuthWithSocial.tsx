@@ -14,9 +14,8 @@ WebBrowser.maybeCompleteAuthSession();
 export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
     // ✅ Google Auth Config
     const [request, response, promptAsync] = Google.useAuthRequest({
-        androidClientId: "166893799275-p2drth8lmt6jj5qo5rk1s9vmdfaiut3b.apps.googleusercontent.com",
-        iosClientId: "YOUR_IOS_CLIENT_ID.apps.googleusercontent.com",
-        webClientId: "166893799275-938aoan8338a9ogk67sk09pbu5gm1rpc.apps.googleusercontent.com",
+        iosClientId: "166893799275-938aoan8338a9ogk67sk09pbu5gm1rpc.apps.googleusercontent.com",
+        // scopes: ["profile", "email",],
     });
 
     // (اختیاری) اتصال به mutation سمت سرور
@@ -25,6 +24,9 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
     useEffect(() => {
         if (response?.type === "success") {
             const { authentication } = response;
+            console.log("====================================");
+            console.log(response);
+            console.log("====================================");
             console.log("✅ Google access token:", authentication?.accessToken);
 
             // در صورت نیاز ارسال به بک‌اند:

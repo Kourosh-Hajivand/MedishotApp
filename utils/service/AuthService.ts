@@ -2,12 +2,12 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { storeTokens } from "../helper/tokenStorage";
-import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody } from "./models/RequestModels";
-import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse } from "./models/ResponseModels";
+import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "./models/RequestModels";
+import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    auth: { login, initiateRegistration, completeRegistration, logout, me, updateProfile, forgetPassword, resetPassword, google, googleCallback, apple, appleCallback, appleConfig },
+    auth: { login, initiateRegistration, completeRegistration, logout, me, updateProfile, forgetPassword, verifyOtpCode, resetPassword, google, googleCallback, apple, appleCallback, appleConfig },
 } = routes;
 
 export const AuthService = {
@@ -94,6 +94,21 @@ export const AuthService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Forget password request failed");
+            }
+            throw error;
+        }
+    },
+
+    verifyOtpCode: async (body: VerifyOtpCodeBody): Promise<VerifyOtpCodeResponse> => {
+        try {
+            const response: AxiosResponse<VerifyOtpCodeResponse> = await axiosInstance.post(baseUrl + verifyOtpCode(), body);
+            if (response.data.data.token) {
+                storeTokens(response.data.data.token);
+            }
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "OTP verification failed");
             }
             throw error;
         }

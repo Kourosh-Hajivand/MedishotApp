@@ -1,6 +1,6 @@
 import { BaseButton, BaseText, OTPInput } from "@/components";
 import { storeTokens } from "@/utils/helper/tokenStorage";
-import { useCompleteRegistration, useInitiateRegistration, useResetPassword } from "@/utils/hook";
+import { useCompleteRegistration, useInitiateRegistration, useVerifyOtpCode } from "@/utils/hook";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
@@ -62,7 +62,9 @@ export default function OTPScreen() {
         },
     );
 
-    const { mutate: resetPassword, isPending: isResetting } = useResetPassword();
+    const { mutate: verifyOtpCode, isPending: isVerifyingOtpCode } = useVerifyOtpCode(() => {
+        router.push("/(auth)/new-password");
+    });
 
     const handleResend = () => {
         if (!canResend || !email) return;
@@ -71,7 +73,7 @@ export default function OTPScreen() {
     useEffect(() => {
         if (otp.length === 6) {
             if (params.forgetPassword) {
-                resetPassword({ email, token: otp, password: params.password as string, password_confirmation: params.password as string });
+                verifyOtpCode({ email, code: otp });
             } else {
                 verifyCode({ email, verification_code: otp, password: params.password as string, password_confirmation: params.password as string });
             }

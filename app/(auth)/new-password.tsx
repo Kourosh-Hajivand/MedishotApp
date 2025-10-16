@@ -1,5 +1,7 @@
 import { BaseButton, BaseText, ControlledInput } from "@/components";
+import { useResetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
 import { View } from "react-native";
@@ -30,8 +32,11 @@ export default function NewPassword() {
             confirmPassword: "",
         },
     });
+    const { mutate: resetPassword, isPending: isResetting } = useResetPassword(() => {
+        router.push("/(auth)/login");
+    });
     const onSubmit = (data: ResetPasswordFormData) => {
-        console.log(data);
+        resetPassword({ password: data.password, password_confirmation: data.confirmPassword });
     };
     return (
         <ScrollView contentContainerClassName="flex-1 bg-white">
@@ -52,7 +57,7 @@ export default function NewPassword() {
                         <ControlledInput control={control} name="confirmPassword" type="password" label="Confirm Password" secureTextEntry autoComplete="new-password" error={errors.confirmPassword?.message} />
                     </View>
                 </View>
-                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" onPress={handleSubmit(onSubmit)} />
+                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
             </View>
         </ScrollView>
     );

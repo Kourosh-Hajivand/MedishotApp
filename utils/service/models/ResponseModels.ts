@@ -85,6 +85,14 @@ export interface ForgetPasswordResponse {
     message: string;
 }
 
+export interface VerifyOtpCodeResponse {
+    message: string;
+    data: {
+        token: string;
+        people: People;
+    };
+}
+
 export interface ResetPasswordResponse {
     message: string;
 }

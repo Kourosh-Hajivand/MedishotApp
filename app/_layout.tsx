@@ -27,7 +27,7 @@ export default function RootLayout() {
                         <Stack.Screen name="index" />
                         <Stack.Screen options={{ presentation: "modal" }} name="(auth)" />
                         <Stack.Screen name="(tabs)" />
-                        <Stack.Screen options={{ presentation: "modal" }} name="(modals)" />
+                        <Stack.Screen options={{ presentation: "modal" }} name="(modals)/add-patient" />
                     </Stack>
 
                     <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
