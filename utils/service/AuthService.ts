@@ -139,9 +139,9 @@ export const AuthService = {
         }
     },
 
-    googleCallback: async (code: string): Promise<LoginResponse> => {
+    googleCallback: async (id_token: string): Promise<LoginResponse> => {
         try {
-            const response: AxiosResponse<LoginResponse> = await axiosInstance.get(baseUrl + googleCallback(), { params: { code } });
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleCallback(), { id_token });
             if (response.data.data.token) {
                 storeTokens(response.data.data.token);
             }

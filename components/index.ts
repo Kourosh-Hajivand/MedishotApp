@@ -2,6 +2,7 @@ export { default as BaseButton } from "./button/BaseButton";
 export { BackButton } from "./button/ui/BackButton";
 export { FloatingActionButton } from "./button/ui/FloatingActionButton";
 export { default as OutlineButton } from "./button/ui/OutlineButton";
+export { DynamicInputList } from "./DynamicField";
 export { default as ImagePickerWrapper } from "./ImagePickerWrapper";
 export { default as ControlledInput } from "./input/ControlledInput";
 export { default as OTPInput } from "./input/OTPInput";

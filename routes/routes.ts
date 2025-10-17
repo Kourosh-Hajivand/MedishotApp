@@ -13,7 +13,7 @@ export const routes = {
         resetPassword: () => "auth/reset-password",
 
         google: () => "auth/oauth/google/redirect",
-        googleCallback: () => "auth/oauth/google/callback",
+        googleCallback: () => "auth/oauth/google/id-token",
 
         apple: () => "auth/oauth/apple/redirect",
         appleCallback: () => "auth/oauth/apple/callback",

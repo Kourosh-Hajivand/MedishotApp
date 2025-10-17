@@ -107,7 +107,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                     secureTextEntry={type === "password" && !showPassword}
                                     keyboardType={type === "number" ? "numeric" : "default"}
                                     textAlign={centerText ? "center" : "left"}
-                                    className="font-system dark:text-dark.text flex-1 py-0"
+                                    className="  dark:text-dark.text flex-1 py-0"
                                     style={[
                                         styles.textInput,
                                         {
@@ -183,6 +183,9 @@ const styles = StyleSheet.create({
     textInput: {
         flex: 1,
         paddingVertical: 0,
+        fontSize: 17,
+        lineHeight: 22,
+        fontWeight: "400",
     },
     passwordToggle: {
         paddingLeft: spacing["2"],

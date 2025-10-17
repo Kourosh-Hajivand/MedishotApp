@@ -10,7 +10,8 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.betoatexpo.medishotapp",
-            "appleTeamId": "T2A8YY9YDW",
+            // "appleTeamId": "T2A8YY9YDW",
+            "appleTeamId": "S6GL3VTAFF",
             "icon": "./assets/icon.icon"
         },
         "android": {

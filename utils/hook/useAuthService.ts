@@ -122,7 +122,7 @@ export const useGoogleCallback = (onSuccess?: (data: LoginResponse) => void, onE
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (code: string) => AuthService.googleCallback(code),
+        mutationFn: (id_token: string) => AuthService.googleCallback(id_token),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
