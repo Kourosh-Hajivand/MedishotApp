@@ -98,18 +98,14 @@ export default function BaseButton({ label, onPress, disabled, isLoading, style,
             ]}
             {...rest}
         >
-            {/* آیکون یا عکس سمت چپ */}
             {srcLeft && <Image source={srcLeft} style={styles.icon} />}
             {leftIcon && <View>{leftIcon}</View>}
-            {/* لودینگ */}
             {isLoading && <ActivityIndicator size="small" color={getActivityIndicatorColor()} />}
-            {/* متن دکمه */}
             {!noText && !!label && (
                 <BaseText type={size === "Small" ? "Subhead" : size === "Medium" ? "Subhead" : size === "Large" ? "Body" : "Title3"} color={getTextColor()} weight={size !== "XLarge" ? "400" : "600"} style={{ fontSize: currentSize.fontSize }}>
                     {label}
                 </BaseText>
             )}
-            {/* آیکون یا عکس سمت راست */}
             {rightIcon && <View>{rightIcon}</View>}
             {srcRight && <Image source={srcRight} style={styles.icon} />}
         </TouchableOpacity>

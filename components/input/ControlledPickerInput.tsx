@@ -32,10 +32,10 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
         bottomSheetRef.current?.dismiss();
     };
 
-    // تاریخ به فرمت خوانا برای کاربر
     const formatDateDisplay = (dateString?: string) => {
         if (!dateString) return "";
-        const d = new Date(dateString);
+        // Handle YYYY-MM-DD format
+        const d = new Date(dateString + "T00:00:00");
         return d.toLocaleDateString("en-US", {
             year: "numeric",
             month: "short",
@@ -95,10 +95,14 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                                         <DateTimePicker
                                             onDateSelected={(date) => {
                                                 setSelectedDate(date);
-                                                onChange(date.toISOString());
+                                                // Convert to YYYY-MM-DD format
+                                                const year = date.getFullYear();
+                                                const month = String(date.getMonth() + 1).padStart(2, "0");
+                                                const day = String(date.getDate()).padStart(2, "0");
+                                                onChange(`${year}-${month}-${day}`);
                                             }}
                                             displayedComponents="date"
-                                            initialDate={value || new Date().toISOString()}
+                                            initialDate={value ? new Date(value + "T00:00:00").toISOString() : new Date().toISOString()}
                                             variant="wheel"
                                         />
                                     </Host>

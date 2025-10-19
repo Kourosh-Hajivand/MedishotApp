@@ -2,6 +2,7 @@ import { AvatarIcon } from "@/assets/icons";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
+import { useCreatePatient } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
@@ -27,6 +28,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const patientData = params.patientData ? JSON.parse(params.patientData as string) : undefined;
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
+
+    // States for dynamic inputs
+    const [phones, setPhones] = useState<any[]>([]);
+    const [emails, setEmails] = useState<any[]>([]);
+    const [addresses, setAddresses] = useState<any[]>([]);
+    const [urls, setUrls] = useState<any[]>([]);
     const handleTakePhoto = () => {
         console.log("Take photo");
     };
@@ -54,10 +61,25 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const firstName = watch("first_name");
     const lastName = watch("last_name");
     const isFormValid = firstName.trim() !== "" && lastName.trim() !== "";
-
+    const { mutate: createPatient } = useCreatePatient();
     const onSubmit = (data: FormData) => {
         console.log("Form submitted with data:", data);
         console.log("Selected image:", selectedImage);
+        console.log("Phones:", phones);
+        console.log("Emails:", emails);
+        console.log("Addresses:", addresses);
+        console.log("URLs:", urls);
+
+        createPatient({
+            first_name: data.first_name,
+            last_name: data.last_name,
+            birth_date: data.birth_date,
+            gender: data.gender as "male" | "female" | "other",
+            numbers: phones,
+            email: emails?.[0]?.value,
+            addresses: addresses,
+            links: urls,
+        });
         // router.push({ pathname: "/(modals)/add-patient/review", params: { patientData: JSON.stringify(patientData ?? {}), photoUri: selectedImage || "" } });
     };
 
@@ -138,11 +160,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                         </View>
                     </View>
-                    <DynamicInputList config={phoneConfig} paramKey="phone" />
-                    <DynamicInputList config={emailConfig} paramKey="email" onChange={(e) => console.log(e)} />
-                    <DynamicInputList config={addressConfig} paramKey="address" onChange={(e) => console.log(e)} />
-                    {/* <DynamicInputList config={dateConfig} paramKey="date" /> */}
-                    <DynamicInputList config={urlConfig} paramKey="url" />
+                    <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} />
+                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} />
+                    <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} />
+                    <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} />
                 </View>
             </View>
         </ScrollView>

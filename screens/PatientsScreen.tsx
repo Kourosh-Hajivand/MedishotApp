@@ -1,5 +1,8 @@
 import HeaderWithMenu from "@/components/ui/HeaderWithMenu";
-import { useGetPatients } from "@/utils/hook/usePatient";
+import { Mockpatients } from "@/utils/data/PatientsData";
+import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
+import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
+import { router } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { GestureEvent, PanGestureHandler, PanGestureHandlerEventPayload, State } from "react-native-gesture-handler";
@@ -17,18 +20,29 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export const PatientsScreen: React.FC = () => {
     const { logout, profile } = useAuth();
 
-    const { data: patients } = useGetPatients();
+    // const { data: patients } = useGetPatients();
 
-    const groupedPatients = patients?.data.data.reduce(
+    // const groupedPatients = patients?.data.data.reduce(
+    //     (acc, patient) => {
+    //         const letter = patient.full_name[0].toUpperCase();
+    //         if (!acc[letter]) acc[letter] = [];
+    //         acc[letter].push(patient);
+    //         return acc;
+    //     },
+    //     {} as Record<string, { full_name: string }[]>,
+    // );
+
+    // استفاده از MockPatients برای تست
+    const groupedPatients = Mockpatients.reduce(
         (acc, patient) => {
-            const letter = patient.full_name[0].toUpperCase();
+            const letter = patient.name[0].toUpperCase();
             if (!acc[letter]) acc[letter] = [];
-            acc[letter].push(patient);
+            acc[letter].push({ full_name: patient.name });
             return acc;
         },
         {} as Record<string, { full_name: string }[]>,
     );
-    log.debug(patients);
+    log.debug(groupedPatients);
     const [search, setSearch] = useState("");
     const [stickyEnabled, setStickyEnabled] = useState(true);
     const scrollViewRef = useRef<SectionList>(null);
@@ -43,7 +57,7 @@ export const PatientsScreen: React.FC = () => {
     const [gestureStartY, setGestureStartY] = useState(0);
     const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
         (acc, letter) => {
-            const items = groupedPatients?.[letter].filter((p) => p.full_name.toLowerCase().includes(search.toLowerCase()));
+            const items = groupedPatients?.[letter]?.filter((p) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
             if (items && items.length > 0) acc[letter] = items;
             return acc;
         },
@@ -191,22 +205,41 @@ export const PatientsScreen: React.FC = () => {
                 </Animated.View>
 
                 <View style={styles.listContainer} className="flex-1 flex-row">
-                    <Animated.View style={[styles.scrollContainer, { transform: [{ translateY: scrollViewTranslateY }] }]} className="px-4 ">
-                        {sections.length > 0 ? (
+                    <Animated.View style={[styles.scrollContainer, { transform: [{ translateY: scrollViewTranslateY }] }]}>
+                        {Mockpatients.length > 0 ? (
                             <SectionList
                                 ref={scrollViewRef}
                                 sections={sections}
-                                keyExtractor={(item, index) => item.name + index}
+                                keyExtractor={(item, index) => item.full_name + index}
                                 stickySectionHeadersEnabled={stickyEnabled}
                                 showsVerticalScrollIndicator={false}
                                 contentContainerStyle={styles.sectionListContent}
                                 renderItem={({ item, index, section }) => (
-                                    <View key={`${section.title}-${index}`} style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]} className={`flex-row items-center gap-3 py-2 ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}>
-                                        <Avatar haveRing name={item.full_name} size={36} />
-                                        <BaseText type="Callout" weight={500} color="labels.primary">
-                                            {item.full_name}
-                                        </BaseText>
-                                    </View>
+                                    <Host style={{ flex: 1 }}>
+                                        <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
+                                            <ContextMenu.Items>
+                                                {/* Submenu 1: Sort By */}
+                                                <Button systemImage="creditcard">Add ID</Button>
+                                                <Button systemImage="camera">Take Photo</Button>
+                                                <Button systemImage="text.document">Fill Consent</Button>
+                                                <Button systemImage="message">Message</Button>
+                                                <Button systemImage="phone">Call</Button>
+                                            </ContextMenu.Items>
+                                            <ContextMenu.Trigger>
+                                                <TouchableOpacity
+                                                    onPress={() => router.push(`/patients/details/${item.id}`)}
+                                                    key={`${section.title}-${index}`}
+                                                    style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
+                                                    className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
+                                                >
+                                                    <Avatar haveRing name={item.full_name} size={36} />
+                                                    <BaseText type="Callout" weight={500} color="labels.primary">
+                                                        {item.full_name}
+                                                    </BaseText>
+                                                </TouchableOpacity>
+                                            </ContextMenu.Trigger>
+                                        </ContextMenu>
+                                    </Host>
                                 )}
                                 renderSectionHeader={({ section: { title } }) => (
                                     <View style={styles.sectionHeader} className="bg-white px-0">
@@ -316,10 +349,11 @@ const styles = StyleSheet.create({
     },
     scrollContainer: {
         flex: 1,
-        paddingHorizontal: spacing["4"],
+        // paddingHorizontal: spacing["4"],
     },
     sectionListContent: {
         flexGrow: 1,
+        paddingHorizontal: spacing["2"],
         paddingBottom: 120,
     },
     listItem: {

@@ -1,6 +1,7 @@
 import { useGoogleCallback } from "@/utils/hook";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Google from "expo-auth-session/providers/google";
+import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
@@ -20,7 +21,9 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
         shouldAutoExchangeCode: true,
         usePKCE: false,
     });
-    const { mutate: googleCallback } = useGoogleCallback();
+    const { mutate: googleCallback } = useGoogleCallback(() => {
+        router.replace("/(tabs)/patients");
+    });
     useEffect(() => {
         if (response?.type === "success") {
             const { authentication } = response;
@@ -33,9 +36,7 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
             });
-            console.log("====================================");
-            console.log(credential);
-            console.log("====================================");
+
             // appleCallback(credential.identityToken || "");
         } catch (e: any) {
             if (e.code === "ERR_CANCELED") return;
