@@ -95,6 +95,17 @@ export interface ResetPasswordResponse {
     message: string;
 }
 
+export interface ChangeEmailResponse {
+    success: true;
+    message: string;
+    data: People;
+}
+
+export interface ChangePasswordResponse {
+    success: true;
+    message: string;
+}
+
 // ============= OAuth Responses =============
 export interface OAuthRedirectResponse {
     redirect_url: string;
@@ -161,6 +172,59 @@ export interface PracticeMembersResponse {
     success: true;
     message: string;
     data: Member[];
+}
+
+export interface PracticeStatsResponse {
+    success: true;
+    message: string;
+    data: Array<{
+        date: string;
+        count: number;
+    }>;
+}
+
+export interface PracticeTag {
+    id: number;
+    practise_id: number;
+    name: string;
+    color?: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PracticeTagsResponse {
+    success: true;
+    message: string;
+    data: PracticeTag[];
+}
+
+export interface PracticeTagResponse {
+    success: true;
+    message: string;
+    data: PracticeTag;
+}
+
+export interface PracticeTemplate {
+    id: number;
+    practise_id: number;
+    name: string;
+    description?: string;
+    content?: object;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PracticeTemplatesResponse {
+    success: true;
+    message: string;
+    data: PracticeTemplate[];
+}
+
+export interface PracticeTemplateResponse {
+    success: true;
+    message: string;
+    data: PracticeTemplate;
 }
 
 // ============= Patient Responses =============
@@ -239,6 +303,18 @@ export interface PatientMediaDeleteResponse {
     success: true;
     message: string;
     data: string;
+}
+
+export interface PatientMediaTrashResponse {
+    success: true;
+    message: string;
+    data: PatientMedia[];
+}
+
+export interface PatientMediaRestoreResponse {
+    success: true;
+    message: string;
+    data: null;
 }
 
 // ============= File Upload Responses =============

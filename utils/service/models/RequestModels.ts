@@ -34,6 +34,17 @@ export interface ResetPasswordBody {
     password_confirmation: string;
 }
 
+export interface ChangeEmailBody {
+    email: string;
+    current_password: string;
+}
+
+export interface ChangePasswordBody {
+    current_password: string;
+    password: string;
+    password_confirmation: string;
+}
+
 // ============= Practice Models =============
 export interface PracticeMetadata {
     zipcode?: number;
@@ -70,6 +81,30 @@ export interface UpdateMemberRoleDto {
 
 export interface TransferOwnershipDto {
     new_owner_id: number;
+}
+
+export interface CreateTagDto {
+    name: string;
+    color?: string;
+}
+
+export interface UpdateTagDto {
+    name?: string;
+    color?: string;
+}
+
+export interface CreateTemplateDto {
+    name: string;
+    description?: string;
+    content?: object;
+    is_active?: boolean;
+}
+
+export interface UpdateTemplateDto {
+    name?: string;
+    description?: string;
+    content?: object;
+    is_active?: boolean;
 }
 
 // ============= Patient Models =============

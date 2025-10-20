@@ -1,5 +1,11 @@
+import { SearchGlyphIcon } from "@/assets/icons/index";
+import { BaseText, SearchBox } from "@/components";
+import Avatar from "@/components/avatar";
 import HeaderWithMenu from "@/components/ui/HeaderWithMenu";
+import { spacing } from "@/styles/spaces";
+import colors from "@/theme/colors.shared";
 import { Mockpatients } from "@/utils/data/PatientsData";
+import { useAuth } from "@/utils/hook/useAuth";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { router } from "expo-router";
@@ -7,17 +13,10 @@ import React, { useRef, useState } from "react";
 import { Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { GestureEvent, PanGestureHandler, PanGestureHandlerEventPayload, State } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { SearchGlyphIcon } from "../assets/icons/index";
-import { BaseText, SearchBox } from "../components";
-import Avatar from "../components/avatar";
-import { spacing } from "../styles/spaces";
-import colors from "../theme/colors.shared";
-import log from "../utils/helper/logger";
-import { useAuth } from "../utils/hook/useAuth";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-export const PatientsScreen: React.FC = () => {
+export default function PatientsScreen() {
     const { logout, profile } = useAuth();
 
     // const { data: patients } = useGetPatients();
@@ -42,7 +41,6 @@ export const PatientsScreen: React.FC = () => {
         },
         {} as Record<string, { full_name: string }[]>,
     );
-    log.debug(groupedPatients);
     const [search, setSearch] = useState("");
     const [stickyEnabled, setStickyEnabled] = useState(true);
     const scrollViewRef = useRef<SectionList>(null);
@@ -178,7 +176,7 @@ export const PatientsScreen: React.FC = () => {
     };
 
     return (
-        <SafeAreaView edges={["top"]} style={styles.container} className="flex-1 bg-white">
+        <SafeAreaView edges={["top"]} style={styles.container} className="flex-1 bg-red-500">
             <View style={styles.content} className="flex-1">
                 <Animated.View
                     style={[
@@ -190,7 +188,7 @@ export const PatientsScreen: React.FC = () => {
                     ]}
                     className="gap-4"
                 >
-                    <View style={styles.headerTop} className="flex-row items-center justify-between px-4">
+                    <View style={styles.headerTop} className="flex-row items-center justify-between bg px-4">
                         <HeaderWithMenu />
                     </View>
                     <View style={styles.titleContainer} className="gap-3 px-4 pb-4">
@@ -227,7 +225,7 @@ export const PatientsScreen: React.FC = () => {
                                             </ContextMenu.Items>
                                             <ContextMenu.Trigger>
                                                 <TouchableOpacity
-                                                    onPress={() => router.push(`/patients/details/${item.id}`)}
+                                                    onPress={() => router.push(`/(tabs)/patients/${item.id}`)}
                                                     key={`${section.title}-${index}`}
                                                     style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
                                                     className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
@@ -293,7 +291,7 @@ export const PatientsScreen: React.FC = () => {
             </View>
         </SafeAreaView>
     );
-};
+}
 
 const styles = StyleSheet.create({
     container: {

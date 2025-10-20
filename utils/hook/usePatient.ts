@@ -72,3 +72,11 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
         },
     });
 };
+
+export const useGetDoctorPatients = (page: number = 1, perPage: number = 15, enabled: boolean = true): UseQueryResult<PatientListResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetDoctorPatients", page, perPage],
+        queryFn: () => PatientService.getDoctorPatients(page, perPage),
+        enabled,
+    });
+};

@@ -1,4 +1,5 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { BlurView } from "expo-blur";
 import React from "react";
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,14 +24,24 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
     return (
         <View
             style={[
-                styles.container,
+                styles.wrapper,
                 tabBarStyle,
                 {
                     bottom: insets.bottom + 12,
                 },
             ]}
-            className="border border-system-gray5 px-4 py-2 rounded-full bg-white "
         >
+            <BlurView intensity={75} tint="extraLight" style={StyleSheet.absoluteFill} />
+
+            <View
+                style={{
+                    ...StyleSheet.absoluteFillObject,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: "rgba(0,0,0,0.08)",
+                }}
+            />
+
             <View style={styles.tabContainer} className="flex-row items-center gap-1">
                 {state.routes.map((route, index) => {
                     const { options } = descriptors[route.key];
@@ -43,7 +54,6 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
                             target: route.key,
                             canPreventDefault: true,
                         });
-
                         if (!isFocused && !event.defaultPrevented) {
                             navigation.navigate(route.name);
                         }
@@ -51,19 +61,17 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
 
                     const renderIcon = () => {
                         switch (routeName) {
-                            case "Patients":
                             case "patients":
-                                return <MenuIcon width={20} height={20} color={isFocused ? colors.system.blue : colors.labels.secondary} strokeWidth={0} />;
-                            case "Album":
+                                return <MenuIcon width={20} height={20} color={isFocused ? colors.system.blue : colors.labels.secondary} />;
                             case "album":
-                                return <GalleryWideIcon width={20} height={20} color={isFocused ? colors.system.blue : colors.labels.secondary} strokeWidth={0} />;
+                                return <GalleryWideIcon width={20} height={20} color={isFocused ? colors.system.blue : colors.labels.secondary} />;
                             default:
                                 return null;
                         }
                     };
 
                     return (
-                        <TouchableOpacity style={styles.tabButton} onPress={onPress} key={index}>
+                        <TouchableOpacity style={styles.tabButton} onPress={onPress} key={index} activeOpacity={0.7}>
                             <View style={styles.tabContent} className="items-center justify-center gap-1">
                                 {renderIcon()}
                                 <BaseText color={isFocused ? "system.blue" : "labels.secondary"} type="Caption1" className="capitalize">
@@ -81,15 +89,14 @@ const CustomTabBar: React.FC<CustomTabBarProps> = ({ state, descriptors, navigat
 };
 
 const styles = StyleSheet.create({
-    container: {
+    wrapper: {
         position: "absolute",
         alignSelf: "center",
-        borderWidth: 1,
-        borderColor: colors.system.gray5,
+        borderRadius: 999,
+        overflow: "hidden",
         paddingHorizontal: spacing["4"],
         paddingVertical: spacing["2"],
-        borderRadius: 999,
-        backgroundColor: colors.background,
+        backdropFilter: "blur(20px)" as any,
     },
     tabContainer: {
         flexDirection: "row",

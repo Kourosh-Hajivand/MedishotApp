@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
-import { AddMemberDto, CreatePracticeDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse } from "@/utils/service/models/ResponseModels";
+import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
+import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 
 // ============= Query Hooks (GET) =============
@@ -162,6 +162,166 @@ export const useTransferOwnership = (onSuccess?: (data: ApiResponse<any>) => voi
             });
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeById", variables.practiceId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+// ============= Practice Statistics =============
+
+export const useGetPatientsCount = (practiceId: number, type: string, enabled: boolean = true): UseQueryResult<PracticeStatsResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetPatientsCount", practiceId, type],
+        queryFn: () => PracticeService.getPatientsCount(practiceId, type),
+        enabled: enabled && !!practiceId,
+    });
+};
+
+// ============= Practice Tags =============
+
+export const useGetPracticeTags = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeTagsResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetPracticeTags", practiceId],
+        queryFn: () => PracticeService.getTags(practiceId),
+        enabled: enabled && !!practiceId,
+    });
+};
+
+export const useGetPracticeTag = (practiceId: number, tagId: number, enabled: boolean = true): UseQueryResult<PracticeTagResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetPracticeTag", practiceId, tagId],
+        queryFn: () => PracticeService.getTag(practiceId, tagId),
+        enabled: enabled && !!practiceId && !!tagId,
+    });
+};
+
+export const useCreatePracticeTag = (onSuccess?: (data: PracticeTagResponse) => void, onError?: (error: Error) => void): UseMutationResult<PracticeTagResponse, Error, { practiceId: number; data: CreateTagDto }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, data }: { practiceId: number; data: CreateTagDto }) => PracticeService.createTag(practiceId, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTags", variables.practiceId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUpdatePracticeTag = (onSuccess?: (data: PracticeTagResponse) => void, onError?: (error: Error) => void): UseMutationResult<PracticeTagResponse, Error, { practiceId: number; tagId: number; data: UpdateTagDto }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, tagId, data }: { practiceId: number; tagId: number; data: UpdateTagDto }) => PracticeService.updateTag(practiceId, tagId, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTags", variables.practiceId],
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTag", variables.practiceId, variables.tagId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useDeletePracticeTag = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; tagId: number }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, tagId }: { practiceId: number; tagId: number }) => PracticeService.deleteTag(practiceId, tagId),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTags", variables.practiceId],
+            });
+            queryClient.removeQueries({
+                queryKey: ["GetPracticeTag", variables.practiceId, variables.tagId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+// ============= Practice Templates =============
+
+export const useGetPracticeTemplates = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeTemplatesResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetPracticeTemplates", practiceId],
+        queryFn: () => PracticeService.getTemplates(practiceId),
+        enabled: enabled && !!practiceId,
+    });
+};
+
+export const useGetPracticeTemplate = (practiceId: number, templateId: number, enabled: boolean = true): UseQueryResult<PracticeTemplateResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetPracticeTemplate", practiceId, templateId],
+        queryFn: () => PracticeService.getTemplate(practiceId, templateId),
+        enabled: enabled && !!practiceId && !!templateId,
+    });
+};
+
+export const useCreatePracticeTemplate = (onSuccess?: (data: PracticeTemplateResponse) => void, onError?: (error: Error) => void): UseMutationResult<PracticeTemplateResponse, Error, { practiceId: number; data: CreateTemplateDto }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, data }: { practiceId: number; data: CreateTemplateDto }) => PracticeService.createTemplate(practiceId, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTemplates", variables.practiceId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUpdatePracticeTemplate = (onSuccess?: (data: PracticeTemplateResponse) => void, onError?: (error: Error) => void): UseMutationResult<PracticeTemplateResponse, Error, { practiceId: number; templateId: number; data: UpdateTemplateDto }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, templateId, data }: { practiceId: number; templateId: number; data: UpdateTemplateDto }) => PracticeService.updateTemplate(practiceId, templateId, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTemplates", variables.practiceId],
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTemplate", variables.practiceId, variables.templateId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useDeletePracticeTemplate = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; templateId: number }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, templateId }: { practiceId: number; templateId: number }) => PracticeService.deleteTemplate(practiceId, templateId),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPracticeTemplates", variables.practiceId],
+            });
+            queryClient.removeQueries({
+                queryKey: ["GetPracticeTemplate", variables.practiceId, variables.templateId],
             });
             onSuccess?.(data);
         },

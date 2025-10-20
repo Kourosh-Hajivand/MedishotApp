@@ -1,6 +1,6 @@
 import MediaService from "@/utils/service/MediaService";
 import { UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
-import { PatientMediaDeleteResponse, PatientMediaListResponse, PatientMediaUploadResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
+import { PatientMediaDeleteResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 
 // ============= Query Hooks (GET) =============
@@ -53,6 +53,31 @@ export const useTempUpload = (onSuccess?: (data: TempUploadResponse) => void, on
     return useMutation({
         mutationFn: (file: File) => MediaService.tempUpload(file),
         onSuccess: (data) => {
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useGetTrashMedia = (patientId: number | string, enabled: boolean = true): UseQueryResult<PatientMediaTrashResponse, Error> => {
+    return useQuery({
+        queryKey: ["GetTrashMedia", patientId],
+        queryFn: () => MediaService.getTrashMedia(patientId),
+        enabled: enabled && !!patientId,
+    });
+};
+
+export const useRestoreMedia = (onSuccess?: (data: PatientMediaRestoreResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaRestoreResponse, Error, number | string> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (mediaId: number | string) => MediaService.restoreMedia(mediaId),
+        onSuccess: (data, mediaId) => {
+            // Invalidate all media queries to refresh the lists
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            queryClient.invalidateQueries({ queryKey: ["GetTrashMedia"] });
             onSuccess?.(data);
         },
         onError: (error) => {

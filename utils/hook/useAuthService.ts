@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
-import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
-import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
+import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
+import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { getTokens } from "../helper/tokenStorage";
 
@@ -183,6 +183,33 @@ export const useResetPassword = (onSuccess?: (data: ResetPasswordResponse) => vo
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useChangeEmail = (onSuccess?: (data: ChangeEmailResponse) => void, onError?: (error: Error) => void): UseMutationResult<ChangeEmailResponse, Error, ChangeEmailBody> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: ChangeEmailBody) => AuthService.changeEmail(data),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useChangePassword = (onSuccess?: (data: ChangePasswordResponse) => void, onError?: (error: Error) => void): UseMutationResult<ChangePasswordResponse, Error, ChangePasswordBody> => {
+    return useMutation({
+        mutationFn: (data: ChangePasswordBody) => AuthService.changePassword(data),
+        onSuccess: (data) => {
             onSuccess?.(data);
         },
         onError: (error) => {

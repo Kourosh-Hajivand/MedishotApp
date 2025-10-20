@@ -1,24 +1,37 @@
-import { Tabs, useRouter } from "expo-router";
+import CustomTabBar from "@/components/navigation/CustomTabBar";
+import { Tabs, useRouter, useSegments } from "expo-router";
 import React from "react";
-import CustomTabBar from "../../components/navigation/CustomTabBar";
 
 export default function TabsLayout() {
     const router = useRouter();
+
+    const segments = useSegments() as string[];
+
+    const isPatientDetail = segments.includes("patients") && segments.length > 2;
 
     const handleAddPatient = () => {
         router.push("/(modals)/add-patient/form");
     };
 
     return (
-        <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <CustomTabBar {...(props as any)} onAddPress={handleAddPatient} />} initialRouteName="patients">
+        <Tabs
+            initialRouteName="patients"
+            screenOptions={{
+                headerShown: false,
+                tabBarStyle: {
+                    display: isPatientDetail ? "none" : "flex",
+                },
+            }}
+            tabBar={(props) => <CustomTabBar {...(props as any)} onAddPress={handleAddPatient} />}
+        >
             <Tabs.Screen
-                name="Album"
+                name="album"
                 options={{
                     tabBarLabel: "Album",
                 }}
             />
             <Tabs.Screen
-                name="Patients"
+                name="patients"
                 options={{
                     tabBarLabel: "Patients",
                 }}

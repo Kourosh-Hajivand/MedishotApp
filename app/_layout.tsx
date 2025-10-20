@@ -1,13 +1,11 @@
-import "react-native-gesture-handler";
-import "react-native-reanimated";
-
 import TenstackProvider from "@/utils/Providers/TenstackProvider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { enableScreens } from "react-native-screens";
-
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import "react-native-reanimated";
+import { enableScreens } from "react-native-screens";
 import ToastManager from "toastify-react-native";
 import "./global.css";
 

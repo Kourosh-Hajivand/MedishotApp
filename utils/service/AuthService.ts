@@ -2,12 +2,13 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { storeTokens } from "../helper/tokenStorage";
-import { CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "./models/RequestModels";
-import { AppleConfigResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "./models/ResponseModels";
+import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "./models/RequestModels";
+import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
     auth: { login, initiateRegistration, completeRegistration, logout, me, updateProfile, forgetPassword, verifyOtpCode, resetPassword, google, googleCallback, apple, appleCallback, appleConfig },
+    profile: { changeEmail, changePassword },
 } = routes;
 
 export const AuthService = {
@@ -189,6 +190,31 @@ export const AuthService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Apple config fetch failed");
+            }
+            throw error;
+        }
+    },
+
+    // Profile Management
+    changeEmail: async (body: ChangeEmailBody): Promise<ChangeEmailResponse> => {
+        try {
+            const response: AxiosResponse<ChangeEmailResponse> = await axiosInstance.post(baseUrl + changeEmail(), body);
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Change email failed");
+            }
+            throw error;
+        }
+    },
+
+    changePassword: async (body: ChangePasswordBody): Promise<ChangePasswordResponse> => {
+        try {
+            const response: AxiosResponse<ChangePasswordResponse> = await axiosInstance.post(baseUrl + changePassword(), body);
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Change password failed");
             }
             throw error;
         }
