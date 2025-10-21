@@ -5,29 +5,29 @@ import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResul
 
 // ============= Query Hooks (GET) =============
 
-export const useGetPatients = (page: number = 1, perPage: number = 15, enabled: boolean = true): UseQueryResult<PatientListResponse, Error> => {
+export const useGetPatients = (practiseId?: string | number, page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
     return useQuery({
-        queryKey: ["GetPatients", page, perPage],
-        queryFn: () => PatientService.getPatients(page, perPage),
-        enabled,
+        queryKey: ["GetPatients", practiseId, page, perPage],
+        queryFn: () => PatientService.getPatients(practiseId!, page, perPage),
+        enabled: !!practiseId,
     });
 };
 
-export const useGetPatientById = (patientId: number | string, enabled: boolean = true): UseQueryResult<PatientDetailResponse, Error> => {
+export const useGetPatientById = (patientId: number | string): UseQueryResult<PatientDetailResponse, Error> => {
     return useQuery({
         queryKey: ["GetPatientById", patientId],
         queryFn: () => PatientService.getPatientById(patientId),
-        enabled: enabled && !!patientId,
+        enabled: !!patientId,
     });
 };
 
 // ============= Mutation Hooks (POST/PUT/DELETE) =============
 
-export const useCreatePatient = (onSuccess?: (data: PatientDetailResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientDetailResponse, Error, CreatePatientRequest> => {
+export const useCreatePatient = (practiseId: string | number, onSuccess?: (data: PatientDetailResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientDetailResponse, Error, CreatePatientRequest> => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: CreatePatientRequest) => PatientService.createPatient(data),
+        mutationFn: (data: CreatePatientRequest) => PatientService.createPatient(practiseId, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
             onSuccess?.(data);
@@ -73,10 +73,9 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
     });
 };
 
-export const useGetDoctorPatients = (page: number = 1, perPage: number = 15, enabled: boolean = true): UseQueryResult<PatientListResponse, Error> => {
+export const useGetDoctorPatients = (page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
     return useQuery({
         queryKey: ["GetDoctorPatients", page, perPage],
         queryFn: () => PatientService.getDoctorPatients(page, perPage),
-        enabled,
     });
 };

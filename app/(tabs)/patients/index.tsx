@@ -5,7 +5,9 @@ import HeaderWithMenu from "@/components/ui/HeaderWithMenu";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
 import { Mockpatients } from "@/utils/data/PatientsData";
+import { useGetDoctorPatients, useGetPatients } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { router } from "expo-router";
@@ -18,8 +20,10 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function PatientsScreen() {
     const { logout, profile } = useAuth();
+    const { selectedPractice, selectedProfile } = useProfileStore();
 
-    // const { data: patients } = useGetPatients();
+    const { data: patients } = useGetPatients(1, 30, selectedPractice?.id);
+    const { data: doctorPatients } = useGetDoctorPatients();
 
     // const groupedPatients = patients?.data.data.reduce(
     //     (acc, patient) => {

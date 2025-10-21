@@ -6,15 +6,14 @@ import { ApiResponse, PatientDetailResponse, PatientListResponse } from "./model
 
 const {
     baseUrl,
-    patients: { list, create, getById, update, delete: deleteRoute },
-    doctor: { getPatients: getDoctorPatients },
+    patients: { list, create, doctorList, getById, update, delete: deleteRoute },
 } = routes;
 
 const PatientService = {
     // Patient Management
-    getPatients: async (page: number = 1, perPage: number = 15): Promise<PatientListResponse> => {
+    getPatients: async (practiseId: string | number, page: number = 1, perPage: number = 15): Promise<PatientListResponse> => {
         try {
-            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + list(), {
+            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + list(practiseId), {
                 params: { page, per_page: perPage },
             });
             return response.data;
@@ -27,7 +26,7 @@ const PatientService = {
         }
     },
 
-    createPatient: async (payload: CreatePatientRequest): Promise<PatientDetailResponse> => {
+    createPatient: async (practiseId: string | number, payload: CreatePatientRequest): Promise<PatientDetailResponse> => {
         try {
             const formData = new FormData();
 
@@ -84,7 +83,7 @@ const PatientService = {
                 formData.append("image", payload.image);
             }
 
-            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + create(), formData, {
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + create(practiseId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -199,7 +198,7 @@ const PatientService = {
     // Doctor Patients
     getDoctorPatients: async (page: number = 1, perPage: number = 15): Promise<PatientListResponse> => {
         try {
-            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + getDoctorPatients(), {
+            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + doctorList(), {
                 params: { page, per_page: perPage },
             });
             return response.data;

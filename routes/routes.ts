@@ -59,8 +59,9 @@ export const routes = {
     },
 
     patients: {
-        list: () => "patients",
-        create: () => "patients",
+        list: (practiseId: string | number) => `${practiseId}/patients`,
+        create: (practiseId: string | number) => `${practiseId}/patients`,
+        doctorList: () => `doctor/patients`,
         getById: (patientId: string | number) => `patients/${patientId}`,
         update: (patientId: string | number) => `patients/${patientId}`,
         delete: (patientId: string | number) => `patients/${patientId}`,
