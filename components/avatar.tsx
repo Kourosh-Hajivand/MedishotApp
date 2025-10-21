@@ -20,12 +20,12 @@ export default function Avatar({ name, imageUrl, size = 48, haveRing = false, ro
         .join("");
 
     if (imageUrl) {
-        return <Image source={{ uri: imageUrl }} style={[styles.image, { width: size, height: size, borderRadius: rounded }]} className="rounded-full" resizeMode="cover" />;
+        return <Image source={{ uri: imageUrl }} style={[styles.image, { width: size, height: size, borderRadius: rounded }]} resizeMode="cover" />;
     }
 
     return (
         <View style={[styles.container, { width: size, height: size, borderRadius: rounded, overflow: "hidden" }]} className={haveRing ? `p-[2px] border-2 border-system-blue ` : ""}>
-            <LinearGradient colors={["#C7C7CC", "#8E8E93"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={styles.gradient}>
+            <LinearGradient colors={["#C7C7CC", "#8E8E93"]} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={{ borderRadius: rounded, width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}>
                 <Text className="text-white font-semibold" style={[styles.text, { fontSize: size * (haveRing ? 0.3 : 0.4) }]}>
                     {initials}
                 </Text>
@@ -46,8 +46,6 @@ const styles = StyleSheet.create({
     gradient: {
         width: "100%",
         height: "100%",
-        borderRadius: 99,
-        overflow: "hidden",
         justifyContent: "center",
         alignItems: "center",
     },

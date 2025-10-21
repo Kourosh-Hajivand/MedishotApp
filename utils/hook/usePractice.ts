@@ -6,10 +6,11 @@ import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResul
 
 // ============= Query Hooks (GET) =============
 
-export const useGetPracticeList = (): UseQueryResult<PracticeListResponse, Error> => {
+export const useGetPracticeList = (enabled: boolean = true): UseQueryResult<PracticeListResponse, Error> => {
     return useQuery({
         queryKey: ["GetPracticeList"],
         queryFn: () => PracticeService.getPracticeList(),
+        enabled,
     });
 };
 
