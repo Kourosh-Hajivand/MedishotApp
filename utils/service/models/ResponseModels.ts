@@ -246,6 +246,11 @@ export interface PatientMetadata {
     chart_number?: string;
 }
 
+export interface PatientContact {
+    type: string;
+    value: string;
+}
+
 export interface Patient {
     id: number;
     first_name: string;
@@ -255,7 +260,7 @@ export interface Patient {
     gender: "male" | "female" | "other" | null;
     national_id?: string;
     email: string[];
-    numbers: string[];
+    numbers: PatientContact[];
     addresses: string[];
     links: string[];
     metadata?: PatientMetadata;
@@ -269,7 +274,13 @@ export interface Patient {
 export interface PatientListResponse {
     success: true;
     message: string;
-    data: PaginatedResponse<Patient>;
+    data: Patient[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number;
+    to: number;
 }
 
 export interface PatientDetailResponse {

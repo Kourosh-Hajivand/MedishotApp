@@ -2,6 +2,8 @@ import { BaseButton, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { useGetPatientById } from "@/utils/hook";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
@@ -12,6 +14,9 @@ export default function PatientDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
     const safeAreaInsets = useSafeAreaInsets();
+    const { data: patient } = useGetPatientById(id);
+    console.log("id", id);
+    console.log(patient?.data.numbers);
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
@@ -31,7 +36,11 @@ export default function PatientDetailsScreen() {
 
     // توابع برای تماس و پیام
     const handleCall = async () => {
-        const phoneNumber = "+12321488254"; // شماره تلفن بیمار
+        const phoneNumber = patient?.data?.numbers?.[0]?.value;
+        if (!phoneNumber) {
+            Alert.alert("Error", "No phone number found");
+            return;
+        }
         const url = `tel:${phoneNumber}`;
 
         try {
@@ -47,7 +56,11 @@ export default function PatientDetailsScreen() {
     };
 
     const handleMessage = async () => {
-        const phoneNumber = "+12321488254"; // شماره تلفن بیمار
+        const phoneNumber = patient?.data?.numbers?.[0]?.value;
+        if (!phoneNumber) {
+            Alert.alert("Error", "No phone number found");
+            return;
+        }
         const url = `sms:${phoneNumber}`;
 
         try {
@@ -90,13 +103,11 @@ export default function PatientDetailsScreen() {
         extrapolate: "clamp",
     });
 
-    // اتصال اسکرول به شدت Blur
     useEffect(() => {
         scrollY.addListener(({ value }) => blurValue.setValue(value));
         return () => scrollY.removeAllListeners();
     }, []);
 
-    // تغییر عنوان بالای صفحه با اسکرول
     useEffect(() => {
         const listener = scrollY.addListener(({ value }) => {
             navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? "John Doe" : "" });
@@ -125,15 +136,15 @@ export default function PatientDetailsScreen() {
                             alignItems: "center",
                         }}
                     >
-                        <Avatar name="John Doe" size={100} haveRing />
+                        <Avatar name={patient?.data.first_name + " " + patient?.data.last_name} size={100} haveRing imageUrl={patient?.data.profile_image?.url} />
                     </Animated.View>
 
                     <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
                         <BaseText type="Title1" weight={600} color="labels.primary">
-                            John Doe
+                            {patient?.data.first_name} {patient?.data.last_name}
                         </BaseText>
                         <BaseText type="Callout" weight={400} color="labels.secondary">
-                            last update: yesterday
+                            last update: {patient?.data.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
                         </BaseText>
                     </Animated.View>
                 </View>
@@ -164,14 +175,16 @@ export default function PatientDetailsScreen() {
                     {/* --- Info Card --- */}
                     <View className="bg-white py-2 px-4 rounded-xl">
                         <View className="flex-row items-center justify-between pb-2 border-b border-border">
-                            <View>
-                                <BaseText type="Subhead" color="labels.secondary">
-                                    Phone
-                                </BaseText>
-                                <BaseText type="Subhead" color="labels.primary">
-                                    +1 (232) 148-8254
-                                </BaseText>
-                            </View>
+                            {patient?.data.numbers && (
+                                <View>
+                                    <BaseText type="Subhead" color="labels.secondary">
+                                        Phone
+                                    </BaseText>
+                                    <BaseText type="Subhead" color="labels.primary">
+                                        {patient?.data.numbers[0].value}
+                                    </BaseText>
+                                </View>
+                            )}
                             <View className="flex-row gap-3">
                                 <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleMessage} />
                                 <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleCall} />
@@ -184,7 +197,7 @@ export default function PatientDetailsScreen() {
                                     assigned to:
                                 </BaseText>
                                 <BaseText type="Subhead" color="labels.primary">
-                                    Dr. Bahrami
+                                    Dr.{patient?.data.doctor?.first_name} {patient?.data.doctor?.last_name}
                                 </BaseText>
                             </View>
                             <View className="flex-1 pl-3">
@@ -192,7 +205,7 @@ export default function PatientDetailsScreen() {
                                     chart number:
                                 </BaseText>
                                 <BaseText type="Subhead" color="labels.primary">
-                                    #23122
+                                    #{patient?.data.metadata?.chart_number}
                                 </BaseText>
                             </View>
                         </View>

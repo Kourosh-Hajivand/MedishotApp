@@ -16,6 +16,9 @@ const PatientService = {
             const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + list(practiseId), {
                 params: { page, per_page: perPage },
             });
+            console.log("==============baseUrl + list(practiseId)======================");
+            console.log(baseUrl + list(practiseId));
+            console.log("====================================");
             return response.data;
         } catch (error) {
             console.error("Error in GetPatients:", error);

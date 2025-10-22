@@ -4,47 +4,38 @@ import Avatar from "@/components/avatar";
 import HeaderWithMenu from "@/components/ui/HeaderWithMenu";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
-import { Mockpatients } from "@/utils/data/PatientsData";
+import { openCallForPatient, openMessageForPatient } from "@/utils/helper/communication";
 import { useGetDoctorPatients, useGetPatients } from "@/utils/hook";
-import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
+import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { router } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { GestureEvent, PanGestureHandler, PanGestureHandlerEventPayload, State } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function PatientsScreen() {
-    const { logout, profile } = useAuth();
     const { selectedPractice, selectedProfile } = useProfileStore();
 
-    const { data: patients } = useGetPatients(1, 30, selectedPractice?.id);
-    const { data: doctorPatients } = useGetDoctorPatients();
+    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, 1, 30);
+    const { data: doctorPatients, isLoading: isDoctorPatientsLoading } = useGetDoctorPatients(1, 30);
 
-    // const groupedPatients = patients?.data.data.reduce(
-    //     (acc, patient) => {
-    //         const letter = patient.full_name[0].toUpperCase();
-    //         if (!acc[letter]) acc[letter] = [];
-    //         acc[letter].push(patient);
-    //         return acc;
-    //     },
-    //     {} as Record<string, { full_name: string }[]>,
-    // );
+    const currentPatients = selectedProfile === "profile" ? doctorPatients?.data : patients?.data;
+    const isLoading = selectedProfile === "profile" ? isDoctorPatientsLoading : isPatientsLoading;
 
-    // استفاده از MockPatients برای تست
-    const groupedPatients = Mockpatients.reduce(
-        (acc, patient) => {
-            const letter = patient.name[0].toUpperCase();
-            if (!acc[letter]) acc[letter] = [];
-            acc[letter].push({ full_name: patient.name });
-            return acc;
-        },
-        {} as Record<string, { full_name: string }[]>,
-    );
+    const groupedPatients =
+        currentPatients?.reduce(
+            (acc: Record<string, { full_name: string; id: number }[]>, patient: any) => {
+                const letter = patient.full_name[0].toUpperCase();
+                if (!acc[letter]) acc[letter] = [];
+                acc[letter].push(patient);
+                return acc;
+            },
+            {} as Record<string, { full_name: string; id: number }[]>,
+        ) || {};
     const [search, setSearch] = useState("");
     const [stickyEnabled, setStickyEnabled] = useState(true);
     const scrollViewRef = useRef<SectionList>(null);
@@ -59,11 +50,11 @@ export default function PatientsScreen() {
     const [gestureStartY, setGestureStartY] = useState(0);
     const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
         (acc, letter) => {
-            const items = groupedPatients?.[letter]?.filter((p) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
+            const items = groupedPatients?.[letter]?.filter((p: any) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
             if (items && items.length > 0) acc[letter] = items;
             return acc;
         },
-        {} as Record<string, { full_name: string }[]>,
+        {} as Record<string, { full_name: string; id: number }[]>,
     );
 
     const sections = Object.keys(filteredGroupedPatients)
@@ -197,7 +188,7 @@ export default function PatientsScreen() {
                     </View>
                     <View style={styles.titleContainer} className="gap-3 px-4 pb-4">
                         <BaseText type="LargeTitle" weight={700} color="labels.primary">
-                            Patients
+                            {selectedProfile === "profile" ? "My Patients" : "Patients"}
                         </BaseText>
                     </View>
                 </Animated.View>
@@ -208,7 +199,14 @@ export default function PatientsScreen() {
 
                 <View style={styles.listContainer} className="flex-1 flex-row">
                     <Animated.View style={[styles.scrollContainer, { transform: [{ translateY: scrollViewTranslateY }] }]}>
-                        {Mockpatients.length > 0 ? (
+                        {isLoading ? (
+                            <View style={styles.loadingContainer} className="flex-1 items-center justify-center">
+                                <ActivityIndicator size="large" color="#007AFF" />
+                                <BaseText type="Body" color="labels.secondary" weight={500} style={{ marginTop: 8 }}>
+                                    Loading patients...
+                                </BaseText>
+                            </View>
+                        ) : currentPatients && currentPatients.length > 0 ? (
                             <SectionList
                                 ref={scrollViewRef}
                                 sections={sections}
@@ -224,8 +222,45 @@ export default function PatientsScreen() {
                                                 <Button systemImage="creditcard">Add ID</Button>
                                                 <Button systemImage="camera">Take Photo</Button>
                                                 <Button systemImage="text.document">Fill Consent</Button>
-                                                <Button systemImage="message">Message</Button>
-                                                <Button systemImage="phone">Call</Button>
+                                                {item.numbers && item.numbers.length > 0 ? (
+                                                    <Submenu button={<Button systemImage="message">Message</Button>}>
+                                                        {item.numbers.map((number: any, index: number) => {
+                                                            // Handle both string and object formats
+                                                            const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                            const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+
+                                                            return (
+                                                                <Button key={`message-${index}-${phoneNumber}`} systemImage="message" onPress={() => openMessageForPatient([phoneNumber])}>
+                                                                    {phoneType}: {phoneNumber}
+                                                                </Button>
+                                                            );
+                                                        })}
+                                                    </Submenu>
+                                                ) : (
+                                                    <Button systemImage="message" onPress={() => openMessageForPatient(item.numbers)}>
+                                                        Message
+                                                    </Button>
+                                                )}
+
+                                                {item.numbers && item.numbers.length > 0 ? (
+                                                    <Submenu button={<Button systemImage="phone">Call</Button>}>
+                                                        {item.numbers.map((number: any, index: number) => {
+                                                            // Handle both string and object formats
+                                                            const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                            const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+
+                                                            return (
+                                                                <Button key={`call-${index}-${phoneNumber}`} systemImage="phone" onPress={() => openCallForPatient([phoneNumber])}>
+                                                                    {phoneType}: {phoneNumber}
+                                                                </Button>
+                                                            );
+                                                        })}
+                                                    </Submenu>
+                                                ) : (
+                                                    <Button systemImage="phone" onPress={() => openCallForPatient(item.numbers)}>
+                                                        Call
+                                                    </Button>
+                                                )}
                                             </ContextMenu.Items>
                                             <ContextMenu.Trigger>
                                                 <TouchableOpacity
@@ -396,5 +431,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         gap: spacing["1"],
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing["2"],
     },
 });
