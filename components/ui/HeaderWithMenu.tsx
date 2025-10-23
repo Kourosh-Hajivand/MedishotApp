@@ -59,9 +59,9 @@ export default function HeaderWithMenu() {
                             <Switch key={index} label={practice.name} variant="switch" value={selectedProfile === "practice" && selectedPractice?.id === practice.id} onValueChange={() => setSelectedProfile("practice", practice)} />
                         ))}
 
-                        {/* <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
+                        <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
                             Logout
-                        </Button> */}
+                        </Button>
                     </ContextMenu.Items>
 
                     <ContextMenu.Trigger>

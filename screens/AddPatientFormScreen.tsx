@@ -9,7 +9,6 @@ import TextRecognition from "react-native-text-recognition";
 import { BaseButton, BaseText } from "../components";
 import { AddPatientStackParamList } from "../navigation/AddPatientModalNavigator";
 import { spacing } from "../styles/spaces";
-import colors from "../theme/colors.shared";
 
 export const AddPatientFormScreen: React.FC = () => {
     const navigation = useNavigation<NativeStackNavigationProp<AddPatientStackParamList>>();
@@ -45,8 +44,8 @@ export const AddPatientFormScreen: React.FC = () => {
     };
 
     return (
-        <SafeAreaView style={styles.container} className="flex-1 items-center justify-between bg-white">
-            <View style={styles.mainContent} className="mt-[15%] flex-1 items-center gap-16">
+        <SafeAreaView className="flex-1 items-center justify-center  gap-24 ">
+            <View className=" items-center gap-10">
                 <View style={[styles.imageContainer, { width: imageWidth, height: imageHeight }]}>{scannedImage ? <Image resizeMode="contain" source={{ uri: scannedImage }} style={styles.image} /> : <Image resizeMode="contain" source={require("../assets/png/AddPatient.png")} style={styles.image} />}</View>
 
                 <View style={styles.textContainer} className="gap-6">
@@ -67,27 +66,15 @@ export const AddPatientFormScreen: React.FC = () => {
                 )}
             </View>
 
-            <View style={styles.buttonContainer} className="mb-[10%] w-full gap-4 px-10">
-                <BaseButton label="Scan The ID" size="Large" ButtonStyle="Filled" onPress={scanDocument} />
-                <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(modals)/add-patient/photo")} />
+            <View className="w-full gap-4 px-10">
+                <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
+                <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(tabs)/(modals)/add-patient/photo")} />
             </View>
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-        alignItems: "center",
-        justifyContent: "space-between",
-    },
-    mainContent: {
-        gap: spacing["16"],
-        flex: 1,
-        alignItems: "center",
-        marginTop: "15%",
-    },
     imageContainer: {
         width: 0,
         height: 0,
@@ -99,11 +86,5 @@ const styles = StyleSheet.create({
     textContainer: {
         gap: spacing["6"],
         alignItems: "center",
-    },
-    buttonContainer: {
-        gap: spacing["4"],
-        width: "100%",
-        paddingHorizontal: spacing["10"],
-        marginBottom: "10%",
     },
 });

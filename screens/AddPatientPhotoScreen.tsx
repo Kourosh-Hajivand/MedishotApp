@@ -3,6 +3,7 @@ import { ControlledPickerInput } from "@/components/input/ControlledPickerInput"
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { useCreatePatient } from "@/utils/hook";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
@@ -57,11 +58,14 @@ export const AddPatientPhotoScreen: React.FC = () => {
             gender: "",
         },
     });
-
+    const { selectedPractice } = useProfileStore();
     const firstName = watch("first_name");
     const lastName = watch("last_name");
-    const isFormValid = firstName.trim() !== "" && lastName.trim() !== "";
-    const { mutate: createPatient } = useCreatePatient();
+    const birthDate = watch("birth_date");
+    const gender = watch("gender");
+
+    const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
+    const { mutate: createPatient } = useCreatePatient(selectedPractice?.id ?? "");
     const onSubmit = (data: FormData) => {
         console.log("Form submitted with data:", data);
         console.log("Selected image:", selectedImage);
@@ -70,20 +74,74 @@ export const AddPatientPhotoScreen: React.FC = () => {
         console.log("Addresses:", addresses);
         console.log("URLs:", urls);
 
-        createPatient({
+        const phoneNumbers = phones
+            .filter((phone) => phone.value && phone.value.trim() !== "")
+            .map((phone) => ({
+                type: phone.label,
+                value: phone.value,
+            }));
+
+        const emailAddresses = emails
+            .filter((email) => email.value && email.value.trim() !== "")
+            .map((email) => ({
+                type: email.label,
+                value: email.value,
+            }));
+
+        const addressList = addresses
+            .filter((address) => address.value && (typeof address.value === "object" ? Object.values(address.value).some((val) => val && typeof val === "string" && val.trim() !== "") : typeof address.value === "string" && address.value.trim() !== ""))
+            .map((address) => ({
+                type: address.label,
+                value:
+                    typeof address.value === "object"
+                        ? address.value
+                        : {
+                              street: address.value as string,
+                              city: "",
+                              state: "",
+                              zip: "",
+                              country: "",
+                          },
+            }));
+
+        const urlLinks = urls
+            .filter((url) => url.value && url.value.trim() !== "")
+            .map((url) => ({
+                type: url.label,
+                value: url.value,
+            }));
+
+        const patientData = {
             first_name: data.first_name,
             last_name: data.last_name,
             birth_date: data.birth_date,
             gender: data.gender as "male" | "female" | "other",
-            numbers: phones,
-            email: emails?.[0]?.value,
-            addresses: addresses,
-            links: urls,
+            numbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
+            email: emailAddresses.length > 0 ? emailAddresses[0].value : undefined,
+            addresses: addressList.length > 0 ? addressList : undefined,
+            links: urlLinks.length > 0 ? urlLinks : undefined,
+            image: selectedImage || undefined,
+        };
+
+        console.log("Final patient data to submit:", patientData);
+
+        createPatient(patientData, {
+            onSuccess: (response) => {
+                console.log("Patient created successfully:", response);
+                router.push("/(tabs)/patients");
+            },
+            onError: (error) => {
+                console.error("Error creating patient:", error);
+                // اینجا می‌توانید یک alert یا toast نمایش دهید
+            },
         });
-        // router.push({ pathname: "/(modals)/add-patient/review", params: { patientData: JSON.stringify(patientData ?? {}), photoUri: selectedImage || "" } });
     };
 
     const handleNext = () => {
+        if (!isFormValid) {
+            console.log("Form is not valid. Please fill required fields.");
+            return;
+        }
         handleSubmit(onSubmit)();
     };
     const phoneConfig: DynamicInputConfig = {
@@ -137,7 +195,14 @@ export const AddPatientPhotoScreen: React.FC = () => {
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10 }}>
             <View className="flex-1 bg-system-gray6 gap-8" style={{ paddingTop: safeAreaInsets.top + 10 }}>
                 <View className="items-center justify-center gap-5">
-                    <ImagePickerWrapper onImageSelected={(result) => setSelectedImage(result.uri ?? (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null))}>
+                    <ImagePickerWrapper
+                        onImageSelected={(result) => {
+                            // اولویت با uri است، اگر موجود نبود از base64 استفاده می‌کنیم
+                            const imageUri = result.uri || (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null);
+                            setSelectedImage(imageUri);
+                            console.log("Image selected:", { uri: result.uri, hasBase64: !!result.base64 });
+                        }}
+                    >
                         <View className="gap-4">
                             <View className="w-32 h-32 rounded-full bg-system-gray2 items-center justify-center">{selectedImage ? <Image source={{ uri: selectedImage }} className="w-full h-full rounded-full" /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}</View>
                             <BaseButton label="Pick a Photo" ButtonStyle="Tinted" size="Small" rounded onPress={handleSelectFromGallery} />

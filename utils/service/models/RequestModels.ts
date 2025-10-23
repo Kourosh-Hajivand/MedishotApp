@@ -138,7 +138,7 @@ export interface PatientMetadata {
 export interface CreatePatientRequest {
     first_name: string;
     last_name: string;
-    birth_date?: string; // YYYY-MM-DD
+    birth_date?: string;
     gender?: "male" | "female" | "other";
     national_id?: string;
     email?: string;
