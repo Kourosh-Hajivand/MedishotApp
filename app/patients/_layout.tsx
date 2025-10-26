@@ -1,11 +1,9 @@
 import { BackButton } from "@/components/button/ui/BackButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors.shared";
-import { useGetPracticeList } from "@/utils/hook";
-import { loadProfileSelection } from "@/utils/hook/useProfileStore";
 import { BlurView } from "expo-blur";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import React, { useEffect } from "react";
+import React from "react";
 import { Animated, TouchableOpacity } from "react-native";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -13,13 +11,7 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 export const blurValue = new Animated.Value(0);
 
 export default function PatientsLayout() {
-    const { data: practiceList } = useGetPracticeList();
     const { id } = useLocalSearchParams<{ id: string }>();
-    useEffect(() => {
-        if (practiceList?.data && practiceList.data.length > 0) {
-            loadProfileSelection(practiceList.data);
-        }
-    }, [practiceList?.data]);
 
     return (
         <Stack>
@@ -32,10 +24,11 @@ export default function PatientsLayout() {
                     title: "",
                     headerRight: () => (
                         <TouchableOpacity
+                            disabled={!id}
                             onPress={() => {
-                                router.push(`/(modals)/add-patient/photo`);
+                                router.push(`/(modals)/add-patient/photo?id=${id}`);
                             }}
-                            className="flex-row px-2  justify-center items-center "
+                            className="flex-row px-2 justify-center items-center"
                         >
                             <IconSymbol name="square.and.pencil" size={24} color={colors.system.blue} />
                         </TouchableOpacity>

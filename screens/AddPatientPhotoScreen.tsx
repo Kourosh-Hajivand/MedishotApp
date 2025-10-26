@@ -2,7 +2,7 @@ import { AvatarIcon } from "@/assets/icons";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
-import { useCreatePatient } from "@/utils/hook";
+import { useCreatePatient, useGetPatientById } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
@@ -25,8 +25,9 @@ type FormData = z.infer<typeof schema>;
 export const AddPatientPhotoScreen: React.FC = () => {
     const router = useRouter();
     const navigation = useNavigation();
-    const params = useLocalSearchParams<{ patientData?: string }>();
-    const patientData = params.patientData ? JSON.parse(params.patientData as string) : undefined;
+    const params = useLocalSearchParams<{ id?: string }>();
+    const { data: patient } = useGetPatientById(params.id ?? "");
+    console.log("Patient:", patient);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
 
@@ -190,7 +191,15 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 </Pressable>
             ),
         });
-    }, [navigation, isFormValid, patientData]);
+    }, [navigation, isFormValid]);
+
+    useLayoutEffect(() => {
+        if (params.id) {
+            navigation.setOptions({
+                headerTitle: "Edit Patient",
+            });
+        }
+    }, [navigation, params.id]);
 
     return (
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
@@ -198,7 +207,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 <View className="items-center justify-center gap-5">
                     <ImagePickerWrapper
                         onImageSelected={(result) => {
-                            // اولویت با uri است، اگر موجود نبود از base64 استفاده می‌کنیم
                             const imageUri = result.uri || (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null);
                             setSelectedImage(imageUri);
                             console.log("Image selected:", { uri: result.uri, hasBase64: !!result.base64 });
