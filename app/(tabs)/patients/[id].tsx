@@ -15,7 +15,9 @@ export default function PatientDetailsScreen() {
     const navigation = useNavigation();
     const safeAreaInsets = useSafeAreaInsets();
     const { data: patient, isLoading } = useGetPatientById(id);
-
+    console.log("====================================");
+    console.log(patient);
+    console.log("====================================");
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
 
@@ -107,7 +109,7 @@ export default function PatientDetailsScreen() {
 
     useEffect(() => {
         const listener = scrollY.addListener(({ value }) => {
-            navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? "John Doe" : "" });
+            navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? patient?.data?.first_name + " " + patient?.data?.last_name : "" });
         });
         return () => scrollY.removeListener(listener);
     }, [navigation]);
@@ -124,7 +126,8 @@ export default function PatientDetailsScreen() {
             <Animated.ScrollView
                 contentContainerStyle={{
                     paddingTop: safeAreaInsets.top + 45,
-                    paddingBottom: 60,
+
+                    flexGrow: 1,
                 }}
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
@@ -140,15 +143,15 @@ export default function PatientDetailsScreen() {
                             alignItems: "center",
                         }}
                     >
-                        <Avatar name={patient?.data.first_name + " " + patient?.data.last_name} size={100} haveRing imageUrl={patient?.data.profile_image?.url} />
+                        <Avatar name={patient?.data?.first_name + " " + patient?.data?.last_name} size={100} haveRing imageUrl={patient?.data?.profile_image?.url} />
                     </Animated.View>
 
                     <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
                         <BaseText type="Title1" weight={600} color="labels.primary">
-                            {patient?.data.first_name} {patient?.data.last_name}
+                            {patient?.data?.first_name} {patient?.data?.last_name}
                         </BaseText>
                         <BaseText type="Callout" weight={400} color="labels.secondary">
-                            last update: {patient?.data.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
+                            last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
                         </BaseText>
                     </Animated.View>
                 </View>
@@ -178,30 +181,32 @@ export default function PatientDetailsScreen() {
 
                     {/* --- Info Card --- */}
                     <View className="bg-white py-2 px-4 rounded-xl">
-                        <View className="flex-row items-center justify-between pb-2 border-b border-border">
-                            {patient?.data.numbers && (
-                                <View>
-                                    <BaseText type="Subhead" color="labels.secondary">
-                                        Phone
-                                    </BaseText>
-                                    <BaseText type="Subhead" color="labels.primary">
-                                        {patient?.data.numbers[0].value}
-                                    </BaseText>
+                        {patient?.data?.numbers && patient?.data?.numbers.length > 0 && (
+                            <View className="flex-row items-center justify-between pb-2 border-b border-border">
+                                {patient?.data?.numbers && (
+                                    <View>
+                                        <BaseText type="Subhead" color="labels.secondary">
+                                            Phone
+                                        </BaseText>
+                                        <BaseText type="Subhead" color="labels.primary">
+                                            {patient?.data?.numbers[0]?.value}
+                                        </BaseText>
+                                    </View>
+                                )}
+                                <View className="flex-row gap-3">
+                                    <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleMessage} />
+                                    <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleCall} />
                                 </View>
-                            )}
-                            <View className="flex-row gap-3">
-                                <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleMessage} />
-                                <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleCall} />
                             </View>
-                        </View>
+                        )}
 
-                        <View className="flex-row pt-2">
+                        <View className={`flex-row ${patient?.data?.numbers && patient?.data?.numbers.length > 0 ? "pt-2" : ""}`}>
                             <View className="flex-1 border-r border-border">
                                 <BaseText type="Subhead" color="labels.secondary">
                                     assigned to:
                                 </BaseText>
                                 <BaseText type="Subhead" color="labels.primary">
-                                    Dr.{patient?.data.doctor?.first_name} {patient?.data.doctor?.last_name}
+                                    Dr.{patient?.data?.doctor?.first_name} {patient?.data?.doctor?.last_name}
                                 </BaseText>
                             </View>
                             <View className="flex-1 pl-3">
@@ -209,7 +214,7 @@ export default function PatientDetailsScreen() {
                                     chart number:
                                 </BaseText>
                                 <BaseText type="Subhead" color="labels.primary">
-                                    #{patient?.data.metadata?.chart_number}
+                                    #{patient?.data?.metadata?.chart_number}
                                 </BaseText>
                             </View>
                         </View>
@@ -217,7 +222,7 @@ export default function PatientDetailsScreen() {
                 </View>
 
                 {/* --- Tabs --- */}
-                <View className="flex-1 bg-white rounded-xl mt-6 overflow-hidden">
+                <View className="flex-1 flex-grow bg-white rounded-xl mt-6 overflow-hidden">
                     <View className="px-5 border-b border-border">
                         <View className="flex-row relative">
                             {tabs.map((tab, i) => (
@@ -242,7 +247,7 @@ export default function PatientDetailsScreen() {
                         </View>
                     </View>
 
-                    <View className="flex-1 p-4">
+                    <View className="flex-1 flex-grow p-4">
                         {activeTab === 0 && <View />}
                         {activeTab === 1 && <BaseText>📝 Consent details...</BaseText>}
                         {activeTab === 2 && <BaseText>🪪 ID info...</BaseText>}

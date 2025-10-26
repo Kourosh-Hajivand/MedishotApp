@@ -65,7 +65,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const gender = watch("gender");
 
     const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
-    const { mutate: createPatient } = useCreatePatient(selectedPractice?.id ?? "");
+    const { mutate: createPatient, isPending } = useCreatePatient(selectedPractice?.id ?? "");
     const onSubmit = (data: FormData) => {
         console.log("Form submitted with data:", data);
         console.log("Selected image:", selectedImage);
@@ -115,7 +115,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
             first_name: data.first_name,
             last_name: data.last_name,
             birth_date: data.birth_date,
-            gender: data.gender as "male" | "female" | "other",
+            gender: data.gender.toLowerCase() as "male" | "female" | "other",
             numbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
             email: emailAddresses.length > 0 ? emailAddresses[0].value : undefined,
             addresses: addressList.length > 0 ? addressList : undefined,
@@ -129,6 +129,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
             onSuccess: (response) => {
                 console.log("Patient created successfully:", response);
                 router.push("/(tabs)/patients");
+                router.back();
             },
             onError: (error) => {
                 console.error("Error creating patient:", error);
@@ -181,7 +182,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <Pressable onPress={handleNext} disabled={!isFormValid} className="px-2" hitSlop={10}>
+                <Pressable onPress={handleNext} disabled={!isFormValid || isPending} className="px-2">
                     <BaseText type="Body" weight="600" color={isFormValid ? "system.blue" : "system.gray"}>
                         Done
                     </BaseText>
@@ -192,10 +193,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     return (
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10 }}>
-            <View className="flex-1 bg-system-gray6 gap-8" style={{ paddingTop: 10 }}>
+            <View className="flex-1 bg-system-gray6 gap-8">
                 <View className="items-center justify-center gap-5">
                     <ImagePickerWrapper
                         onImageSelected={(result) => {
+                            // اولویت با uri است، اگر موجود نبود از base64 استفاده می‌کنیم
                             const imageUri = result.uri || (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null);
                             setSelectedImage(imageUri);
                             console.log("Image selected:", { uri: result.uri, hasBase64: !!result.base64 });
