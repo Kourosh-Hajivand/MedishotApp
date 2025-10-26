@@ -147,7 +147,7 @@ export default function PatientsScreen() {
     return (
         <ScrollView style={{ flex: 1, backgroundColor: "white" }} showsHorizontalScrollIndicator={false}>
             {isLoading ? (
-                <View style={styles.loadingContainer} className="flex-1 items-center justify-center">
+                <View className="flex-1 py-[60%] items-center justify-center">
                     <ActivityIndicator size="large" color="#007AFF" />
                     <BaseText type="Body" color="labels.secondary" weight={500} style={{ marginTop: 8 }}>
                         Loading patients...
@@ -212,7 +212,7 @@ export default function PatientsScreen() {
                                 </ContextMenu.Items>
                                 <ContextMenu.Trigger>
                                     <TouchableOpacity
-                                        onPress={() => router.push(`/(tabs)/patients/${item.id}`)}
+                                        onPress={() => router.push(`/patients/${item.id}`)}
                                         key={`${section.title}-${index}`}
                                         style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
                                         className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
@@ -371,11 +371,5 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         gap: spacing["1"],
-    },
-    loadingContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: spacing["2"],
     },
 });

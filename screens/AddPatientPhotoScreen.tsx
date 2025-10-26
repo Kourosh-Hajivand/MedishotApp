@@ -35,6 +35,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const [emails, setEmails] = useState<any[]>([]);
     const [addresses, setAddresses] = useState<any[]>([]);
     const [urls, setUrls] = useState<any[]>([]);
+
     const handleTakePhoto = () => {
         console.log("Take photo");
     };

@@ -15,9 +15,7 @@ export default function PatientDetailsScreen() {
     const navigation = useNavigation();
     const safeAreaInsets = useSafeAreaInsets();
     const { data: patient, isLoading } = useGetPatientById(id);
-    console.log("====================================");
-    console.log(patient);
-    console.log("====================================");
+
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
 
@@ -108,11 +106,13 @@ export default function PatientDetailsScreen() {
     }, []);
 
     useEffect(() => {
-        const listener = scrollY.addListener(({ value }) => {
-            navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? patient?.data?.first_name + " " + patient?.data?.last_name : "" });
-        });
-        return () => scrollY.removeListener(listener);
-    }, [navigation]);
+        if (patient?.data) {
+            const listener = scrollY.addListener(({ value }) => {
+                navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? patient?.data?.first_name + " " + patient?.data?.last_name : "" });
+            });
+            return () => scrollY.removeListener(listener);
+        }
+    }, [navigation, patient?.data]);
 
     if (isLoading) {
         return (
@@ -136,7 +136,7 @@ export default function PatientDetailsScreen() {
                 })}
             >
                 {/* --- Animated Header --- */}
-                <View className="items-center justify-center mb-6">
+                <View className="items-center justify-center mb-6 ">
                     <Animated.View
                         style={{
                             transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }],
