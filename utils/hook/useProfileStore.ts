@@ -3,24 +3,26 @@ import { create } from "zustand";
 import { Practice } from "../service/models/ResponseModels";
 
 interface ProfileStore {
-    selectedProfile: "profile" | "practice" | null;
     selectedPractice: Practice | null;
-    setSelectedProfile: (type: "profile" | "practice", practice?: Practice) => void;
+    viewMode: "doctor" | "owner";
+    setSelectedPractice: (practice: Practice) => void;
+    setViewMode: (mode: "doctor" | "owner") => void;
     resetSelection: () => void;
     isLoaded: boolean;
+    isLoading: boolean;
 }
 
 const STORAGE_KEY = "profile_selection";
 
 export const useProfileStore = create<ProfileStore>((set, get) => ({
-    selectedProfile: null,
     selectedPractice: null,
+    viewMode: "doctor",
     isLoaded: false,
+    isLoading: false,
 
-    setSelectedProfile: async (type, practice) => {
+    setSelectedPractice: async (practice) => {
         const newState = {
-            selectedProfile: type,
-            selectedPractice: type === "practice" ? practice || null : null,
+            selectedPractice: practice,
         };
 
         set(newState);
@@ -28,14 +30,28 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         try {
             await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
         } catch (error) {
-            console.error("خطا در ذخیره انتخاب پروفایل:", error);
+            console.error("خطا در ذخیره انتخاب practice:", error);
+        }
+    },
+
+    setViewMode: async (mode) => {
+        const newState = {
+            viewMode: mode,
+        };
+
+        set(newState);
+
+        try {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+        } catch (error) {
+            console.error("خطا در ذخیره view mode:", error);
         }
     },
 
     resetSelection: async () => {
         const newState = {
-            selectedProfile: null,
             selectedPractice: null,
+            viewMode: "doctor" as const,
         };
 
         set(newState);
@@ -43,62 +59,135 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         try {
             await AsyncStorage.removeItem(STORAGE_KEY);
         } catch (error) {
-            console.error("خطا در حذف انتخاب پروفایل:", error);
+            console.error("خطا در حذف انتخاب practice:", error);
         }
     },
 }));
 
 export const loadProfileSelection = async (practiceList?: any[]) => {
+    const currentState = useProfileStore.getState();
+
+    // اگر در حال لود است، از فراخوانی مکرر جلوگیری کن
+    if (currentState.isLoading) {
+        return;
+    }
+
+    // اگر قبلاً لود شده و selectedPractice وجود دارد، از فراخوانی مکرر جلوگیری کن
+    if (currentState.isLoaded && currentState.selectedPractice) {
+        return;
+    }
+
+    // اگر isLoaded است اما selectedPractice وجود ندارد، isLoaded را reset کن
+    if (currentState.isLoaded && !currentState.selectedPractice) {
+        console.log("Resetting isLoaded because selectedPractice is null");
+        useProfileStore.setState({ isLoaded: false });
+    }
+
     try {
+        console.log("loadProfileSelection called with:", practiceList);
+        useProfileStore.setState({ isLoading: true });
+
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        console.log("stored data:", stored);
+
         if (stored) {
             const parsed = JSON.parse(stored);
-            useProfileStore.setState({
-                selectedProfile: parsed.selectedProfile,
-                selectedPractice: parsed.selectedPractice,
-                isLoaded: true,
-            });
+
+            // اگر ساختار قدیمی است، آن را نادیده بگیر و داده جدید ایجاد کن
+            if (parsed.selectedProfile || !parsed.viewMode) {
+                console.log("Old data structure detected, ignoring and creating new data");
+                await AsyncStorage.removeItem(STORAGE_KEY);
+
+                if (practiceList && practiceList.length > 0) {
+                    const ownerPractice = practiceList.find((practice) => practice.role === "owner");
+                    const defaultPractice = ownerPractice || practiceList[0];
+                    const defaultViewMode = ownerPractice ? "owner" : "doctor";
+
+                    console.log("Setting default practice:", defaultPractice);
+                    console.log("Setting default view mode:", defaultViewMode);
+
+                    useProfileStore.setState({
+                        selectedPractice: defaultPractice,
+                        viewMode: defaultViewMode,
+                        isLoaded: true,
+                        isLoading: false,
+                    });
+                    await AsyncStorage.setItem(
+                        STORAGE_KEY,
+                        JSON.stringify({
+                            selectedPractice: defaultPractice,
+                            viewMode: defaultViewMode,
+                        }),
+                    );
+                } else {
+                    useProfileStore.setState({
+                        isLoaded: true,
+                        isLoading: false,
+                    });
+                }
+            } else {
+                // ساختار جدید
+                useProfileStore.setState({
+                    selectedPractice: parsed.selectedPractice,
+                    viewMode: parsed.viewMode || "doctor",
+                    isLoaded: true,
+                    isLoading: false,
+                });
+            }
         } else {
             if (practiceList && practiceList.length > 0) {
+                const ownerPractice = practiceList.find((practice) => practice.role === "owner");
+                const defaultPractice = ownerPractice || practiceList[0];
+                const defaultViewMode = ownerPractice ? "owner" : "doctor";
+
+                console.log("Setting default practice:", defaultPractice);
+                console.log("Setting default view mode:", defaultViewMode);
+
                 useProfileStore.setState({
-                    selectedProfile: "practice",
-                    selectedPractice: practiceList[0],
+                    selectedPractice: defaultPractice,
+                    viewMode: defaultViewMode,
                     isLoaded: true,
+                    isLoading: false,
                 });
                 await AsyncStorage.setItem(
                     STORAGE_KEY,
                     JSON.stringify({
-                        selectedProfile: "practice",
-                        selectedPractice: practiceList[0],
+                        selectedPractice: defaultPractice,
+                        viewMode: defaultViewMode,
                     }),
                 );
             } else {
-                useProfileStore.setState({ isLoaded: true });
+                useProfileStore.setState({
+                    isLoaded: true,
+                    isLoading: false,
+                });
             }
         }
     } catch (error) {
-        console.error("خطا در بارگذاری انتخاب پروفایل:", error);
-        useProfileStore.setState({ isLoaded: true });
+        console.error("خطا در بارگذاری انتخاب practice:", error);
+        useProfileStore.setState({
+            isLoaded: true,
+            isLoading: false,
+        });
     }
 };
 
 export const validateAndSetDefaultSelection = async (practiceList?: any[]) => {
     const currentState = useProfileStore.getState();
 
-    if (currentState.selectedProfile === "practice" && currentState.selectedPractice && practiceList) {
+    if (currentState.selectedPractice && practiceList) {
         const isValidPractice = practiceList.some((p) => p.id === currentState.selectedPractice?.id);
 
         if (!isValidPractice && practiceList.length > 0) {
             useProfileStore.setState({
-                selectedProfile: "practice",
                 selectedPractice: practiceList[0],
             });
 
             await AsyncStorage.setItem(
                 STORAGE_KEY,
                 JSON.stringify({
-                    selectedProfile: "practice",
                     selectedPractice: practiceList[0],
+                    viewMode: currentState.viewMode,
                 }),
             );
         }

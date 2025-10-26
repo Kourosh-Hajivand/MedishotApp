@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Image, TouchableOpacity, View } from "react-native";
+import { Image, Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
@@ -132,7 +132,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
             },
             onError: (error) => {
                 console.error("Error creating patient:", error);
-                // اینجا می‌توانید یک alert یا toast نمایش دهید
             },
         });
     };
@@ -182,22 +181,21 @@ export const AddPatientPhotoScreen: React.FC = () => {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <TouchableOpacity onPress={handleNext} disabled={!isFormValid} className="px-2">
+                <Pressable onPress={handleNext} disabled={!isFormValid} className="px-2" hitSlop={10}>
                     <BaseText type="Body" weight="600" color={isFormValid ? "system.blue" : "system.gray"}>
                         Done
                     </BaseText>
-                </TouchableOpacity>
+                </Pressable>
             ),
         });
     }, [navigation, isFormValid, patientData]);
 
     return (
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10 }}>
-            <View className="flex-1 bg-system-gray6 gap-8" style={{ paddingTop: safeAreaInsets.top + 10 }}>
+            <View className="flex-1 bg-system-gray6 gap-8" style={{ paddingTop: 10 }}>
                 <View className="items-center justify-center gap-5">
                     <ImagePickerWrapper
                         onImageSelected={(result) => {
-                            // اولویت با uri است، اگر موجود نبود از base64 استفاده می‌کنیم
                             const imageUri = result.uri || (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null);
                             setSelectedImage(imageUri);
                             console.log("Image selected:", { uri: result.uri, hasBase64: !!result.base64 });

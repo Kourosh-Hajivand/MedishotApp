@@ -141,6 +141,9 @@ export interface Practice {
     type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology";
     image?: Media;
     metadata?: PracticeMetadata;
+    created_by?: People;
+    patients_count?: number;
+    role?: "owner" | "admin" | "member" | "viewer";
     created_at: string;
     updated_at: string;
 }
@@ -151,6 +154,10 @@ export interface Member {
     last_name: string;
     email: string;
     role: "owner" | "admin" | "member" | "viewer";
+    patients_count?: number;
+    taken_images_count?: number;
+    joined_at?: string;
+    updated_at?: string;
     pivot?: {
         role: "owner" | "admin" | "member" | "viewer";
     };
@@ -236,6 +243,10 @@ export interface Media {
     mime_type?: string;
     size?: number;
     collection_name?: string;
+    model_type?: string;
+    model_id?: number;
+    disk?: string;
+    conversions_disk?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -295,6 +306,7 @@ export interface PatientMedia {
     patient_id: number;
     patient_type: string;
     data: Record<string, any> | null;
+    taker?: People;
     media: Media | null;
 }
 
@@ -319,13 +331,28 @@ export interface PatientMediaDeleteResponse {
 export interface PatientMediaTrashResponse {
     success: true;
     message: string;
-    data: PatientMedia[];
+    data: PatientMediaTrash[];
+}
+
+export interface PatientMediaTrash extends PatientMedia {
+    deleted_at: string;
 }
 
 export interface PatientMediaRestoreResponse {
     success: true;
     message: string;
     data: null;
+}
+
+export interface PatientMediaEditResponse {
+    success: true;
+    message: string;
+    id: number;
+    patient_id: number;
+    patient_type: string;
+    data: Record<string, any>;
+    original_media?: Media;
+    edited_media?: Media;
 }
 
 // ============= File Upload Responses =============

@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function PatientsScreen() {
-    const { selectedPractice, selectedProfile } = useProfileStore();
+    const { selectedPractice, viewMode } = useProfileStore();
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
     const { q } = useLocalSearchParams<{ q?: string }>();
@@ -27,8 +27,8 @@ export default function PatientsScreen() {
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, 1, 30);
     const { data: doctorPatients, isLoading: isDoctorPatientsLoading } = useGetDoctorPatients(1, 30);
 
-    const currentPatients = selectedProfile === "profile" ? doctorPatients?.data : patients?.data;
-    const isLoading = selectedProfile === "profile" ? isDoctorPatientsLoading : isPatientsLoading;
+    const currentPatients = viewMode === "doctor" ? doctorPatients?.data : patients?.data;
+    const isLoading = viewMode === "doctor" ? isDoctorPatientsLoading : isPatientsLoading;
 
     const groupedPatients =
         currentPatients?.reduce(

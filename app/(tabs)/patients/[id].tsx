@@ -6,7 +6,7 @@ import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useGetPatientById } from "@/utils/hook";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { blurValue } from "./_layout";
 
@@ -14,9 +14,7 @@ export default function PatientDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
     const safeAreaInsets = useSafeAreaInsets();
-    const { data: patient } = useGetPatientById(id);
-    console.log("id", id);
-    console.log(patient?.data.numbers);
+    const { data: patient, isLoading } = useGetPatientById(id);
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
@@ -34,7 +32,6 @@ export default function PatientDetailsScreen() {
         }).start();
     };
 
-    // توابع برای تماس و پیام
     const handleCall = async () => {
         const phoneNumber = patient?.data?.numbers?.[0]?.value;
         if (!phoneNumber) {
@@ -115,6 +112,13 @@ export default function PatientDetailsScreen() {
         return () => scrollY.removeListener(listener);
     }, [navigation]);
 
+    if (isLoading) {
+        return (
+            <View className="flex-1 items-center justify-center">
+                <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
     return (
         <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
             <Animated.ScrollView
