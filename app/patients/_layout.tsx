@@ -4,7 +4,7 @@ import colors from "@/theme/colors.shared";
 import { useGetPracticeList } from "@/utils/hook";
 import { loadProfileSelection } from "@/utils/hook/useProfileStore";
 import { BlurView } from "expo-blur";
-import { router, Stack } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect } from "react";
 import { Animated, TouchableOpacity } from "react-native";
 
@@ -14,7 +14,7 @@ export const blurValue = new Animated.Value(0);
 
 export default function PatientsLayout() {
     const { data: practiceList } = useGetPracticeList();
-
+    const { id } = useLocalSearchParams<{ id: string }>();
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {
             loadProfileSelection(practiceList.data);
@@ -31,7 +31,12 @@ export default function PatientsLayout() {
                     headerTintColor: "#000",
                     title: "",
                     headerRight: () => (
-                        <TouchableOpacity className="flex-row px-2  justify-center items-center ">
+                        <TouchableOpacity
+                            onPress={() => {
+                                router.push(`/(modals)/add-patient/photo`);
+                            }}
+                            className="flex-row px-2  justify-center items-center "
+                        >
                             <IconSymbol name="square.and.pencil" size={24} color={colors.system.blue} />
                         </TouchableOpacity>
                     ),

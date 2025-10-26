@@ -68,7 +68,7 @@ export const AddPatientFormScreen: React.FC = () => {
 
             <View className="w-full gap-4 px-10">
                 <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
-                <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(tabs)/(modals)/add-patient/photo")} />
+                <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(modals)/add-patient/photo")} />
             </View>
         </SafeAreaView>
     );

@@ -14,7 +14,7 @@ export default function TabsLayout() {
                 <Label>Album</Label>
                 <Icon sf="photo.stack" drawable="custom_android_drawable" />
             </NativeTabs.Trigger>
-            <NativeTabs.Trigger options={{ selectedIconColor: colors.system.blue, iconColor: colors.labels.primary, indicatorColor: colors.system.blue }} name="(modals)/add-patient" role="search">
+            <NativeTabs.Trigger options={{ selectedIconColor: colors.system.blue, iconColor: colors.labels.primary, indicatorColor: colors.system.blue }} name="add-patient" role="search">
                 {Platform.select({
                     ios: <Icon sf="plus.circle.fill" selectedColor={colors.system.blue} drawable="custom_android_drawable" />,
                     android: <Icon sf="plus.circle.fill" drawable="custom_android_drawable" />,

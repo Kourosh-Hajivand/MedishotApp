@@ -193,7 +193,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     }, [navigation, isFormValid, patientData]);
 
     return (
-        <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10 }}>
+        <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
             <View className="flex-1 bg-system-gray6 gap-8">
                 <View className="items-center justify-center gap-5">
                     <ImagePickerWrapper

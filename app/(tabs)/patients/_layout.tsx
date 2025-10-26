@@ -116,7 +116,8 @@ export default function PatientsLayout() {
                         ),
                         headerSearchBarOptions: {
                             placeholder: "Search patients",
-                            // allowToolbarIntegration: true,
+                            allowToolbarIntegration: true,
+                            shouldShowHintSearchIcon: true,
                             onChangeText: (event) => {
                                 router.setParams({
                                     q: event.nativeEvent.text,
