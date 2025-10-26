@@ -2,11 +2,11 @@ import { AvatarIcon } from "@/assets/icons";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
-import { useCreatePatient, useGetPatientById } from "@/utils/hook";
+import { useCreatePatient, useGetPatientById, useUpdatePatient } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Image, Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
@@ -27,7 +27,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const navigation = useNavigation();
     const params = useLocalSearchParams<{ id?: string }>();
     const { data: patient } = useGetPatientById(params.id ?? "");
-    console.log("Patient:", patient);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
 
@@ -67,15 +66,66 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const gender = watch("gender");
 
     const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
-    const { mutate: createPatient, isPending } = useCreatePatient(selectedPractice?.id ?? "");
-    const onSubmit = (data: FormData) => {
-        console.log("Form submitted with data:", data);
-        console.log("Selected image:", selectedImage);
-        console.log("Phones:", phones);
-        console.log("Emails:", emails);
-        console.log("Addresses:", addresses);
-        console.log("URLs:", urls);
+    const isEditMode = !!params.id;
 
+    const { mutate: createPatient, isPending: isCreating } = useCreatePatient(selectedPractice?.id ?? "");
+    const { mutate: updatePatient, isPending: isUpdating } = useUpdatePatient(() => {
+        router.back();
+    });
+
+    const isPending = isCreating || isUpdating;
+
+    useEffect(() => {
+        if (patient?.data && isEditMode) {
+            const patientData = patient.data;
+            setValue("first_name", patientData.first_name || "");
+            setValue("last_name", patientData.last_name || "");
+            setValue("birth_date", patientData.birth_date || "");
+            setValue("gender", patientData.gender || "");
+
+            if (patientData.profile_image?.url) {
+                setSelectedImage(patientData.profile_image.url);
+            }
+
+            if (patientData.numbers && patientData.numbers.length > 0) {
+                const phoneData = patientData.numbers.map((phone: any, index: number) => ({
+                    id: `phone-${index}`,
+                    label: phone.type,
+                    value: phone.value,
+                }));
+                setPhones(phoneData);
+            }
+
+            if (patientData.email && patientData.email.length > 0) {
+                const emailData = patientData.email.map((email: any, index: number) => ({
+                    id: `email-${index}`,
+                    label: "Personal",
+                    value: email,
+                }));
+                setEmails(emailData);
+            }
+
+            if (patientData.addresses && patientData.addresses.length > 0) {
+                const addressData = patientData.addresses.map((address: any, index: number) => ({
+                    id: `address-${index}`,
+                    label: "Home",
+                    value: typeof address === "string" ? address : address,
+                }));
+                setAddresses(addressData);
+            }
+
+            if (patientData.links && patientData.links.length > 0) {
+                const linkData = patientData.links.map((link: any, index: number) => ({
+                    id: `link-${index}`,
+                    label: "Other",
+                    value: typeof link === "string" ? link : link,
+                }));
+                setUrls(linkData);
+            }
+        }
+    }, [patient, isEditMode, setValue]);
+
+    const onSubmit = (data: FormData) => {
         const phoneNumbers = phones
             .filter((phone) => phone.value && phone.value.trim() !== "")
             .map((phone) => ({
@@ -127,16 +177,33 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
         console.log("Final patient data to submit:", patientData);
 
-        createPatient(patientData, {
-            onSuccess: (response) => {
-                console.log("Patient created successfully:", response);
-                router.push("/(tabs)/patients");
-                router.back();
-            },
-            onError: (error) => {
-                console.error("Error creating patient:", error);
-            },
-        });
+        if (isEditMode && params.id) {
+            console.log("Updating patient:", patientData);
+
+            updatePatient(
+                { patientId: params.id, data: patientData },
+                {
+                    onSuccess: (response) => {
+                        console.log("Patient updated successfully:", response);
+                        router.push(`/patients/${params.id}`);
+                    },
+                    onError: (error) => {
+                        console.error("Error updating patient:", error);
+                    },
+                },
+            );
+        } else {
+            createPatient(patientData, {
+                onSuccess: (response) => {
+                    console.log("Patient created successfully:", response);
+                    router.push("/(tabs)/patients");
+                    router.back();
+                },
+                onError: (error) => {
+                    console.error("Error creating patient:", error);
+                },
+            });
+        }
     };
 
     const handleNext = () => {
@@ -234,10 +301,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                         </View>
                     </View>
-                    <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} />
-                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} />
-                    <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} />
-                    <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} />
+                    <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
+                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
+                    <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
+                    <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                 </View>
             </View>
         </ScrollView>

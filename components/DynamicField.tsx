@@ -5,7 +5,7 @@ import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { BottomSheetBackdrop } from "@gorhom/bottom-sheet";
 import { router, useFocusEffect, useGlobalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { LayoutAnimation, Platform, StyleSheet, TouchableOpacity, UIManager, View } from "react-native";
 import Animated, { FadeInDown, FadeOutDown, FadeOutUp, Layout } from "react-native-reanimated";
 import { AddressInput, EmailInput, PhoneNumberInput, TextFieldInput, URLInput } from "./input/DynamicFieldInputs";
@@ -20,6 +20,14 @@ const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpaci
 
 export const DynamicInputList: React.FC<DynamicInputListProps & { paramKey: string }> = ({ config, onChange, initialItems = [], paramKey }) => {
     const [items, setItems] = useState<DynamicFieldItem[]>(initialItems);
+    const isInitializedRef = useRef(false);
+
+    useEffect(() => {
+        if (initialItems.length > 0 && !isInitializedRef.current) {
+            setItems(initialItems);
+            isInitializedRef.current = true;
+        }
+    }, [initialItems]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [visible, setVisible] = useState(false);
     const [selectedLabel, setSelectedLabel] = useState<FieldLabel>(config.labelOptions[0]);
