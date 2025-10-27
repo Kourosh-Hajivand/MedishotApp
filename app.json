@@ -2,7 +2,7 @@
     "expo": {
         "name": "Medishots",
         "slug": "medishots",
-        "version": "1.0.0",
+        "version": "1.1.1",
         "orientation": "portrait",
         "scheme": "medishots",
         "userInterfaceStyle": "automatic",
@@ -10,11 +10,15 @@
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.betoatexpo.medishotapp",
-            // "appleTeamId": "T2A8YY9YDW",
             "appleTeamId": "S6GL3VTAFF",
-            "icon": "./assets/icon.icon"
+            "buildNumber": "1",
+            "icon": "./assets/icon.icon",
+            "infoPlist": {
+                "ITSAppUsesNonExemptEncryption": false
+            }
         },
         "android": {
+            "versionCode": 1,
             "adaptiveIcon": {
                 "foregroundImage": "./assets/images/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
@@ -44,6 +48,12 @@
         ],
         "experiments": {
             "typedRoutes": true
+        },
+        "extra": {
+            "router": {},
+            "eas": {
+                "projectId": "17a6b875-99cc-4edd-8bcd-bb733d0b9e8b"
+            }
         }
     }
 }
