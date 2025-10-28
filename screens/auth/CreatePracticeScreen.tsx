@@ -161,7 +161,7 @@ export const CreatePracticeScreen: React.FC = () => {
                         { name: "address", label: "Address" },
                     ].map((f, i) => (
                         <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
-                            <BaseText type="Title3" weight="500" color="system.black" style={styles.label}>
+                            <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                                 {f.label}
                             </BaseText>
                             <View style={styles.inputWrapper}>
@@ -228,7 +228,8 @@ const styles = StyleSheet.create({
     },
     formRow: {
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
+        // alignItems: "flex-start",
         paddingVertical: spacing["3"],
         borderBottomWidth: 1,
         borderBottomColor: colors.system.gray5,

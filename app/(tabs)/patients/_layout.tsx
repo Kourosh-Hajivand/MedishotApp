@@ -4,7 +4,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors.shared";
 import { useGetPracticeList } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
-import { loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
+import { forceReloadProfileSelection, loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
@@ -17,14 +17,23 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 export const blurValue = new Animated.Value(0);
 
 export default function PatientsLayout() {
-    const { data: practiceList } = useGetPracticeList();
-    const { logout: handleLogout, profile } = useAuth();
+    const { logout: handleLogout, profile, isAuthenticated } = useAuth();
+    const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, viewMode, setSelectedPractice, setViewMode, isLoaded, isLoading } = useProfileStore();
+
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {
             loadProfileSelection(practiceList.data);
         }
     }, [practiceList?.data]);
+
+    // Force reload profile selection when user authentication changes
+    useEffect(() => {
+        if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0) {
+            console.log("User authenticated, force reloading profile selection with practice list:", practiceList.data);
+            forceReloadProfileSelection(practiceList.data);
+        }
+    }, [isAuthenticated, practiceList?.data]);
 
     return (
         <BottomSheetModalProvider>
@@ -35,6 +44,7 @@ export default function PatientsLayout() {
                         headerTitle: "Patients",
                         headerLargeTitle: true,
                         headerTransparent: true,
+                        // headerTransparent: false,
                         headerShadowVisible: true,
                         headerRight: () => (
                             <Host style={{ width: 30, height: 50 }}>

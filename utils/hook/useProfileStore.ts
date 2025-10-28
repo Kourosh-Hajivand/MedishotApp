@@ -69,11 +69,13 @@ export const loadProfileSelection = async (practiceList?: any[]) => {
 
     // اگر در حال لود است، از فراخوانی مکرر جلوگیری کن
     if (currentState.isLoading) {
+        console.log("Already loading, skipping...");
         return;
     }
 
     // اگر قبلاً لود شده و selectedPractice وجود دارد، از فراخوانی مکرر جلوگیری کن
     if (currentState.isLoaded && currentState.selectedPractice) {
+        console.log("Already loaded with practice, skipping...");
         return;
     }
 
@@ -191,5 +193,29 @@ export const validateAndSetDefaultSelection = async (practiceList?: any[]) => {
                 }),
             );
         }
+    }
+};
+
+export const forceReloadProfileSelection = async (practiceList?: any[]) => {
+    console.log("Force reloading profile selection...");
+
+    // Reset the store state
+    useProfileStore.setState({
+        selectedPractice: null,
+        viewMode: "doctor",
+        isLoaded: false,
+        isLoading: false,
+    });
+
+    // Clear stored data
+    try {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+        console.error("خطا در حذف داده‌های ذخیره شده:", error);
+    }
+
+    // Load fresh selection
+    if (practiceList && practiceList.length > 0) {
+        await loadProfileSelection(practiceList);
     }
 };

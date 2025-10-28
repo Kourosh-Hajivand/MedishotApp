@@ -2,9 +2,11 @@ import { AvatarIcon } from "@/assets/icons";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
-import { useCreatePatient, useGetPatientById, useUpdatePatient } from "@/utils/hook";
+import { useCreatePatient, useGetPatientById, useTempUpload, useUpdatePatient } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
+import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -12,7 +14,7 @@ import { Image, Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper } from "../components";
+import { BaseText, ControlledInput, DynamicInputList } from "../components";
 const schema = z.object({
     first_name: z.string().min(1, "First Name is required."),
     last_name: z.string().min(1, "Last Name is required."),
@@ -29,20 +31,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const { data: patient } = useGetPatientById(params.id ?? "");
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
-
+    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
     // States for dynamic inputs
     const [phones, setPhones] = useState<any[]>([]);
     const [emails, setEmails] = useState<any[]>([]);
     const [addresses, setAddresses] = useState<any[]>([]);
     const [urls, setUrls] = useState<any[]>([]);
-
-    const handleTakePhoto = () => {
-        console.log("Take photo");
-    };
-
-    const handleSelectFromGallery = () => {
-        console.log("Select from gallery");
-    };
 
     const {
         control,
@@ -268,22 +262,114 @@ export const AddPatientPhotoScreen: React.FC = () => {
         }
     }, [navigation, params.id]);
 
+    const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
+        (response) => {
+            setUploadedFilename(response.filename);
+            console.log("Image uploaded successfully:", response.filename);
+        },
+        (error) => {
+            console.error("Error uploading image:", error.message);
+        },
+    );
+    const handleSelectFromGallery = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+            alert("Permission to access gallery is required!");
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+            base64: false,
+        });
+
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            setSelectedImage(uri);
+
+            try {
+                const filename = uri.split("/").pop() || "image.jpg";
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : "image/jpeg";
+
+                const file = {
+                    uri,
+                    type,
+                    name: filename,
+                } as any;
+
+                uploadImage(file); // ✅ همین کاری که تو CreatePractice کردی
+            } catch (err) {
+                console.log("upload error", err);
+            }
+        }
+    };
+
+    const handleTakePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+            alert("Permission to access camera is required!");
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            allowsEditing: true,
+            quality: 0.8,
+            base64: false,
+        });
+
+        if (!result.canceled) {
+            const uri = result.assets[0].uri;
+            setSelectedImage(uri);
+
+            try {
+                const filename = uri.split("/").pop() || "image.jpg";
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : "image/jpeg";
+
+                const file = {
+                    uri,
+                    type,
+                    name: filename,
+                } as any;
+
+                uploadImage(file); // ✅ همین
+            } catch (err) {
+                console.log("upload error", err);
+            }
+        }
+    };
     return (
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
             <View className="flex-1 bg-system-gray6 gap-8">
                 <View className="items-center justify-center gap-5">
-                    <ImagePickerWrapper
-                        onImageSelected={(result) => {
-                            const imageUri = result.uri || (result.base64 ? `data:image/jpeg;base64,${result.base64}` : null);
-                            setSelectedImage(imageUri);
-                            console.log("Image selected:", { uri: result.uri, hasBase64: !!result.base64 });
-                        }}
-                    >
-                        <View className="gap-4">
-                            <View className="w-32 h-32 rounded-full bg-system-gray2 items-center justify-center">{selectedImage ? <Image source={{ uri: selectedImage }} className="w-full h-full rounded-full" /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}</View>
-                            <BaseButton label="Pick a Photo" ButtonStyle="Tinted" size="Small" rounded onPress={handleSelectFromGallery} />
-                        </View>
-                    </ImagePickerWrapper>
+                    <View className="gap-4 ">
+                        <View className="w-32 h-32 rounded-full bg-system-gray2 items-center justify-center">{selectedImage ? <Image source={{ uri: selectedImage }} className="w-full h-full rounded-full" /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}</View>
+                        <Host style={{ width: 110, height: 35 }}>
+                            <ContextMenu>
+                                <ContextMenu.Items>
+                                    <Button systemImage="photo.stack" controlSize="mini" onPress={handleSelectFromGallery}>
+                                        Photo from Gallery
+                                    </Button>
+                                    <Button systemImage="camera" controlSize="mini" onPress={handleTakePhoto}>
+                                        with Camera
+                                    </Button>
+                                </ContextMenu.Items>
+
+                                <ContextMenu.Trigger>
+                                    <View className="flex-1 ">
+                                        <Host style={{ width: 110, height: 30 }}>
+                                            <Button role="default" controlSize="mini" variant="glassProminent">
+                                                Pick a Photo
+                                            </Button>
+                                        </Host>
+                                    </View>
+                                </ContextMenu.Trigger>
+                            </ContextMenu>
+                        </Host>
+                    </View>
                 </View>
 
                 <View className="px-4 gap-4">
