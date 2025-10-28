@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { router } from "expo-router";
 import { QueryKeys } from "../../models/enums";
 import { getTokens, removeTokens } from "../helper/tokenStorage";
 import { useGetMe } from "./useAuthService";
@@ -15,6 +16,7 @@ export const useAuth = () => {
         removeTokens();
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+        router.replace("/welcome");
     };
 
     return {

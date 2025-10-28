@@ -52,6 +52,9 @@ export default function PatientsLayout() {
                                             <Button systemImage="arrow.up">A → Z</Button>
                                             <Button systemImage="arrow.down">Z → A</Button>
                                         </Submenu>
+                                        <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
+                                            Logout
+                                        </Button>
                                     </ContextMenu.Items>
 
                                     <ContextMenu.Trigger>
@@ -117,7 +120,7 @@ export default function PatientsLayout() {
                         headerSearchBarOptions: {
                             placeholder: "Search patients",
                             allowToolbarIntegration: true,
-                            shouldShowHintSearchIcon: true,
+
                             onChangeText: (event) => {
                                 router.setParams({
                                     q: event.nativeEvent.text,
