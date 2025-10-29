@@ -1,26 +1,33 @@
 {
-    "cli": {
-        "version": ">= 3.16.0"
+  "cli": {
+    "version": ">= 3.16.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
     },
-    "build": {
-        "development": {
-            "distribution": "internal",
-            "ios": {
-                "simulator": true
-            }
-        },
-        "preview": {
-            "distribution": "internal"
-        },
-        "production": {
-            "ios": {
-                "image": "latest",
-                "resourceClass": "m-medium"
-            },
-            "distribution": "store"
-        }
+    "preview": {
+      "distribution": "internal",
+      "autoIncrement": true
     },
-    "submit": {
-        "production": {}
+    "production": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "ios": {
+        "image": "latest",
+        "resourceClass": "m-medium"
+      }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleTeamId": "S6GL3VTAFF"
+      }
+    }
+  }
 }
