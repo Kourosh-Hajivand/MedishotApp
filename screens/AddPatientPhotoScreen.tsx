@@ -27,11 +27,23 @@ type FormData = z.infer<typeof schema>;
 export const AddPatientPhotoScreen: React.FC = () => {
     const router = useRouter();
     const navigation = useNavigation();
-    const params = useLocalSearchParams<{ id?: string }>();
+    const params = useLocalSearchParams<{
+        id?: string;
+        firstName?: string;
+        lastName?: string;
+        birthDate?: string;
+        gender?: string;
+        idNumber?: string;
+        address?: string;
+        phone?: string;
+        email?: string;
+        scannedImageUri?: string;
+    }>();
     const { data: patient } = useGetPatientById(params.id ?? "");
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+    const [hasUploadedScannedImage, setHasUploadedScannedImage] = useState(false);
     // States for dynamic inputs
     const [phones, setPhones] = useState<any[]>([]);
     const [emails, setEmails] = useState<any[]>([]);
@@ -68,6 +80,94 @@ export const AddPatientPhotoScreen: React.FC = () => {
     });
 
     const isPending = isCreating || isUpdating;
+
+    const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
+        (response) => {
+            setUploadedFilename(response.filename);
+            setSelectedImage(response.filename); // Update selected image with uploaded filename
+            console.log("Image uploaded successfully:", response.filename);
+        },
+        (error) => {
+            console.error("Error uploading image:", error.message);
+        },
+    );
+
+    // Auto-fill form with parsed ID card data
+    useEffect(() => {
+        if (!isEditMode && params.firstName) {
+            // Auto-fill from scanned ID card data
+            if (params.firstName) {
+                setValue("first_name", params.firstName);
+            }
+            if (params.lastName) {
+                setValue("last_name", params.lastName);
+            }
+            if (params.birthDate) {
+                setValue("birth_date", params.birthDate);
+            }
+            if (params.gender) {
+                // Convert "Male"/"Female" to lowercase for form
+                const genderValue = params.gender.toLowerCase();
+                setValue("gender", genderValue === "male" ? "Male" : genderValue === "female" ? "Female" : params.gender);
+            }
+
+            // Set scanned image if available
+            if (params.scannedImageUri && !hasUploadedScannedImage) {
+                setSelectedImage(params.scannedImageUri);
+                // Upload the scanned image automatically
+                try {
+                    const filename = params.scannedImageUri.split("/").pop() || "scanned-id.jpg";
+                    const match = /\.(\w+)$/.exec(filename);
+                    const type = match ? `image/${match[1]}` : "image/jpeg";
+
+                    const file = {
+                        uri: params.scannedImageUri,
+                        type,
+                        name: filename,
+                    } as any;
+
+                    // Upload the scanned image
+                    uploadImage(file);
+                    setHasUploadedScannedImage(true);
+                } catch (err) {
+                    console.log("Error preparing scanned image:", err);
+                }
+            }
+
+            // Set phone number if available
+            if (params.phone) {
+                setPhones([
+                    {
+                        id: "phone-0",
+                        label: "Mobile",
+                        value: params.phone,
+                    },
+                ]);
+            }
+
+            // Set email if available
+            if (params.email) {
+                setEmails([
+                    {
+                        id: "email-0",
+                        label: "Personal",
+                        value: params.email,
+                    },
+                ]);
+            }
+
+            // Set address if available
+            if (params.address) {
+                setAddresses([
+                    {
+                        id: "address-0",
+                        label: "Home",
+                        value: params.address,
+                    },
+                ]);
+            }
+        }
+    }, [params, isEditMode, setValue, uploadImage, hasUploadedScannedImage]);
 
     useEffect(() => {
         if (patient?.data && isEditMode) {
@@ -262,15 +362,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
         }
     }, [navigation, params.id]);
 
-    const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
-            setUploadedFilename(response.filename);
-            console.log("Image uploaded successfully:", response.filename);
-        },
-        (error) => {
-            console.error("Error uploading image:", error.message);
-        },
-    );
     const handleSelectFromGallery = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {

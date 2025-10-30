@@ -6,8 +6,12 @@
   "build": {
     "development": {
       "distribution": "internal",
+      "developmentClient": true,
       "ios": {
         "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "preview": {

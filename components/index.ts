@@ -9,3 +9,4 @@ export { default as OTPInput } from "./input/OTPInput";
 export { default as SearchBox } from "./input/searchbox/searchbox";
 export { default as CustomTabBar } from "./navigation/CustomTabBar";
 export { BaseText } from "./text/BaseText";
+export { TabletWrapper } from "./tablet-wrapper";

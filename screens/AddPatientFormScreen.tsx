@@ -2,13 +2,14 @@ import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { router } from "expo-router";
 import React, { useState } from "react";
-import { Dimensions, Image, ScrollView, StyleSheet, View } from "react-native";
+import { Dimensions, Image, StyleSheet, View } from "react-native";
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
 import { BaseButton, BaseText } from "../components";
 import { AddPatientStackParamList } from "../navigation/AddPatientModalNavigator";
 import { spacing } from "../styles/spaces";
+import { parseUSIDCardData } from "../utils/helper/HelperFunction";
 
 export const AddPatientFormScreen: React.FC = () => {
     const navigation = useNavigation<NativeStackNavigationProp<AddPatientStackParamList>>();
@@ -19,6 +20,7 @@ export const AddPatientFormScreen: React.FC = () => {
 
     const [scannedImage, setScannedImage] = useState<string | null>(null);
     const [extractedText, setExtractedText] = useState<string | null>(null);
+    const [parsedData, setParsedData] = useState<any>(null);
 
     const scanDocument = async () => {
         try {
@@ -36,10 +38,34 @@ export const AddPatientFormScreen: React.FC = () => {
                 const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                 setExtractedText(fullText);
                 console.log("OCR:", fullText);
+
+                // Parse the extracted data
+                const parsed = parseUSIDCardData(fullText, imagePath);
+                setParsedData(parsed);
+                console.log("Parsed ID Card Data:", parsed);
             }
         } catch (error) {
             console.error("Document scan or OCR failed:", error);
             // setExtractedText('OCR failed. Please try a clearer scan.');
+        }
+    };
+
+    const handleContinue = () => {
+        if (parsedData && scannedImage) {
+            // Encode the parsed data and image as base64 or pass as params
+            const params: any = {
+                ...parsedData,
+                scannedImageUri: scannedImage,
+            };
+
+            // Navigate to photo screen with parsed data
+            router.push({
+                pathname: "/(modals)/add-patient/photo",
+                params: params,
+            });
+        } else {
+            // If no scan, go to photo screen normally
+            router.push("/(modals)/add-patient/photo");
         }
     };
 
@@ -56,18 +82,11 @@ export const AddPatientFormScreen: React.FC = () => {
                         You can fill patient data with image of ID card easily.
                     </BaseText>
                 </View>
-
-                {extractedText && (
-                    <ScrollView style={{ maxHeight: 150, marginTop: 10 }}>
-                        <BaseText type="Body" color="labels.primary">
-                            {extractedText}
-                        </BaseText>
-                    </ScrollView>
-                )}
             </View>
 
             <View className="w-full gap-4 px-10">
                 <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
+                {parsedData && scannedImage && <BaseButton label="Continue with Scanned Data" size="Large" rounded ButtonStyle="Filled" onPress={handleContinue} />}
                 <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(modals)/add-patient/photo")} />
             </View>
         </SafeAreaView>
