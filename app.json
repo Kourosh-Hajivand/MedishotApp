@@ -5,7 +5,7 @@
         "version": "1.2.1",
         "orientation": "portrait",
         "scheme": "medishots",
-        "userInterfaceStyle": "automatic",
+        "userInterfaceStyle": "light",
         "newArchEnabled": true,
         "ios": {
             "supportsTablet": true,

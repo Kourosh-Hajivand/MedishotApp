@@ -12,7 +12,7 @@ import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../..
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
-import { usPhoneRegex } from "../../utils/helper/HelperFunction";
+import { normalizeUSPhoneToE164 } from "../../utils/helper/HelperFunction";
 import { storeTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
@@ -21,7 +21,12 @@ import { useTempUpload } from "../../utils/hook/useMedia";
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
     website: z.string().optional(),
-    phoneNumber: z.string().min(10, "Phone number is too short").max(14, "Phone number is too long").regex(usPhoneRegex, "Invalid US phone number"),
+    phoneNumber: z
+        .string()
+        .transform((val) => val.replace(/\D/g, ""))
+        .refine((val) => val.length === 10 || val.length === 11, {
+            message: "Phone number must be 10 digits",
+        }),
     specialty: z.string().min(1, "Required"),
     address: z.string().min(1, "Address is required"),
     zipCode: z.string().min(1, "Zip Code is required"),
@@ -117,16 +122,29 @@ export const CreatePracticeScreen: React.FC = () => {
     const onSubmit = (data: FormData) => {
         storeTokens(token);
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
-        createPractice({
+        console.log("====================================");
+        console.log({
             name: data.practiceName,
             metadata: {
-                website: data.website,
+                website: `https://${data.website}`,
                 email: "",
-                phone: data.phoneNumber,
+                phone: normalizeUSPhoneToE164(data.phoneNumber),
                 address: data.address,
             },
             type: practiceType.id,
-            image: uploadedFilename || undefined,
+            ...(uploadedFilename ? { image: uploadedFilename } : {}),
+        });
+        console.log("====================================");
+        createPractice({
+            name: data.practiceName,
+            metadata: {
+                website: `https://${data.website}`,
+                email: "",
+                phone: normalizeUSPhoneToE164(data.phoneNumber),
+                address: data.address,
+            },
+            type: practiceType.id,
+            ...(uploadedFilename ? { image: uploadedFilename } : {}),
         });
     };
 
@@ -157,7 +175,7 @@ export const CreatePracticeScreen: React.FC = () => {
                         { name: "website", label: "Website", optional: true },
                         { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
                         { name: "specialty", label: "Specialty", disabled: true },
-                        { name: "zipCode", label: "Zip Code" },
+                        { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad" },
                         { name: "address", label: "Address" },
                     ].map((f, i) => (
                         <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
@@ -235,8 +253,8 @@ const styles = StyleSheet.create({
         borderBottomColor: colors.system.gray5,
     },
     label: {
-        width: 140,
-        marginTop: spacing["2"],
+        width: 120,
+        // marginTop: spacing["2"],
     },
     inputWrapper: {
         flex: 1,
