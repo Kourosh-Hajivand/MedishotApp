@@ -10,10 +10,12 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { useHeaderHeight } from "@react-navigation/elements";
+import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Animated, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { GestureEvent, PanGestureHandler, PanGestureHandlerEventPayload, ScrollView, State } from "react-native-gesture-handler";
+import { ActivityIndicator, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -40,24 +42,20 @@ export default function PatientsScreen() {
             },
             {} as Record<string, { full_name: string; id: number }[]>,
         ) || {};
-    const [search, setSearch] = useState("");
 
+    const [search, setSearch] = useState("");
     useEffect(() => {
-        if (q !== undefined) {
-            setSearch(q);
-        }
+        if (q !== undefined) setSearch(q);
     }, [q]);
+
     const [stickyEnabled, setStickyEnabled] = useState(true);
     const scrollViewRef = useRef<SectionList>(null);
-    const animatedValue = useRef(new Animated.Value(0)).current;
     const [isDragging, setIsDragging] = useState(false);
     const alphabetContainerRef = useRef<View>(null);
-    const [alphabetContainerLayout, setAlphabetContainerLayout] = useState({
-        y: 0,
-        height: 0,
-    });
+    const [alphabetContainerLayout, setAlphabetContainerLayout] = useState({ y: 0, height: 0 });
     const [activeLetter, setActiveLetter] = useState<string | null>(null);
-    const [gestureStartY, setGestureStartY] = useState(0);
+    const activeIndexSV = useSharedValue(-1);
+
     const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
         (acc, letter) => {
             const items = groupedPatients?.[letter]?.filter((p: any) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
@@ -74,49 +72,26 @@ export default function PatientsScreen() {
             data: filteredGroupedPatients[letter],
         }));
 
-    const handleAlphabetGesture = (event: GestureEvent<PanGestureHandlerEventPayload>) => {
-        const { translationY, absoluteY, state } = event.nativeEvent;
+    const handleAlphabetPress = (letter: string, animated = true) => {
+        const sectionIndex = sections.findIndex((sec) => sec.title === letter);
+        if (sectionIndex === -1 || !scrollViewRef.current) return;
 
-        if (state === State.BEGAN) {
-            setIsDragging(true);
-            setGestureStartY(absoluteY);
-        }
+        // محاسبه offset برای sticky header
+        const stickyHeaderHeight = headerHeight || 0;
 
-        if (state === State.ACTIVE) {
-            const containerHeight = alphabetContainerLayout.height;
-            const itemHeight = containerHeight / alphabet.length;
-
-            const currentY = gestureStartY + translationY;
-            const containerY = alphabetContainerLayout.y;
-            const relativeY = currentY - containerY;
-            const letterIndex = Math.floor(relativeY / itemHeight);
-            const clampedIndex = Math.max(0, Math.min(letterIndex, alphabet.length - 1));
-
-            const letter = alphabet[clampedIndex];
-            setActiveLetter(letter);
-
-            const sectionIndex = sections.findIndex((sec) => sec.title === letter);
-
-            if (sectionIndex !== -1 && scrollViewRef.current) {
-                setStickyEnabled(false);
-                scrollViewRef.current.scrollToLocation({
+        setTimeout(() => {
+            try {
+                scrollViewRef.current?.scrollToLocation({
                     sectionIndex,
                     itemIndex: 0,
-                    animated: false,
-                    viewOffset: 0,
+                    animated,
+                    viewPosition: 0, // موقعیت در viewport (0 = بالا)
+                    viewOffset: stickyHeaderHeight, // offset برای sticky header
                 });
+            } catch (e) {
+                console.warn("ScrollToLocation error:", e);
             }
-        }
-
-        if (state === State.END) {
-            if (activeLetter) {
-                handleAlphabetPress(activeLetter);
-            }
-            setIsDragging(false);
-            setActiveLetter(null);
-            setGestureStartY(0);
-            setStickyEnabled(true);
-        }
+        }, 50);
     };
 
     const onAlphabetContainerLayout = (event: any) => {
@@ -124,28 +99,69 @@ export default function PatientsScreen() {
         setAlphabetContainerLayout({ y, height });
     };
 
-    const handleAlphabetPress = (letter: string) => {
-        const sectionIndex = sections.findIndex((sec) => sec.title === letter);
-        if (sectionIndex !== -1 && scrollViewRef.current) {
-            setStickyEnabled(false);
+    // ✅ gesture ترکیبی Tap + Pan با Haptic Feedback
+    const pan = Gesture.Pan()
+        .onBegin((e) => {
+            // بررسی اینکه touch در ناحیه الفبا هست یا نه
+            if (alphabetContainerLayout.height === 0) return;
 
-            setTimeout(() => {
-                scrollViewRef.current?.scrollToLocation({
-                    sectionIndex,
-                    itemIndex: 0,
-                    animated: true,
-                    viewOffset: 0,
-                });
+            // بررسی محدوده X برای جلوگیری از تداخل با لیست
+            const relativeX = e.absoluteX - (alphabetContainerLayout.y > 0 ? 0 : 0); // placeholder
+            const relativeY = e.absoluteY - alphabetContainerLayout.y;
 
-                setTimeout(() => {
-                    setStickyEnabled(true);
-                }, 500);
-            }, 50);
-        }
-    };
+            // اگر touch خارج از محدوده container الفبا بود، gesture رو cancel کن
+            if (relativeY < 0 || relativeY > alphabetContainerLayout.height) {
+                return;
+            }
+
+            runOnJS(setIsDragging)(true);
+        })
+        .onUpdate((e) => {
+            const containerHeight = alphabetContainerLayout.height;
+            if (containerHeight === 0) return;
+
+            // بررسی اینکه touch در محدوده container الفبا هست
+            const relativeY = e.absoluteY - alphabetContainerLayout.y;
+            if (relativeY < 0 || relativeY > containerHeight) return;
+
+            const itemHeight = containerHeight / alphabet.length;
+            const index = Math.floor(relativeY / itemHeight);
+            const clampedIndex = Math.max(0, Math.min(index, alphabet.length - 1));
+            const letter = alphabet[clampedIndex];
+            if (clampedIndex !== activeIndexSV.value) {
+                activeIndexSV.value = clampedIndex;
+                runOnJS(setActiveLetter)(letter);
+                runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+                runOnJS(handleAlphabetPress)(letter, false);
+            }
+        })
+        .onEnd(() => {
+            runOnJS(setIsDragging)(false);
+            runOnJS(setActiveLetter)(null);
+            activeIndexSV.value = -1;
+        })
+        .maxPointers(1);
+
+    const tap = Gesture.Tap().onStart((e) => {
+        const containerHeight = alphabetContainerLayout.height;
+        if (containerHeight === 0) return;
+
+        // بررسی اینکه touch در محدوده container الفبا هست
+        const relativeY = e.absoluteY - alphabetContainerLayout.y;
+        if (relativeY < 0 || relativeY > containerHeight) return;
+
+        const itemHeight = containerHeight / alphabet.length;
+        const index = Math.floor(relativeY / itemHeight);
+        const clampedIndex = Math.max(0, Math.min(index, alphabet.length - 1));
+        const letter = alphabet[clampedIndex];
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+        runOnJS(handleAlphabetPress)(letter, true);
+    });
+
+    const composedGesture = Gesture.Race(pan, tap);
 
     return (
-        <ScrollView style={{ flex: 1, backgroundColor: "white" }} showsHorizontalScrollIndicator={false}>
+        <>
             {isLoading ? (
                 <View className="flex-1 py-[60%] items-center justify-center">
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -156,27 +172,55 @@ export default function PatientsScreen() {
             ) : currentPatients && currentPatients.length > 0 ? (
                 <SectionList
                     ref={scrollViewRef}
+                    style={{ flex: 1, backgroundColor: "white" }}
                     sections={sections}
                     keyExtractor={(item, index) => item.full_name + index}
                     stickySectionHeadersEnabled={stickyEnabled}
                     showsVerticalScrollIndicator={false}
-                    showsHorizontalScrollIndicator
-                    contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white", minHeight: 600 }}
+                    scrollEventThrottle={16}
+                    contentInsetAdjustmentBehavior="automatic"
+                    contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white" }}
+                    getItemLayout={(data, index) => {
+                        const ITEM_HEIGHT = 60;
+                        const SECTION_HEADER_HEIGHT = 24;
+                        let offset = 0;
+                        let currentIndex = 0;
+
+                        // محاسبه offset با توجه به sections
+                        for (let i = 0; i < sections.length; i++) {
+                            const sectionLength = sections[i].data.length;
+                            if (index < currentIndex + sectionLength) {
+                                // این آیتم در section فعلی است
+                                const itemIndexInSection = index - currentIndex;
+                                return {
+                                    length: ITEM_HEIGHT,
+                                    offset: offset + SECTION_HEADER_HEIGHT + itemIndexInSection * ITEM_HEIGHT,
+                                    index,
+                                };
+                            }
+                            offset += SECTION_HEADER_HEIGHT + sectionLength * ITEM_HEIGHT;
+                            currentIndex += sectionLength;
+                        }
+
+                        // fallback
+                        return {
+                            length: ITEM_HEIGHT,
+                            offset: offset,
+                            index,
+                        };
+                    }}
                     renderItem={({ item, index, section }) => (
                         <Host style={{ flex: 1 }}>
                             <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
                                 <ContextMenu.Items>
-                                    {/* Submenu 1: Sort By */}
                                     <Button systemImage="creditcard">Add ID</Button>
                                     <Button systemImage="camera">Take Photo</Button>
                                     <Button systemImage="text.document">Fill Consent</Button>
                                     {item.numbers && item.numbers.length > 0 ? (
                                         <Submenu button={<Button systemImage="message">Message</Button>}>
                                             {item.numbers.map((number: any, index: number) => {
-                                                // Handle both string and object formats
                                                 const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
                                                 const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-
                                                 return (
                                                     <Button key={`message-${index}-${phoneNumber}`} systemImage="message" onPress={() => openMessageForPatient([phoneNumber])}>
                                                         {phoneType}: {phoneNumber}
@@ -189,14 +233,11 @@ export default function PatientsScreen() {
                                             Message
                                         </Button>
                                     )}
-
                                     {item.numbers && item.numbers.length > 0 ? (
                                         <Submenu button={<Button systemImage="phone">Call</Button>}>
                                             {item.numbers.map((number: any, index: number) => {
-                                                // Handle both string and object formats
                                                 const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
                                                 const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-
                                                 return (
                                                     <Button key={`call-${index}-${phoneNumber}`} systemImage="phone" onPress={() => openCallForPatient([phoneNumber])}>
                                                         {phoneType}: {phoneNumber}
@@ -235,7 +276,7 @@ export default function PatientsScreen() {
                     )}
                 />
             ) : search.length > 0 ? (
-                <View style={styles.noResults} className="py-[75%]  items-center justify-center">
+                <View style={styles.noResults} className="py-[75%] items-center justify-center">
                     <SearchGlyphIcon width={40} height={40} strokeWidth={0} style={{ marginBottom: 10 }} />
                     <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.primary" weight={500}>
                         No results for "{search}"
@@ -245,131 +286,49 @@ export default function PatientsScreen() {
                     </BaseText>
                 </View>
             ) : (
-                <View style={styles.noResults} className="py-[60%]  items-center justify-center">
+                <View style={styles.noResults} className="py-[60%] items-center justify-center">
                     <IconSymbol name="person.2" color={colors.labels.secondary} size={40} />
                     <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.secondary" weight={500}>
                         No patients found
                     </BaseText>
                 </View>
             )}
-            {sections.length > 0 && (
-                <View className="absolute bottom-10 right-1 top-1/2 -translate-y-1/2 items-center justify-center" ref={alphabetContainerRef} onLayout={onAlphabetContainerLayout}>
-                    <PanGestureHandler onGestureEvent={handleAlphabetGesture as any}>
-                        <View style={styles.alphabetWrapper}>
-                            {alphabet.map((letter) => {
-                                const sectionIndex = sections.findIndex((sec) => sec.title === letter);
-                                const hasSection = sectionIndex !== -1;
-                                const isActive = isDragging && activeLetter === letter;
 
+            {sections.length > 0 && (
+                <View
+                    className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center"
+                    ref={alphabetContainerRef}
+                    onLayout={onAlphabetContainerLayout}
+                    style={{ zIndex: 1 }}
+                    pointerEvents="box-none" // اجازه بده touch events به children برسه
+                >
+                    <GestureDetector gesture={composedGesture}>
+                        <View style={styles.alphabetWrapper} pointerEvents="auto">
+                            {alphabet.map((letter) => {
+                                const hasSection = sections.some((s) => s.title === letter);
+                                const isActive = isDragging && activeLetter === letter;
                                 return (
-                                    <TouchableOpacity key={letter} onPress={() => handleAlphabetPress(letter)} style={[styles.alphabetItem, isActive && styles.activeAlphabetItem]} className="px-1">
-                                        <BaseText type="Caption1" color={isActive ? "system.blue" : hasSection ? "system.blue" : "labels.tertiary"} weight={isActive ? "700" : "500"}>
+                                    <View key={letter} style={[styles.alphabetItem, isActive && styles.activeAlphabetItem]}>
+                                        <BaseText type="Caption1" color={isActive ? "system.blue" : hasSection ? "system.blue" : "labels.tertiary"} weight={isActive ? "700" : "500"} style={{ transform: [{ scale: isActive ? 1.4 : 1 }] }}>
                                             {letter}
                                         </BaseText>
-                                    </TouchableOpacity>
+                                    </View>
                                 );
                             })}
                         </View>
-                    </PanGestureHandler>
+                    </GestureDetector>
                 </View>
             )}
-        </ScrollView>
+        </>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.background,
-    },
-    content: {
-        flex: 1,
-    },
-    header: {
-        gap: spacing["4"],
-    },
-    headerTop: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: spacing["4"],
-    },
-    userContainer: {
-        backgroundColor: "rgba(120, 120, 128, 0.12)",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing["2"],
-        paddingHorizontal: spacing["1"],
-        paddingVertical: spacing["1"],
-        paddingRight: spacing["4"],
-        borderRadius: 999,
-        alignSelf: "flex-start",
-    },
-    menuButton: {
-        backgroundColor: "rgba(120, 120, 128, 0.12)",
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    titleContainer: {
-        gap: spacing["3"],
-        paddingBottom: spacing["4"],
-        paddingHorizontal: spacing["4"],
-    },
-    searchContainer: {
-        backgroundColor: colors.background,
-        paddingBottom: spacing["3"],
-        zIndex: 10,
-        marginBottom: 8,
-        paddingHorizontal: 16,
-    },
-    listContainer: {
-        flex: 1,
-        backgroundColor: "white",
-    },
-    scrollContainer: {
-        flex: 1,
-        // paddingHorizontal: spacing["4"],
-    },
-
-    listItem: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing["3"],
-        paddingVertical: spacing["2"],
-    },
-    listItemBorder: {
-        borderBottomWidth: 1,
-        borderBottomColor: colors.system.gray5,
-    },
-    sectionHeader: {
-        backgroundColor: colors.background,
-        paddingHorizontal: 0,
-    },
-    alphabetContainer: {
-        position: "absolute",
-        right: 4,
-        top: 200,
-        bottom: 40,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    alphabetWrapper: {
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    alphabetItem: {
-        paddingHorizontal: spacing["1"],
-    },
-    activeAlphabetItem: {
-        backgroundColor: "rgba(0, 122, 255, 0.1)",
-        borderRadius: 4,
-    },
-    noResults: {
-        alignItems: "center",
-        justifyContent: "center",
-        gap: spacing["1"],
-    },
+    listItem: { flexDirection: "row", alignItems: "center", gap: spacing["3"], paddingVertical: spacing["2"] },
+    listItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.system.gray5 },
+    sectionHeader: { backgroundColor: colors.background, paddingHorizontal: 0 },
+    alphabetWrapper: { alignItems: "center", justifyContent: "center" },
+    alphabetItem: { paddingHorizontal: spacing["1"], marginVertical: 1 },
+    activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
+    noResults: { alignItems: "center", justifyContent: "center", gap: spacing["1"] },
 });
