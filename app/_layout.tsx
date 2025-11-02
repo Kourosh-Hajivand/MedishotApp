@@ -1,3 +1,5 @@
+import { TabletWrapper } from "@/components";
+import { Layout } from "@/constants/theme";
 import TenstackProvider from "@/utils/Providers/TenstackProvider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { Stack } from "expo-router";
@@ -7,8 +9,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { enableScreens } from "react-native-screens";
 import ToastManager from "toastify-react-native";
-import { TabletWrapper } from "@/components";
-import { Layout } from "@/constants/theme";
 import "./global.css";
 
 export const unstable_settings = { anchor: "(tabs)" };

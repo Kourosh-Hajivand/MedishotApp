@@ -1,4 +1,5 @@
 import { BaseButton, BaseText } from "@/components";
+import { AppleGallery } from "@/components/AppleGallery";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -247,8 +248,8 @@ export default function PatientDetailsScreen() {
                         </View>
                     </View>
 
-                    <View className="flex-1 flex-grow p-4">
-                        {activeTab === 0 && <View />}
+                    <View className="flex-1 flex-grow ">
+                        {activeTab === 0 && <AppleGallery images={Array.from({ length: 50 }, (_, i) => `https://picsum.photos/200/300?random=${i}`)} />}
                         {activeTab === 1 && <BaseText>📝 Consent details...</BaseText>}
                         {activeTab === 2 && <BaseText>🪪 ID info...</BaseText>}
                         {activeTab === 3 && <BaseText>📊 Activity log...</BaseText>}

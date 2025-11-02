@@ -34,7 +34,7 @@ export default function PatientsLayout() {
                         </TouchableOpacity>
                     ),
                     headerLeft: () => <BackButton onPress={() => router.back()} />,
-                    headerBackground: () => <AnimatedBlurBackground />,
+                    // headerBackground: () => <AnimatedBlurBackground />,
                 }}
             />
         </Stack>
@@ -54,7 +54,7 @@ function AnimatedBlurBackground() {
             tint="light"
             style={{
                 flex: 1,
-                borderBottomColor: "rgba(0,0,0,0.15)",
+                // borderBottomColor: "rgba(0,0,0,0.15)",
             }}
         />
     );

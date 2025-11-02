@@ -1,6 +1,5 @@
-import { useIsTablet } from "@/hooks/use-is-tablet";
 import React from "react";
-import { StyleSheet, View, ViewProps } from "react-native";
+import { Platform, StyleSheet, View, ViewProps } from "react-native";
 
 export interface TabletWrapperProps extends ViewProps {
     /**
@@ -22,15 +21,9 @@ export interface TabletWrapperProps extends ViewProps {
  * Useful for preventing content from becoming too wide on large screens
  */
 export function TabletWrapper({ children, maxWidth = 600, align = "center", sideBackgroundColor = "#ffffff", style, ...props }: TabletWrapperProps) {
-    const isTablet = useIsTablet();
-
-    if (!isTablet) {
+    if (Platform.OS === "ios") {
         // On mobile, just render children without wrapper
-        return (
-            <View style={[{ flex: 1 }, style]} {...props}>
-                {children}
-            </View>
-        );
+        return <>{children}</>;
     }
 
     const alignStyles = {
