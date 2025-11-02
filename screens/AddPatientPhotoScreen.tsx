@@ -74,7 +74,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
     const isEditMode = !!params.id;
 
-    const { mutate: createPatient, isPending: isCreating } = useCreatePatient(selectedPractice?.id ?? "");
+    const { mutate: createPatient, isPending: isCreating } = useCreatePatient(selectedPractice?.id ?? "", () => {
+        router.back();
+        router.back();
+        router.push("/(tabs)/patients");
+    });
     const { mutate: updatePatient, isPending: isUpdating } = useUpdatePatient(() => {
         router.back();
     });
@@ -181,7 +185,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setSelectedImage(patientData.profile_image.url);
             }
 
-            if (patientData.numbers && patientData.numbers.length > 0) {
+            if (patientData?.numbers && patientData?.numbers?.length > 0) {
                 const phoneData = patientData.numbers.map((phone: any, index: number) => ({
                     id: `phone-${index}`,
                     label: phone.type,
@@ -190,7 +194,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setPhones(phoneData);
             }
 
-            if (patientData.email && patientData.email.length > 0) {
+            if (patientData?.email && patientData?.email?.length > 0) {
                 const emailData = patientData.email.map((email: any, index: number) => ({
                     id: `email-${index}`,
                     label: "Personal",
@@ -199,7 +203,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setEmails(emailData);
             }
 
-            if (patientData.addresses && patientData.addresses.length > 0) {
+            if (patientData?.addresses && patientData?.addresses?.length > 0) {
                 const addressData = patientData.addresses.map((address: any, index: number) => ({
                     id: `address-${index}`,
                     label: "Home",
@@ -208,7 +212,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setAddresses(addressData);
             }
 
-            if (patientData.links && patientData.links.length > 0) {
+            if (patientData?.links && patientData?.links?.length > 0) {
                 const linkData = patientData.links.map((link: any, index: number) => ({
                     id: `link-${index}`,
                     label: "Other",
@@ -287,6 +291,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 },
             );
         } else {
+            console.log("===============createPatient IS CAlling=====================");
+
             createPatient(patientData, {
                 onSuccess: (response) => {
                     console.log("Patient created successfully:", response);

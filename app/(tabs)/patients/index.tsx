@@ -26,8 +26,8 @@ export default function PatientsScreen() {
     const headerHeight = useHeaderHeight();
     const { q } = useLocalSearchParams<{ q?: string }>();
 
-    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, 1, 30);
-    const { data: doctorPatients, isLoading: isDoctorPatientsLoading } = useGetDoctorPatients(1, 30);
+    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, 1, 1000);
+    const { data: doctorPatients, isLoading: isDoctorPatientsLoading } = useGetDoctorPatients(1, 1000);
 
     const currentPatients = viewMode === "doctor" ? doctorPatients?.data : patients?.data;
     const isLoading = viewMode === "doctor" ? isDoctorPatientsLoading : isPatientsLoading;

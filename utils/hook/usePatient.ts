@@ -33,6 +33,7 @@ export const useCreatePatient = (practiseId: string | number, onSuccess?: (data:
             onSuccess?.(data);
         },
         onError: (error) => {
+            console.log("===============useCreatePatient onError=====================");
             onError?.(error);
         },
     });

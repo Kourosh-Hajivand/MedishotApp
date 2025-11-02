@@ -1,85 +1,60 @@
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ViewImageScreen() {
-    const params = useLocalSearchParams<{ imageUri: string }>();
-    const insets = useSafeAreaInsets();
-    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+    const params = useLocalSearchParams<{ imageUri: string | string[] }>();
+    const [imageUri, setImageUri] = useState<string | null>(null);
+    const [imageSize, setImageSize] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
-    const imageUri = params.imageUri;
+    useEffect(() => {
+        const uri = Array.isArray(params.imageUri) ? params.imageUri[0] : params.imageUri;
+        if (uri) {
+            setImageUri(decodeURIComponent(uri));
+        } else {
+            setTimeout(() => router.back(), 200);
+        }
+    }, [params.imageUri]);
 
-    if (!imageUri) {
-        router.back();
-        return null;
-    }
-
-    // مقادیر انیمیشن
+    // انیمیشن‌ها
     const scale = useSharedValue(1);
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
 
-    // محاسبه ابعاد تصویر
+    // ابعاد تصویر
     const handleImageLoad = (event: any) => {
-        let width = 0;
-        let height = 0;
+        const width = event?.source?.width || event?.nativeEvent?.source?.width || SCREEN_WIDTH;
+        const height = event?.source?.height || event?.nativeEvent?.source?.height || SCREEN_HEIGHT;
 
-        if (event?.source?.width && event?.source?.height) {
-            width = event.source.width;
-            height = event.source.height;
-        } else if (event?.nativeEvent?.source?.width && event?.nativeEvent?.source?.height) {
-            width = event.nativeEvent.source.width;
-            height = event.nativeEvent.source.height;
-        }
+        const ratio = width / height;
+        const screenRatio = SCREEN_WIDTH / SCREEN_HEIGHT;
 
-        if (width && height) {
-            const imageAspectRatio = width / height;
-            const screenAspectRatio = SCREEN_WIDTH / SCREEN_HEIGHT;
-
-            let displayWidth = SCREEN_WIDTH;
-            let displayHeight = SCREEN_HEIGHT;
-
-            if (imageAspectRatio > screenAspectRatio) {
-                displayHeight = SCREEN_WIDTH / imageAspectRatio;
-            } else {
-                displayWidth = SCREEN_HEIGHT * imageAspectRatio;
-            }
-
-            setImageSize({ width: displayWidth, height: displayHeight });
-        } else {
-            setImageSize({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
-        }
+        let w = SCREEN_WIDTH;
+        let h = SCREEN_HEIGHT;
+        if (ratio > screenRatio) h = SCREEN_WIDTH / ratio;
+        else w = SCREEN_HEIGHT * ratio;
+        setImageSize({ width: w, height: h });
     };
 
-    // Gesture برای zoom و pan
+    // gesture logic
     const savedScale = useSharedValue(1);
     const savedTranslateX = useSharedValue(0);
     const savedTranslateY = useSharedValue(0);
 
-    const pinchGesture = Gesture.Pinch()
+    const pinch = Gesture.Pinch()
         .onStart(() => {
             savedScale.value = scale.value;
         })
         .onUpdate((e) => {
             scale.value = Math.max(1, Math.min(4, savedScale.value * e.scale));
-        })
-        .onEnd(() => {
-            if (scale.value < 1) {
-                scale.value = withSpring(1);
-            }
-            if (scale.value > 4) {
-                scale.value = withSpring(4);
-            }
         });
 
-    const panGesture = Gesture.Pan()
-        .enabled(true)
+    const pan = Gesture.Pan()
         .onStart(() => {
             savedTranslateX.value = translateX.value;
             savedTranslateY.value = translateY.value;
@@ -89,32 +64,9 @@ export default function ViewImageScreen() {
                 translateX.value = savedTranslateX.value + e.translationX;
                 translateY.value = savedTranslateY.value + e.translationY;
             }
-        })
-        .onEnd(() => {
-            if (scale.value > 1 && imageSize.width > 0 && imageSize.height > 0) {
-                const scaledWidth = imageSize.width * scale.value;
-                const scaledHeight = imageSize.height * scale.value;
-                const maxTranslateX = Math.max(0, (scaledWidth - SCREEN_WIDTH) / 2);
-                const maxTranslateY = Math.max(0, (scaledHeight - SCREEN_HEIGHT) / 2);
-
-                if (maxTranslateX > 0 && Math.abs(translateX.value) > maxTranslateX) {
-                    translateX.value = withSpring(Math.sign(translateX.value) * maxTranslateX);
-                } else if (Math.abs(translateX.value) > SCREEN_WIDTH / 2) {
-                    translateX.value = withSpring(0);
-                }
-
-                if (maxTranslateY > 0 && Math.abs(translateY.value) > maxTranslateY) {
-                    translateY.value = withSpring(Math.sign(translateY.value) * maxTranslateY);
-                } else if (Math.abs(translateY.value) > SCREEN_HEIGHT / 2) {
-                    translateY.value = withSpring(0);
-                }
-            } else {
-                translateX.value = withSpring(0);
-                translateY.value = withSpring(0);
-            }
         });
 
-    const doubleTapGesture = Gesture.Tap()
+    const doubleTap = Gesture.Tap()
         .numberOfTaps(2)
         .onEnd(() => {
             if (scale.value > 1) {
@@ -126,49 +78,45 @@ export default function ViewImageScreen() {
             }
         });
 
-    const singleTapGesture = Gesture.Tap()
+    const singleTap = Gesture.Tap()
         .numberOfTaps(1)
         .maxDuration(250)
         .onEnd(() => {
-            // فقط وقتی scale = 1 باشد و روی عکس کلیک نشده باشد، بسته شود
-            if (scale.value === 1) {
-                runOnJS(handleClose)();
-            }
+            if (scale.value === 1) runOnJS(handleClose)();
         });
 
-    const composedGesture = Gesture.Simultaneous(Gesture.Simultaneous(pinchGesture, panGesture), Gesture.Race(doubleTapGesture, singleTapGesture));
+    const composed = Gesture.Simultaneous(Gesture.Simultaneous(pinch, pan), Gesture.Race(doubleTap, singleTap));
 
-    // استایل انیمیشن تصویر
-    const imageAnimatedStyle = useAnimatedStyle(() => {
-        return {
-            transform: [{ scale: scale.value }, { translateX: translateX.value }, { translateY: translateY.value }],
-        };
-    });
+    const handleClose = () => router.back();
 
-    const handleClose = () => {
-        router.back();
-    };
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }, { translateX: translateX.value }, { translateY: translateY.value }],
+    }));
+
+    if (!imageUri) return null;
 
     return (
         <GestureHandlerRootView style={styles.container}>
-            <GestureDetector gesture={composedGesture}>
+            <GestureDetector gesture={composed}>
                 <View style={styles.content}>
-                    <Animated.View style={[styles.imageContainer, imageAnimatedStyle]}>
-                        <Image
-                            source={{ uri: imageUri }}
-                            style={[
-                                styles.image,
-                                imageSize.width > 0 && {
-                                    width: imageSize.width,
-                                    height: imageSize.height,
-                                },
-                            ]}
-                            contentFit="contain"
-                            onLoad={handleImageLoad}
-                        />
+                    <Animated.View style={[styles.imageContainer, animatedStyle]}>
+                        <Image source={{ uri: imageUri }} onLoad={handleImageLoad} style={{ width: imageSize.width, height: imageSize.height }} contentFit="contain" />
                     </Animated.View>
                 </View>
             </GestureDetector>
+
+            {/* Toolbar پایین */}
+            {/* <BlurView intensity={60} tint="dark" style={styles.bottomBar}>
+                <TouchableOpacity onPress={handleClose}>
+                    <IconSymbol name="xmark.circle.fill" color={colors.system.gray3} size={30} />
+                </TouchableOpacity>
+                <TouchableOpacity>
+                    <IconSymbol name="heart" color={colors.system.red} size={30} />
+                </TouchableOpacity>
+                <TouchableOpacity>
+                    <IconSymbol name="info.circle" color={colors.system.blue} size={30} />
+                </TouchableOpacity>
+            </BlurView> */}
         </GestureHandlerRootView>
     );
 }
@@ -176,7 +124,7 @@ export default function ViewImageScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        // backgroundColor: "rgba(0, 0, 0, 0.95)",
+        backgroundColor: "black",
     },
     content: {
         flex: 1,
@@ -187,21 +135,16 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    image: {
-        maxWidth: SCREEN_WIDTH,
-        maxHeight: SCREEN_HEIGHT,
-    },
-    closeButton: {
+    bottomBar: {
         position: "absolute",
-        right: 16,
-        zIndex: 10,
-    },
-    closeButtonInner: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 80,
+        flexDirection: "row",
         alignItems: "center",
+        justifyContent: "space-around",
+        borderTopWidth: 0.5,
+        borderColor: "rgba(255,255,255,0.1)",
     },
 });
