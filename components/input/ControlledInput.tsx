@@ -19,6 +19,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
     const focusInput = () => !disabled && inputRef.current?.focus();
 
     const height = size === "Large" ? 50 : 44;
+
     const animatedRingStyle = useAnimatedStyle(() => {
         const scale = withSpring(isFocused ? 1.05 : 1);
         const opacity = withTiming(isFocused ? 1 : 0);
@@ -33,15 +34,13 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                 render={({ field: { onChange, onBlur, value } }) => {
                     // 🟢 Phone formatting logic
                     const handlePhoneChange = (text: string) => {
-                        const prev = value || "";
-                        const isDeleting = text.length < prev.length;
+                        const digits = text.replace(/\D/g, "");
 
-                        if (isDeleting) {
-                            onChange(text);
+                        // فقط زمانی که عدد وارد شده باشد چیزی نمایش داده شود
+                        if (digits.length === 0) {
+                            onChange("");
                             return;
                         }
-
-                        const digits = text.replace(/\D/g, "");
 
                         const normalized = digits.startsWith("1") && digits.length >= 10 ? `+1${digits.slice(1, 11)}` : `+1${digits.slice(0, 10)}`;
 
@@ -54,7 +53,6 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                         onChange(cleaned);
                     };
 
-                    // 🟢 Default handler
                     const handleChange = (text: string) => {
                         if (name === "phoneNumber") handlePhoneChange(text);
                         else if (SperatedNumber) handleNumberChange(text);
@@ -105,7 +103,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                     <TextInput
                                         ref={inputRef}
                                         {...props}
-                                        value={name === "phoneNumber" ? formatUSPhoneNumber(value || "") : SperatedNumber && value ? formatNumber(value.toString()) : value}
+                                        value={name === "phoneNumber" ? (value ? formatUSPhoneNumber(value || "") : "") : SperatedNumber && value ? formatNumber(value.toString()) : value}
                                         onChangeText={handleChange}
                                         onBlur={(e) => {
                                             setIsFocused(false);
@@ -115,7 +113,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                         onFocus={(e) => {
                                             setIsFocused(true);
                                             props.onFocus?.(e);
-                                            if (name === "phoneNumber" && !value) onChange("+1 ");
+                                            // حذف افزودن خودکار +1
                                         }}
                                         editable={!disabled}
                                         placeholder=""
@@ -129,6 +127,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                                 paddingVertical: 0,
                                                 textAlignVertical: "center",
                                                 color: colors.text,
+                                                paddingBottom: 3,
                                             },
                                         ]}
                                     />

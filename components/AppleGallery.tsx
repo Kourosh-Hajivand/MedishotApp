@@ -19,7 +19,6 @@ export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColum
     const [numColumns, setNumColumns] = useState(initialColumns);
     const scale = useSharedValue(1);
 
-    // ✅ استفاده از Gesture API جدید
     const pinchGesture = Gesture.Pinch()
         .onUpdate((e) => {
             scale.value = e.scale;
@@ -36,19 +35,23 @@ export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColum
             scale.value = 1;
         });
 
-    const handleImagePress = (uri: string) => {
+    const handleImagePress = (uri: string, index: number) => {
         if (onImagePress) {
             onImagePress(uri);
         } else {
             router.push({
                 pathname: "/(fullScreenModal)/view-image",
-                params: { imageUri: uri },
+                params: {
+                    imageUri: uri,
+                    images: JSON.stringify(images),
+                    initialIndex: index.toString(),
+                },
             });
         }
     };
 
-    const renderItem = ({ item }: { item: string }) => (
-        <TouchableOpacity activeOpacity={0.9} onPress={() => handleImagePress(item)}>
+    const renderItem = ({ item, index }: { item: string; index: number }) => (
+        <TouchableOpacity activeOpacity={0.9} onPress={() => handleImagePress(item, index)}>
             <Image
                 source={{ uri: item }}
                 style={{

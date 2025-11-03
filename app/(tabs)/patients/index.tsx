@@ -276,7 +276,7 @@ export default function PatientsScreen() {
                     )}
                 />
             ) : search.length > 0 ? (
-                <View style={styles.noResults} className="py-[75%] items-center justify-center">
+                <View style={styles.noResults} className="flex-1 items-center justify-center">
                     <SearchGlyphIcon width={40} height={40} strokeWidth={0} style={{ marginBottom: 10 }} />
                     <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.primary" weight={500}>
                         No results for "{search}"
@@ -286,7 +286,7 @@ export default function PatientsScreen() {
                     </BaseText>
                 </View>
             ) : (
-                <View style={styles.noResults} className="py-[60%] items-center justify-center">
+                <View style={styles.noResults} className=" flex-1 items-center  justify-center">
                     <IconSymbol name="person.2" color={colors.labels.secondary} size={40} />
                     <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.secondary" weight={500}>
                         No patients found

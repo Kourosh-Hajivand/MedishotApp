@@ -1,12 +1,9 @@
 import { BackButton } from "@/components/button/ui/BackButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors.shared";
-import { BlurView } from "expo-blur";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import React from "react";
 import { Animated, TouchableOpacity } from "react-native";
-
-const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export const blurValue = new Animated.Value(0);
 
@@ -22,6 +19,7 @@ export default function PatientsLayout() {
                     headerTitleAlign: "center",
                     headerTintColor: "#000",
                     title: "",
+                    headerShadowVisible: false,
                     headerRight: () => (
                         <TouchableOpacity
                             disabled={!id}
@@ -34,27 +32,26 @@ export default function PatientsLayout() {
                         </TouchableOpacity>
                     ),
                     headerLeft: () => <BackButton onPress={() => router.back()} />,
-                    // headerBackground: () => <AnimatedBlurBackground />,
+                    headerBackground: () => <AnimatedWhiteBackground />,
                 }}
             />
         </Stack>
     );
 }
 
-function AnimatedBlurBackground() {
-    const animatedIntensity = blurValue.interpolate({
-        inputRange: [60, 140],
-        outputRange: [0, 80],
+function AnimatedWhiteBackground() {
+    const backgroundOpacity = blurValue.interpolate({
+        inputRange: [200, 240],
+        outputRange: [0, 1],
         extrapolate: "clamp",
     });
 
     return (
-        <AnimatedBlurView
-            intensity={animatedIntensity as any}
-            tint="light"
+        <Animated.View
             style={{
                 flex: 1,
-                // borderBottomColor: "rgba(0,0,0,0.15)",
+                backgroundColor: "white",
+                opacity: backgroundOpacity as any,
             }}
         />
     );

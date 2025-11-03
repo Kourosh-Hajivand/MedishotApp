@@ -138,10 +138,10 @@ export const CreatePracticeScreen: React.FC = () => {
         createPractice({
             name: data.practiceName,
             metadata: {
-                website: `https://${data.website}`,
-                email: "",
-                phone: normalizeUSPhoneToE164(data.phoneNumber),
-                address: data.address,
+                // website: `https://${data.website}`,
+                // email: "",
+                // phone: normalizeUSPhoneToE164(data.phoneNumber),
+                // address: data.address,
             },
             type: practiceType.id,
             ...(uploadedFilename ? { image: uploadedFilename } : {}),
