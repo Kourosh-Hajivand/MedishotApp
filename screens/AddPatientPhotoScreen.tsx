@@ -4,6 +4,7 @@ import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { useCreatePatient, useGetPatientById, useTempUpload, useUpdatePatient } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { CreatePatientRequest } from "@/utils/service/models/RequestModels";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as ImagePicker from "expo-image-picker";
@@ -261,17 +262,43 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 value: url.value,
             }));
 
-        const patientData = {
+        const patientData: CreatePatientRequest = {
             first_name: data.first_name,
             last_name: data.last_name,
-            birth_date: data.birth_date,
-            gender: data.gender.toLowerCase() as "male" | "female" | "other",
-            numbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
-            email: emailAddresses.length > 0 ? emailAddresses[0].value : undefined,
-            addresses: addressList.length > 0 ? addressList : undefined,
-            links: urlLinks.length > 0 ? urlLinks : undefined,
-            image: selectedImage || undefined,
         };
+
+        const birthDateValue = data.birth_date?.trim();
+        if (birthDateValue) {
+            patientData.birth_date = birthDateValue;
+        }
+
+        const genderValue = data.gender?.trim().toLowerCase();
+        if (genderValue === "male" || genderValue === "female" || genderValue === "other") {
+            patientData.gender = genderValue;
+        }
+
+        if (phoneNumbers.length > 0) {
+            patientData.numbers = phoneNumbers;
+        }
+
+        if (emailAddresses.length > 0) {
+            const emailValue = emailAddresses[0].value?.trim();
+            if (emailValue) {
+                patientData.email = emailValue;
+            }
+        }
+
+        if (addressList.length > 0) {
+            patientData.addresses = addressList;
+        }
+
+        if (urlLinks.length > 0) {
+            patientData.links = urlLinks;
+        }
+
+        if (selectedImage) {
+            patientData.image = selectedImage;
+        }
 
         console.log("Final patient data to submit:--------------------------------", selectedPractice?.id, patientData);
 
