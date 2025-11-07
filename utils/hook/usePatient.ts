@@ -2,22 +2,25 @@ import PatientService from "@/utils/service/PatientService";
 import { CreatePatientRequest, UpdatePatientRequest } from "@/utils/service/models/RequestModels";
 import { ApiResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
+import { useAuth } from "./useAuth";
 
 // ============= Query Hooks (GET) =============
 
 export const useGetPatients = (practiseId?: string | number, page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPatients", practiseId, page, perPage],
         queryFn: () => PatientService.getPatients(practiseId!, page, perPage),
-        enabled: !!practiseId,
+        enabled: isAuthenticated === true && !!practiseId,
     });
 };
 
 export const useGetPatientById = (patientId: number | string): UseQueryResult<PatientDetailResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPatientById", patientId],
         queryFn: () => PatientService.getPatientById(patientId),
-        enabled: !!patientId,
+        enabled: isAuthenticated === true && !!patientId,
     });
 };
 
@@ -75,8 +78,10 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
 };
 
 export const useGetDoctorPatients = (page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetDoctorPatients", page, perPage],
         queryFn: () => PatientService.getDoctorPatients(page, perPage),
+        enabled: isAuthenticated === true,
     });
 };

@@ -273,7 +273,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
             image: selectedImage || undefined,
         };
 
-        console.log("Final patient data to submit:", patientData);
+        console.log("Final patient data to submit:--------------------------------", selectedPractice?.id, patientData);
 
         if (isEditMode && params.id) {
             console.log("Updating patient:", patientData);

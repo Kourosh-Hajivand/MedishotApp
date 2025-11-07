@@ -99,17 +99,13 @@ export default function PatientsScreen() {
         setAlphabetContainerLayout({ y, height });
     };
 
-    // ✅ gesture ترکیبی Tap + Pan با Haptic Feedback
     const pan = Gesture.Pan()
         .onBegin((e) => {
-            // بررسی اینکه touch در ناحیه الفبا هست یا نه
             if (alphabetContainerLayout.height === 0) return;
 
-            // بررسی محدوده X برای جلوگیری از تداخل با لیست
             const relativeX = e.absoluteX - (alphabetContainerLayout.y > 0 ? 0 : 0); // placeholder
             const relativeY = e.absoluteY - alphabetContainerLayout.y;
 
-            // اگر touch خارج از محدوده container الفبا بود، gesture رو cancel کن
             if (relativeY < 0 || relativeY > alphabetContainerLayout.height) {
                 return;
             }
@@ -120,7 +116,6 @@ export default function PatientsScreen() {
             const containerHeight = alphabetContainerLayout.height;
             if (containerHeight === 0) return;
 
-            // بررسی اینکه touch در محدوده container الفبا هست
             const relativeY = e.absoluteY - alphabetContainerLayout.y;
             if (relativeY < 0 || relativeY > containerHeight) return;
 
@@ -146,7 +141,6 @@ export default function PatientsScreen() {
         const containerHeight = alphabetContainerLayout.height;
         if (containerHeight === 0) return;
 
-        // بررسی اینکه touch در محدوده container الفبا هست
         const relativeY = e.absoluteY - alphabetContainerLayout.y;
         if (relativeY < 0 || relativeY > containerHeight) return;
 
@@ -186,11 +180,9 @@ export default function PatientsScreen() {
                         let offset = 0;
                         let currentIndex = 0;
 
-                        // محاسبه offset با توجه به sections
                         for (let i = 0; i < sections.length; i++) {
                             const sectionLength = sections[i].data.length;
                             if (index < currentIndex + sectionLength) {
-                                // این آیتم در section فعلی است
                                 const itemIndexInSection = index - currentIndex;
                                 return {
                                     length: ITEM_HEIGHT,
@@ -202,7 +194,6 @@ export default function PatientsScreen() {
                             currentIndex += sectionLength;
                         }
 
-                        // fallback
                         return {
                             length: ITEM_HEIGHT,
                             offset: offset,
@@ -295,13 +286,7 @@ export default function PatientsScreen() {
             )}
 
             {sections.length > 0 && (
-                <View
-                    className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center"
-                    ref={alphabetContainerRef}
-                    onLayout={onAlphabetContainerLayout}
-                    style={{ zIndex: 1 }}
-                    pointerEvents="box-none" // اجازه بده touch events به children برسه
-                >
+                <View className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center" ref={alphabetContainerRef} onLayout={onAlphabetContainerLayout} style={{ zIndex: 1 }} pointerEvents="box-none">
                     <GestureDetector gesture={composedGesture}>
                         <View style={styles.alphabetWrapper} pointerEvents="auto">
                             {alphabet.map((letter) => {

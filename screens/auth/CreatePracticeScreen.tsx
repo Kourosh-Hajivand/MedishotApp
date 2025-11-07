@@ -130,6 +130,7 @@ export const CreatePracticeScreen: React.FC = () => {
                 email: "",
                 phone: normalizeUSPhoneToE164(data.phoneNumber),
                 address: data.address,
+                zipcode: Number(data.zipCode),
             },
             type: practiceType.id,
             ...(uploadedFilename ? { image: uploadedFilename } : {}),
@@ -138,10 +139,10 @@ export const CreatePracticeScreen: React.FC = () => {
         createPractice({
             name: data.practiceName,
             metadata: {
-                // website: `https://${data.website}`,
-                // email: "",
-                // phone: normalizeUSPhoneToE164(data.phoneNumber),
-                // address: data.address,
+                website: `https://${data.website}`,
+                phone: normalizeUSPhoneToE164(data.phoneNumber),
+                address: data.address,
+                zipcode: Number(data.zipCode),
             },
             type: practiceType.id,
             ...(uploadedFilename ? { image: uploadedFilename } : {}),

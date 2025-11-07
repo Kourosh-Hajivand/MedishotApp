@@ -1,9 +1,10 @@
+import { Patient } from "@/utils/service/models/ResponseModels";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import React, { useState } from "react";
 import { Dimensions, FlatList, TouchableOpacity } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
+import { ImageViewerModal } from "./ImageViewerModal";
 
 interface AppleGalleryProps {
     images: string[];
@@ -11,12 +12,15 @@ interface AppleGalleryProps {
     minColumns?: number;
     maxColumns?: number;
     onImagePress?: (uri: string) => void;
+    patientData?: Patient;
 }
 
 const { width } = Dimensions.get("window");
 
-export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress }) => {
+export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData }) => {
     const [numColumns, setNumColumns] = useState(initialColumns);
+    const [viewerVisible, setViewerVisible] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(0);
     const scale = useSharedValue(1);
 
     const pinchGesture = Gesture.Pinch()
@@ -36,18 +40,9 @@ export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColum
         });
 
     const handleImagePress = (uri: string, index: number) => {
-        if (onImagePress) {
-            onImagePress(uri);
-        } else {
-            router.push({
-                pathname: "/(fullScreenModal)/view-image",
-                params: {
-                    imageUri: uri,
-                    images: JSON.stringify(images),
-                    initialIndex: index.toString(),
-                },
-            });
-        }
+        if (onImagePress) onImagePress(uri);
+        setSelectedIndex(index);
+        setViewerVisible(true);
     };
 
     const renderItem = ({ item, index }: { item: string; index: number }) => (
@@ -70,6 +65,8 @@ export const AppleGallery: React.FC<AppleGalleryProps> = ({ images, initialColum
                     <FlatList data={images} key={numColumns} numColumns={numColumns} renderItem={renderItem} keyExtractor={(_, i) => i.toString()} />
                 </Animated.View>
             </GestureDetector>
+
+            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={images} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} />
         </GestureHandlerRootView>
     );
 };

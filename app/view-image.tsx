@@ -22,7 +22,6 @@ export default function ViewImageScreen() {
         let imagesList: string[] = [];
         let initialIndex = 0;
 
-        // اگر لیست تصاویر پاس داده شده باشد
         if (params.images) {
             try {
                 imagesList = JSON.parse(params.images);
@@ -30,9 +29,7 @@ export default function ViewImageScreen() {
             } catch (e) {
                 console.error("Error parsing images:", e);
             }
-        }
-        // اگر فقط یک تصویر پاس داده شده باشد
-        else if (params.imageUri) {
+        } else if (params.imageUri) {
             const uri = Array.isArray(params.imageUri) ? params.imageUri[0] : params.imageUri;
             imagesList = [decodeURIComponent(uri)];
             initialIndex = 0;
@@ -46,7 +43,6 @@ export default function ViewImageScreen() {
         setImages(imagesList);
         setCurrentIndex(initialIndex);
 
-        // اسکرول به تصویر اولیه
         setTimeout(() => {
             flatListRef.current?.scrollToIndex({ index: initialIndex, animated: false });
         }, 100);
@@ -67,14 +63,12 @@ export default function ViewImageScreen() {
         itemVisiblePercentThreshold: 50,
     }).current;
 
-    // کامپوننت برای هر تصویر
     const ImageItem = ({ uri, index }: { uri: string; index: number }) => {
         const scale = useSharedValue(1);
         const translateX = useSharedValue(0);
         const translateY = useSharedValue(0);
         const [imageSize, setImageSize] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
 
-        // ابعاد تصویر
         const handleImageLoad = (event: any) => {
             const width = event?.source?.width || event?.nativeEvent?.source?.width || SCREEN_WIDTH;
             const height = event?.source?.height || event?.nativeEvent?.source?.height || SCREEN_HEIGHT;
@@ -89,7 +83,6 @@ export default function ViewImageScreen() {
             setImageSize({ width: w, height: h });
         };
 
-        // gesture logic
         const savedScale = useSharedValue(1);
         const savedTranslateX = useSharedValue(0);
         const savedTranslateY = useSharedValue(0);
@@ -134,7 +127,6 @@ export default function ViewImageScreen() {
                 if (scale.value === 1) runOnJS(handleClose)();
             });
 
-        // فقط pinch و pan را با هم ترکیب کن، تا swipe افقی FlatList کار کند
         const composed = Gesture.Simultaneous(Gesture.Simultaneous(pinch, pan), Gesture.Race(doubleTap, singleTap));
 
         const animatedStyle = useAnimatedStyle(() => ({
@@ -174,7 +166,6 @@ export default function ViewImageScreen() {
                 initialScrollIndex={currentIndex}
             />
 
-            {/* شماره تصویر فعلی */}
             {images.length > 1 && (
                 <View style={styles.counter}>
                     <View style={styles.counterBg}>

@@ -6,7 +6,6 @@ import { View } from "react-native";
 export default function AddPatientRedirect() {
     useFocusEffect(
         useCallback(() => {
-            // وقتی این tab فوکوس میشه، modal رو باز کن
             router.push("/(modals)/add-patient/form");
         }, []),
     );

@@ -3,30 +3,34 @@ import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
 import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
+import { useAuth } from "./useAuth";
 
 // ============= Query Hooks (GET) =============
 
 export const useGetPracticeList = (enabled: boolean = true): UseQueryResult<PracticeListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeList"],
         queryFn: () => PracticeService.getPracticeList(),
-        enabled,
+        enabled: isAuthenticated === true && enabled,
     });
 };
 
 export const useGetPracticeById = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeDetailResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeById", practiceId],
         queryFn: () => PracticeService.getPracticeById(practiceId),
-        enabled: enabled && !!practiceId,
+        enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
 
 export const useGetPracticeMembers = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeMembersResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeMembers", practiceId],
         queryFn: () => PracticeService.getMembers(practiceId),
-        enabled: enabled && !!practiceId,
+        enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
 
@@ -175,28 +179,31 @@ export const useTransferOwnership = (onSuccess?: (data: ApiResponse<any>) => voi
 // ============= Practice Statistics =============
 
 export const useGetPatientsCount = (practiceId: number, type: string, enabled: boolean = true): UseQueryResult<PracticeStatsResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPatientsCount", practiceId, type],
         queryFn: () => PracticeService.getPatientsCount(practiceId, type),
-        enabled: enabled && !!practiceId,
+        enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
 
 // ============= Practice Tags =============
 
 export const useGetPracticeTags = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeTagsResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeTags", practiceId],
         queryFn: () => PracticeService.getTags(practiceId),
-        enabled: enabled && !!practiceId,
+        enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
 
 export const useGetPracticeTag = (practiceId: number, tagId: number, enabled: boolean = true): UseQueryResult<PracticeTagResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeTag", practiceId, tagId],
         queryFn: () => PracticeService.getTag(practiceId, tagId),
-        enabled: enabled && !!practiceId && !!tagId,
+        enabled: isAuthenticated === true && enabled && !!practiceId && !!tagId,
     });
 };
 
@@ -260,18 +267,20 @@ export const useDeletePracticeTag = (onSuccess?: (data: ApiResponse<string>) => 
 // ============= Practice Templates =============
 
 export const useGetPracticeTemplates = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeTemplatesResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeTemplates", practiceId],
         queryFn: () => PracticeService.getTemplates(practiceId),
-        enabled: enabled && !!practiceId,
+        enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
 
 export const useGetPracticeTemplate = (practiceId: number, templateId: number, enabled: boolean = true): UseQueryResult<PracticeTemplateResponse, Error> => {
+    const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetPracticeTemplate", practiceId, templateId],
         queryFn: () => PracticeService.getTemplate(practiceId, templateId),
-        enabled: enabled && !!practiceId && !!templateId,
+        enabled: isAuthenticated === true && enabled && !!practiceId && !!templateId,
     });
 };
 

@@ -1,5 +1,5 @@
 import { BaseButton, BaseText } from "@/components";
-import { AppleGallery } from "@/components/AppleGallery";
+import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -58,21 +58,52 @@ export default function PatientDetailsScreen() {
 
     // Scroll animation / blur
     const scrollY = useRef(new Animated.Value(0)).current;
+    // const HEADER_DISTANCE = 30;
+
     const HEADER_DISTANCE = 30;
 
     const avatarScale = scrollY.interpolate({
-        inputRange: [0, HEADER_DISTANCE - 20],
+        inputRange: [0, HEADER_DISTANCE],
         outputRange: [1, 0.7],
         extrapolate: "clamp",
     });
 
     const avatarTranslateY = scrollY.interpolate({
-        inputRange: [0, HEADER_DISTANCE - 0],
+        inputRange: [0, HEADER_DISTANCE],
         outputRange: [0, -35],
+        extrapolate: "clamp",
+    });
+
+    const avatarOpacity = scrollY.interpolate({
+        inputRange: [0, HEADER_DISTANCE * 0.8, HEADER_DISTANCE],
+        outputRange: [1, 0.5, 0.2],
         extrapolate: "clamp",
     });
     const nameOpacity = scrollY.interpolate({ inputRange: [0, HEADER_DISTANCE * 0.7, HEADER_DISTANCE], outputRange: [1, 0.5, 0], extrapolate: "clamp" });
 
+    const SNAP_THRESHOLD = 40;
+
+    const handleSnapScroll = (event: any) => {
+        const y = event.nativeEvent.contentOffset.y;
+
+        if (y > 0 && y < SNAP_THRESHOLD) {
+            // اگر نصفه اسکرول کرده، برگرد بالا
+            Animated.spring(scrollY, {
+                toValue: 0,
+                useNativeDriver: false,
+                speed: 8,
+                bounciness: 0,
+            }).start();
+        } else if (y >= SNAP_THRESHOLD && y < HEADER_DISTANCE) {
+            // اگر بیشتر از نصفه رفته، بره بالا کامل
+            Animated.spring(scrollY, {
+                toValue: HEADER_DISTANCE,
+                useNativeDriver: false,
+                speed: 8,
+                bounciness: 0,
+            }).start();
+        }
+    };
     useEffect(() => {
         const sub = scrollY.addListener(({ value }) => blurValue.setValue(value));
         return () => scrollY.removeListener(sub);
@@ -102,7 +133,7 @@ export default function PatientDetailsScreen() {
             return (
                 <>
                     <View className="items-center justify-center mb-6">
-                        <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], alignItems: "center" }}>
+                        <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], opacity: avatarOpacity, alignItems: "center" }}>
                             <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing imageUrl={patient?.data?.profile_image?.url} />
                         </Animated.View>
 
@@ -212,7 +243,31 @@ export default function PatientDetailsScreen() {
 
         return (
             <View style={{ flex: 1, backgroundColor: colors.system.white }}>
-                {activeTab === 0 && <AppleGallery images={Array.from({ length: 50 }, (_, i) => `https://picsum.photos/200/300?random=${i}`)} />}
+                {activeTab === 0 && (
+                    <GalleryWithMenu
+                        menuItems={[
+                            {
+                                icon: "wand.and.stars",
+                                label: "Use Magic",
+                                onPress: () => console.log("📸 Take Photo pressed"),
+                            },
+                            {
+                                icon: "square.and.arrow.up",
+                                label: "Share",
+                                role: "default",
+                                onPress: () => console.log("Share pressed"),
+                            },
+                            {
+                                icon: "archivebox",
+                                label: "Archive Image",
+                                role: "destructive",
+                                onPress: () => console.log("Archive Image pressed"),
+                            },
+                        ]}
+                        patientData={patient?.data}
+                        images={Array.from({ length: 50 }, (_, i) => `https://picsum.photos/200/300?random=${i}`)}
+                    />
+                )}
                 {activeTab === 1 && <BaseText className="p-5 flex-1 h-full">📝 Consent details...</BaseText>}
                 {activeTab === 2 && <BaseText className="p-5">🪪 ID info...</BaseText>}
                 {activeTab === 3 && <BaseText className="p-5">📊 Activity log...</BaseText>}
@@ -224,6 +279,7 @@ export default function PatientDetailsScreen() {
         <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
             <Animated.FlatList
                 data={DATA}
+                onMomentumScrollEnd={handleSnapScroll}
                 keyExtractor={(it) => it.key}
                 renderItem={renderRow}
                 scrollEventThrottle={16}
