@@ -6,9 +6,9 @@ import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useGetPatientById } from "@/utils/hook";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Image as RNImage, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { blurValue } from "./_layout";
 
@@ -24,6 +24,15 @@ export default function PatientDetailsScreen() {
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
+    const [firstImageUri, setFirstImageUri] = useState<string>("");
+
+    useEffect(() => {
+        const imageSource = require("../../assets/images/img_0944.jpg");
+        const resolved = RNImage.resolveAssetSource(imageSource);
+        if (resolved?.uri) {
+            setFirstImageUri(resolved.uri);
+        }
+    }, []);
 
     const screenWidth = Dimensions.get("window").width;
     const tabWidth = (screenWidth - 32) / tabs.length;
@@ -247,9 +256,15 @@ export default function PatientDetailsScreen() {
                     <GalleryWithMenu
                         menuItems={[
                             {
-                                icon: "wand.and.stars",
+                                icon: "sparkles",
                                 label: "Use Magic",
-                                onPress: () => console.log("📸 Take Photo pressed"),
+
+                                onPress: (imageUri) => {
+                                    router.push({
+                                        pathname: "/(fullmodals)/image-editor",
+                                        params: { uri: imageUri },
+                                    });
+                                },
                             },
                             {
                                 icon: "square.and.arrow.up",
@@ -265,7 +280,7 @@ export default function PatientDetailsScreen() {
                             },
                         ]}
                         patientData={patient?.data}
-                        images={Array.from({ length: 50 }, (_, i) => `https://picsum.photos/200/300?random=${i}`)}
+                        images={[firstImageUri || `https://picsum.photos/200/300?random=0`, ...Array.from({ length: 49 }, (_, i) => `https://picsum.photos/200/300?random=${i + 1}`)]}
                     />
                 )}
                 {activeTab === 1 && <BaseText className="p-5 flex-1 h-full">📝 Consent details...</BaseText>}

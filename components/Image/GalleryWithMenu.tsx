@@ -11,7 +11,7 @@ import { ImageViewerModal } from "./ImageViewerModal";
 interface MenuItem {
     icon: SymbolViewProps["name"];
     label: string;
-    onPress?: () => void;
+    onPress?: (uri: string) => void;
     role?: ButtonRole;
 }
 interface GalleryWithMenuProps {
@@ -58,9 +58,9 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initia
         <Host style={{ flex: 1 }}>
             <ContextMenu activationMethod="longPress">
                 <ContextMenu.Items>
-                    {menuItems.map((item, index) => (
-                        <Button key={`${item.icon}-${index}`} systemImage={item.icon} role={item.role} onPress={item.onPress}>
-                            {item.label}
+                    {menuItems.map((menu, index) => (
+                        <Button key={`${menu.icon}-${index}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(item)}>
+                            {menu.label}
                         </Button>
                     ))}
                 </ContextMenu.Items>
