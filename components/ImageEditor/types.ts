@@ -1,3 +1,4 @@
+import { ImageSourcePropType } from "react-native";
 // Types for Image Editor Tools
 
 export interface ImageChange {
@@ -32,9 +33,21 @@ export interface NoteChange {
     }>;
 }
 
+export interface MagicColorOption {
+    title: string;
+    image: ImageSourcePropType;
+    modeKey: string;
+}
+
+export interface MagicStyleOption {
+    title: string;
+    imageUri: ImageSourcePropType;
+    resultType: "orig" | "pred";
+}
+
 export interface MagicChange {
-    color: { title: string; image: string };
-    style: { title: string; imageUri: string };
+    color: MagicColorOption;
+    style: MagicStyleOption;
 }
 
 export interface PenChange {

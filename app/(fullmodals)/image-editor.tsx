@@ -1,5 +1,5 @@
 import { BaseText } from "@/components";
-import { ImageChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
 import { Button, Host } from "@expo/ui/swift-ui";
@@ -24,7 +24,13 @@ export default function ImageEditorScreen() {
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [resultImages, setResultImages] = useState<Record<string, string>>({});
-    const processedUriRef = useRef<string | null>(null);
+    const [magicSelection, setMagicSelection] = useState<{
+        modeKey: string;
+        resultType: "orig" | "pred";
+        colorTitle: string;
+        styleTitle: string;
+    } | null>(null);
+    const [displayedImageUri, setDisplayedImageUri] = useState<string | null>(null);
     const hasRequestedRef = useRef(false);
 
     const scale = useSharedValue(1);
@@ -58,6 +64,20 @@ export default function ImageEditorScreen() {
             const filtered = prev.filter((c) => c.type !== change.type);
             return [...filtered, change];
         });
+
+        if (change.type === "magic") {
+            const { color, style } = change.data as MagicChange;
+            if (color?.modeKey && style?.resultType) {
+                const selection = {
+                    modeKey: color.modeKey,
+                    resultType: style.resultType,
+                    colorTitle: color.title,
+                    styleTitle: style.title,
+                };
+                setMagicSelection(selection);
+                updateDisplayedImageFromResult(selection);
+            }
+        }
     };
 
     // ✅ تبدیل عکس به base64
@@ -94,7 +114,7 @@ export default function ImageEditorScreen() {
         const requestBody = {
             image_base64: imageBase64,
             color_settings: {
-                saturation_scale: 0.1,
+                saturation_scale: 0.4,
                 yellow_hue_range: [15, 45],
                 red_hue_range: [0, 15],
                 sat_range: [0, 255],
@@ -102,36 +122,36 @@ export default function ImageEditorScreen() {
             },
             texture_modes: {
                 Mode_A1: {
-                    fade_power: 5.5,
-                    center_offset: [0.0, 0.6],
+                    fade_power: 4.0,
+                    center_offset: [0.0, 0.1],
                     stretch: [0.5, 0.8],
                     center_opacity: 0.5,
                     blend_opacity: 0.8,
-                    mask_color: [0, 0, 255],
+                    mask_color: [92, 137, 170],
                 },
                 Mode_C1: {
-                    fade_power: 4.0,
-                    center_offset: [0.0, 0.5],
-                    stretch: [0.6, 0.9],
-                    center_opacity: 0.3,
-                    blend_opacity: 0.6,
-                    mask_color: [0, 255, 0],
+                    fade_power: 6.0,
+                    center_offset: [0.0, 0.2],
+                    stretch: [0.5, 0.8],
+                    center_opacity: 0.6,
+                    blend_opacity: 0.8,
+                    mask_color: [112, 158, 181],
                 },
                 Mode_D3: {
-                    fade_power: 7.0,
-                    center_offset: [0.0, 0.7],
-                    stretch: [0.4, 0.7],
-                    center_opacity: 0.7,
-                    blend_opacity: 0.9,
-                    mask_color: [255, 0, 0],
+                    fade_power: 6.0,
+                    center_offset: [0.0, 0.2],
+                    stretch: [0.5, 0.6],
+                    center_opacity: 0.5,
+                    blend_opacity: 0.8,
+                    mask_color: [101, 152, 184],
                 },
                 Mode_A2: {
-                    fade_power: 5.5,
-                    center_offset: [0.0, 0.6],
+                    fade_power: 4.0,
+                    center_offset: [0.0, 0.3],
                     stretch: [0.5, 0.8],
-                    center_opacity: 0.5,
+                    center_opacity: 0.99,
                     blend_opacity: 0.7,
-                    mask_color: [255, 255, 0],
+                    mask_color: [91, 137, 170],
                 },
             },
         };
@@ -146,11 +166,53 @@ export default function ImageEditorScreen() {
     };
 
     useEffect(() => {
+        hasRequestedRef.current = false;
+        setDisplayedImageUri(uri ?? null);
+    }, [uri]);
+
+    useEffect(() => {
+        if (!magicSelection) return;
+        updateDisplayedImageFromResult(magicSelection);
+    }, [magicSelection, resultImages]);
+
+    const formatBase64ToDataUri = (value: string) => {
+        if (!value) return null;
+        return value.startsWith("data:") ? value : `data:image/png;base64,${value}`;
+    };
+
+    const getResultImageForSelection = (selection: { modeKey: string; resultType: "orig" | "pred" }) => {
+        const { modeKey, resultType } = selection;
+        if (!modeKey) return null;
+        const normalizedModeKey = modeKey.toLowerCase();
+        const entries = Object.entries(resultImages);
+
+        const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
+        const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
+        if (directMatch?.[1]) return directMatch[1];
+
+        const fallback = entries.find(([key]) => key.toLowerCase().includes(normalizedModeKey));
+        return fallback?.[1] ?? null;
+    };
+
+    const updateDisplayedImageFromResult = (selection: { modeKey: string; resultType: "orig" | "pred"; colorTitle: string; styleTitle: string }) => {
+        const resultImage = getResultImageForSelection(selection);
+        if (resultImage) {
+            const formatted = formatBase64ToDataUri(resultImage);
+            if (formatted) {
+                console.log("🖼️ نمایش:", selection.colorTitle);
+                setDisplayedImageUri(formatted);
+                return;
+            }
+        }
+        console.log("🖼️ نمایش:", "اصلی");
+        setDisplayedImageUri(uri ?? null);
+    };
+
+    useEffect(() => {
         const processImage = async () => {
             if (!uri) return;
             if (hasRequestedRef.current) return;
             hasRequestedRef.current = true;
-            processedUriRef.current = uri;
             setIsProcessing(true);
             setIsLoading(true);
             try {
@@ -241,13 +303,7 @@ export default function ImageEditorScreen() {
             <View style={styles.canvasContainer}>
                 <GestureDetector gesture={pinch}>
                     <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
-                        <Image
-                            source={{
-                                uri: uri || "",
-                            }}
-                            style={styles.image}
-                            resizeMode="cover"
-                        />
+                        <Image source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} resizeMode="cover" />
                     </Animated.View>
                 </GestureDetector>
             </View>
