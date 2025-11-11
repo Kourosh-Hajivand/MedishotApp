@@ -61,7 +61,7 @@ export const routes = {
     patients: {
         list: (practiseId: string | number) => `${practiseId}/patients`,
         create: (practiseId: string | number) => `${practiseId}/patients`,
-        doctorList: () => `doctor/patients`,
+
         getById: (patientId: string | number) => `patients/${patientId}`,
         update: (patientId: string | number) => `patients/${patientId}`,
         delete: (patientId: string | number) => `patients/${patientId}`,
@@ -72,6 +72,7 @@ export const routes = {
         deleteMedia: (patientId: string | number, mediaId: string | number) => `patients/media/${patientId}/${mediaId}`,
         getTrashMedia: (patientId: string | number) => `patients/media/trash/${patientId}`,
         restoreMedia: (mediaId: string | number) => `patients/media/restore/${mediaId}`,
+        editMedia: (mediaId: string | number) => `patients/media/edit-image/${mediaId}`,
     },
 
     doctor: {

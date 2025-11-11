@@ -1,4 +1,4 @@
-import PatientService from "@/utils/service/PatientService";
+import PatientService, { GetPatientsParams } from "@/utils/service/PatientService";
 import { CreatePatientRequest, UpdatePatientRequest } from "@/utils/service/models/RequestModels";
 import { ApiResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
@@ -6,12 +6,21 @@ import { useAuth } from "./useAuth";
 
 // ============= Query Hooks (GET) =============
 
-export const useGetPatients = (practiseId?: string | number, page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
+export const useGetPatients = (practiseId?: string | number, params?: GetPatientsParams): UseQueryResult<PatientListResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: ["GetPatients", practiseId, page, perPage],
-        queryFn: () => PatientService.getPatients(practiseId!, page, perPage),
+        queryKey: ["GetPatients", practiseId, params],
+        queryFn: () => PatientService.getPatients(practiseId!, params),
         enabled: isAuthenticated === true && !!practiseId,
+    });
+};
+
+export const useGetDoctorPatients = (params?: { page?: number; per_page?: number }): UseQueryResult<PatientListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetDoctorPatients", params],
+        queryFn: () => PatientService.getDoctorPatients(params),
+        enabled: isAuthenticated === true,
     });
 };
 
@@ -74,14 +83,5 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
         onError: (error) => {
             onError?.(error);
         },
-    });
-};
-
-export const useGetDoctorPatients = (page: number = 1, perPage: number = 15): UseQueryResult<PatientListResponse, Error> => {
-    const { isAuthenticated } = useAuth();
-    return useQuery({
-        queryKey: ["GetDoctorPatients", page, perPage],
-        queryFn: () => PatientService.getDoctorPatients(page, perPage),
-        enabled: isAuthenticated === true,
     });
 };

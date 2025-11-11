@@ -6,24 +6,53 @@ import { ApiResponse, PatientDetailResponse, PatientListResponse } from "./model
 
 const {
     baseUrl,
-    patients: { list, create, doctorList, getById, update, delete: deleteRoute },
+    patients: { list, create, getById, update, delete: deleteRoute },
+    doctor: { getPatients: getDoctorPatientsRoute },
 } = routes;
+
+export interface GetPatientsParams {
+    doctor_id?: string | number;
+}
 
 const PatientService = {
     // Patient Management
-    getPatients: async (practiseId: string | number, page: number = 1, perPage: number = 15): Promise<PatientListResponse> => {
+    getPatients: async (practiseId: string | number, params?: GetPatientsParams): Promise<PatientListResponse> => {
         try {
-            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + list(practiseId), {
-                params: { page, per_page: perPage },
-            });
-            console.log("==============baseUrl + list(practiseId)======================");
-            console.log(baseUrl + list(practiseId));
-            console.log("====================================");
+            const queryParams = new URLSearchParams();
+            if (params?.doctor_id) {
+                queryParams.append("doctor_id", String(params.doctor_id));
+            }
+
+            const url = baseUrl + list(practiseId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
             console.error("Error in GetPatients:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patients failed");
+            }
+            throw error;
+        }
+    },
+
+    // Get Doctor's Patients
+    getDoctorPatients: async (params?: { page?: number; per_page?: number }): Promise<PatientListResponse> => {
+        try {
+            const queryParams = new URLSearchParams();
+            if (params?.page) {
+                queryParams.append("page", String(params.page));
+            }
+            if (params?.per_page) {
+                queryParams.append("per_page", String(params.per_page));
+            }
+
+            const url = baseUrl + getDoctorPatientsRoute() + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error("Error in GetDoctorPatients:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Get doctor patients failed");
             }
             throw error;
         }
@@ -193,22 +222,6 @@ const PatientService = {
             console.error("Error in DeletePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Delete patient failed");
-            }
-            throw error;
-        }
-    },
-
-    // Doctor Patients
-    getDoctorPatients: async (page: number = 1, perPage: number = 15): Promise<PatientListResponse> => {
-        try {
-            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(baseUrl + doctorList(), {
-                params: { page, per_page: perPage },
-            });
-            return response.data;
-        } catch (error) {
-            console.error("Error in GetDoctorPatients:", error);
-            if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get doctor patients failed");
             }
             throw error;
         }

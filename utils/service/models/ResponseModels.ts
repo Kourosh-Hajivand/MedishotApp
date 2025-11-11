@@ -264,6 +264,7 @@ export interface PatientContact {
 
 export interface Patient {
     id: number;
+    chart_number: string;
     first_name: string;
     last_name: string;
     full_name: string;
@@ -286,12 +287,6 @@ export interface PatientListResponse {
     success: true;
     message: string;
     data: Patient[];
-    current_page: number;
-    last_page: number;
-    per_page: number;
-    total: number;
-    from: number;
-    to: number;
 }
 
 export interface PatientDetailResponse {

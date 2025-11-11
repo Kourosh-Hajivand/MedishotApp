@@ -20,6 +20,7 @@ export default function PatientsLayout() {
     const { logout: handleLogout, profile, isAuthenticated } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, viewMode, setSelectedPractice, setViewMode, isLoaded, isLoading } = useProfileStore();
+    console.log("practiceList", selectedPractice);
 
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {

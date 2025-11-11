@@ -5,14 +5,14 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
 import { openCallForPatient, openMessageForPatient } from "@/utils/helper/communication";
-import { useGetDoctorPatients, useGetPatients } from "@/utils/hook";
+import { useGetPatients } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { useHeaderHeight } from "@react-navigation/elements";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -26,16 +26,17 @@ export default function PatientsScreen() {
     const headerHeight = useHeaderHeight();
     const { q } = useLocalSearchParams<{ q?: string }>();
 
-    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, 1, 1000);
-    const { data: doctorPatients, isLoading: isDoctorPatientsLoading } = useGetDoctorPatients(1, 1000);
+    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: viewMode === "doctor" ? selectedPractice?.id : undefined });
 
-    const currentPatients = viewMode === "doctor" ? doctorPatients?.data : patients?.data;
-    const isLoading = viewMode === "doctor" ? isDoctorPatientsLoading : isPatientsLoading;
+    const currentPatients = patients?.data;
+    const isLoading = isPatientsLoading;
 
     const groupedPatients =
         currentPatients?.reduce(
             (acc: Record<string, { full_name: string; id: number }[]>, patient: any) => {
-                const letter = patient.full_name[0].toUpperCase();
+                const firstChar = patient.full_name?.[0]?.toUpperCase();
+                // اگر حرف اول وجود نداشته باشد یا در A-Z نباشد، آن را به بخش "#" اضافه کن
+                const letter = firstChar && alphabet.includes(firstChar) ? firstChar : "#";
                 if (!acc[letter]) acc[letter] = [];
                 acc[letter].push(patient);
                 return acc;
@@ -65,12 +66,36 @@ export default function PatientsScreen() {
         {} as Record<string, { full_name: string; id: number }[]>,
     );
 
-    const sections = Object.keys(filteredGroupedPatients)
-        .sort()
-        .map((letter) => ({
+    const sections = (() => {
+        const keys = Object.keys(filteredGroupedPatients);
+        const hashSection = keys.find((key) => key === "#");
+        const otherKeys = keys.filter((key) => key !== "#").sort();
+        // بخش "#" را در انتهای لیست قرار بده
+        const sortedKeys = hashSection ? [...otherKeys, hashSection] : otherKeys;
+        return sortedKeys.map((letter) => ({
             title: letter,
             data: filteredGroupedPatients[letter],
         }));
+    })();
+
+    // آرایه حروف الفبا برای نمایش در sidebar (شامل "#" اگر وجود داشته باشد)
+    const alphabetWithHash = useMemo(() => {
+        return sections.some((s) => s.title === "#") ? [...alphabet, "#"] : alphabet;
+    }, [sections]);
+
+    // نگه‌داری alphabetWithHash در ref برای استفاده در gesture handlers
+    const alphabetWithHashRef = useRef<string[]>(alphabetWithHash);
+    useEffect(() => {
+        alphabetWithHashRef.current = alphabetWithHash;
+    }, [alphabetWithHash]);
+
+    // طول alphabetWithHash را برای استفاده در gesture handlers نگه دار
+    const alphabetLengthSV = useSharedValue(alphabetWithHash.length);
+
+    // بروزرسانی طول وقتی sections تغییر می‌کند
+    useEffect(() => {
+        alphabetLengthSV.value = alphabetWithHash.length;
+    }, [alphabetWithHash.length, alphabetLengthSV]);
 
     const handleAlphabetPress = (letter: string, animated = true) => {
         const sectionIndex = sections.findIndex((sec) => sec.title === letter);
@@ -92,6 +117,20 @@ export default function PatientsScreen() {
                 console.warn("ScrollToLocation error:", e);
             }
         }, 50);
+    };
+
+    // توابع helper برای gesture handlers
+    const handleGestureUpdate = (index: number) => {
+        const letter = alphabetWithHashRef.current[index] || "";
+        setActiveLetter(letter);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        handleAlphabetPress(letter, false);
+    };
+
+    const handleGestureTap = (index: number) => {
+        const letter = alphabetWithHashRef.current[index] || "";
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        handleAlphabetPress(letter, true);
     };
 
     const onAlphabetContainerLayout = (event: any) => {
@@ -119,15 +158,13 @@ export default function PatientsScreen() {
             const relativeY = e.absoluteY - alphabetContainerLayout.y;
             if (relativeY < 0 || relativeY > containerHeight) return;
 
-            const itemHeight = containerHeight / alphabet.length;
+            const alphabetLength = alphabetLengthSV.value;
+            const itemHeight = containerHeight / alphabetLength;
             const index = Math.floor(relativeY / itemHeight);
-            const clampedIndex = Math.max(0, Math.min(index, alphabet.length - 1));
-            const letter = alphabet[clampedIndex];
+            const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
             if (clampedIndex !== activeIndexSV.value) {
                 activeIndexSV.value = clampedIndex;
-                runOnJS(setActiveLetter)(letter);
-                runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-                runOnJS(handleAlphabetPress)(letter, false);
+                runOnJS(handleGestureUpdate)(clampedIndex);
             }
         })
         .onEnd(() => {
@@ -144,12 +181,11 @@ export default function PatientsScreen() {
         const relativeY = e.absoluteY - alphabetContainerLayout.y;
         if (relativeY < 0 || relativeY > containerHeight) return;
 
-        const itemHeight = containerHeight / alphabet.length;
+        const alphabetLength = alphabetLengthSV.value;
+        const itemHeight = containerHeight / alphabetLength;
         const index = Math.floor(relativeY / itemHeight);
-        const clampedIndex = Math.max(0, Math.min(index, alphabet.length - 1));
-        const letter = alphabet[clampedIndex];
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-        runOnJS(handleAlphabetPress)(letter, true);
+        const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
+        runOnJS(handleGestureTap)(clampedIndex);
     });
 
     const composedGesture = Gesture.Race(pan, tap);
@@ -289,7 +325,7 @@ export default function PatientsScreen() {
                 <View className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center" ref={alphabetContainerRef} onLayout={onAlphabetContainerLayout} style={{ zIndex: 1 }} pointerEvents="box-none">
                     <GestureDetector gesture={composedGesture}>
                         <View style={styles.alphabetWrapper} pointerEvents="auto">
-                            {alphabet.map((letter) => {
+                            {alphabetWithHash.map((letter) => {
                                 const hasSection = sections.some((s) => s.title === letter);
                                 const isActive = isDragging && activeLetter === letter;
                                 return (
