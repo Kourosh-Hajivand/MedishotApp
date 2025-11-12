@@ -7,6 +7,12 @@ const config = getDefaultConfig(__dirname);
 config.transformer = {
     ...config.transformer,
     babelTransformerPath: require.resolve("react-native-svg-transformer"),
+    getTransformOptions: async () => ({
+        transform: {
+            experimentalImportSupport: false,
+            inlineRequires: true,
+        },
+    }),
 };
 
 config.resolver = {
@@ -15,4 +21,9 @@ config.resolver = {
     sourceExts: [...config.resolver.sourceExts, "svg"],
 };
 
-module.exports = withNativeWind(config, { input: "./app/global.css" });
+// Enable watch mode for better style reloading
+config.watchFolders = [__dirname];
+
+module.exports = withNativeWind(config, { 
+    input: "./app/global.css",
+});
