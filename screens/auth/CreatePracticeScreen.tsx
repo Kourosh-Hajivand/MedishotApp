@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
@@ -91,6 +91,7 @@ export const CreatePracticeScreen: React.FC = () => {
     );
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
+        Keyboard.dismiss();
         setSelectedImage(result.uri);
 
         // تبدیل URI به File object برای آپلود
@@ -117,25 +118,28 @@ export const CreatePracticeScreen: React.FC = () => {
         error,
     } = useCreatePractice(() => {
         router.replace("/(tabs)/patients");
+        storeTokens(token);
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
     });
 
     const onSubmit = (data: FormData) => {
-        storeTokens(token);
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         console.log("====================================");
-        console.log({
+        console.log("data to create practice", {
             name: data.practiceName,
             metadata: {
                 website: `https://${data.website}`,
-                email: "",
                 phone: normalizeUSPhoneToE164(data.phoneNumber),
                 address: data.address,
                 zipcode: Number(data.zipCode),
+                city: "",
+                country: "",
+                email: "",
             },
             type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : {}),
+            ...(uploadedFilename ? { image: uploadedFilename } : ""),
         });
         console.log("====================================");
+
         createPractice({
             name: data.practiceName,
             metadata: {
@@ -143,9 +147,12 @@ export const CreatePracticeScreen: React.FC = () => {
                 phone: normalizeUSPhoneToE164(data.phoneNumber),
                 address: data.address,
                 zipcode: Number(data.zipCode),
+                city: "",
+                country: "",
+                email: "",
             },
             type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : {}),
+            ...(uploadedFilename ? { image: uploadedFilename } : ""),
         });
     };
 

@@ -2,7 +2,7 @@ import { CameraIcon, GalleryWideIcon } from "@/assets/icons";
 import { BottomSheetBackdrop, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useMemo, useRef } from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Keyboard, StyleSheet, TouchableOpacity, View } from "react-native";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared";
 import BaseButton from "./button/BaseButton";
@@ -17,6 +17,7 @@ export default function ImagePickerWrapper({ onImageSelected, children }: Props)
     const snapPoints = useMemo(() => ["50%"], []);
 
     const openSheet = useCallback(() => {
+        Keyboard.dismiss();
         bottomSheetRef.current?.present();
         console.log("openSheet");
     }, []);

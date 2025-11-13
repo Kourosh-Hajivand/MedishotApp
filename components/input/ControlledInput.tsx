@@ -10,7 +10,7 @@ import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors";
 import { BaseText } from "../text/BaseText";
 
-export default function ControlledInput<T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", PlaceHolder, optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps) {
+export default function ControlledInput<T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<TextInput>(null);
@@ -32,19 +32,18 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                 control={control}
                 name={name}
                 render={({ field: { onChange, onBlur, value } }) => {
-                    // 🟢 Phone formatting logic
                     const handlePhoneChange = (text: string) => {
                         const digits = text.replace(/\D/g, "");
 
-                        // فقط زمانی که عدد وارد شده باشد چیزی نمایش داده شود
                         if (digits.length === 0) {
                             onChange("");
                             return;
                         }
 
-                        const normalized = digits.startsWith("1") && digits.length >= 10 ? `+1${digits.slice(1, 11)}` : `+1${digits.slice(0, 10)}`;
+                        const limited = digits.slice(0, 10);
 
-                        const formatted = formatUSPhoneNumber(normalized);
+                        const formatted = formatUSPhoneNumber(limited);
+
                         onChange(formatted);
                     };
 
@@ -99,21 +98,40 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                         </View>
                                     )}
 
-                                    {/* Input */}
+                                    {/* INPUT */}
                                     <TextInput
                                         ref={inputRef}
                                         {...props}
-                                        value={name === "phoneNumber" ? (value ? formatUSPhoneNumber(value || "") : "") : SperatedNumber && value ? formatNumber(value.toString()) : value}
+                                        value={name === "phoneNumber" ? value || "" : SperatedNumber && value ? formatNumber(value.toString()) : value}
                                         onChangeText={handleChange}
                                         onBlur={(e) => {
                                             setIsFocused(false);
+
+                                            // -------------------------
+                                            //  ذخیره مقدار واقعی با +1
+                                            // -------------------------
+                                            if (name === "phoneNumber" && value) {
+                                                const digits = value.replace(/\D/g, "");
+
+                                                if (digits.length === 10) {
+                                                    const finalValue = "+1" + digits; // ذخیره واقعی
+                                                    const shownFormatted = formatUSPhoneNumber(digits); // نمایش
+
+                                                    onChange(shownFormatted);
+
+                                                    // مقدار واقعی را یک لحظه بعد ذخیره کن
+                                                    setTimeout(() => {
+                                                        onChange(finalValue);
+                                                    }, 0);
+                                                }
+                                            }
+
                                             onBlur();
                                             props.onBlur?.(e);
                                         }}
                                         onFocus={(e) => {
                                             setIsFocused(true);
                                             props.onFocus?.(e);
-                                            // حذف افزودن خودکار +1
                                         }}
                                         editable={!disabled}
                                         placeholder=""
@@ -132,16 +150,14 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                         ]}
                                     />
 
-                                    {/* Password toggle */}
                                     {type === "password" && (
-                                        <TouchableOpacity onPress={togglePasswordVisibility} disabled={disabled} style={styles.passwordToggle} accessibilityLabel="Toggle Password Visibility">
+                                        <TouchableOpacity onPress={togglePasswordVisibility} disabled={disabled} style={styles.passwordToggle}>
                                             {showPassword ? <EyeVisibleIcon width={20} height={20} strokeWidth={0} /> : <EyeInvisibleIcon width={20} height={20} strokeWidth={0} />}
                                         </TouchableOpacity>
                                     )}
                                 </TouchableOpacity>
                             </View>
 
-                            {/* Error or Info */}
                             {(!!error || haveBorder) && (
                                 <View style={styles.errorContainer}>
                                     {!!error && (

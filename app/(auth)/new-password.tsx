@@ -10,8 +10,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z
     .object({
-        password: z.string().min(6, "Password must be at least 6 characters"),
-        confirmPassword: z.string().min(6, "Password must be at least 6 characters"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+        confirmPassword: z.string().min(8, "Password must be at least 8 characters"),
     })
     .refine((data) => data.password === data.confirmPassword, {
         message: "Passwords don't match",
