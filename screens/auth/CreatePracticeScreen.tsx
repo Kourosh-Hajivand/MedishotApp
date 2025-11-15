@@ -123,36 +123,16 @@ export const CreatePracticeScreen: React.FC = () => {
     });
 
     const onSubmit = (data: FormData) => {
-        console.log("====================================");
-        console.log("data to create practice", {
-            name: data.practiceName,
-            metadata: {
-                website: `https://${data.website}`,
-                phone: normalizeUSPhoneToE164(data.phoneNumber),
-                address: data.address,
-                zipcode: Number(data.zipCode),
-                city: "",
-                country: "",
-                email: "",
-            },
-            type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : ""),
-        });
-        console.log("====================================");
-
         createPractice({
             name: data.practiceName,
-            metadata: {
-                website: `https://${data.website}`,
+            metadata: JSON.stringify({
+                website: data.website ? `https://${data.website}` : "",
                 phone: normalizeUSPhoneToE164(data.phoneNumber),
                 address: data.address,
                 zipcode: Number(data.zipCode),
-                city: "",
-                country: "",
-                email: "",
-            },
+            }),
             type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : ""),
+            ...(uploadedFilename ? { image: uploadedFilename } : {}),
         });
     };
 

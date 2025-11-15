@@ -34,11 +34,10 @@ export const PracticeService = {
             }
 
             if (data.metadata) {
-                Object.entries(data.metadata).forEach(([key, value]) => {
-                    if (value !== undefined && value !== null) {
-                        formData.append(`metadata[${key}]`, String(value));
-                    }
-                });
+                // اگر metadata یک string است (JSON stringified شده)، مستقیماً ارسال می‌کنیم
+                // اگر object است، آن را JSON.stringify می‌کنیم
+                const metadataString = typeof data.metadata === "string" ? data.metadata : JSON.stringify(data.metadata);
+                formData.append("metadata", metadataString);
             }
 
             const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + create(), formData, {

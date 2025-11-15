@@ -61,7 +61,7 @@ export interface CreatePracticeDto {
     name: string;
     type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology";
     image?: File | string;
-    metadata?: PracticeMetadata;
+    metadata?: string; // JSON string
 }
 
 export interface UpdatePracticeDto {
