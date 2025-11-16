@@ -1,5 +1,3 @@
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import { Dimensions, Image, StyleSheet, View } from "react-native";
@@ -7,13 +5,10 @@ import DocumentScanner from "react-native-document-scanner-plugin";
 import { SafeAreaView } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
 import { BaseButton, BaseText } from "../components";
-import { AddPatientStackParamList } from "../navigation/AddPatientModalNavigator";
 import { spacing } from "../styles/spaces";
 import { parseUSIDCardData } from "../utils/helper/HelperFunction";
 
 export const AddPatientFormScreen: React.FC = () => {
-    const navigation = useNavigation<NativeStackNavigationProp<AddPatientStackParamList>>();
-
     const screenWidth = Dimensions.get("window").width;
     const imageWidth = screenWidth * 0.7;
     const imageHeight = screenWidth * 0.6;
