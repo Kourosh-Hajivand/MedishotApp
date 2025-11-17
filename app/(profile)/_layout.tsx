@@ -8,13 +8,10 @@ export default function layout() {
             screenOptions={{
                 headerShown: true,
                 headerLeft: () => <BackButton onPress={() => router.back()} />,
-                headerTitle: "",
+                headerTitle: "Profile",
                 headerShadowVisible: true,
                 headerTransparent: true,
-                // presentation: "transparentModal",
-                headerStyle: {
-                    backgroundColor: "transparent",
-                },
+                headerLargeTitle: true,
             }}
         >
             <Stack.Screen name="index" />

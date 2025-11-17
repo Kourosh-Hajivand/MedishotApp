@@ -20,7 +20,6 @@ export default function PatientsLayout() {
     const { logout: handleLogout, profile, isAuthenticated } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, viewMode, setSelectedPractice, setViewMode, isLoaded, isLoading } = useProfileStore();
-    console.log("practiceList", selectedPractice);
 
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {
@@ -121,9 +120,9 @@ export default function PatientsLayout() {
                                     </ContextMenu.Items>
 
                                     <ContextMenu.Trigger>
-                                        <View style={{ width: 35, backgroundColor: "white", borderRadius: 100 }} className="flex-row items-center gap-2">
+                                        <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: 35, backgroundColor: "white", borderRadius: 100 }} className="flex-row items-center gap-2">
                                             <Avatar name={viewMode === "doctor" ? (profile?.first_name ?? "") : (selectedPractice?.name ?? "")} size={35} />
-                                        </View>
+                                        </TouchableOpacity>
                                     </ContextMenu.Trigger>
                                 </ContextMenu>
                             </Host>

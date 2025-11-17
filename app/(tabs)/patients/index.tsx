@@ -287,7 +287,7 @@ export default function PatientsScreen() {
                                         style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
                                         className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
                                     >
-                                        <Avatar haveRing name={item.full_name} size={36} />
+                                        <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url} />
                                         <BaseText type="Callout" weight={500} color="labels.primary">
                                             {item.full_name}
                                         </BaseText>
