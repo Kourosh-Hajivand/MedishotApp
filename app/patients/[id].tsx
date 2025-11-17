@@ -68,47 +68,54 @@ export default function PatientDetailsScreen() {
     };
 
     // Scroll animation / blur
-    const scrollY = useRef(new Animated.Value(0)).current;
+    const scrollY = useRef(new Animated.Value(-headerHeight)).current;
     // const HEADER_DISTANCE = 30;
 
-    const HEADER_DISTANCE = 30;
+    const HEADER_DISTANCE = 60;
+    const scrollStart = -headerHeight + 60;
+    const animationStart = scrollStart; // انیمیشن از scrollStart شروع می‌شود تا فاصله بالا رو هم در نظر بگیره
+    const animationEnd = scrollStart + HEADER_DISTANCE;
 
     const avatarScale = scrollY.interpolate({
-        inputRange: [0, HEADER_DISTANCE],
+        inputRange: [animationStart, animationEnd],
         outputRange: [1, 0.7],
         extrapolate: "clamp",
     });
 
     const avatarTranslateY = scrollY.interpolate({
-        inputRange: [0, HEADER_DISTANCE],
+        inputRange: [animationStart, animationEnd],
         outputRange: [0, -35],
         extrapolate: "clamp",
     });
 
     const avatarOpacity = scrollY.interpolate({
-        inputRange: [0, HEADER_DISTANCE * 0.8, HEADER_DISTANCE],
+        inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.8, animationEnd],
         outputRange: [1, 0.5, 0.2],
         extrapolate: "clamp",
     });
-    const nameOpacity = scrollY.interpolate({ inputRange: [0, HEADER_DISTANCE * 0.7, HEADER_DISTANCE], outputRange: [1, 0.5, 0], extrapolate: "clamp" });
+    const nameOpacity = scrollY.interpolate({
+        inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.7, animationEnd],
+        outputRange: [1, 0.5, 0],
+        extrapolate: "clamp",
+    });
 
-    const SNAP_THRESHOLD = 40;
+    const SNAP_THRESHOLD = scrollStart + 50;
 
     const handleSnapScroll = (event: any) => {
         const y = event.nativeEvent.contentOffset.y;
 
-        if (y > 0 && y < SNAP_THRESHOLD) {
+        if (y > scrollStart && y < SNAP_THRESHOLD) {
             // اگر نصفه اسکرول کرده، برگرد بالا
             Animated.spring(scrollY, {
-                toValue: 0,
+                toValue: scrollStart,
                 useNativeDriver: false,
                 speed: 8,
                 bounciness: 0,
             }).start();
-        } else if (y >= SNAP_THRESHOLD && y < HEADER_DISTANCE) {
+        } else if (y >= SNAP_THRESHOLD && y < animationEnd) {
             // اگر بیشتر از نصفه رفته، بره بالا کامل
             Animated.spring(scrollY, {
-                toValue: HEADER_DISTANCE,
+                toValue: animationEnd,
                 useNativeDriver: false,
                 speed: 8,
                 bounciness: 0,
@@ -123,10 +130,10 @@ export default function PatientDetailsScreen() {
     useEffect(() => {
         if (!patient?.data) return;
         const sub = scrollY.addListener(({ value }) => {
-            navigation.setOptions({ headerTitle: value > HEADER_DISTANCE ? `${patient?.data?.first_name} ${patient?.data?.last_name}` : "" });
+            navigation.setOptions({ headerTitle: value > animationEnd ? `${patient?.data?.first_name} ${patient?.data?.last_name}` : "" });
         });
         return () => scrollY.removeListener(sub);
-    }, [navigation, patient?.data]);
+    }, [navigation, patient?.data, animationEnd]);
 
     if (isLoading) {
         return (
