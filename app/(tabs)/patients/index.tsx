@@ -27,7 +27,9 @@ export default function PatientsScreen() {
     const { q } = useLocalSearchParams<{ q?: string }>();
 
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: viewMode === "doctor" ? selectedPractice?.id : undefined });
-
+    console.log("====================================");
+    console.log(patients?.data);
+    console.log("====================================");
     const currentPatients = patients?.data;
     const isLoading = isPatientsLoading;
 

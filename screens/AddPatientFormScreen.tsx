@@ -33,7 +33,6 @@ export const AddPatientFormScreen: React.FC = () => {
                 const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                 setExtractedText(fullText);
                 console.log("OCR:", fullText);
-
                 // Parse the extracted data
                 const parsed = parseUSIDCardData(fullText, imagePath);
                 setParsedData(parsed);

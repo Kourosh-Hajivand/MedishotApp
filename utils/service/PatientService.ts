@@ -115,6 +115,10 @@ const PatientService = {
                 formData.append("image", payload.image);
             }
 
+            if (payload.id_card) {
+                formData.append("id_card", payload.id_card);
+            }
+
             const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + create(practiseId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
@@ -199,6 +203,10 @@ const PatientService = {
 
             if (payload.image) {
                 formData.append("image", payload.image);
+            }
+
+            if (payload.id_card) {
+                formData.append("id_card", payload.id_card);
             }
 
             const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.put(baseUrl + update(patientId), formData, {

@@ -147,6 +147,7 @@ export interface CreatePatientRequest {
     links?: PatientLink[];
     metadata?: PatientMetadata;
     image?: File | string;
+    id_card?: File | string;
 }
 
 export interface UpdatePatientRequest {
@@ -161,6 +162,7 @@ export interface UpdatePatientRequest {
     links?: PatientLink[];
     metadata?: PatientMetadata;
     image?: File | string;
+    id_card?: File | string;
 }
 
 // ============= Media Models =============

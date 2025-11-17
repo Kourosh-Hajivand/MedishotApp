@@ -2,6 +2,7 @@ import { AvatarIcon } from "@/assets/icons";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
+import { routes } from "@/routes/routes";
 import { useCreatePatient, useGetPatientById, useTempUpload, useUpdatePatient } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { CreatePatientRequest } from "@/utils/service/models/RequestModels";
@@ -9,7 +10,7 @@ import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Image, Pressable, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
@@ -25,9 +26,85 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+type AddressValue = {
+    street1: string;
+    street2: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+};
+
+const createEmptyAddressValue = (): AddressValue => ({
+    street1: "",
+    street2: "",
+    city: "",
+    state: "",
+    zip: "",
+    country: "United States",
+});
+
+const normalizeAddressValue = (address: any): AddressValue => {
+    const base = createEmptyAddressValue();
+
+    if (!address) {
+        return base;
+    }
+
+    if (typeof address === "string") {
+        return { ...base, street1: address };
+    }
+
+    if (typeof address === "object") {
+        const candidate = "value" in address ? address.value : address;
+        if (candidate && typeof candidate === "object") {
+            return {
+                ...base,
+                ...candidate,
+                street1: candidate.street1 ?? candidate.street ?? base.street1,
+                street2: candidate.street2 ?? candidate.street_extra ?? "",
+            };
+        }
+    }
+
+    return base;
+};
+
+const API_BASE_URL = routes.baseUrl.replace(/\/+$/, "");
+const STORAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, "");
+
+const formatImageUri = (uri: string | null): string | null => {
+    if (!uri) return null;
+
+    const trimmed = uri.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (trimmed.startsWith("file://") || trimmed.startsWith("content://")) {
+        return trimmed;
+    }
+
+    let normalized = trimmed;
+
+    if (!/^https?:\/\//i.test(normalized)) {
+        const base = STORAGE_BASE_URL || API_BASE_URL;
+        normalized = `${base}${normalized.startsWith("/") ? "" : "/"}${normalized}`;
+    }
+
+    const parts = normalized.split("://");
+    if (parts.length === 2) {
+        const [protocol, rest] = parts;
+        normalized = `${protocol}://${rest.replace(/\/{2,}/g, "/")}`;
+    }
+
+    return normalized;
+};
+
 export const AddPatientPhotoScreen: React.FC = () => {
     const router = useRouter();
     const navigation = useNavigation();
+
     const params = useLocalSearchParams<{
         id?: string;
         firstName?: string;
@@ -40,11 +117,14 @@ export const AddPatientPhotoScreen: React.FC = () => {
         email?: string;
         scannedImageUri?: string;
     }>();
+
     const { data: patient } = useGetPatientById(params.id ?? "");
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const safeAreaInsets = useSafeAreaInsets();
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
     const [hasUploadedScannedImage, setHasUploadedScannedImage] = useState(false);
+    const [idCardImage, setIdCardImage] = useState<string | null>(null);
+    const [idCardFilename, setIdCardFilename] = useState<string | null>(null);
     // States for dynamic inputs
     const [phones, setPhones] = useState<any[]>([]);
     const [emails, setEmails] = useState<any[]>([]);
@@ -97,6 +177,18 @@ export const AddPatientPhotoScreen: React.FC = () => {
         },
     );
 
+    const { mutate: uploadIdCardImage, isPending: isUploadingIdCard } = useTempUpload(
+        (response) => {
+            setIdCardFilename(response.filename);
+            console.log("ID Card image uploaded successfully:", response.filename);
+        },
+        (error) => {
+            console.error("Error uploading ID card image:", error.message);
+        },
+    );
+
+    const displayIdCardImage = useMemo(() => formatImageUri(idCardImage), [idCardImage]);
+
     // Auto-fill form with parsed ID card data
     useEffect(() => {
         if (!isEditMode && params.firstName) {
@@ -116,10 +208,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setValue("gender", genderValue === "male" ? "Male" : genderValue === "female" ? "Female" : params.gender);
             }
 
-            // Set scanned image if available
+            // Set scanned ID card image if available (don't set as profile image)
             if (params.scannedImageUri && !hasUploadedScannedImage) {
-                setSelectedImage(params.scannedImageUri);
-                // Upload the scanned image automatically
+                setIdCardImage(params.scannedImageUri);
+                // Upload the scanned ID card image automatically
                 try {
                     const filename = params.scannedImageUri.split("/").pop() || "scanned-id.jpg";
                     const match = /\.(\w+)$/.exec(filename);
@@ -131,11 +223,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         name: filename,
                     } as any;
 
-                    // Upload the scanned image
-                    uploadImage(file);
+                    // Upload the scanned ID card image
+                    uploadIdCardImage(file);
                     setHasUploadedScannedImage(true);
                 } catch (err) {
-                    console.log("Error preparing scanned image:", err);
+                    console.log("Error preparing scanned ID card image:", err);
                 }
             }
 
@@ -167,16 +259,19 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     {
                         id: "address-0",
                         label: "Home",
-                        value: params.address,
+                        value: normalizeAddressValue(params.address),
                     },
                 ]);
             }
         }
-    }, [params, isEditMode, setValue, uploadImage, hasUploadedScannedImage]);
+    }, [params, isEditMode, setValue, uploadIdCardImage, hasUploadedScannedImage]);
 
     useEffect(() => {
         if (patient?.data && isEditMode) {
             const patientData = patient.data;
+            console.log("====================================");
+            console.log(patientData?.addresses);
+            console.log("====================================");
             setValue("first_name", patientData.first_name || "");
             setValue("last_name", patientData.last_name || "");
             setValue("birth_date", patientData.birth_date || "");
@@ -184,6 +279,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
             if (patientData.profile_image?.url) {
                 setSelectedImage(patientData.profile_image.url);
+            }
+
+            if (patientData.id_card?.url) {
+                setIdCardImage(patientData.id_card.url);
+                setIdCardFilename(patientData.id_card.url);
             }
 
             if (patientData?.numbers && patientData?.numbers?.length > 0) {
@@ -195,30 +295,53 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setPhones(phoneData);
             }
 
-            if (patientData?.email && patientData?.email?.length > 0) {
-                const emailData = patientData.email.map((email: any, index: number) => ({
-                    id: `email-${index}`,
-                    label: "Personal",
-                    value: email,
-                }));
-                setEmails(emailData);
+            if (patientData?.email) {
+                if (Array.isArray(patientData.email)) {
+                    const emailData = patientData.email.map((email: any, index: number) => ({
+                        id: `email-${index}`,
+                        label: "Personal",
+                        value: email,
+                    }));
+                    setEmails(emailData);
+                } else if (typeof patientData.email === "string") {
+                    setEmails([
+                        {
+                            id: "email-0",
+                            label: "Personal",
+                            value: patientData.email,
+                        },
+                    ]);
+                }
             }
 
             if (patientData?.addresses && patientData?.addresses?.length > 0) {
-                const addressData = patientData.addresses.map((address: any, index: number) => ({
-                    id: `address-${index}`,
-                    label: "Home",
-                    value: typeof address === "string" ? address : address,
-                }));
+                const addressData = patientData.addresses.map((address: any, index: number) => {
+                    const label = typeof address === "object" && address?.type ? address.type : "Home";
+                    const valueSource = typeof address === "object" && "value" in address ? address.value : address;
+                    return {
+                        id: `address-${index}`,
+                        label,
+                        value: normalizeAddressValue(valueSource),
+                    };
+                });
                 setAddresses(addressData);
             }
 
             if (patientData?.links && patientData?.links?.length > 0) {
-                const linkData = patientData.links.map((link: any, index: number) => ({
-                    id: `link-${index}`,
-                    label: "Other",
-                    value: typeof link === "string" ? link : link,
-                }));
+                const linkData = patientData.links.map((link: any, index: number) => {
+                    if (typeof link === "string") {
+                        return {
+                            id: `link-${index}`,
+                            label: "Other",
+                            value: link,
+                        };
+                    }
+                    return {
+                        id: `link-${index}`,
+                        label: link?.type || "Other",
+                        value: link?.value || "",
+                    };
+                });
                 setUrls(linkData);
             }
         }
@@ -247,11 +370,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     typeof address.value === "object"
                         ? address.value
                         : {
-                              street: address.value as string,
+                              street1: (address.value as string) ?? "",
+                              street2: "",
                               city: "",
                               state: "",
                               zip: "",
-                              country: "",
+                              country: "United States",
                           },
             }));
 
@@ -298,6 +422,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
         if (selectedImage) {
             patientData.image = selectedImage;
+        }
+
+        if (idCardFilename) {
+            patientData.id_card = idCardFilename;
         }
 
         console.log("Final patient data to submit:--------------------------------", selectedPractice?.id, patientData);
@@ -465,6 +593,9 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
         }
     };
+    console.log("===============displayIdCardImage=====================");
+    console.log(displayIdCardImage);
+    console.log("====================================");
     return (
         <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
             <View className="flex-1 bg-system-gray6 gap-8">
@@ -511,6 +642,16 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                         </View>
                     </View>
+                    {displayIdCardImage && (
+                        <View className="bg-white rounded-2xl p-4 flex-row items-start justify-between ">
+                            <BaseText type="Body" weight="500" color="labels.primary">
+                                ID Card
+                            </BaseText>
+                            <View className="w-[192px] h-[122px] rounded-xl bg-system-gray6 overflow-hidden">
+                                <Image source={{ uri: displayIdCardImage }} className="w-full h-full " resizeMode="cover" />
+                            </View>
+                        </View>
+                    )}
                     <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
                     <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
                     <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />

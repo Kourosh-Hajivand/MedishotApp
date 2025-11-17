@@ -18,8 +18,10 @@ export default function PatientDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
     const { data: patient, isLoading } = useGetPatientById(id);
-
-    const headerHeight = useHeaderHeight(); // ارتفاع واقعی هدر (با ناحیه‌ی ناتچ)
+    console.log("====================================");
+    console.log(patient?.data);
+    console.log("====================================");
+    const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
@@ -210,7 +212,7 @@ export default function PatientDetailsScreen() {
                                         chart number:
                                     </BaseText>
                                     <BaseText type="Subhead" color="labels.primary">
-                                        #{patient?.data?.metadata?.chart_number}
+                                        #{patient?.data?.chart_number}
                                     </BaseText>
                                 </View>
                             </View>
