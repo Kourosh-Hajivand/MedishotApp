@@ -1,5 +1,7 @@
 import axios from 'axios';
-import {getTokens} from './helper/tokenStorage';
+import {getTokens, removeTokens} from './helper/tokenStorage';
+import {AuthService} from './service/AuthService';
+import {navigate} from '../navigation/navigationRef';
 
 import {routes} from '../routes/routes';
 
@@ -35,18 +37,40 @@ axiosInstance.interceptors.response.use(
     } else {
       console.error('Axios Error Message:', error.message);
     }
-    // if (originalRequest.url?.includes('auth/refresh')) {
-    //   await removeTokens();
-    //   navigate('Auth');
-    //   throw error;
-    // }
-    // if (error.response?.status === 401 && !originalRequest._retry) {
-    //   originalRequest._retry = true;
-    //   console.warn('Unauthorized (401), removing tokens...');
-    //   await removeTokens();
-    //   navigate('Auth');
-    //   throw error;
-    // }
+
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        // Try to refresh the token
+        if (originalRequest.url?.includes('auth/refresh')) {
+          // If refresh endpoint itself fails, clear tokens and redirect
+          await removeTokens();
+          navigate('AuthFlowModal', { screen: 'Login' });
+          console.warn('Refresh token expired, redirecting to auth...');
+          throw error;
+        }
+
+        // Attempt to refresh the access token
+        const tokens = await getTokens();
+        if (tokens.refreshToken) {
+          console.log('Attempting to refresh token...');
+          const refreshResponse = await AuthService.refresh();
+
+          if (refreshResponse.data.token) {
+            // Update the original request with new token and retry
+            originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.token}`;
+            return axiosInstance(originalRequest);
+          }
+        }
+      } catch (refreshError) {
+        console.warn('Token refresh failed, clearing tokens...');
+        await removeTokens();
+        navigate('AuthFlowModal', { screen: 'Login' });
+      }
+    }
+
     throw error;
   },
 );

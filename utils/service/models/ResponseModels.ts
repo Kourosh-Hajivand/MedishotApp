@@ -356,3 +356,21 @@ export interface TempUploadResponse {
     size: number;
     mime_type: string;
 }
+
+// ============= Practice Statistics Responses =============
+export interface PatientsCountItem {
+    date: string;
+    count: number;
+}
+
+export interface PatientsCountResponse {
+    success: true;
+    message: string;
+    data: PatientsCountItem[];
+}
+
+export interface RecentlyPhotosResponse {
+    success: true;
+    message: string;
+    data: Media[];
+}

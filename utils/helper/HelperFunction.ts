@@ -20,6 +20,40 @@ export function formatUSPhoneNumber(value: string) {
     return `+1 ${formatted}`;
 }
 
+// فرمت شماره به صورت +1-555-123-4567
+export function formatUSPhoneWithDashes(value: string): string {
+    const digits = value.replace(/\D/g, "").replace(/^1/, ""); // حذف همه غیر از اعداد و حذف 1 اول
+    if (digits.length === 0) return "+1";
+    
+    const match = digits.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
+    if (!match) return "+1";
+    
+    const [, area, prefix, line] = match;
+    let formatted = "+1";
+    
+    if (area) {
+        formatted += `-${area}`;
+        if (prefix) {
+            formatted += `-${prefix}`;
+            if (line) {
+                formatted += `-${line}`;
+            }
+        }
+    }
+    
+    return formatted;
+}
+
+// تبدیل شماره به فرمت +1-555-123-4567 برای ارسال به بک‌اند
+export function normalizeUSPhoneToDashedFormat(value: string): string {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length >= 10) {
+        const clean = digits.slice(-10);
+        return formatUSPhoneWithDashes(clean);
+    }
+    return value;
+}
+
 export function normalizeUSPhoneToE164(value: string) {
     const digits = value.replace(/\D/g, "");
     if (digits.length >= 10) {

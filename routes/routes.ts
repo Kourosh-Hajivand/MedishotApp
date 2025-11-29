@@ -6,23 +6,24 @@ export const routes = {
         initiateRegistration: () => "auth/initiate-registration",
         completeRegistration: () => "auth/complete-registration",
         logout: () => "auth/logout",
+        refresh: () => "auth/refresh",
         me: () => "auth/me",
         updateProfile: () => "auth/update-profile",
         forgetPassword: () => "auth/forget-password",
         verifyOtpCode: () => "auth/verify-otp-code",
         resetPassword: () => "auth/reset-password",
+        changeEmail: () => "profile/change-email",
+        changePassword: () => "profile/change-password",
 
         google: () => "auth/oauth/google/redirect",
-        googleCallback: () => "auth/oauth/google/id-token",
+        googleCallback: () => "auth/oauth/google/callback",
+        googleIdToken: () => "auth/oauth/google/id-token",
+        googleConfig: () => "auth/oauth/google/config",
 
         apple: () => "auth/oauth/apple/redirect",
         appleCallback: () => "auth/oauth/apple/callback",
+        appleIdToken: () => "auth/oauth/apple/id-token",
         appleConfig: () => "auth/oauth/apple/config",
-    },
-
-    profile: {
-        changeEmail: () => "profile/change-email",
-        changePassword: () => "profile/change-password",
     },
 
     practises: {
@@ -42,6 +43,7 @@ export const routes = {
 
         // Statistics
         getPatientsCount: (practiseId: string | number, type: string) => `practises/${practiseId}/patients-count/${type}`,
+        getRecentlyPhotos: (practiseId: string | number) => `practises/${practiseId}/recently-photos`,
 
         // Tags
         getTags: (practiseId: string | number) => `practises/${practiseId}/tags`,
@@ -56,6 +58,9 @@ export const routes = {
         getTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
         updateTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
         deleteTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
+
+        // Patients
+        getPatients: (practiseId: string | number) => `${practiseId}/patients`,
     },
 
     patients: {
@@ -80,6 +85,10 @@ export const routes = {
     },
 
     media: {
+        tempUpload: () => "temp-upload",
+    },
+
+    upload: {
         tempUpload: () => "temp-upload",
     },
 };

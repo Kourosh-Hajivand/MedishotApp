@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
 import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
-import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
+import { ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { getTokens } from "../helper/tokenStorage";
 
@@ -37,7 +37,7 @@ export const useGetAppleRedirect = (): UseQueryResult<OAuthRedirectResponse, Err
     });
 };
 
-export const useGetAppleConfig = (): UseQueryResult<AppleConfigResponse, Error> => {
+export const useGetAppleConfig = (): UseQueryResult<OAuthRedirectResponse, Error> => {
     return useQuery({
         queryKey: ["GetAppleConfig"],
         queryFn: () => AuthService.appleConfig(),
@@ -118,11 +118,12 @@ export const useUpdateProfile = (onSuccess?: (data: UpdateProfileResponse) => vo
     });
 };
 
+// Mobile OAuth Callbacks (ID Token)
 export const useGoogleCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, string> => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (id_token: string) => AuthService.googleCallback(id_token),
+        mutationFn: (id_token: string) => AuthService.googleIdToken(id_token),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
@@ -137,7 +138,38 @@ export const useAppleCallback = (onSuccess?: (data: LoginResponse) => void, onEr
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (code: string) => AuthService.appleCallback(code),
+        mutationFn: (identity_token: string) => AuthService.appleIdToken(identity_token),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+// Web OAuth Callbacks
+export const useGoogleWebCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, { code: string; state?: string }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ code, state }) => AuthService.googleCallback(code, state),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useAppleWebCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, { code: string; state?: string }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ code, state }) => AuthService.appleCallback(code, state),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);

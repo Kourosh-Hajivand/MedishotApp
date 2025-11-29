@@ -1,4 +1,4 @@
-import { formatNumber, formatUSPhoneNumber } from "@/utils/helper/HelperFunction";
+import { formatNumber, formatUSPhoneWithDashes } from "@/utils/helper/HelperFunction";
 import classNames from "classnames";
 import React, { useRef, useState } from "react";
 import { Controller, FieldValues } from "react-hook-form";
@@ -36,13 +36,14 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                         const digits = text.replace(/\D/g, "");
 
                         if (digits.length === 0) {
-                            onChange("");
+                            // همیشه حداقل +1 را نمایش بده
+                            onChange("+1");
                             return;
                         }
 
                         const limited = digits.slice(0, 10);
 
-                        const formatted = formatUSPhoneNumber(limited);
+                        const formatted = formatUSPhoneWithDashes(limited);
 
                         onChange(formatted);
                     };
@@ -90,7 +91,7 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                     ]}
                                 >
                                     {/* Placeholder */}
-                                    {!value && !!label && (
+                                    {(!value || value === "+1") && !!label && name !== "phoneNumber" && (
                                         <View style={styles.placeholder}>
                                             <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
                                                 {label} {optional && `(Optional)`}
@@ -102,27 +103,30 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                     <TextInput
                                         ref={inputRef}
                                         {...props}
-                                        value={name === "phoneNumber" ? value || "" : SperatedNumber && value ? formatNumber(value.toString()) : value}
+                                        value={name === "phoneNumber" ? value || "+1" : SperatedNumber && value ? formatNumber(value.toString()) : value}
                                         onChangeText={handleChange}
                                         onBlur={(e) => {
                                             setIsFocused(false);
 
                                             // -------------------------
-                                            //  ذخیره مقدار واقعی با +1
+                                            //  حفظ فرمت +1-555-123-4567
                                             // -------------------------
-                                            if (name === "phoneNumber" && value) {
-                                                const digits = value.replace(/\D/g, "");
+                                            if (name === "phoneNumber") {
+                                                if (value && value !== "+1") {
+                                                    const digits = value.replace(/\D/g, "");
 
-                                                if (digits.length === 10) {
-                                                    const finalValue = "+1" + digits; // ذخیره واقعی
-                                                    const shownFormatted = formatUSPhoneNumber(digits); // نمایش
-
-                                                    onChange(shownFormatted);
-
-                                                    // مقدار واقعی را یک لحظه بعد ذخیره کن
-                                                    setTimeout(() => {
-                                                        onChange(finalValue);
-                                                    }, 0);
+                                                    if (digits.length === 10) {
+                                                        // همیشه فرمت +1-555-123-4567 را نمایش بده
+                                                        const formatted = formatUSPhoneWithDashes(digits);
+                                                        onChange(formatted);
+                                                    } else if (digits.length > 0) {
+                                                        // اگر کامل نیست، همان فرمت را حفظ کن
+                                                        const formatted = formatUSPhoneWithDashes(digits);
+                                                        onChange(formatted);
+                                                    }
+                                                } else {
+                                                    // اگر خالی بود یا فقط +1، حداقل +1 را نمایش بده
+                                                    onChange("+1");
                                                 }
                                             }
 

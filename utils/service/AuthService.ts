@@ -5,10 +5,13 @@ import { storeTokens } from "../helper/tokenStorage";
 import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "./models/RequestModels";
 import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "./models/ResponseModels";
 
+// Import the new service for practice operations
+import { PracticeService } from "./PracticeService";
+import { UploadService } from "./UploadService";
+
 const {
     baseUrl,
-    auth: { login, initiateRegistration, completeRegistration, logout, me, updateProfile, forgetPassword, verifyOtpCode, resetPassword, google, googleCallback, apple, appleCallback, appleConfig },
-    profile: { changeEmail, changePassword },
+    auth: { login, initiateRegistration, completeRegistration, logout, refresh, me, updateProfile, forgetPassword, verifyOtpCode, resetPassword, changeEmail, changePassword, google, googleCallback, googleIdToken, googleConfig, apple, appleCallback, appleIdToken, appleConfig },
 } = routes;
 
 export const AuthService = {
@@ -58,6 +61,25 @@ export const AuthService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Logout failed");
+            }
+            throw error;
+        }
+    },
+
+    refresh: async (): Promise<LoginResponse> => {
+        try {
+            const response: AxiosResponse<LoginResponse> = await axios.post(baseUrl + refresh(), {}, {
+                headers: {
+                    'Authorization': `Bearer ${(await import('../helper/tokenStorage')).getTokens().then(tokens => tokens.refreshToken)}`
+                }
+            });
+            if (response.data.data.token) {
+                (await import('../helper/tokenStorage')).storeTokens(response.data.data.token);
+            }
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Token refresh failed");
             }
             throw error;
         }
@@ -140,16 +162,16 @@ export const AuthService = {
         }
     },
 
-    googleCallback: async (id_token: string): Promise<LoginResponse> => {
+    googleIdToken: async (id_token: string): Promise<LoginResponse> => {
         try {
-            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleCallback(), { id_token });
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleIdToken(), { id_token });
             if (response.data.data.token) {
                 storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Google callback failed");
+                throw new Error(error.response.data.message || "Google ID token authentication failed");
             }
             throw error;
         }
@@ -186,6 +208,76 @@ export const AuthService = {
     appleConfig: async (): Promise<AppleConfigResponse> => {
         try {
             const response: AxiosResponse<AppleConfigResponse> = await axiosInstance.get(baseUrl + appleConfig());
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Apple config fetch failed");
+            }
+            throw error;
+        }
+    },
+
+    appleIdToken: async (identity_token: string): Promise<LoginResponse> => {
+        try {
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleIdToken(), { identity_token });
+            if (response.data.data.token) {
+                storeTokens(response.data.data.token);
+            }
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Apple identity token authentication failed");
+            }
+            throw error;
+        }
+    },
+
+    // OAuth Web Callbacks
+    googleCallback: async (code: string, state?: string): Promise<LoginResponse> => {
+        try {
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleCallback(), { code, state });
+            if (response.data.data.token) {
+                storeTokens(response.data.data.token);
+            }
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Google callback failed");
+            }
+            throw error;
+        }
+    },
+
+    googleConfig: async (): Promise<OAuthRedirectResponse> => {
+        try {
+            const response: AxiosResponse<OAuthRedirectResponse> = await axiosInstance.get(baseUrl + googleConfig());
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Google config fetch failed");
+            }
+            throw error;
+        }
+    },
+
+    appleCallback: async (code: string, state?: string): Promise<LoginResponse> => {
+        try {
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleCallback(), { code, state });
+            if (response.data.data.token) {
+                storeTokens(response.data.data.token);
+            }
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Apple callback failed");
+            }
+            throw error;
+        }
+    },
+
+    appleConfig: async (): Promise<OAuthRedirectResponse> => {
+        try {
+            const response: AxiosResponse<OAuthRedirectResponse> = await axiosInstance.get(baseUrl + appleConfig());
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

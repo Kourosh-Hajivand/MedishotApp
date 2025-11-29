@@ -140,22 +140,6 @@ export default function PatientsLayout() {
                     }}
                 />
 
-                <Stack.Screen
-                    name="[id]"
-                    options={{
-                        headerTransparent: true,
-                        headerTitleAlign: "center",
-                        headerTintColor: "#000",
-                        title: "",
-                        headerRight: () => (
-                            <TouchableOpacity className="flex-row px-2  justify-center items-center ">
-                                <IconSymbol name="square.and.pencil" size={24} color={colors.system.blue} />
-                            </TouchableOpacity>
-                        ),
-                        headerLeft: () => <BackButton onPress={() => router.back()} />,
-                        headerBackground: () => <AnimatedBlurBackground />,
-                    }}
-                />
             </Stack>
         </BottomSheetModalProvider>
     );

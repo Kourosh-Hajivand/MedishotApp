@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -177,6 +177,15 @@ export const useTransferOwnership = (onSuccess?: (data: ApiResponse<any>) => voi
 };
 
 // ============= Practice Statistics =============
+
+export const useGetRecentlyPhotos = (practiceId: number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetRecentlyPhotos", practiceId],
+        queryFn: () => PracticeService.getRecentlyPhotos(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
 
 export const useGetPatientsCount = (practiceId: number, type: string, enabled: boolean = true): UseQueryResult<PracticeStatsResponse, Error> => {
     const { isAuthenticated } = useAuth();

@@ -12,7 +12,7 @@ import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../..
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
-import { normalizeUSPhoneToE164 } from "../../utils/helper/HelperFunction";
+import { normalizeUSPhoneToDashedFormat } from "../../utils/helper/HelperFunction";
 import { storeTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
@@ -123,11 +123,15 @@ export const CreatePracticeScreen: React.FC = () => {
     });
 
     const onSubmit = (data: FormData) => {
+        console.log("====================================");
+        console.log(data);
+        324;
+        console.log("====================================");
         createPractice({
             name: data.practiceName,
             metadata: JSON.stringify({
                 website: data.website ? `https://${data.website}` : "",
-                phone: normalizeUSPhoneToE164(data.phoneNumber),
+                phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
                 address: data.address,
                 zipcode: Number(data.zipCode),
             }),

@@ -2,308 +2,322 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse } from "./models/ResponseModels";
+import { ApiResponse, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    practises: { list, create, getById, update, delete: deletePractice, getMembers, addMember, updateMemberRole, removeMember, leave, transferOwnership, getPatientsCount, getTags, createTag, getTag, updateTag, deleteTag, getTemplates, createTemplate, getTemplate, updateTemplate, deleteTemplate },
+    practises: { list, create, getById, update, delete: deletePractice, getMembers, addMember, updateMemberRole, removeMember, leave, transferOwnership, getTags, createTag, getTag, updateTag, deleteTag, getTemplates, createTemplate, getTemplate, updateTemplate, deleteTemplate, getRecentlyPhotos, getPatientsCount },
 } = routes;
 
 export const PracticeService = {
-    // Practice Management
+    // ============= Practice CRUD =============
+
+    // Get list of practices
     getPracticeList: async (): Promise<PracticeListResponse> => {
         try {
             const response: AxiosResponse<PracticeListResponse> = await axiosInstance.get(baseUrl + list());
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get practice list failed");
+                throw new Error(error.response.data.message || "Failed to get practice list");
             }
             throw error;
         }
     },
 
+    // Create a new practice
     createPractice: async (data: CreatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const formData = new FormData();
-            formData.append("name", data.name);
-            formData.append("type", data.type);
-
-            if (data.image) {
-                formData.append("image", data.image);
-            }
-
-            if (data.metadata) {
-                // اگر metadata یک string است (JSON stringified شده)، مستقیماً ارسال می‌کنیم
-                // اگر object است، آن را JSON.stringify می‌کنیم
-                const metadataString = typeof data.metadata === "string" ? data.metadata : JSON.stringify(data.metadata);
-                formData.append("metadata", metadataString);
-            }
-
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + create(), formData, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + create(), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Create practice failed");
+                throw new Error(error.response.data.message || "Failed to create practice");
             }
             throw error;
         }
     },
 
-    getPracticeById: async (id: number): Promise<PracticeDetailResponse> => {
+    // Get practice by ID
+    getPracticeById: async (practiceId: number): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.get(baseUrl + getById(id));
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.get(baseUrl + getById(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get practice by id failed");
+                throw new Error(error.response.data.message || "Failed to get practice");
             }
             throw error;
         }
     },
 
-    updatePractice: async (id: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
+    // Update practice
+    updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const formData = new FormData();
-            formData.append("name", data.name);
-
-            if (data.image) {
-                formData.append("image", data.image);
-            }
-
-            if (data.metadata) {
-                formData.append("metadata", data.metadata);
-            }
-
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(baseUrl + update(id), formData, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(baseUrl + update(practiceId), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Update practice failed");
+                throw new Error(error.response.data.message || "Failed to update practice");
             }
             throw error;
         }
     },
 
-    deletePractice: async (id: number): Promise<ApiResponse<string>> => {
+    // Delete practice
+    deletePractice: async (practiceId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deletePractice(id));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deletePractice(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Delete practice failed");
+                throw new Error(error.response.data.message || "Failed to delete practice");
             }
             throw error;
         }
     },
 
-    // Member Management
-    getMembers: async (practiseId: number): Promise<PracticeMembersResponse> => {
+    // ============= Practice Members =============
+
+    // Get practice members
+    getMembers: async (practiceId: number): Promise<PracticeMembersResponse> => {
         try {
-            const response: AxiosResponse<PracticeMembersResponse> = await axiosInstance.get(baseUrl + getMembers(practiseId));
+            const response: AxiosResponse<PracticeMembersResponse> = await axiosInstance.get(baseUrl + getMembers(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get members failed");
+                throw new Error(error.response.data.message || "Failed to get practice members");
             }
             throw error;
         }
     },
 
-    addMember: async (practiseId: number, data: AddMemberDto): Promise<ApiResponse<any>> => {
+    // Add member to practice
+    addMember: async (practiceId: number, data: AddMemberDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + addMember(practiseId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + addMember(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Add member failed");
+                throw new Error(error.response.data.message || "Failed to add member");
             }
             throw error;
         }
     },
 
-    updateMemberRole: async (practiseId: number, memberId: number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
+    // Update member role
+    updateMemberRole: async (practiceId: number, memberId: number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.put(baseUrl + updateMemberRole(practiseId, memberId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.put(baseUrl + updateMemberRole(practiceId, memberId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Update member role failed");
+                throw new Error(error.response.data.message || "Failed to update member role");
             }
             throw error;
         }
     },
 
-    removeMember: async (practiseId: number, memberId: number): Promise<ApiResponse<string>> => {
+    // Remove member from practice
+    removeMember: async (practiceId: number, memberId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + removeMember(practiseId, memberId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + removeMember(practiceId, memberId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Remove member failed");
+                throw new Error(error.response.data.message || "Failed to remove member");
             }
             throw error;
         }
     },
 
-    leavePractice: async (practiseId: number): Promise<ApiResponse<string>> => {
+    // Leave practice
+    leavePractice: async (practiceId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.post(baseUrl + leave(practiseId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.post(baseUrl + leave(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Leave practice failed");
+                throw new Error(error.response.data.message || "Failed to leave practice");
             }
             throw error;
         }
     },
 
-    transferOwnership: async (practiseId: number, data: TransferOwnershipDto): Promise<ApiResponse<any>> => {
+    // Transfer ownership
+    transferOwnership: async (practiceId: number, data: TransferOwnershipDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + transferOwnership(practiseId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + transferOwnership(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Transfer ownership failed");
+                throw new Error(error.response.data.message || "Failed to transfer ownership");
             }
             throw error;
         }
     },
 
-    // Practice Statistics
-    getPatientsCount: async (practiseId: number, type: string): Promise<PracticeStatsResponse> => {
+    // ============= Practice Statistics =============
+
+    // Get recently uploaded photos for a practice
+    getRecentlyPhotos: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
         try {
-            const response: AxiosResponse<PracticeStatsResponse> = await axiosInstance.get(baseUrl + getPatientsCount(practiseId, type));
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getRecentlyPhotos(practiseId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get patients count failed");
+                throw new Error(error.response.data.message || "Failed to get recently uploaded photos");
             }
             throw error;
         }
     },
 
-    // Practice Tags
-    getTags: async (practiseId: number): Promise<PracticeTagsResponse> => {
+    // Get patient count statistics
+    getPatientsCount: async (practiseId: string | number, type: string): Promise<PatientsCountResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagsResponse> = await axiosInstance.get(baseUrl + getTags(practiseId));
+            const response: AxiosResponse<PatientsCountResponse> = await axiosInstance.get(baseUrl + getPatientsCount(practiseId, type));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get tags failed");
+                throw new Error(error.response.data.message || "Failed to get patient count statistics");
             }
             throw error;
         }
     },
 
-    createTag: async (practiseId: number, data: CreateTagDto): Promise<PracticeTagResponse> => {
+    // ============= Practice Tags =============
+
+    // Get practice tags
+    getTags: async (practiceId: number): Promise<PracticeTagsResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + createTag(practiseId), data);
+            const response: AxiosResponse<PracticeTagsResponse> = await axiosInstance.get(baseUrl + getTags(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Create tag failed");
+                throw new Error(error.response.data.message || "Failed to get practice tags");
             }
             throw error;
         }
     },
 
-    getTag: async (practiseId: number, tagId: number): Promise<PracticeTagResponse> => {
+    // Create practice tag
+    createTag: async (practiceId: number, data: CreateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.get(baseUrl + getTag(practiseId, tagId));
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + createTag(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get tag failed");
+                throw new Error(error.response.data.message || "Failed to create practice tag");
             }
             throw error;
         }
     },
 
-    updateTag: async (practiseId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
+    // Get practice tag
+    getTag: async (practiceId: number, tagId: number): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(baseUrl + updateTag(practiseId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.get(baseUrl + getTag(practiceId, tagId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Update tag failed");
+                throw new Error(error.response.data.message || "Failed to get practice tag");
             }
             throw error;
         }
     },
 
-    deleteTag: async (practiseId: number, tagId: number): Promise<ApiResponse<string>> => {
+    // Update practice tag
+    updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTag(practiseId, tagId));
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(baseUrl + updateTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Delete tag failed");
+                throw new Error(error.response.data.message || "Failed to update practice tag");
             }
             throw error;
         }
     },
 
-    // Practice Templates
-    getTemplates: async (practiseId: number): Promise<PracticeTemplatesResponse> => {
+    // Delete practice tag
+    deleteTag: async (practiceId: number, tagId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<PracticeTemplatesResponse> = await axiosInstance.get(baseUrl + getTemplates(practiseId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTag(practiceId, tagId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get templates failed");
+                throw new Error(error.response.data.message || "Failed to delete practice tag");
             }
             throw error;
         }
     },
 
-    createTemplate: async (practiseId: number, data: CreateTemplateDto): Promise<PracticeTemplateResponse> => {
+    // ============= Practice Templates =============
+
+    // Get practice templates
+    getTemplates: async (practiceId: number): Promise<PracticeTemplatesResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + createTemplate(practiseId), data);
+            const response: AxiosResponse<PracticeTemplatesResponse> = await axiosInstance.get(baseUrl + getTemplates(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Create template failed");
+                throw new Error(error.response.data.message || "Failed to get practice templates");
             }
             throw error;
         }
     },
 
-    getTemplate: async (practiseId: number, templateId: number): Promise<PracticeTemplateResponse> => {
+    // Create practice template
+    createTemplate: async (practiceId: number, data: CreateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.get(baseUrl + getTemplate(practiseId, templateId));
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + createTemplate(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Get template failed");
+                throw new Error(error.response.data.message || "Failed to create practice template");
             }
             throw error;
         }
     },
 
-    updateTemplate: async (practiseId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
+    // Get practice template
+    getTemplate: async (practiceId: number, templateId: number): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(baseUrl + updateTemplate(practiseId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.get(baseUrl + getTemplate(practiceId, templateId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Update template failed");
+                throw new Error(error.response.data.message || "Failed to get practice template");
             }
             throw error;
         }
     },
 
-    deleteTemplate: async (practiseId: number, templateId: number): Promise<ApiResponse<string>> => {
+    // Update practice template
+    updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTemplate(practiseId, templateId));
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(baseUrl + updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Delete template failed");
+                throw new Error(error.response.data.message || "Failed to update practice template");
+            }
+            throw error;
+        }
+    },
+
+    // Delete practice template
+    deleteTemplate: async (practiceId: number, templateId: number): Promise<ApiResponse<string>> => {
+        try {
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTemplate(practiceId, templateId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to delete practice template");
             }
             throw error;
         }
