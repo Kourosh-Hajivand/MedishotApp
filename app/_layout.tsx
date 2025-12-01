@@ -39,6 +39,7 @@ export default function RootLayout() {
                             <Stack.Screen name="(tabs)" />
                             <Stack.Screen options={{ presentation: "modal" }} name="(modals)" />
                             <Stack.Screen options={{ presentation: "modal", gestureEnabled: false }} name="(modals)/add-patient" />
+                            <Stack.Screen options={{ presentation: "modal" }} name="(modals)/add-practice-member" />
                                 <Stack.Screen options={{ presentation: "modal" }} name="(fullmodals)" />
                             <Stack.Screen name="patients" />
                         </Stack>

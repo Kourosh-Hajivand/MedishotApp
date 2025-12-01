@@ -71,7 +71,7 @@ export interface UpdatePracticeDto {
 }
 
 export interface AddMemberDto {
-    user_id: number;
+    email: string;
     role: "owner" | "admin" | "member" | "viewer";
 }
 

@@ -152,6 +152,7 @@ export interface Member {
     id: number;
     first_name: string;
     last_name: string;
+    image?: Media;
     email: string;
     role: "owner" | "admin" | "member" | "viewer";
     patients_count?: number;

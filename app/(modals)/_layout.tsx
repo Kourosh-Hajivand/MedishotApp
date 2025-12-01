@@ -7,6 +7,7 @@ export default function ModalsLayout() {
             <Stack.Screen name="select-date" />
             <Stack.Screen name="select-gender" />
             <Stack.Screen name="add-patient" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="add-practice-member" options={{ headerShown: false, gestureEnabled: false }} />
         </Stack>
     );
 }

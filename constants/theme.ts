@@ -7,7 +7,7 @@ import { Platform } from "react-native";
 
 const tintColorLight = "#0a7ea4";
 const tintColorDark = "#fff";
-export const headerHeight = 110;
+export const headerHeight = 115;
 export const Colors = {
     light: {
         text: "#11181C",
