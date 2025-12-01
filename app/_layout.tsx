@@ -26,28 +26,28 @@ export default function RootLayout() {
                     onAnimationComplete={() => setIsSplashReady(true)}
                 />
             ) : (
-                <BottomSheetModalProvider>
-                    <TenstackProvider>
-                        <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
-                            <Stack
-                                screenOptions={{
-                                    headerShown: false,
-                                }}
-                            >
-                                <Stack.Screen name="index" />
-                                <Stack.Screen options={{ presentation: "modal" }} name="(auth)" />
-                                <Stack.Screen name="(tabs)" />
-                                <Stack.Screen options={{ presentation: "modal" }} name="(modals)" />
-                                <Stack.Screen options={{ presentation: "modal", gestureEnabled: false }} name="(modals)/add-patient" />
+            <BottomSheetModalProvider>
+                <TenstackProvider>
+                    <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
+                        <Stack
+                            screenOptions={{
+                                headerShown: false,
+                            }}
+                        >
+                            <Stack.Screen name="index" />
+                            <Stack.Screen options={{ presentation: "modal" }} name="(auth)" />
+                            <Stack.Screen name="(tabs)" />
+                            <Stack.Screen options={{ presentation: "modal" }} name="(modals)" />
+                            <Stack.Screen options={{ presentation: "modal", gestureEnabled: false }} name="(modals)/add-patient" />
                                 <Stack.Screen options={{ presentation: "modal" }} name="(fullmodals)" />
-                                <Stack.Screen name="patients" />
-                            </Stack>
-                        </TabletWrapper>
+                            <Stack.Screen name="patients" />
+                        </Stack>
+                    </TabletWrapper>
 
-                        <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
-                        <ToastManager />
-                    </TenstackProvider>
-                </BottomSheetModalProvider>
+                    <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
+                    <ToastManager />
+                </TenstackProvider>
+            </BottomSheetModalProvider>
             )}
         </GestureHandlerRootView>
     );

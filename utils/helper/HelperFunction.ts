@@ -24,13 +24,13 @@ export function formatUSPhoneNumber(value: string) {
 export function formatUSPhoneWithDashes(value: string): string {
     const digits = value.replace(/\D/g, "").replace(/^1/, ""); // حذف همه غیر از اعداد و حذف 1 اول
     if (digits.length === 0) return "+1";
-    
+
     const match = digits.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
     if (!match) return "+1";
-    
+
     const [, area, prefix, line] = match;
     let formatted = "+1";
-    
+
     if (area) {
         formatted += `-${area}`;
         if (prefix) {
@@ -40,7 +40,7 @@ export function formatUSPhoneWithDashes(value: string): string {
             }
         }
     }
-    
+
     return formatted;
 }
 
@@ -83,7 +83,10 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
 
     if (!ocrText) return data;
 
-    const lines = ocrText.split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+    const lines = ocrText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
     const text = ocrText.toLowerCase();
 
     // Extract First Name and Last Name
@@ -142,10 +145,7 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
     }
 
     // Extract Gender/Sex
-    const genderPatterns = [
-        /(?:sex|gender)\s*[:]?\s*(male|female|m|f)/i,
-        /\b(male|female|m|f)\b/i,
-    ];
+    const genderPatterns = [/(?:sex|gender)\s*[:]?\s*(male|female|m|f)/i, /\b(male|female|m|f)\b/i];
 
     for (const pattern of genderPatterns) {
         const match = text.match(pattern);
@@ -191,10 +191,7 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
     }
 
     // Extract Phone Number
-    const phonePatterns = [
-        /(?:phone|tel|mobile|cell)\s*[:]?\s*([\+]?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i,
-        /(\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/,
-    ];
+    const phonePatterns = [/(?:phone|tel|mobile|cell)\s*[:]?\s*([\+]?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i, /(\+?1?[-.\s]?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/];
 
     for (const pattern of phonePatterns) {
         const match = ocrText.match(pattern);

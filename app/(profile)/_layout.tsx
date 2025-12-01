@@ -14,7 +14,48 @@ export default function layout() {
                 headerLargeTitle: true,
             }}
         >
-            <Stack.Screen name="index" />
+            <Stack.Screen
+                name="index"
+                options={{
+                    headerTitle: "Profile",
+                }}
+            />
+            <Stack.Screen
+                name="practice-overview"
+                options={{
+                    headerTitle: "Practice Overview",
+                }}
+            />
+            <Stack.Screen
+                name="practice-team"
+                options={{
+                    headerTitle: "Practice Team",
+                }}
+            />
+            <Stack.Screen
+                name="print-information"
+                options={{
+                    headerTitle: "Print Information",
+                }}
+            />
+            <Stack.Screen
+                name="subscription"
+                options={{
+                    headerTitle: "Subscription",
+                }}
+            />
+            <Stack.Screen
+                name="notification"
+                options={{
+                    headerTitle: "Notification Settings",
+                }}
+            />
+            <Stack.Screen
+                name="archive"
+                options={{
+                    headerTitle: "Archive",
+                }}
+            />
         </Stack>
     );
 }
