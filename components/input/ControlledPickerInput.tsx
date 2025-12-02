@@ -14,12 +14,13 @@ interface PickerInputProps<T extends FieldValues> {
     placeholder?: string;
     error?: string;
     noBorder?: boolean;
+    disabled?: boolean;
 }
 
 // Store callbacks globally
 const pickerCallbacks: { [key: string]: (value: string) => void } = {};
 
-export function ControlledPickerInput<T extends FieldValues>({ control, name, label, type, placeholder, error, noBorder = false }: PickerInputProps<T>) {
+export function ControlledPickerInput<T extends FieldValues>({ control, name, label, type, placeholder, error, noBorder = false, disabled = false }: PickerInputProps<T>) {
     const formatDateDisplay = (dateString?: string) => {
         if (!dateString) return "";
         // Handle YYYY-MM-DD format
@@ -39,6 +40,7 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                 const callbackKey = `picker_${String(name)}_${type}`;
 
                 const handlePress = () => {
+                    if (disabled) return;
                     // Store the onChange callback
                     pickerCallbacks[callbackKey] = onChange;
 
@@ -61,11 +63,13 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                         <TouchableOpacity
                             onPress={handlePress}
                             activeOpacity={0.7}
+                            disabled={disabled}
                             style={[
                                 styles.inputContainer,
                                 {
                                     borderColor: error ? colors.system.red : colors.border,
                                     borderWidth: noBorder ? 0 : 1,
+                                    opacity: disabled ? 0.5 : 1,
                                 },
                             ]}
                         >

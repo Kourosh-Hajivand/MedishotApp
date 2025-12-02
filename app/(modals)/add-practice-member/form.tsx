@@ -5,7 +5,7 @@ import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { useAddMember, useTempUpload } from "@/utils/hook";
+import { useAddMember, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
@@ -57,13 +57,34 @@ const urlConfig: DynamicInputConfig = {
 
 export default function AddPracticeMemberForm() {
     const navigation = useNavigation();
+    const params = useLocalSearchParams<{ practiceId: string; member?: string; mode?: string }>();
+    const practiceId = params.practiceId;
+    const mode = params.mode || "create";
+    const isEditMode = mode === "edit";
+
+    // Parse member data if in edit mode
+    const memberData = React.useMemo(() => {
+        if (isEditMode && params.member) {
+            try {
+                return JSON.parse(params.member);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    }, [isEditMode, params.member]);
+
     const { mutate: addMember, isPending: isAddingMember } = useAddMember((data) => {
         console.log("addMember", data);
         router.back();
     });
+
+    const { mutate: updateMemberRole, isPending: isUpdatingRole } = useUpdateMemberRole(() => {
+        router.back();
+    });
+
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
-    const { practiceId } = useLocalSearchParams<{ practiceId: string }>();
     const insets = useSafeAreaInsets();
     const [selectedRoleIndex, setSelectedRoleIndex] = React.useState(2);
 
@@ -86,6 +107,7 @@ export default function AddPracticeMemberForm() {
         handleSubmit,
         formState: { errors },
         setValue,
+        reset,
     } = useForm<AddMemberFormData>({
         resolver: zodResolver(
             z.object({
@@ -106,6 +128,29 @@ export default function AddPracticeMemberForm() {
             role: "member",
         },
     });
+
+    // Set form values when member data is available (edit mode)
+    React.useEffect(() => {
+        if (isEditMode && memberData) {
+            reset({
+                first_name: memberData.first_name || "",
+                last_name: memberData.last_name || "",
+                email: memberData.email || "",
+                birth_date: "",
+                gender: "",
+                role: memberData.role || "member",
+            });
+            // Set role index
+            const roleIndex = roleOptions.findIndex((option) => option.toLowerCase() === (memberData.role || "member"));
+            if (roleIndex !== -1) {
+                setSelectedRoleIndex(roleIndex);
+            }
+            // Set image if available
+            if (memberData.image?.url) {
+                setSelectedImage(memberData.image.url);
+            }
+        }
+    }, [isEditMode, memberData, reset]);
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
         Keyboard.dismiss();
@@ -129,9 +174,18 @@ export default function AddPracticeMemberForm() {
     };
 
     const onSubmit = (data: AddMemberFormData) => {
-        console.log("onSubmit", data);
-        // TODO: Include phones, emails, addresses, urls, uploadedFilename in the request
-        addMember({ practiceId: parseInt(practiceId), data: { email: data.email, role: data.role } });
+        if (isEditMode && memberData) {
+            // Update member role only
+            updateMemberRole({
+                practiceId: parseInt(practiceId),
+                memberId: memberData.id,
+                data: { role: data.role },
+            });
+        } else {
+            // Add new member
+            // TODO: Include phones, emails, addresses, urls, uploadedFilename in the request
+            addMember({ practiceId: parseInt(practiceId), data: { email: data.email, role: data.role } });
+        }
     };
 
     useEffect(() => {
@@ -143,25 +197,25 @@ export default function AddPracticeMemberForm() {
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerRight: () => <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember} ButtonStyle="Filled" size="Medium" />,
+            headerRight: () => <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} ButtonStyle="Filled" size="Medium" />,
         });
-    }, [navigation, handleSubmit, isAddingMember]);
+    }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode]);
 
     return (
         <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View style={styles.avatarContainer}>
-                <ImagePickerWrapper onImageSelected={handleImageSelected}>
+                <ImagePickerWrapper onImageSelected={handleImageSelected} disabled={isEditMode}>
                     <View style={styles.avatarWrapper}>
                         {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
-                        <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
+                        {!isEditMode && <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>}
                     </View>
                 </ImagePickerWrapper>
                 <View style={styles.titleContainer}>
                     <BaseText type="Title1" weight="700" color="system.black">
-                        Add Member
+                        {isEditMode ? "Update Member Role" : "Add Member"}
                     </BaseText>
                     <BaseText type="Body" color="labels.secondary" align="center">
-                        Add a new member to your practice.
+                        {isEditMode ? "Update the role for this member." : "Add a new member to your practice."}
                     </BaseText>
                 </View>
             </View>
@@ -169,19 +223,19 @@ export default function AddPracticeMemberForm() {
             <View className="gap-4">
                 <View className="bg-white rounded-2xl px-4">
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} />
+                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} disabled={isEditMode} />
                     </View>
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} />
+                        <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} disabled={isEditMode} />
                     </View>
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="email" label="Email Address" haveBorder={false} keyboardType="email-address" autoCapitalize="none" error={errors.email?.message} />
+                        <ControlledInput control={control} name="email" label="Email Address" haveBorder={false} keyboardType="email-address" autoCapitalize="none" error={errors.email?.message} disabled={isEditMode} />
                     </View>
                     <View className="border-b border-border">
-                        <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} />
+                        <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} disabled={isEditMode} />
                     </View>
                     <View className="border-b border-border">
-                        <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
+                        <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} disabled={isEditMode} />
                     </View>
                     <View className="py-3">
                         <View className="gap-2 flex-row items-center justify-between pl-5">
@@ -216,12 +270,14 @@ export default function AddPracticeMemberForm() {
                         )}
                     </View>
                 </View>
-                <View className="gap-1">
-                    <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
-                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
-                    <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
-                    <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
-                </View>
+                {!isEditMode && (
+                    <View className="gap-1">
+                        <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
+                        <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
+                        <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
+                        <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
+                    </View>
+                )}
             </View>
         </ScrollView>
     );

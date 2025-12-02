@@ -11,9 +11,10 @@ import { BaseText } from "./text/BaseText";
 type Props = {
     onImageSelected?: (result: { uri: string; base64?: string | null }) => void;
     children: React.ReactNode;
+    disabled?: boolean;
 };
 
-export default function ImagePickerWrapper({ onImageSelected, children }: Props) {
+export default function ImagePickerWrapper({ onImageSelected, children, disabled = false }: Props) {
     const [visible, setVisible] = useState(false);
     const insets = useSafeAreaInsets();
     const slideAnim = React.useRef(new Animated.Value(300)).current;
@@ -88,7 +89,9 @@ export default function ImagePickerWrapper({ onImageSelected, children }: Props)
 
     return (
         <>
-            <TouchableOpacity onPress={openSheet}>{children}</TouchableOpacity>
+            <TouchableOpacity onPress={disabled ? undefined : openSheet} disabled={disabled} style={{ opacity: disabled ? 0.5 : 1 }}>
+                {children}
+            </TouchableOpacity>
             <Modal visible={visible} transparent animationType="fade" onRequestClose={closeSheet}>
                 <View style={styles.overlay}>
                     <Pressable style={styles.backdrop} onPress={closeSheet} />
