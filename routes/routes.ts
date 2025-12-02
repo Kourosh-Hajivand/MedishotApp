@@ -14,6 +14,7 @@ export const routes = {
         resetPassword: () => "auth/reset-password",
         changeEmail: () => "profile/change-email",
         changePassword: () => "profile/change-password",
+        updateProfileFull: () => "profile",
 
         google: () => "auth/oauth/google/redirect",
         googleCallback: () => "auth/oauth/google/callback",
@@ -94,5 +95,19 @@ export const routes = {
 
     upload: {
         tempUpload: () => "temp-upload",
+    },
+
+    plans: {
+        list: () => "plans",
+        getById: (id: string | number) => `plans/${id}`,
+    },
+
+    subscriptions: {
+        getStatus: (practiseId: string | number) => `practises/${practiseId}/subscription/status`,
+        subscribe: (practiseId: string | number) => `practises/${practiseId}/subscription/subscribe`,
+        cancel: (practiseId: string | number) => `practises/${practiseId}/subscription/cancel`,
+        resume: (practiseId: string | number) => `practises/${practiseId}/subscription/resume`,
+        swap: (practiseId: string | number) => `practises/${practiseId}/subscription/swap`,
+        updateAddonLimit: (practiseId: string | number) => `practises/${practiseId}/subscription/addon-limit`,
     },
 };

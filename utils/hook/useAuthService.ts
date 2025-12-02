@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { AuthService } from "@/utils/service";
-import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
-import { ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
+import { AppleIdTokenBody, ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, UpdateProfileFullBody, VerifyOtpCodeBody } from "@/utils/service/models/RequestModels";
+import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { getTokens } from "../helper/tokenStorage";
 
@@ -37,7 +37,7 @@ export const useGetAppleRedirect = (): UseQueryResult<OAuthRedirectResponse, Err
     });
 };
 
-export const useGetAppleConfig = (): UseQueryResult<OAuthRedirectResponse, Error> => {
+export const useGetAppleConfig = (): UseQueryResult<AppleConfigResponse, Error> => {
     return useQuery({
         queryKey: ["GetAppleConfig"],
         queryFn: () => AuthService.appleConfig(),
@@ -118,6 +118,21 @@ export const useUpdateProfile = (onSuccess?: (data: UpdateProfileResponse) => vo
     });
 };
 
+export const useUpdateProfileFull = (onSuccess?: (data: UpdateProfileResponse) => void, onError?: (error: Error) => void): UseMutationResult<UpdateProfileResponse, Error, UpdateProfileFullBody> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: UpdateProfileFullBody) => AuthService.updateProfileFull(data),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
 // Mobile OAuth Callbacks (ID Token)
 export const useGoogleCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, string> => {
     const queryClient = useQueryClient();
@@ -134,11 +149,11 @@ export const useGoogleCallback = (onSuccess?: (data: LoginResponse) => void, onE
     });
 };
 
-export const useAppleCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, string> => {
+export const useAppleCallback = (onSuccess?: (data: LoginResponse) => void, onError?: (error: Error) => void): UseMutationResult<LoginResponse, Error, AppleIdTokenBody> => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (identity_token: string) => AuthService.appleIdToken(identity_token),
+        mutationFn: (body: AppleIdTokenBody) => AuthService.appleIdToken(body),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
@@ -169,7 +184,7 @@ export const useAppleWebCallback = (onSuccess?: (data: LoginResponse) => void, o
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ code, state }) => AuthService.appleCallback(code, state),
+        mutationFn: ({ code, state }) => AuthService.appleCallbackWeb(code, state),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);

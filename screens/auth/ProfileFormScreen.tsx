@@ -199,7 +199,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                     <View className="border-b border-border">
                         <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} />
                     </View>
-                    <View className="border-b border-border">
+                    <View className={`${initialData?.email === "create" ? "border-b border-border" : ""}`}>
                         <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                     </View>
 

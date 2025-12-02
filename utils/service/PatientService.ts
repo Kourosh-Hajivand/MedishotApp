@@ -12,6 +12,8 @@ const {
 
 export interface GetPatientsParams {
     doctor_id?: string | number;
+    page?: number;
+    per_page?: number;
 }
 
 const PatientService = {
@@ -21,6 +23,12 @@ const PatientService = {
             const queryParams = new URLSearchParams();
             if (params?.doctor_id) {
                 queryParams.append("doctor_id", String(params.doctor_id));
+            }
+            if (params?.page) {
+                queryParams.append("page", String(params.page));
+            }
+            if (params?.per_page) {
+                queryParams.append("per_page", String(params.per_page));
             }
 
             const url = baseUrl + list(practiseId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");

@@ -21,10 +21,10 @@ interface AddMemberFormData {
     email: string;
     birth_date?: string;
     gender?: string;
-    role: "owner" | "admin" | "member" | "viewer" | "doctor";
+    role: "admin" | "member" | "doctor";
 }
 
-const roleOptions = ["Owner", "Admin", "Member", "Viewer", "Doctor"];
+const roleOptions = ["Admin", "Member", "Doctor"];
 
 // Dynamic input configs
 const phoneConfig: DynamicInputConfig = {
@@ -116,7 +116,7 @@ export default function AddPracticeMemberForm() {
                 email: z.string().email("Please enter a valid email address"),
                 birth_date: z.string().optional(),
                 gender: z.string().optional(),
-                role: z.enum(["owner", "admin", "member", "viewer", "doctor"]),
+                role: z.enum(["admin", "member", "doctor"]),
             }),
         ),
         defaultValues: {
@@ -183,8 +183,32 @@ export default function AddPracticeMemberForm() {
             });
         } else {
             // Add new member
-            // TODO: Include phones, emails, addresses, urls, uploadedFilename in the request
-            addMember({ practiceId: parseInt(practiceId), data: { email: data.email, role: data.role } });
+            // Map DynamicFieldItem arrays to the format expected by API and include in metadata
+            const phonesData = phones.length > 0 ? phones.map((phone) => ({ label: phone.label, value: typeof phone.value === "string" ? phone.value : "" })) : undefined;
+            const emailsData = emails.length > 0 ? emails.map((email) => ({ label: email.label, value: typeof email.value === "string" ? email.value : "" })) : undefined;
+            const addressesData = addresses.length > 0 ? addresses.map((address) => ({ label: address.label, value: address.value })) : undefined;
+            const urlsData = urls.length > 0 ? urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;
+
+            // Build metadata object
+            const metadataObject: any = {};
+            if (phonesData) metadataObject.phones = phonesData;
+            if (emailsData) metadataObject.emails = emailsData;
+            if (addressesData) metadataObject.addresses = addressesData;
+            if (urlsData) metadataObject.urls = urlsData;
+
+            addMember({
+                practiceId: parseInt(practiceId),
+                data: {
+                    first_name: data.first_name,
+                    last_name: data.last_name,
+                    email: data.email,
+                    role: data.role,
+                    ...(data.birth_date && { birth_date: data.birth_date }),
+                    ...(data.gender && { gender: data.gender as "male" | "female" | "other" }),
+                    // ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
+                    // ...(uploadedFilename && { profile_photo: uploadedFilename }),
+                },
+            });
         }
     };
 
@@ -253,7 +277,7 @@ export default function AddPracticeMemberForm() {
                                             variant="menu"
                                             onOptionSelected={({ nativeEvent: { index } }) => {
                                                 setSelectedRoleIndex(index);
-                                                const roleValue = roleOptions[index].toLowerCase() as "owner" | "admin" | "member" | "viewer" | "doctor";
+                                                const roleValue = roleOptions[index].toLowerCase() as "admin" | "member" | "doctor";
                                                 onChange(roleValue);
                                                 setValue("role", roleValue);
                                             }}

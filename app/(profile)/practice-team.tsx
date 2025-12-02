@@ -52,7 +52,7 @@ export default function PracticeTeamScreen() {
             ),
         });
     }, [navigation]);
-    const handleRemoveMember = (practiceId: number, memberId: number) => {
+    const handleRemoveMember = (practiceId: number, memberId: string | number) => {
         Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practise.", [
             {
                 text: "Cancel",
@@ -67,7 +67,9 @@ export default function PracticeTeamScreen() {
             },
         ]);
     };
-    const handleTransferOwnership = (practiceId: number, memberId: number) => {
+    const handleTransferOwnership = (practiceId: number, memberId: string | number) => {
+        // Extract numeric ID from "user:1" format if needed
+        const numericId = typeof memberId === "string" ? parseInt(memberId.split(":")[1] || memberId, 10) : memberId;
         Alert.alert("Transfer Ownership", "Are you sure you want to transfer ownership of this practice to this member?", [
             {
                 text: "Cancel",
@@ -77,7 +79,7 @@ export default function PracticeTeamScreen() {
             {
                 text: "Transfer",
                 style: "default",
-                onPress: () => transferOwnership({ practiceId: practiceId, data: { new_owner_id: memberId } as TransferOwnershipDto }),
+                onPress: () => transferOwnership({ practiceId: practiceId, data: { new_owner_id: numericId } as TransferOwnershipDto }),
             },
         ]);
     };
@@ -120,15 +122,15 @@ export default function PracticeTeamScreen() {
                 </ContextMenu>
             </Host>
             <View className="pt-0 border-t border-system-gray5">
-                {practiceMembers?.data?.members?.map((member, index) => (
+                {practiceMembers?.data?.map((member, index) => (
                     <Host style={{ width: "100%", height: 68 }}>
                         <ContextMenu activationMethod="longPress">
                             <ContextMenu.Items>
-                                {/* {member.role !== "owner" && ( */}
-                                <Button systemImage="person.crop.circle.badge.plus" onPress={() => handleTransferOwnership(selectedPractice?.id ?? 0, member.id)}>
-                                    Transfer Ownership
-                                </Button>
-                                {/* )} */}
+                                {member.role !== "owner" && (
+                                    <Button systemImage="person.crop.circle.badge.plus" onPress={() => handleTransferOwnership(selectedPractice?.id ?? 0, member.id)}>
+                                        Transfer Ownership
+                                    </Button>
+                                )}
                                 <Button
                                     systemImage="pencil.and.scribble"
                                     onPress={() =>
@@ -153,7 +155,7 @@ export default function PracticeTeamScreen() {
                                 <TouchableOpacity
                                     disabled={member.status !== "active"}
                                     key={`member-${member.id}`}
-                                    className={`flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60 ${index !== practiceMembers?.data.members.length - 1 ? "pb-2 border-b border-system-gray5" : ""}`}
+                                    className={`flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60 ${index !== (practiceMembers?.data?.length ?? 0) - 1 ? "pb-2 border-b border-system-gray5" : ""}`}
                                     onPress={() => {
                                         if (member.status === "active") {
                                             router.push({
@@ -182,21 +184,6 @@ export default function PracticeTeamScreen() {
                             </ContextMenu.Trigger>
                         </ContextMenu>
                     </Host>
-                ))}
-                {practiceMembers?.data?.invitations?.map((invitation, index) => (
-                    <TouchableOpacity disabled={true} key={`invite-${invitation.id}`} className={`flex-row items-center justify-between pl-1 py-2 pr-4 disabled:opacity-60 ${index !== practiceMembers?.data.invitations.length - 1 ? "pb-2 border-b border-system-gray5" : ""}`}>
-                        <View className="flex-row items-center gap-2">
-                            <Avatar size={54} rounded={99} name={invitation.email} />
-                            <View>
-                                <BaseText type="Callout" weight="500" color="system.black">
-                                    {invitation.email}
-                                </BaseText>
-                                <BaseText type="Footnote" weight="400" color="labels.secondary">
-                                    Pending
-                                </BaseText>
-                            </View>
-                        </View>
-                    </TouchableOpacity>
                 ))}
             </View>
         </ScrollView>

@@ -6,7 +6,33 @@ import { ApiResponse, PatientsCountResponse, PracticeDetailResponse, PracticeLis
 
 const {
     baseUrl,
-    practises: { list, create, getById, update, delete: deletePractice, getMembers, addMember, updateMemberRole, removeMember, leave, transferOwnership, getTags, createTag, getTag, updateTag, deleteTag, getTemplates, createTemplate, getTemplate, updateTemplate, deleteTemplate, getRecentlyPhotos, getPatientsCount, getArchivedMedia, getMember },
+    practises: {
+        list,
+        create,
+        getById,
+        update,
+        delete: deletePractice,
+        getMembers,
+        addMember,
+        updateMemberRole,
+        removeMember,
+        leave,
+        transferOwnership,
+        getTags,
+        createTag,
+        getTag,
+        updateTag,
+        deleteTag,
+        getTemplates,
+        createTemplate,
+        getTemplate,
+        updateTemplate,
+        deleteTemplate,
+        getRecentlyPhotos,
+        getPatientsCount,
+        getArchivedMedia,
+        getMember,
+    },
 } = routes;
 
 export const PracticeService = {
@@ -110,7 +136,7 @@ export const PracticeService = {
     },
 
     // Update member role
-    updateMemberRole: async (practiceId: number, memberId: number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
+    updateMemberRole: async (practiceId: number, memberId: string | number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
         try {
             const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.put(baseUrl + updateMemberRole(practiceId, memberId), data);
             return response.data;
@@ -123,7 +149,7 @@ export const PracticeService = {
     },
 
     // Remove member from practice
-    removeMember: async (practiceId: number, memberId: number): Promise<ApiResponse<string>> => {
+    removeMember: async (practiceId: number, memberId: string | number): Promise<ApiResponse<string>> => {
         try {
             const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + removeMember(practiceId, memberId));
             return response.data;

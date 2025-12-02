@@ -123,11 +123,11 @@ export const useAddMember = (onSuccess?: (data: ApiResponse<any>) => void, onErr
     });
 };
 
-export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<any>, Error, { practiceId: number; memberId: number; data: UpdateMemberRoleDto }> => {
+export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<any>, Error, { practiceId: number; memberId: string | number; data: UpdateMemberRoleDto }> => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ practiceId, memberId, data }: { practiceId: number; memberId: number; data: UpdateMemberRoleDto }) => PracticeService.updateMemberRole(practiceId, memberId, data),
+        mutationFn: ({ practiceId, memberId, data }: { practiceId: number; memberId: string | number; data: UpdateMemberRoleDto }) => PracticeService.updateMemberRole(practiceId, memberId, data),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeMembers", variables.practiceId],
@@ -140,11 +140,11 @@ export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void
     });
 };
 
-export const useRemoveMember = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; memberId: number }> => {
+export const useRemoveMember = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; memberId: string | number }> => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ practiceId, memberId }: { practiceId: number; memberId: number }) => PracticeService.removeMember(practiceId, memberId),
+        mutationFn: ({ practiceId, memberId }: { practiceId: number; memberId: string | number }) => PracticeService.removeMember(practiceId, memberId),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeMembers", variables.practiceId],

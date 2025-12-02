@@ -28,6 +28,9 @@ export interface People {
     last_name: string | null;
     name?: string;
     email: string;
+    gender?: "male" | "female" | "other" | null;
+    birth_date?: string | null; // YYYY-MM-DD format
+    profile_photo_url?: string | null;
     colors?: string | null;
     is_verified?: boolean;
     email_verified_at: string | null;
@@ -150,17 +153,16 @@ export interface Practice {
 }
 
 export interface Member {
-    id: number;
-    type: "member";
+    id: string; // Format: "user:1" or number as string
     first_name: string | null;
     last_name: string | null;
     email: string;
     role: "owner" | "admin" | "member" | "viewer" | "doctor";
-    color?: string | null;
-    status: "active" | "pending";
+    status: "active";
     patients_count: number;
     taken_images_count: number;
-    activities: Array<{
+    color?: string | null;
+    activities?: Array<{
         description: string;
         created_at: string;
         subject_type: string;
@@ -194,11 +196,7 @@ export interface PracticeDetailResponse {
 
 export interface PracticeMembersResponse {
     success: boolean;
-    message: string | null;
-    data: {
-        members: Member[];
-        invitations: Invitation[];
-    };
+    data: Member[];
 }
 
 export interface PracticeStatsResponse {
@@ -306,7 +304,25 @@ export interface Patient {
 export interface PatientListResponse {
     success: true;
     message: string;
-    data: Patient[];
+    data: {
+        data: Patient[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from?: number;
+        to?: number;
+        first_page_url?: string;
+        last_page_url?: string;
+        next_page_url?: string | null;
+        prev_page_url?: string | null;
+        path?: string;
+        links?: Array<{
+            url: string | null;
+            label: string;
+            active: boolean;
+        }>;
+    };
 }
 
 export interface PatientDetailResponse {
@@ -343,14 +359,14 @@ export interface PatientMediaDeleteResponse {
     data: string;
 }
 
+export interface PatientMediaTrash extends PatientMedia {
+    deleted_at: string;
+}
+
 export interface PatientMediaTrashResponse {
     success: true;
     message: string;
     data: PatientMediaTrash[];
-}
-
-export interface PatientMediaTrash extends PatientMedia {
-    deleted_at: string;
 }
 
 export interface PatientMediaRestoreResponse {
@@ -378,19 +394,62 @@ export interface TempUploadResponse {
 }
 
 // ============= Practice Statistics Responses =============
-export interface PatientsCountItem {
-    date: string;
-    count: number;
-}
-
-export interface PatientsCountResponse {
-    success: true;
-    message: string;
-    data: PatientsCountItem[];
-}
+// PatientsCountResponse is the same as PracticeStatsResponse
+export type PatientsCountResponse = PracticeStatsResponse;
 
 export interface RecentlyPhotosResponse {
     success: true;
     message: string;
     data: Media[];
+}
+
+// ============= Plan & Subscription Responses =============
+export interface PlanFeature {
+    id: number;
+    feature_key: string;
+    feature_type: "limit" | "boolean";
+    feature_value: string;
+    display_name: string;
+    description: string;
+}
+
+export interface PlanAddon {
+    id: number;
+    addon_key: string;
+    included_quantity: number;
+}
+
+export interface Plan {
+    id: number;
+    name: string;
+    slug: string;
+    description: string;
+    price: number;
+    currency: string;
+    billing_interval: "month" | "year";
+    is_active: boolean;
+    features: PlanFeature[];
+    addons: PlanAddon[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PlanListResponse {
+    data: Plan[];
+}
+
+export interface PlanDetailResponse {
+    data: Plan;
+}
+
+export interface SubscriptionStatus {
+    subscribed: boolean;
+    plan: Plan | null;
+    ends_at: string | null;
+    on_grace_period: boolean;
+    trial_ends_at: string | null;
+}
+
+export interface SubscriptionStatusResponse {
+    data: SubscriptionStatus;
 }

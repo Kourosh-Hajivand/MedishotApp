@@ -1,11 +1,12 @@
 // import { BlurView } from "@react-native-community/blur";
+import { Button, Host } from "@expo/ui/swift-ui";
 import { BlurView } from "expo-blur";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { Dimensions, FlatList, StyleSheet, View } from "react-native";
 import Animated, { Extrapolate, interpolate, interpolateColor, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BaseButton, BaseText } from "../../components";
+import { BaseText } from "../../components";
 import { spacing } from "../../styles/spaces";
 import { SPECIALTIES } from "../../utils/data/SPECIALTIES";
 
@@ -104,7 +105,7 @@ export const SelectRoleScreen: React.FC = () => {
     const params = useLocalSearchParams<{ token?: string }>();
     const token = params.token as string;
     const [currentIndex, setCurrentIndex] = useState(0);
-
+    const navigation = useNavigation();
     /**
      * Reanimated shared values & handlers
      */
@@ -141,6 +142,16 @@ export const SelectRoleScreen: React.FC = () => {
     const handleContinue = useCallback(() => {
         router.push({ pathname: "/(auth)/create-practice", params: { token, practiceType: JSON.stringify(SPECIALTIES[currentIndex]) } });
     }, [currentIndex, router, token]);
+
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <Host style={{ width: 65, height: 35 }}>
+                    <Button onPress={handleContinue}>Next</Button>
+                </Host>
+            ),
+        });
+    }, [navigation, handleContinue]);
 
     return (
         <SafeAreaView style={[styles.container]} className="flex-1 items-center justify-between pb-[30%]">
@@ -196,11 +207,6 @@ export const SelectRoleScreen: React.FC = () => {
                         <DescriptionItem key={`desc-${item.id}`} item={item} index={idx} scrollX={scrollX} />
                     ))}
                 </View>
-            </View>
-
-            {/* Continue button */}
-            <View style={styles.buttonContainer} className="mt-10 w-full px-10">
-                <BaseButton label="Continue" ButtonStyle="Filled" size="Large" className="mt-10 w-full" onPress={handleContinue} />
             </View>
         </SafeAreaView>
     );

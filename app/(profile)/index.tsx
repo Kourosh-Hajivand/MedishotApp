@@ -5,6 +5,7 @@ import colors from "@/theme/colors";
 import { useGetPracticeList } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { People } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host, Image, Switch } from "@expo/ui/swift-ui";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useNavigation } from "expo-router";
@@ -34,7 +35,10 @@ export default function index() {
     const { profile, isAuthenticated, logout: handleLogout } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { setSettingView, settingView } = useProfileStore();
-
+    console.log("====================================");
+    console.log("profile", profile);
+    console.log("settingView", settingView);
+    console.log("====================================");
     const navigation = useNavigation();
 
     const handleEditPress = () => {
@@ -60,6 +64,9 @@ export default function index() {
                 <Host style={{ width: 30, height: 50 }}>
                     <ContextMenu>
                         <ContextMenu.Items>
+                            <Button systemImage="plus" onPress={() => router.push("/(auth)/create-practice")}>
+                                Add Practice
+                            </Button>
                             {canEdit && (
                                 <Button systemImage="square.and.pencil" onPress={handleEditPress}>
                                     Edit {settingView.type === "profile" ? "Profile" : "Practice"}
@@ -101,7 +108,7 @@ export default function index() {
                             variant="switch"
                             value={settingView.type === "profile" && settingView.profile?.id === profile?.id}
                             onValueChange={() => {
-                                setSettingView({ type: "profile", profile: profile ?? null });
+                                setSettingView({ type: "profile", profile: profile as People });
                             }}
                         />
                         {practiceList?.data.map((practice, index) => (
@@ -120,7 +127,7 @@ export default function index() {
                     <ContextMenu.Trigger>
                         <TouchableOpacity className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] ${settingView.type === "profile" ? "rounded-full" : "rounded-[12px]"}`} onPress={() => router.push("/(profile)/profile-detail")}>
                             <View className="flex-row items-center gap-2">
-                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} haveRing={settingView.type === "profile"} color={settingView.type === "profile" && profile?.colors ? profile?.colors : undefined} />
+                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} />
                                 <View className="flex-1 ">
                                     <BaseText type="Title3" weight="500" color="system.black">
                                         {settingView.type === "profile" ? profile?.first_name + " " + profile?.last_name : settingView.practice?.name}

@@ -45,6 +45,28 @@ export interface ChangePasswordBody {
     password_confirmation: string;
 }
 
+export interface UpdateProfileFullBody {
+    first_name: string;
+    last_name: string;
+    gender?: "male" | "female" | "other";
+    birth_date?: string; // YYYY-MM-DD format
+    metadata?: string; // JSON string containing phones, emails, addresses, urls
+    profile_photo?: File | string; // File for direct upload or string for Livewire temp filename
+}
+
+export interface AppleIdTokenBody {
+    identity_token: string;
+    user?: string;
+    full_name?: {
+        given_name?: string;
+        family_name?: string;
+        middle_name?: string;
+        name_prefix?: string;
+        name_suffix?: string;
+        nickname?: string;
+    };
+}
+
 // ============= Practice Models =============
 export interface PracticeMetadata {
     zipcode?: number;
@@ -71,8 +93,14 @@ export interface UpdatePracticeDto {
 }
 
 export interface AddMemberDto {
+    first_name: string;
+    last_name: string;
     email: string;
-    role: "owner" | "admin" | "member" | "viewer" | "doctor";
+    role: "owner" | "admin" | "member" | "doctor";
+    birth_date?: string; // YYYY-MM-DD format
+    gender?: "male" | "female" | "other";
+    metadata?: string; // JSON string containing phones, emails, addresses, urls
+    profile_photo?: string | File; // Livewire temp filename or File
 }
 
 export interface UpdateMemberRoleDto {
@@ -172,6 +200,25 @@ export interface UploadPatientMediaRequest {
     data: Record<string, any>;
 }
 
+export interface EditPatientMediaRequest {
+    media: File | string; // File or Livewire temp filename
+}
+
 export interface TempUploadRequest {
     file: File;
+}
+
+// ============= Subscription Models =============
+export interface SubscribeDto {
+    plan_id: number;
+    payment_method_id: string;
+}
+
+export interface SwapSubscriptionDto {
+    plan_id: number;
+}
+
+export interface UpdateAddonLimitDto {
+    addon_key: string;
+    quantity: number;
 }

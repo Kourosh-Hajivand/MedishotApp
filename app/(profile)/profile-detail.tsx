@@ -79,7 +79,7 @@ export default function ProfileDetailScreen() {
                         <ContextMenu.Trigger>
                             <TouchableOpacity className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] ${settingView.type === "profile" ? "rounded-full" : "rounded-[12px]"}`}>
                                 <View className="flex-row items-center gap-2">
-                                    <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} haveRing={settingView.type === "profile"} color={settingView.type === "profile" && profile?.colors ? profile?.colors : undefined} />
+                                    <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} />
                                     <View className="flex-1 ">
                                         <BaseText type="Title3" weight="500" color="system.black">
                                             {settingView.type === "profile" ? profile?.first_name + " " + profile?.last_name : settingView.practice?.name}

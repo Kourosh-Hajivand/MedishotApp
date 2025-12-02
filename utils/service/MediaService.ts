@@ -1,12 +1,12 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { UploadPatientMediaRequest } from "./models/RequestModels";
-import { PatientMediaDeleteResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "./models/ResponseModels";
+import { EditPatientMediaRequest, UploadPatientMediaRequest } from "./models/RequestModels";
+import { PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { getMedia, uploadMedia, deleteMedia, getTrashMedia, restoreMedia },
+    patients: { getMedia, uploadMedia, deleteMedia, getTrashMedia, restoreMedia, editMedia },
     media: { tempUpload },
 } = routes;
 
@@ -99,6 +99,25 @@ const MediaService = {
             console.error("Error in RestoreMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Restore media failed");
+            }
+            throw error;
+        }
+    },
+
+    // Edit patient media image
+    editPatientMedia: async (mediaId: string | number, payload: EditPatientMediaRequest): Promise<PatientMediaEditResponse> => {
+        try {
+            const formData = new FormData();
+            formData.append("media", payload.media);
+
+            const response: AxiosResponse<PatientMediaEditResponse> = await axiosInstance.post(baseUrl + editMedia(mediaId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Error in EditPatientMedia:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Edit patient media failed");
             }
             throw error;
         }

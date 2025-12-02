@@ -2,16 +2,14 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { storeTokens } from "../helper/tokenStorage";
-import { ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, VerifyOtpCodeBody } from "./models/RequestModels";
+import { AppleIdTokenBody, ChangeEmailBody, ChangePasswordBody, CompleteRegistrationBody, ForgetPasswordBody, InitiateRegistrationBody, LoginBody, ResetPasswordBody, UpdateProfileBody, UpdateProfileFullBody, VerifyOtpCodeBody } from "./models/RequestModels";
 import { AppleConfigResponse, ChangeEmailResponse, ChangePasswordResponse, CompleteRegistrationResponse, ForgetPasswordResponse, InitiateRegistrationResponse, LoginResponse, LogoutResponse, MeResponse, OAuthRedirectResponse, ResetPasswordResponse, UpdateProfileResponse, VerifyOtpCodeResponse } from "./models/ResponseModels";
 
 // Import the new service for practice operations
-import { PracticeService } from "./PracticeService";
-import { UploadService } from "./UploadService";
 
 const {
     baseUrl,
-    auth: { login, initiateRegistration, completeRegistration, logout, refresh, me, updateProfile, forgetPassword, verifyOtpCode, resetPassword, changeEmail, changePassword, google, googleCallback, googleIdToken, googleConfig, apple, appleCallback, appleIdToken, appleConfig },
+    auth: { login, initiateRegistration, completeRegistration, logout, refresh, me, updateProfile, updateProfileFull, forgetPassword, verifyOtpCode, resetPassword, changeEmail, changePassword, google, googleCallback, googleIdToken, googleConfig, apple, appleCallback, appleIdToken, appleConfig },
 } = routes;
 
 export const AuthService = {
@@ -68,13 +66,17 @@ export const AuthService = {
 
     refresh: async (): Promise<LoginResponse> => {
         try {
-            const response: AxiosResponse<LoginResponse> = await axios.post(baseUrl + refresh(), {}, {
-                headers: {
-                    'Authorization': `Bearer ${(await import('../helper/tokenStorage')).getTokens().then(tokens => tokens.refreshToken)}`
-                }
-            });
+            const response: AxiosResponse<LoginResponse> = await axios.post(
+                baseUrl + refresh(),
+                {},
+                {
+                    headers: {
+                        Authorization: `Bearer ${(await import("../helper/tokenStorage")).getTokens().then((tokens) => tokens.refreshToken)}`,
+                    },
+                },
+            );
             if (response.data.data.token) {
-                (await import('../helper/tokenStorage')).storeTokens(response.data.data.token);
+                (await import("../helper/tokenStorage")).storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -100,6 +102,39 @@ export const AuthService = {
     updateProfile: async (body: UpdateProfileBody): Promise<UpdateProfileResponse> => {
         try {
             const response: AxiosResponse<UpdateProfileResponse> = await axiosInstance.post(baseUrl + updateProfile(), body);
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Update profile failed");
+            }
+            throw error;
+        }
+    },
+
+    updateProfileFull: async (body: UpdateProfileFullBody): Promise<UpdateProfileResponse> => {
+        try {
+            const formData = new FormData();
+            formData.append("first_name", body.first_name);
+            formData.append("last_name", body.last_name);
+
+            if (body.gender) {
+                formData.append("gender", body.gender);
+            }
+            if (body.birth_date) {
+                formData.append("birth_date", body.birth_date);
+            }
+            if (body.profile_photo) {
+                // Support both File and string (Livewire temp filename)
+                if (typeof body.profile_photo === "string") {
+                    formData.append("profile_photo", body.profile_photo);
+                } else {
+                    formData.append("profile_photo", body.profile_photo);
+                }
+            }
+
+            const response: AxiosResponse<UpdateProfileResponse> = await axiosInstance.put(baseUrl + updateProfileFull(), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -217,9 +252,9 @@ export const AuthService = {
         }
     },
 
-    appleIdToken: async (identity_token: string): Promise<LoginResponse> => {
+    appleIdToken: async (body: AppleIdTokenBody): Promise<LoginResponse> => {
         try {
-            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleIdToken(), { identity_token });
+            const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleIdToken(), body);
             if (response.data.data.token) {
                 storeTokens(response.data.data.token);
             }
@@ -260,7 +295,7 @@ export const AuthService = {
         }
     },
 
-    appleCallback: async (code: string, state?: string): Promise<LoginResponse> => {
+    appleCallbackWeb: async (code: string, state?: string): Promise<LoginResponse> => {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleCallback(), { code, state });
             if (response.data.data.token) {
@@ -270,18 +305,6 @@ export const AuthService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Apple callback failed");
-            }
-            throw error;
-        }
-    },
-
-    appleConfig: async (): Promise<OAuthRedirectResponse> => {
-        try {
-            const response: AxiosResponse<OAuthRedirectResponse> = await axiosInstance.get(baseUrl + appleConfig());
-            return response.data;
-        } catch (error) {
-            if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Apple config fetch failed");
             }
             throw error;
         }

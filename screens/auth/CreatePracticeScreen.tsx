@@ -1,14 +1,15 @@
 import { useCreatePractice } from "@/utils/hook";
+import { Button, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
-import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
+import { BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
@@ -35,6 +36,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 export const CreatePracticeScreen: React.FC = () => {
+    const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
     const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
@@ -155,7 +157,17 @@ export const CreatePracticeScreen: React.FC = () => {
             ...(uploadedFilename ? { image: uploadedFilename } : {}),
         });
     };
-
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <Host style={{ width: 65, height: 35 }}>
+                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending}>
+                        Create
+                    </Button>
+                </Host>
+            ),
+        });
+    }, [navigation, handleSubmit, onSubmit, isPending]);
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
             <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -203,11 +215,6 @@ export const CreatePracticeScreen: React.FC = () => {
                     )}
                 </View>
             </ScrollView>
-
-            {/* Fixed bottom button */}
-            <View style={[styles.buttonContainer, { paddingBottom: insets.bottom || 20 }]}>
-                <BaseButton label="Next" ButtonStyle="Filled" size="Large" disabled={isPending} isLoading={isPending} onPress={handleSubmit(onSubmit)} />
-            </View>
         </KeyboardAvoidingView>
     );
 };

@@ -1,8 +1,9 @@
 import { BaseButton, BaseText, OTPInput } from "@/components";
 import { storeTokens } from "@/utils/helper/tokenStorage";
 import { useCompleteRegistration, useInitiateRegistration, useVerifyOtpCode } from "@/utils/hook";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { Button, Host } from "@expo/ui/swift-ui";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useEffect, useLayoutEffect, useState } from "react";
 import { View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +18,16 @@ export default function OTPScreen() {
     const [timer, setTimer] = useState(120); // 2 minutes = 120 seconds
     const [canResend, setCanResend] = useState(false);
 
+    const navigation = useNavigation();
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <Host style={{ width: 65, height: 35 }}>
+                    <Button disabled={otp.length !== 6}>Next</Button>
+                </Host>
+            ),
+        });
+    }, [navigation]);
     // Timer countdown
     useEffect(() => {
         if (timer > 0) {
@@ -121,7 +132,6 @@ export default function OTPScreen() {
                         </View>
                     </View>
                 </View>
-                <BaseButton ButtonStyle="Filled" size="Large" label="Verify" className="!rounded-2xl" onPress={() => {}} disabled={otp.length !== 6 || isVerifying} isLoading={isVerifying} />
             </View>
         </ScrollView>
     );
