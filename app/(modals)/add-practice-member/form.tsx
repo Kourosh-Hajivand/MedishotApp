@@ -14,10 +14,10 @@ import { z } from "zod";
 
 interface AddMemberFormData {
     email: string;
-    role: "owner" | "admin" | "member" | "viewer";
+    role: "owner" | "admin" | "member" | "viewer" | "doctor";
 }
 
-const roleOptions = ["Owner", "Admin", "Member", "Viewer"];
+const roleOptions = ["Owner", "Admin", "Member", "Viewer", "Doctor"];
 
 export default function AddPracticeMemberForm() {
     const navigation = useNavigation();
@@ -39,7 +39,7 @@ export default function AddPracticeMemberForm() {
         resolver: zodResolver(
             z.object({
                 email: z.string().email("Please enter a valid email address"),
-                role: z.enum(["owner", "admin", "member", "viewer"]),
+                role: z.enum(["owner", "admin", "member", "viewer", "doctor"]),
             }),
         ),
         defaultValues: {
@@ -70,13 +70,13 @@ export default function AddPracticeMemberForm() {
         <View style={[styles.container, { paddingTop: insets.top }]}>
             <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
                 <View style={styles.content}>
-                    <View className="gap-2">
+                    <View className="gap-0">
                         <ControlledInput control={control} name="email" label="Email Address" placeholder="Enter email address" keyboardType="email-address" autoCapitalize="none" error={errors.email?.message} />
 
-                        <View className="gap-1 pl-4">
+                        <View className="gap-1 pl-4 border-t border-system-gray5 pt-4">
                             <View className="gap-2 flex-row items-center justify-between">
                                 <BaseText type="Body" weight="500" color="labels.primary" style={styles.label}>
-                                    Role
+                                    Role:
                                 </BaseText>
                                 <Host style={{ height: 40, width: "30%" }}>
                                     <Controller
@@ -90,7 +90,7 @@ export default function AddPracticeMemberForm() {
                                                 onOptionSelected={({ nativeEvent: { index } }) => {
                                                     setSelectedRoleIndex(index);
                                                     // Convert display name to backend value
-                                                    const roleValue = roleOptions[index].toLowerCase() as "owner" | "admin" | "member" | "viewer";
+                                                    const roleValue = roleOptions[index].toLowerCase() as "owner" | "admin" | "member" | "viewer" | "doctor";
                                                     onChange(roleValue);
                                                     setValue("role", roleValue);
                                                 }}
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     inputContainer: {
-        gap: 16,
+        gap: 0,
     },
 
     label: {

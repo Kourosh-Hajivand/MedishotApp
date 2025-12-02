@@ -33,6 +33,13 @@ export default function layout() {
                 }}
             />
             <Stack.Screen
+                name="practice-member-details"
+                options={{
+                    headerTitle: "",
+                    headerLargeTitle: false,
+                }}
+            />
+            <Stack.Screen
                 name="print-information"
                 options={{
                     headerTitle: "Print Information",

@@ -6,7 +6,7 @@ import { ApiResponse, PatientsCountResponse, PracticeDetailResponse, PracticeLis
 
 const {
     baseUrl,
-    practises: { list, create, getById, update, delete: deletePractice, getMembers, addMember, updateMemberRole, removeMember, leave, transferOwnership, getTags, createTag, getTag, updateTag, deleteTag, getTemplates, createTemplate, getTemplate, updateTemplate, deleteTemplate, getRecentlyPhotos, getPatientsCount },
+    practises: { list, create, getById, update, delete: deletePractice, getMembers, addMember, updateMemberRole, removeMember, leave, transferOwnership, getTags, createTag, getTag, updateTag, deleteTag, getTemplates, createTemplate, getTemplate, updateTemplate, deleteTemplate, getRecentlyPhotos, getPatientsCount, getArchivedMedia, getMember },
 } = routes;
 
 export const PracticeService = {
@@ -184,6 +184,32 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to get patient count statistics");
+            }
+            throw error;
+        }
+    },
+
+    // Get archived media for a practice
+    getArchivedMedia: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
+        try {
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getArchivedMedia(practiseId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get archived media");
+            }
+            throw error;
+        }
+    },
+
+    // Get specific practice member details
+    getMember: async (practiceId: number, memberId: string): Promise<ApiResponse<any>> => {
+        try {
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.get(baseUrl + getMember(practiceId, memberId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get practice member");
             }
             throw error;
         }

@@ -8,11 +8,7 @@ export default function PrintInformationScreen() {
     const insets = useSafeAreaInsets();
 
     return (
-        <ScrollView
-            style={[styles.container, { paddingTop: insets.top + headerHeight }]}
-            contentContainerStyle={styles.contentContainer}
-            showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={[styles.container, { paddingTop: insets.top + headerHeight }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             <BaseText type="Title1" weight="600" color="system.black">
                 Print Information
             </BaseText>

@@ -72,11 +72,11 @@ export interface UpdatePracticeDto {
 
 export interface AddMemberDto {
     email: string;
-    role: "owner" | "admin" | "member" | "viewer";
+    role: "owner" | "admin" | "member" | "viewer" | "doctor";
 }
 
 export interface UpdateMemberRoleDto {
-    role: "owner" | "admin" | "member" | "viewer";
+    role: "owner" | "admin" | "member" | "viewer" | "doctor";
 }
 
 export interface TransferOwnershipDto {

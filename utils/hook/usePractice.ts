@@ -34,6 +34,24 @@ export const useGetPracticeMembers = (practiceId: number, enabled: boolean = tru
     });
 };
 
+export const useGetArchivedMedia = (practiceId: number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetArchivedMedia", practiceId],
+        queryFn: () => PracticeService.getArchivedMedia(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
+
+export const useGetPracticeMember = (practiceId: number, memberId: string, enabled: boolean = true): UseQueryResult<ApiResponse<any>, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetPracticeMember", practiceId, memberId],
+        queryFn: () => PracticeService.getMember(practiceId, memberId),
+        enabled: isAuthenticated === true && enabled && !!practiceId && !!memberId,
+    });
+};
+
 // ============= Mutation Hooks (POST/PUT/DELETE) =============
 
 export const useCreatePractice = (onSuccess?: (data: PracticeDetailResponse) => void, onError?: (error: Error) => void): UseMutationResult<PracticeDetailResponse, Error, CreatePracticeDto> => {

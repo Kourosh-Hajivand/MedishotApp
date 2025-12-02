@@ -44,6 +44,10 @@ export const routes = {
         // Statistics
         getPatientsCount: (practiseId: string | number, type: string) => `practises/${practiseId}/patients-count/${type}`,
         getRecentlyPhotos: (practiseId: string | number) => `practises/${practiseId}/recently-photos`,
+        getArchivedMedia: (practiseId: string | number) => `practises/${practiseId}/archived-media`,
+
+        // Members
+        getMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}`,
 
         // Tags
         getTags: (practiseId: string | number) => `practises/${practiseId}/tags`,
