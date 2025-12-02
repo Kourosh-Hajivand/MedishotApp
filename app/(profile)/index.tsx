@@ -34,6 +34,7 @@ export default function index() {
     const { profile, isAuthenticated, logout: handleLogout } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { setSettingView, settingView } = useProfileStore();
+
     const navigation = useNavigation();
     useLayoutEffect(() => {
         navigation.setOptions({

@@ -27,21 +27,28 @@ export default function ProfileDetailScreen() {
                 pathname: "/(modals)/edit-practice",
                 params: { practice: JSON.stringify(settingView.practice) },
             });
-        } else {
-            // TODO: Navigate to edit profile modal
+        } else if (settingView.type === "profile" && profile) {
+            router.push({
+                pathname: "/(modals)/edit-profile",
+                params: { profile: JSON.stringify(profile) },
+            });
         }
     };
+
+    // Check if user can edit (profile view or owner of practice)
+    const canEdit = settingView.type === "profile" || (settingView.type === "practice" && settingView.practice?.role === "owner");
 
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: "Profile Details",
-            headerRight: () => (
-                <TouchableOpacity onPress={handleEditPress} className="flex-row px-2 justify-center items-center">
-                    <IconSymbol name="square.and.pencil" size={24} color={colors.system.blue} />
-                </TouchableOpacity>
-            ),
+            headerRight: () =>
+                canEdit ? (
+                    <TouchableOpacity onPress={handleEditPress} className="flex-row px-2 justify-center items-center">
+                        <IconSymbol name="square.and.pencil" size={24} color={colors.system.blue} />
+                    </TouchableOpacity>
+                ) : null,
         });
-    }, [navigation, settingView]);
+    }, [navigation, settingView, canEdit]);
     return (
         <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingTop: insets.top + headerHeight, gap: 16 }}>
             <View className="px-4">

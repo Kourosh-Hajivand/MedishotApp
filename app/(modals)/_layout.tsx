@@ -9,6 +9,7 @@ export default function ModalsLayout() {
             <Stack.Screen name="add-patient" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="add-practice-member" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="edit-practice" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="edit-profile" options={{ headerShown: false, gestureEnabled: false }} />
         </Stack>
     );
 }
