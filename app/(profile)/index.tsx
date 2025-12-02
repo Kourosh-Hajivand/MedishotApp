@@ -36,13 +36,35 @@ export default function index() {
     const { setSettingView, settingView } = useProfileStore();
 
     const navigation = useNavigation();
+
+    const handleEditPress = () => {
+        if (settingView.type === "profile" && profile) {
+            router.push({
+                pathname: "/(modals)/edit-profile",
+                params: { profile: JSON.stringify(profile) },
+            });
+        } else if (settingView.type === "practice" && settingView.practice?.role === "owner" && settingView.practice) {
+            router.push({
+                pathname: "/(modals)/edit-practice",
+                params: { practice: JSON.stringify(settingView.practice) },
+            });
+        }
+    };
+
+    // Check if edit button should be shown
+    const canEdit = settingView.type === "profile" || (settingView.type === "practice" && settingView.practice?.role === "owner");
+
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
                 <Host style={{ width: 30, height: 50 }}>
                     <ContextMenu>
                         <ContextMenu.Items>
-                            <Button systemImage="square.and.pencil">Edit Profile</Button>
+                            {canEdit && (
+                                <Button systemImage="square.and.pencil" onPress={handleEditPress}>
+                                    Edit {settingView.type === "profile" ? "Profile" : "Practice"}
+                                </Button>
+                            )}
                             <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
                                 Logout
                             </Button>
@@ -59,7 +81,7 @@ export default function index() {
                 </Host>
             ),
         });
-    }, [navigation, handleLogout]);
+    }, [navigation, handleLogout, settingView, canEdit, handleEditPress]);
     const menuItems: { lable: string; icon: IconSymbolName; href: string }[] = [
         { lable: "Practice Overview", icon: "chart.bar.xaxis", href: "/practice-overview" },
         { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team" },

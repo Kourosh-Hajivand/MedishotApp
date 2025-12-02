@@ -8,7 +8,7 @@ export default function AddPracticeMemberModalLayout() {
             <Stack.Screen
                 name="index"
                 options={{
-                    headerTitle: "Add Member",
+                    headerTitle: "",
                     headerTransparent: true,
                     headerLeft: () => <BackButton onPress={() => router.back()} />,
                     gestureEnabled: false,
