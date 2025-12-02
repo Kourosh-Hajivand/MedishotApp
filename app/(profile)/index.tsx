@@ -5,11 +5,11 @@ import colors from "@/theme/colors";
 import { useGetPracticeList } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { ContextMenu, Host, Switch } from "@expo/ui/swift-ui";
+import { Button, ContextMenu, Host, Image, Switch } from "@expo/ui/swift-ui";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
-import React, { ComponentProps } from "react";
+import React, { ComponentProps, useLayoutEffect } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -31,10 +31,34 @@ const MAPPING = {
 
 export default function index() {
     const insets = useSafeAreaInsets();
-    const { profile, isAuthenticated } = useAuth();
+    const { profile, isAuthenticated, logout: handleLogout } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { setSettingView, settingView } = useProfileStore();
+    const navigation = useNavigation();
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <Host style={{ width: 30, height: 50 }}>
+                    <ContextMenu>
+                        <ContextMenu.Items>
+                            <Button systemImage="square.and.pencil">Edit Profile</Button>
+                            <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
+                                Logout
+                            </Button>
+                        </ContextMenu.Items>
 
+                        <ContextMenu.Trigger>
+                            <View>
+                                <Host style={{ width: 35, height: 35 }}>
+                                    <Image systemName="ellipsis" />
+                                </Host>
+                            </View>
+                        </ContextMenu.Trigger>
+                    </ContextMenu>
+                </Host>
+            ),
+        });
+    }, [navigation, handleLogout]);
     const menuItems: { lable: string; icon: IconSymbolName; href: string }[] = [
         { lable: "Practice Overview", icon: "chart.bar.xaxis", href: "/practice-overview" },
         { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team" },
@@ -71,9 +95,9 @@ export default function index() {
                     </ContextMenu.Items>
 
                     <ContextMenu.Trigger>
-                        <View className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] ${settingView.type === "profile" ? "rounded-full" : "rounded-[12px]"}`}>
+                        <TouchableOpacity className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] ${settingView.type === "profile" ? "rounded-full" : "rounded-[12px]"}`} onPress={() => router.push("/(profile)/profile-detail")}>
                             <View className="flex-row items-center gap-2">
-                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} haveRing={settingView.type === "profile"} />
+                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} haveRing={settingView.type === "profile"} color={settingView.type === "profile" && profile?.colors ? profile?.colors : undefined} />
                                 <View className="flex-1 ">
                                     <BaseText type="Title3" weight="500" color="system.black">
                                         {settingView.type === "profile" ? profile?.first_name + " " + profile?.last_name : settingView.practice?.name}
@@ -86,7 +110,7 @@ export default function index() {
                             <View className="flex-1">
                                 <IconSymbol name="chevron.up.chevron.down" size={14} color={colors.labels.secondary} />
                             </View>
-                        </View>
+                        </TouchableOpacity>
                     </ContextMenu.Trigger>
                 </ContextMenu>
             </Host>

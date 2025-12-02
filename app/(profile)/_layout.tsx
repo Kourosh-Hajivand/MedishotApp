@@ -63,6 +63,12 @@ export default function layout() {
                     headerTitle: "Archive",
                 }}
             />
+            <Stack.Screen
+                name="profile-detail"
+                options={{
+                    headerTitle: "Profile Details",
+                }}
+            />
         </Stack>
     );
 }

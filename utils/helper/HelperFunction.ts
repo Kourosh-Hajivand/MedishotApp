@@ -63,6 +63,28 @@ export function normalizeUSPhoneToE164(value: string) {
     return value;
 }
 
+/**
+ * Normalize website URL to always have https:// prefix
+ * @param url - The website URL (with or without protocol)
+ * @returns URL with https:// prefix, or empty string if input is empty
+ */
+export function normalizeWebsiteUrl(url: string | undefined | null): string {
+    if (!url || url.trim() === "") return "";
+    
+    const trimmedUrl = url.trim();
+    
+    // If already has http:// or https://, return as is (but prefer https)
+    if (trimmedUrl.startsWith("https://")) {
+        return trimmedUrl;
+    }
+    if (trimmedUrl.startsWith("http://")) {
+        return trimmedUrl.replace("http://", "https://");
+    }
+    
+    // Otherwise, add https://
+    return `https://${trimmedUrl}`;
+}
+
 // Parse US Driver's License/ID Card data from OCR text
 export interface ParsedIDCardData {
     firstName?: string;

@@ -1,22 +1,21 @@
-import { useCreatePractice } from "@/utils/hook";
+import { AvatarIcon, PlusIcon } from "@/assets/icons";
+import { BaseText, ControlledInput, ImagePickerWrapper } from "@/components";
+import { spacing } from "@/styles/spaces";
+import colors from "@/theme/colors";
+import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "@/utils/helper/HelperFunction";
+import useDebounce from "@/utils/hook/useDebounce";
+import { useGetSearchDetail, useMapboxSearch } from "@/utils/hook/useGetMapboxSearch";
+import { useTempUpload } from "@/utils/hook/useMedia";
+import { useUpdatePractice } from "@/utils/hook/usePractice";
+import { Practice } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-import { AvatarIcon, PlusIcon } from "../../assets/icons";
-import { BaseButton, BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
-import { QueryKeys } from "../../models/enums";
-import { spacing } from "../../styles/spaces";
-import colors from "../../theme/colors.shared";
-import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "../../utils/helper/HelperFunction";
-import { storeTokens } from "../../utils/helper/tokenStorage";
-import useDebounce from "../../utils/hook/useDebounce";
-import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
-import { useTempUpload } from "../../utils/hook/useMedia";
 
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
@@ -24,24 +23,48 @@ const schema = z.object({
     phoneNumber: z
         .string()
         .transform((val) => val.replace(/\D/g, ""))
-        .refine((val) => val.length === 10 || val.length === 11, {
+        .refine((val) => val.length === 0 || val.length === 10 || val.length === 11, {
             message: "Phone number must be 10 digits",
         }),
-    specialty: z.string().min(1, "Required"),
-    address: z.string().min(1, "Address is required"),
-    zipCode: z.string().min(1, "Zip Code is required"),
+    address: z.string().optional(),
+    zipCode: z.string().optional(),
+    email: z.string().email().optional().or(z.literal("")),
 });
 
 type FormData = z.infer<typeof schema>;
 
-export const CreatePracticeScreen: React.FC = () => {
+export default function EditPracticeScreen() {
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
-    const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
-    const token = params.token as string;
-    const practiceType = params.practiceType ? JSON.parse(params.practiceType as string) : undefined;
+    const navigation = useNavigation();
+    const params = useLocalSearchParams<{ practice?: string }>();
 
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    // Parse practice data from params
+    const practice: Practice | null = useMemo(() => {
+        if (params.practice) {
+            try {
+                return JSON.parse(params.practice);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    }, [params.practice]);
+
+    // Parse metadata
+    const metadata = useMemo(() => {
+        if (!practice?.metadata) return null;
+        if (typeof practice.metadata === "string") {
+            try {
+                return JSON.parse(practice.metadata);
+            } catch {
+                return null;
+            }
+        }
+        return practice.metadata;
+    }, [practice?.metadata]);
+
+    const [selectedImage, setSelectedImage] = useState<string | null>(practice?.image?.url || null);
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
 
     const {
@@ -53,12 +76,12 @@ export const CreatePracticeScreen: React.FC = () => {
     } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
-            practiceName: "",
-            website: "",
-            phoneNumber: "",
-            specialty: practiceType?.title || "",
-            address: "",
-            zipCode: "",
+            practiceName: practice?.name || "",
+            website: metadata?.website?.replace("https://", "") || "",
+            phoneNumber: metadata?.phone?.replace(/-/g, "") || "",
+            address: metadata?.address || "",
+            zipCode: metadata?.zipcode?.toString() || "",
+            email: metadata?.email || "",
         },
     });
 
@@ -83,7 +106,6 @@ export const CreatePracticeScreen: React.FC = () => {
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
             setUploadedFilename(response.filename);
-            console.log("Image uploaded successfully:", response.filename);
         },
         (error) => {
             console.error("Error uploading image:", error.message);
@@ -112,53 +134,52 @@ export const CreatePracticeScreen: React.FC = () => {
     };
 
     const {
-        mutate: createPractice,
+        mutate: updatePractice,
         isPending,
         error,
-    } = useCreatePractice(() => {
-        router.replace("/(tabs)/patients");
-        storeTokens(token);
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+    } = useUpdatePractice(() => {
+        queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+        router.back();
     });
 
     const onSubmit = (data: FormData) => {
-        console.log("====================================");
-        console.log(data);
-        324;
-        console.log("====================================");
-        createPractice({
-            name: data.practiceName,
-            metadata: JSON.stringify({
-                website: normalizeWebsiteUrl(data.website),
-                phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
-                address: data.address,
-                zipcode: Number(data.zipCode),
-                print_settings: {
-                    avatar: "profile_picture",
-                    practiceName: true,
-                    doctorName: true,
-                    address: true,
-                    practicePhone: true,
-                    practiceURL: false,
-                    practiceEmail: false,
-                    practiceSocialMedia: false,
-                },
-                notification_settings: {
-                    imageAdded: true,
-                    notes: true,
-                    imageEnhanced: true,
-                    consentFilled: true,
-                    patientAdded: false,
-                },
-            }),
-            type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : {}),
+        if (!practice?.id) return;
+
+        updatePractice({
+            id: practice.id,
+            data: {
+                name: data.practiceName,
+                metadata: JSON.stringify({
+                    website: normalizeWebsiteUrl(data.website),
+                    phone: data.phoneNumber ? normalizeUSPhoneToDashedFormat(data.phoneNumber) : "",
+                    address: data.address || "",
+                    zipcode: data.zipCode ? Number(data.zipCode) : undefined,
+                    email: data.email || "",
+                    // Preserve existing settings
+                    print_settings: metadata?.print_settings,
+                    notification_settings: metadata?.notification_settings,
+                }),
+                ...(uploadedFilename ? { image: uploadedFilename } : {}),
+            },
         });
     };
 
+    // Set header right button
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerRight: () => (
+                <TouchableOpacity onPress={handleSubmit(onSubmit)} disabled={isPending} className="px-2">
+                    <BaseText type="Body" weight="600" color={isPending ? "labels.tertiary" : "system.blue"}>
+                        Save
+                    </BaseText>
+                </TouchableOpacity>
+            ),
+        });
+    }, [navigation, handleSubmit, isPending]);
+
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 10 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.avatarContainer}>
                     <ImagePickerWrapper onImageSelected={handleImageSelected}>
                         <View style={styles.avatarWrapper}>
@@ -168,10 +189,10 @@ export const CreatePracticeScreen: React.FC = () => {
                     </ImagePickerWrapper>
                     <View style={styles.titleContainer}>
                         <BaseText type="Title1" weight="700" color="system.black">
-                            Create New Practice
+                            Edit Practice
                         </BaseText>
                         <BaseText type="Body" color="labels.secondary" align="center">
-                            Start by creating your practice.
+                            Update your practice information.
                         </BaseText>
                     </View>
                 </View>
@@ -181,17 +202,17 @@ export const CreatePracticeScreen: React.FC = () => {
                     {[
                         { name: "practiceName", label: "Practice Name" },
                         { name: "website", label: "Website", optional: true },
-                        { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
-                        { name: "specialty", label: "Specialty", disabled: true },
-                        { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad" },
-                        { name: "address", label: "Address" },
+                        { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true },
+                        { name: "email", label: "Email", keyboardType: "email-address", optional: true },
+                        { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", optional: true },
+                        { name: "address", label: "Address", optional: true },
                     ].map((f, i) => (
                         <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
                             <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                                 {f.label}
                             </BaseText>
                             <View style={styles.inputWrapper}>
-                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} disabled={f.disabled} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
                             </View>
                         </View>
                     ))}
@@ -203,21 +224,15 @@ export const CreatePracticeScreen: React.FC = () => {
                     )}
                 </View>
             </ScrollView>
-
-            {/* Fixed bottom button */}
-            <View style={[styles.buttonContainer, { paddingBottom: insets.bottom || 20 }]}>
-                <BaseButton label="Next" ButtonStyle="Filled" size="Large" disabled={isPending} isLoading={isPending} onPress={handleSubmit(onSubmit)} />
-            </View>
         </KeyboardAvoidingView>
     );
-};
+}
 
 const styles = StyleSheet.create({
     scrollView: {
         flex: 1,
         paddingHorizontal: spacing["6"],
     },
-
     avatarContainer: {
         alignItems: "center",
     },
@@ -255,22 +270,14 @@ const styles = StyleSheet.create({
     formRow: {
         flexDirection: "row",
         alignItems: "center",
-        // alignItems: "flex-start",
         paddingVertical: spacing["3"],
         borderBottomWidth: 1,
         borderBottomColor: colors.system.gray5,
     },
     label: {
         width: 120,
-        // marginTop: spacing["2"],
     },
     inputWrapper: {
         flex: 1,
     },
-    buttonContainer: {
-        backgroundColor: colors.background,
-        paddingHorizontal: spacing["4"],
-    },
 });
-
-CreatePracticeScreen.displayName = "CreatePracticeScreen";
