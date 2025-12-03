@@ -1,6 +1,6 @@
 import PatientService, { GetPatientsParams } from "@/utils/service/PatientService";
 import { CreatePatientRequest, UpdatePatientRequest } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, DoctorPatientsResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -15,7 +15,7 @@ export const useGetPatients = (practiseId?: string | number, params?: GetPatient
     });
 };
 
-export const useGetDoctorPatients = (params?: { page?: number; per_page?: number }): UseQueryResult<PatientListResponse, Error> => {
+export const useGetDoctorPatients = (params?: { page?: number; per_page?: number }): UseQueryResult<DoctorPatientsResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetDoctorPatients", params],

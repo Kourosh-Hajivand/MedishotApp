@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { CreatePatientRequest, UpdatePatientRequest } from "./models/RequestModels";
-import { ApiResponse, PatientDetailResponse, PatientListResponse } from "./models/ResponseModels";
+import { ApiResponse, DoctorPatientsResponse, PatientDetailResponse, PatientListResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -44,7 +44,7 @@ const PatientService = {
     },
 
     // Get Doctor's Patients
-    getDoctorPatients: async (params?: { page?: number; per_page?: number }): Promise<PatientListResponse> => {
+    getDoctorPatients: async (params?: { page?: number; per_page?: number }): Promise<DoctorPatientsResponse> => {
         try {
             const queryParams = new URLSearchParams();
             if (params?.page) {
@@ -55,7 +55,7 @@ const PatientService = {
             }
 
             const url = baseUrl + getDoctorPatientsRoute() + (queryParams.toString() ? `?${queryParams.toString()}` : "");
-            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
+            const response: AxiosResponse<DoctorPatientsResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
             console.error("Error in GetDoctorPatients:", error);

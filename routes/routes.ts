@@ -83,6 +83,8 @@ export const routes = {
         getTrashMedia: (patientId: string | number) => `patients/media/trash/${patientId}`,
         restoreMedia: (mediaId: string | number) => `patients/media/restore/${mediaId}`,
         editMedia: (mediaId: string | number) => `patients/media/edit-image/${mediaId}`,
+        bookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
+        unbookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
     },
 
     doctor: {

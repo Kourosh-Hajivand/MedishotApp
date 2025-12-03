@@ -64,7 +64,7 @@ export default function index() {
                 <Host style={{ width: 30, height: 50 }}>
                     <ContextMenu>
                         <ContextMenu.Items>
-                            <Button systemImage="plus" onPress={() => router.push("/(auth)/create-practice")}>
+                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>
                                 Add Practice
                             </Button>
                             {canEdit && (

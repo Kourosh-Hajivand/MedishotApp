@@ -79,3 +79,18 @@ export const getRelativeTimeWithDayjs = (dateString: string): string => {
     const date = dayjs(dateString);
     return date.fromNow();
 };
+
+/**
+ * تبدیل تاریخ به فرمت خوانا (مثل "December 2, 2025")
+ * @param dateString - تاریخ به صورت string (مثل "2025-12-02T19:09:49.000000Z")
+ * @param format - فرمت دلخواه (پیش‌فرض: "MMMM D, YYYY")
+ * @returns تاریخ فرمت شده
+ */
+export const formatDate = (dateString: string, format: string = "MMMM D, YYYY"): string => {
+    if (!dateString) return "";
+
+    const date = dayjs(dateString);
+    if (!date.isValid()) return "";
+
+    return date.format(format);
+};

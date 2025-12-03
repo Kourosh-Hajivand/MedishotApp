@@ -301,7 +301,15 @@ export interface Patient {
     updated_at: string;
 }
 
+// Response for /{practise}/patients - returns simple array
 export interface PatientListResponse {
+    success: true;
+    message: string;
+    data: Patient[];
+}
+
+// Response for /doctor/patients - returns paginated data
+export interface DoctorPatientsResponse {
     success: true;
     message: string;
     data: {
@@ -336,6 +344,7 @@ export interface PatientMedia {
     id: number;
     patient_id: number;
     patient_type: string;
+    is_bookmarked?: boolean;
     data: Record<string, any> | null;
     taker?: People;
     media: Media | null;
@@ -384,6 +393,12 @@ export interface PatientMediaEditResponse {
     data: Record<string, any>;
     original_media?: Media;
     edited_media?: Media;
+}
+
+export interface PatientMediaBookmarkResponse {
+    success: true;
+    message: string;
+    data: null | object;
 }
 
 // ============= File Upload Responses =============

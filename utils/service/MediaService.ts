@@ -2,11 +2,11 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { EditPatientMediaRequest, UploadPatientMediaRequest } from "./models/RequestModels";
-import { PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "./models/ResponseModels";
+import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { getMedia, uploadMedia, deleteMedia, getTrashMedia, restoreMedia, editMedia },
+    patients: { getMedia, uploadMedia, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
     media: { tempUpload },
 } = routes;
 
@@ -118,6 +118,34 @@ const MediaService = {
             console.error("Error in EditPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Edit patient media failed");
+            }
+            throw error;
+        }
+    },
+
+    // Bookmark patient media
+    bookmarkMedia: async (mediaId: string | number): Promise<PatientMediaBookmarkResponse> => {
+        try {
+            const response: AxiosResponse<PatientMediaBookmarkResponse> = await axiosInstance.post(baseUrl + bookmarkMedia(mediaId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in BookmarkMedia:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Bookmark media failed");
+            }
+            throw error;
+        }
+    },
+
+    // Unbookmark patient media
+    unbookmarkMedia: async (mediaId: string | number): Promise<PatientMediaBookmarkResponse> => {
+        try {
+            const response: AxiosResponse<PatientMediaBookmarkResponse> = await axiosInstance.delete(baseUrl + unbookmarkMedia(mediaId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in UnbookmarkMedia:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Unbookmark media failed");
             }
             throw error;
         }

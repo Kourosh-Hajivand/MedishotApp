@@ -1,6 +1,6 @@
 import MediaService from "@/utils/service/MediaService";
 import { EditPatientMediaRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
-import { PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
+import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 
 // ============= Query Hooks (GET) =============
@@ -93,6 +93,38 @@ export const useEditPatientMedia = (onSuccess?: (data: PatientMediaEditResponse)
         mutationFn: ({ mediaId, data }: { mediaId: number | string; data: EditPatientMediaRequest }) => MediaService.editPatientMedia(mediaId, data),
         onSuccess: (data, variables) => {
             // Invalidate all media queries to refresh the lists
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useBookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaBookmarkResponse, Error, number | string> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (mediaId: number | string) => MediaService.bookmarkMedia(mediaId),
+        onSuccess: (data, mediaId) => {
+            // Invalidate all media queries to refresh bookmark status
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUnbookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaBookmarkResponse, Error, number | string> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (mediaId: number | string) => MediaService.unbookmarkMedia(mediaId),
+        onSuccess: (data, mediaId) => {
+            // Invalidate all media queries to refresh bookmark status
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
             onSuccess?.(data);
         },
