@@ -57,7 +57,7 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
 // Component for Patients tab
 const MemberPatients = ({ memberData, practiceId }: { memberData?: MemberData; practiceId?: number }) => {
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(practiceId || 0, { doctor_id: memberData?.id });
-    console.log("patients", patients?.data[0].doctor);
+
     return (
         <View className="gap-3">
             <BaseText type="Headline" weight={600} color="labels.primary">
