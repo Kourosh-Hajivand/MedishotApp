@@ -2,14 +2,13 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
-import { getTemplateById } from "@/utils/constants/templates";
-import { CameraState, CapturedPhoto, FlashMode, PhotoTemplate } from "@/utils/types/camera.types";
+import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,23 +20,31 @@ export default function CaptureScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission] = useCameraPermissions();
 
-    const { patientId, patientName, patientAvatar, doctorName, templates } = useLocalSearchParams<{
+    const { patientId, patientName, patientAvatar, doctorName, templateId, ghostItems } = useLocalSearchParams<{
         patientId: string;
         patientName: string;
         patientAvatar?: string;
         doctorName: string;
-        templates: string;
+        templateId: string;
+        ghostItems: string;
     }>();
 
-    // Parse templates
-    const templateIds: string[] = templates ? JSON.parse(templates) : [];
-    const templateList = templateIds.map((id) => getTemplateById(id)).filter(Boolean) as PhotoTemplate[];
+    // Parse ghost items
+    const ghostItemIds: string[] = ghostItems ? JSON.parse(ghostItems) : [];
 
-    const [currentTemplateIndex, setCurrentTemplateIndex] = useState(0);
+    // Ghost items mapping - using PNG
+    const GHOST_ITEMS_MAP: Record<string, any> = {
+        face: require("@/assets/gost/face.png"),
+        leftFace: require("@/assets/gost/leftFace.png"),
+        tooth: require("@/assets/gost/toth.png"),
+    };
+
+    const [currentGhostIndex, setCurrentGhostIndex] = useState(0);
     const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
     const [isCapturing, setIsCapturing] = useState(false);
     const [showRetakePreview, setShowRetakePreview] = useState(false);
     const [previewPhoto, setPreviewPhoto] = useState<CapturedPhoto | null>(null);
+    const [showGuideModal, setShowGuideModal] = useState(true);
 
     const [cameraState, setCameraState] = useState<CameraState>({
         flashMode: "auto",
@@ -49,12 +56,26 @@ export default function CaptureScreen() {
     // Animation values
     const shutterScale = useSharedValue(1);
     const flashAnim = useSharedValue(0);
-    const templateOpacity = useSharedValue(1);
+    const ghostOpacity = useSharedValue(1);
     const checkmarkScale = useSharedValue(0);
 
-    const currentTemplate = templateList[currentTemplateIndex];
-    const isLastTemplate = currentTemplateIndex === templateList.length - 1;
-    const allPhotosCaptures = capturedPhotos.length === templateList.length;
+    const currentGhostItem = ghostItemIds[currentGhostIndex];
+    const currentGhostImage = currentGhostItem ? GHOST_ITEMS_MAP[currentGhostItem] : null;
+    const isLastGhost = currentGhostIndex === ghostItemIds.length - 1;
+    const allPhotosCaptures = capturedPhotos.length === ghostItemIds.length;
+
+    // Get template name for guide modal
+    const getTemplateName = () => {
+        if (currentGhostItem === "face") return "Front Face Template";
+        if (currentGhostItem === "leftFace") return "Left Face Template";
+        if (currentGhostItem === "tooth") return "Tooth Template";
+        return "Template";
+    };
+
+    const handleCloseGuide = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowGuideModal(false);
+    };
 
     const handleTakePhoto = useCallback(async () => {
         if (!cameraRef.current || isCapturing) return;
@@ -78,14 +99,14 @@ export default function CaptureScreen() {
                 const newPhoto: CapturedPhoto = {
                     id: `photo-${Date.now()}`,
                     uri: photo.uri,
-                    templateId: currentTemplate.id,
-                    templateName: currentTemplate.name,
+                    templateId: currentGhostItem || "",
+                    templateName: currentGhostItem || "",
                     timestamp: Date.now(),
                     isCompleted: true,
                 };
 
                 setCapturedPhotos((prev) => {
-                    const existing = prev.findIndex((p) => p.templateId === currentTemplate.id);
+                    const existing = prev.findIndex((p) => p.templateId === currentGhostItem);
                     if (existing !== -1) {
                         const updated = [...prev];
                         updated[existing] = newPhoto;
@@ -97,11 +118,11 @@ export default function CaptureScreen() {
                 // Show checkmark animation
                 checkmarkScale.value = withSequence(withSpring(1.2, { damping: 8 }), withSpring(1, { damping: 10 }));
 
-                // Move to next template after delay
+                // Move to next ghost item after delay
                 setTimeout(() => {
                     checkmarkScale.value = withTiming(0, { duration: 200 });
-                    if (!isLastTemplate) {
-                        setCurrentTemplateIndex((prev) => prev + 1);
+                    if (!isLastGhost) {
+                        setCurrentGhostIndex((prev) => prev + 1);
                     } else {
                         // All photos taken, go to review
                         handleGoToReview();
@@ -113,7 +134,7 @@ export default function CaptureScreen() {
         } finally {
             setIsCapturing(false);
         }
-    }, [currentTemplate, isCapturing, isLastTemplate]);
+    }, [currentGhostItem, isCapturing, isLastGhost]);
 
     const handleSelectThumbnail = (photo: CapturedPhoto, index: number) => {
         Haptics.selectionAsync();
@@ -125,10 +146,10 @@ export default function CaptureScreen() {
         if (!previewPhoto) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Find template index
-        const templateIndex = templateList.findIndex((t) => t.id === previewPhoto.templateId);
-        if (templateIndex !== -1) {
-            setCurrentTemplateIndex(templateIndex);
+        // Find ghost item index
+        const ghostIndex = ghostItemIds.findIndex((id) => id === previewPhoto.templateId);
+        if (ghostIndex !== -1) {
+            setCurrentGhostIndex(ghostIndex);
         }
 
         // Remove the photo
@@ -145,7 +166,7 @@ export default function CaptureScreen() {
     const handleGoToReview = () => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.push({
-            pathname: "/(fullmodals)/camera/review",
+            pathname: "/camera/review" as any,
             params: {
                 patientId,
                 patientName,
@@ -210,7 +231,7 @@ export default function CaptureScreen() {
     return (
         <View style={styles.container}>
             {/* Camera View */}
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode}>
+            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0}>
                 {/* Grid Overlay */}
                 {cameraState.isGridEnabled && (
                     <View style={styles.gridContainer}>
@@ -224,15 +245,12 @@ export default function CaptureScreen() {
                 {/* Template Overlay */}
                 <View style={styles.templateOverlay}>
                     <View style={styles.templateFrame}>
-                        {/* Template guide lines */}
-                        <View style={styles.templateGuide}>
-                            <View style={styles.guideCenterVertical} />
-                            <View style={styles.guideCenterHorizontal} />
-                            <View style={styles.guideOutline} />
-                        </View>
-
-                        {/* Template icon placeholder */}
-                        <IconSymbol name={currentTemplate?.category === "face" ? "face.smiling" : currentTemplate?.category === "teeth" ? "mouth" : "figure.stand"} size={200} color="rgba(0, 199, 190, 0.3)" />
+                        {/* Ghost item overlay */}
+                        {currentGhostImage && (
+                            <View style={styles.ghostOverlayContainer}>
+                                <Image source={currentGhostImage} style={styles.ghostOverlayImage} contentFit="contain" />
+                            </View>
+                        )}
                     </View>
                 </View>
 
@@ -274,7 +292,7 @@ export default function CaptureScreen() {
                 {/* Template name badge */}
                 <View style={styles.templateBadge}>
                     <BaseText type="Caption1" weight={600} color="labels.primary">
-                        {currentTemplate?.name || "Template"}
+                        {currentGhostItem || "Ghost Item"}
                     </BaseText>
                 </View>
 
@@ -291,17 +309,17 @@ export default function CaptureScreen() {
 
                 {/* Bottom area */}
                 <View style={[styles.bottomArea, { paddingBottom: insets.bottom + 20 }]}>
-                    {/* Template thumbnails */}
+                    {/* Ghost item thumbnails */}
                     <View style={styles.thumbnailsContainer}>
                         <FlatList
-                            data={templateList}
+                            data={ghostItemIds}
                             horizontal
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.thumbnailsList}
-                            keyExtractor={(item) => item.id}
+                            keyExtractor={(item, index) => `${item}-${index}`}
                             renderItem={({ item, index }) => {
-                                const photo = capturedPhotos.find((p) => p.templateId === item.id);
-                                const isActive = index === currentTemplateIndex;
+                                const photo = capturedPhotos.find((p) => p.templateId === item);
+                                const isActive = index === currentGhostIndex;
                                 const isCompleted = !!photo;
 
                                 return (
@@ -390,11 +408,32 @@ export default function CaptureScreen() {
                     </View>
                 </Animated.View>
             )}
+
+            {/* Guide Modal */}
+            <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <Image source={require("@/assets/gost/Guid.png")} style={styles.guideImage} resizeMode="contain" />
+                        <BaseText type="Title2" weight={700} color="labels.primary" className="mt-6 text-center">
+                            {getTemplateName()}
+                        </BaseText>
+                        <BaseText type="Body" color="labels.secondary" className="mt-3 text-center px-4">
+                            Place The Head Between Lines and keep eye line leveled.
+                        </BaseText>
+                        <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseGuide} activeOpacity={0.8}>
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Close
+                            </BaseText>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
 
 // Figma Design Colors
+const MINT_COLOR = "#00c7be";
 const FIGMA_COLORS = {
     mint: "#00c7be",
     buttonBg: "rgba(120,120,128,0.32)",
@@ -467,8 +506,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     templateFrame: {
-        width: width * 0.8,
-        height: width * 0.8,
+        width: width * 0.95, // Increased from 0.8 to 0.95 for larger ghost items
+        height: width * 0.95, // Increased from 0.8 to 0.95
         justifyContent: "center",
         alignItems: "center",
     },
@@ -477,26 +516,15 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    guideCenterVertical: {
-        position: "absolute",
-        width: 1,
-        height: "100%",
-        backgroundColor: "rgba(0, 199, 190, 0.5)",
+    ghostOverlayContainer: {
+        width: "100%", // Increased from 80% to 100% for larger ghost items
+        height: "100%", // Increased from 80% to 100%
+        justifyContent: "center",
+        alignItems: "center",
     },
-    guideCenterHorizontal: {
-        position: "absolute",
-        width: "100%",
-        height: 1,
-        backgroundColor: "rgba(0, 199, 190, 0.5)",
-        top: "40%",
-    },
-    guideOutline: {
-        width: "90%",
-        height: "90%",
-        borderRadius: 150,
-        borderWidth: 2,
-        borderColor: "rgba(0, 199, 190, 0.4)",
-        borderStyle: "dashed",
+    ghostOverlayImage: {
+        opacity: 0.4,
+        color: MINT_COLOR,
     },
     controlsRow: {
         position: "absolute",
@@ -685,5 +713,35 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 25,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.8)",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: colors.system.white,
+        borderRadius: 20,
+        padding: 24,
+        alignItems: "center",
+        maxWidth: width - 40,
+        width: "100%",
+    },
+    guideImage: {
+        width: width - 100,
+        height: (width - 100) * 1.2,
+        borderRadius: 12,
+    },
+    closeGuideButton: {
+        marginTop: 24,
+        backgroundColor: MINT_COLOR,
+        paddingHorizontal: 32,
+        paddingVertical: 14,
+        borderRadius: 12,
+        minWidth: 120,
+        alignItems: "center",
+        justifyContent: "center",
     },
 });

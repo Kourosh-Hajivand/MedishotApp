@@ -55,19 +55,20 @@ export default function ReviewScreen() {
     const handleRetake = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Go back to capture with current photo's template selected
+        // Go back to capture with current photo's ghost item selected
         const updatedPhotos = capturedPhotos.filter((p) => p.id !== currentPhoto.id);
+        const allGhostItems = capturedPhotos.map((p) => p.templateId);
 
         router.replace({
-            pathname: "/(fullmodals)/camera/capture",
+            pathname: "/(fullmodals)/camera/capture" as any,
             params: {
                 patientId,
                 patientName,
                 patientAvatar,
                 doctorName,
-                templates: JSON.stringify(capturedPhotos.map((p) => p.templateId)),
-                existingPhotos: JSON.stringify(updatedPhotos),
-                retakeTemplateId: currentPhoto.templateId,
+                templateId: "template-1", // Default template
+                ghostItems: JSON.stringify(allGhostItems),
+                retakeGhostId: currentPhoto.templateId,
             },
         });
     };
@@ -159,22 +160,37 @@ export default function ReviewScreen() {
 
             {/* Main Image Carousel */}
             <View style={styles.carouselContainer}>
-                <FlatList
-                    ref={flatListRef}
-                    data={capturedPhotos}
-                    renderItem={renderMainImage}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    pagingEnabled
-                    showsHorizontalScrollIndicator={false}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={16}
-                    getItemLayout={(_, index) => ({
-                        length: width,
-                        offset: width * index,
-                        index,
-                    })}
-                />
+                {capturedPhotos.length > 0 ? (
+                    <FlatList
+                        ref={flatListRef}
+                        data={capturedPhotos}
+                        renderItem={renderMainImage}
+                        keyExtractor={(item) => item.id}
+                        horizontal
+                        pagingEnabled
+                        showsHorizontalScrollIndicator={false}
+                        onScroll={handleScroll}
+                        scrollEventThrottle={16}
+                        getItemLayout={(_, index) => ({
+                            length: width,
+                            offset: width * index,
+                            index,
+                        })}
+                        initialScrollIndex={currentIndex}
+                        onScrollToIndexFailed={(info) => {
+                            const wait = new Promise((resolve) => setTimeout(resolve, 500));
+                            wait.then(() => {
+                                flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                            });
+                        }}
+                    />
+                ) : (
+                    <View style={styles.emptyState}>
+                        <BaseText type="Body" color="labels.secondary">
+                            No photos captured
+                        </BaseText>
+                    </View>
+                )}
 
                 {/* Retake button overlay */}
                 <View style={styles.retakeContainer}>
@@ -281,8 +297,13 @@ const styles = StyleSheet.create({
     },
     mainImage: {
         width: width - 40,
-        height: "100%",
+        height: height * 0.7,
         borderRadius: 16,
+    },
+    emptyState: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
     },
     selectionOverlay: {
         position: "absolute",

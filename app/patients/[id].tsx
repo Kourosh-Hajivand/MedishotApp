@@ -171,7 +171,7 @@ export default function PatientDetailsScreen() {
                                 className="flex-1 items-center justify-center gap-2 border-r border-border"
                                 onPress={() => {
                                     router.push({
-                                        pathname: "/(fullmodals)/camera",
+                                        pathname: "/camera" as any,
                                         params: {
                                             patientId: id,
                                             patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,

@@ -6,13 +6,12 @@ export default function CameraLayout() {
             screenOptions={{
                 headerShown: false,
                 animation: "fade",
-                gestureEnabled: false,
             }}
         >
             <Stack.Screen
                 name="index"
                 options={{
-                    presentation: "fullScreenModal",
+                    animation: "slide_from_right",
                 }}
             />
             <Stack.Screen
@@ -30,19 +29,25 @@ export default function CameraLayout() {
                 }}
             />
             <Stack.Screen
+                name="select-ghost-items"
+                options={{
+                    presentation: "modal",
+                    animation: "slide_from_bottom",
+                }}
+            />
+            <Stack.Screen
                 name="capture"
                 options={{
-                    presentation: "fullScreenModal",
                     animation: "fade",
                 }}
             />
             <Stack.Screen
                 name="review"
                 options={{
-                    presentation: "fullScreenModal",
                     animation: "slide_from_right",
                 }}
             />
         </Stack>
     );
 }
+

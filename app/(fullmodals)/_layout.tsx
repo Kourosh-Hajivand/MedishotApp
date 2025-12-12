@@ -16,14 +16,6 @@ export default function FullLayout() {
                     contentStyle: { backgroundColor: "#000" },
                 }}
             />
-            <Stack.Screen
-                name="camera"
-                options={{
-                    presentation: "fullScreenModal",
-                    animation: "slide_from_bottom",
-                    contentStyle: { backgroundColor: "#000" },
-                }}
-            />
         </Stack>
     );
 }
