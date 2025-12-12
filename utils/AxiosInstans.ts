@@ -7,6 +7,7 @@ import { routes } from "../routes/routes";
 
 const axiosInstance = axios.create({
     baseURL: routes.baseUrl,
+    timeout: 30000, // 30 ثانیه timeout برای تمام requests
 });
 
 axiosInstance.interceptors.request.use(async (config) => {

@@ -7,17 +7,36 @@ import { getTokens } from "../helper/tokenStorage";
 
 // ============= Query Hooks (GET) =============
 
-export const useGetMe = (enabled: boolean = true): UseQueryResult<MeResponse, Error> => {
-    const { data: tokens } = useQuery({
+export const useGetMe = (enabled: boolean = true, tokens?: { accessToken: string | null; refreshToken: string | null }): UseQueryResult<MeResponse, Error> => {
+    // همیشه از query استفاده کن تا از cache بهره ببریم
+    // اما اگر tokens پاس داده شده، از آن استفاده کن
+    const tokensQuery = useQuery({
         queryKey: [QueryKeys.tokens],
         queryFn: getTokens,
     });
 
-    const isAuthenticated = !!tokens?.accessToken;
+    // اگر tokens به عنوان parameter پاس داده شده، از آن استفاده کن
+    // در غیر این صورت از query result استفاده کن
+    const finalTokens = tokens || tokensQuery.data;
+    const isAuthenticated = !!finalTokens?.accessToken;
+    // اگر tokens پاس داده شده، نیازی به wait کردن برای tokens query نیست
+    const isTokensLoading = !tokens && tokensQuery.isLoading;
+
     return useQuery({
         queryKey: ["GetMe"],
         queryFn: () => AuthService.me(),
-        enabled: isAuthenticated && enabled,
+        enabled: isAuthenticated && enabled && !isTokensLoading,
+        retry: (failureCount, error) => {
+            // اگر 401 یا 403 باشد، retry نکن
+            const status = (error as any)?.response?.status;
+            if (status === 401 || status === 403) {
+                return false;
+            }
+            return failureCount < 1; // فقط یک بار retry کن
+        },
+        retryDelay: 1000, // 1 ثانیه delay بین retry ها
+        staleTime: 5 * 60 * 1000, // 5 دقیقه
+        gcTime: 10 * 60 * 1000, // 10 دقیقه (قبلاً cacheTime)
     });
 };
 

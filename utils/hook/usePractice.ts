@@ -13,6 +13,10 @@ export const useGetPracticeList = (enabled: boolean = true): UseQueryResult<Prac
         queryKey: ["GetPracticeList"],
         queryFn: () => PracticeService.getPracticeList(),
         enabled: isAuthenticated === true && enabled,
+        retry: 1, // فقط یک بار retry کن
+        retryDelay: 1000, // 1 ثانیه delay بین retry ها
+        staleTime: 2 * 60 * 1000, // 2 دقیقه
+        gcTime: 5 * 60 * 1000, // 5 دقیقه
     });
 };
 

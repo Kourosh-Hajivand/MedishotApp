@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { useEffect, useRef } from "react";
 import { QueryKeys } from "../../models/enums";
 import { getTokens, removeTokens } from "../helper/tokenStorage";
 import { useGetMe } from "./useAuthService";
@@ -11,19 +12,54 @@ export const useAuth = () => {
         queryFn: getTokens,
     });
 
-    const { data: me, isLoading: isMeLoading } = useGetMe();
+    const hasToken = !!tokens?.accessToken;
+    // tokens را به useGetMe پاس بده تا از duplicate query جلوگیری شود
+    const { data: me, isLoading: isMeLoading, error: meError, isError: isMeError } = useGetMe(hasToken && !isTokensLoading, tokens);
+    const hasHandledError = useRef(false);
+    
+    // اگر token وجود دارد اما API call fail شود، token را invalidate کن
+    useEffect(() => {
+        if (hasToken && meError && !isMeLoading && !hasHandledError.current) {
+            const errorStatus = (meError as any)?.response?.status;
+            if (errorStatus === 401 || errorStatus === 403) {
+                // Token منقضی شده یا نامعتبر است
+                hasHandledError.current = true;
+                removeTokens()
+                    .then(() => {
+                        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+                        queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+                        queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+                    })
+                    .catch(console.error);
+            }
+        }
+        
+        // Reset error handler اگر error برطرف شد
+        if (!meError) {
+            hasHandledError.current = false;
+        }
+    }, [hasToken, meError, isMeLoading, queryClient]);
+
     const logout = () => {
         removeTokens();
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+        queryClient.invalidateQueries({ queryKey: ["GetMe"] });
         router.replace("/welcome");
     };
+
+    // محاسبه isProfileLoading: اگر token وجود دارد اما profile هنوز لود نشده
+    // اگر query enabled نیست، نباید loading باشیم
+    const isQueryEnabled = hasToken && !isTokensLoading;
+    // اگر query enabled است و هنوز در حال loading است
+    // اما اگر error داریم، نباید loading باشیم
+    const isProfileLoading = isQueryEnabled && isMeLoading && !isMeError;
 
     return {
         isAuthenticated: isTokensLoading ? null : tokens?.accessToken ? true : false,
         isLoading: isTokensLoading,
         profile: me?.data,
-        isProfileLoading: isMeLoading,
+        isProfileLoading,
         logout,
     };
 };
