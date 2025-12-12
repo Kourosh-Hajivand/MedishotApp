@@ -167,7 +167,20 @@ export default function PatientDetailsScreen() {
 
                     <View className="gap-5 px-5 mb-6">
                         <View className="w-full h-[76px] bg-white rounded-xl flex-row">
-                            <TouchableOpacity className="flex-1 items-center justify-center gap-2 border-r border-border">
+                            <TouchableOpacity
+                                className="flex-1 items-center justify-center gap-2 border-r border-border"
+                                onPress={() => {
+                                    router.push({
+                                        pathname: "/(fullmodals)/camera",
+                                        params: {
+                                            patientId: id,
+                                            patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,
+                                            patientAvatar: patient?.data?.profile_image?.url || "",
+                                            doctorName: `Dr. ${patient?.data?.doctor?.first_name || ""} ${patient?.data?.doctor?.last_name || ""}`,
+                                        },
+                                    });
+                                }}
+                            >
                                 <IconSymbol name="camera" color={colors.system.blue} size={26} />
                                 <BaseText type="Footnote" color="labels.primary">
                                     Take photo
@@ -265,9 +278,18 @@ export default function PatientDetailsScreen() {
                     <GalleryWithMenu
                         menuItems={[
                             {
+                                icon: "slider.horizontal.3",
+                                label: "Edit Photo",
+                                onPress: (imageUri) => {
+                                    router.push({
+                                        pathname: "/(fullmodals)/image-editor",
+                                        params: { uri: imageUri },
+                                    });
+                                },
+                            },
+                            {
                                 icon: "sparkles",
                                 label: "Use Magic",
-
                                 onPress: (imageUri) => {
                                     router.push({
                                         pathname: "/(fullmodals)/image-editor",

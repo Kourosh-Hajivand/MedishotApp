@@ -14,7 +14,9 @@
             "buildNumber": "1",
             "icon": "./assets/icon.icon",
             "infoPlist": {
-                "ITSAppUsesNonExemptEncryption": false
+                "ITSAppUsesNonExemptEncryption": false,
+                "NSCameraUsageDescription": "This app needs access to your camera to take photos of patients.",
+                "NSMicrophoneUsageDescription": "This app needs access to your microphone for video recording."
             }
         },
         "android": {
@@ -24,7 +26,11 @@
                 "backgroundColor": "#ffffff"
             },
             "edgeToEdgeEnabled": true,
-            "package": "com.betoatexpo.medishotapp"
+            "package": "com.betoatexpo.medishotapp",
+            "permissions": [
+                "CAMERA",
+                "RECORD_AUDIO"
+            ]
         },
         "web": {
             "bundler": "metro",
@@ -41,7 +47,15 @@
             ],
             "expo-font",
             "expo-web-browser",
-            "expo-video"
+            "expo-video",
+            [
+                "expo-camera",
+                {
+                    "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos.",
+                    "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video recording.",
+                    "recordAudioAndroid": true
+                }
+            ]
         ],
         "experiments": {
             "typedRoutes": true

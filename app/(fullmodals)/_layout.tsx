@@ -2,14 +2,25 @@ import { Stack } from "expo-router";
 
 export default function FullLayout() {
     return (
-        <Stack>
+        <Stack
+            screenOptions={{
+                headerShown: false,
+                gestureEnabled: false,
+            }}
+        >
             <Stack.Screen
                 name="image-editor"
                 options={{
-                    headerShown: false,
-                    gestureEnabled: false,
                     presentation: "fullScreenModal",
                     animation: "fade",
+                    contentStyle: { backgroundColor: "#000" },
+                }}
+            />
+            <Stack.Screen
+                name="camera"
+                options={{
+                    presentation: "fullScreenModal",
+                    animation: "slide_from_bottom",
                     contentStyle: { backgroundColor: "#000" },
                 }}
             />
