@@ -106,18 +106,24 @@ export default function TemplateSelectScreen() {
         if (!template) return;
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        // Navigate directly to capture with ghost items
-        router.push({
-            pathname: "/camera/capture" as any,
-            params: {
-                patientId,
-                patientName,
-                patientAvatar,
-                doctorName,
-                templateId: selectedTemplate,
-                ghostItems: JSON.stringify(template.ghostItems),
-            },
-        });
+
+        // Close this modal and go back to camera with ghost items
+        router.dismiss();
+        
+        // Navigate to camera with template params
+        setTimeout(() => {
+            router.replace({
+                pathname: "/camera" as any,
+                params: {
+                    patientId,
+                    patientName,
+                    patientAvatar,
+                    doctorName,
+                    templateId: selectedTemplate,
+                    ghostItems: JSON.stringify(template.ghostItems),
+                },
+            });
+        }, 100);
     };
 
     const handleClose = () => {

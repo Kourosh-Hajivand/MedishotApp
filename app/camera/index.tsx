@@ -5,13 +5,16 @@ import colors from "@/theme/colors";
 import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
+const THUMBNAIL_SIZE = 48;
+const MINT_COLOR = "#00c7be";
 
 const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "auto", icon: "bolt.badge.automatic", label: "Auto" },
@@ -19,33 +22,75 @@ const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "off", icon: "bolt.slash", label: "Off" },
 ];
 
+// Ghost items mapping - using PNG
+const GHOST_ITEMS_MAP: Record<string, any> = {
+    face: require("@/assets/gost/face.png"),
+    leftFace: require("@/assets/gost/leftFace.png"),
+    tooth: require("@/assets/gost/toth.png"),
+};
+
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
 
-    const { patientId, patientName, patientAvatar, doctorName } = useLocalSearchParams<{
+    const { patientId, patientName, patientAvatar, doctorName, ghostItems, templateId } = useLocalSearchParams<{
         patientId: string;
         patientName: string;
         patientAvatar?: string;
         doctorName: string;
+        ghostItems?: string;
+        templateId?: string;
     }>();
+
+    // Parse ghost items from params
+    const ghostItemIds: string[] = ghostItems ? JSON.parse(ghostItems) : [];
+    const hasGhostItems = ghostItemIds.length > 0;
 
     const [cameraState, setCameraState] = useState<CameraState>({
         flashMode: "auto",
         cameraPosition: "back",
-        isGridEnabled: false,
-        zoomLevel: 0, // Default zoom level (not zoomed)
+        isGridEnabled: true,
+        zoomLevel: 0,
     });
 
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
+    const [currentGhostIndex, setCurrentGhostIndex] = useState(0);
+    const [showGuideModal, setShowGuideModal] = useState(false);
+
+    // Show guide modal when ghost items are available
+    useEffect(() => {
+        if (hasGhostItems) {
+            setShowGuideModal(true);
+        }
+    }, [hasGhostItems]);
 
     // Animation values
     const shutterScale = useSharedValue(1);
     const flashAnim = useSharedValue(0);
+    const checkmarkScale = useSharedValue(0);
 
-    // Simple toggle functions (no popup menus)
+    // Current ghost item
+    const currentGhostItem = hasGhostItems ? ghostItemIds[currentGhostIndex] : null;
+    const currentGhostImage = currentGhostItem ? GHOST_ITEMS_MAP[currentGhostItem] : null;
+    const isLastGhost = currentGhostIndex === ghostItemIds.length - 1;
+    const allPhotosCaptures = capturedPhotos.length === ghostItemIds.length && hasGhostItems;
+
+    // Get template name for guide modal
+    const getTemplateName = () => {
+        if (currentGhostItem === "face") return "Front Face Template";
+        if (currentGhostItem === "leftFace") return "Left Face Template";
+        if (currentGhostItem === "tooth") return "Tooth Template";
+        return "Template";
+    };
+
+    const handleCloseGuide = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowGuideModal(false);
+    };
+
+    // Simple toggle functions
     const toggleFlash = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const modes: FlashMode[] = ["auto", "on", "off"];
@@ -75,7 +120,7 @@ export default function CameraScreen() {
         });
     };
 
-    // Take photo without template
+    // Take photo
     const handleTakePhoto = useCallback(async () => {
         if (!cameraRef.current || isCapturing) return;
 
@@ -95,32 +140,63 @@ export default function CameraScreen() {
                 const newPhoto: CapturedPhoto = {
                     id: `photo-${Date.now()}`,
                     uri: photo.uri,
-                    templateId: "no-template",
-                    templateName: "Quick Photo",
+                    templateId: currentGhostItem || "no-template",
+                    templateName: currentGhostItem || "Quick Photo",
                     timestamp: Date.now(),
                     isCompleted: true,
                 };
 
-                setCapturedPhotos((prev) => [...prev, newPhoto]);
-
-                // Navigate to review with the photo
-                router.push({
-                    pathname: "/camera/review" as any,
-                    params: {
-                        patientId,
-                        patientName,
-                        patientAvatar,
-                        doctorName,
-                        photos: JSON.stringify([newPhoto]),
-                    },
+                setCapturedPhotos((prev) => {
+                    // Replace if exists for this ghost item
+                    const existing = prev.findIndex((p) => p.templateId === currentGhostItem);
+                    if (existing !== -1) {
+                        const updated = [...prev];
+                        updated[existing] = newPhoto;
+                        return updated;
+                    }
+                    return [...prev, newPhoto];
                 });
+
+                // Show checkmark animation
+                checkmarkScale.value = withSequence(withSpring(1.2, { damping: 8 }), withSpring(1, { damping: 10 }));
+
+                setTimeout(() => {
+                    checkmarkScale.value = withTiming(0, { duration: 200 });
+
+                    if (hasGhostItems) {
+                        if (!isLastGhost) {
+                            // Move to next ghost
+                            setCurrentGhostIndex((prev) => prev + 1);
+                        } else {
+                            // All ghosts captured, go to review
+                            handleGoToReview([...capturedPhotos, newPhoto]);
+                        }
+                    } else {
+                        // No template, go to review directly
+                        handleGoToReview([newPhoto]);
+                    }
+                }, 800);
             }
         } catch (error) {
             console.error("Error taking photo:", error);
         } finally {
             setIsCapturing(false);
         }
-    }, [isCapturing, patientId, patientName, patientAvatar, doctorName]);
+    }, [isCapturing, currentGhostItem, hasGhostItems, isLastGhost, capturedPhotos]);
+
+    const handleGoToReview = (photos: CapturedPhoto[]) => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.push({
+            pathname: "/camera/review" as any,
+            params: {
+                patientId,
+                patientName,
+                patientAvatar,
+                doctorName,
+                photos: JSON.stringify(photos),
+            },
+        });
+    };
 
     const handleClose = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -139,6 +215,11 @@ export default function CameraScreen() {
 
     const flashOverlayStyle = useAnimatedStyle(() => ({
         opacity: flashAnim.value,
+    }));
+
+    const checkmarkAnimStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: checkmarkScale.value }],
+        opacity: checkmarkScale.value,
     }));
 
     // Permission handling
@@ -183,6 +264,15 @@ export default function CameraScreen() {
                     </View>
                 )}
 
+                {/* Ghost Overlay */}
+                {currentGhostImage && (
+                    <View style={styles.ghostOverlay}>
+                        <View style={styles.ghostFrame}>
+                            <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
+                        </View>
+                    </View>
+                )}
+
                 {/* Header */}
                 <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
                     <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
@@ -217,29 +307,90 @@ export default function CameraScreen() {
                     </View>
                 </View>
 
-                {/* Template Select Button - Centered */}
-                <View style={styles.templateButtonContainer}>
-                    <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
-                        <BaseText type="Body" weight={600} color="system.white">
-                            Select a template
+                {/* Template Badge - shows current ghost name */}
+                {hasGhostItems && (
+                    <View style={styles.templateBadge}>
+                        <BaseText type="Caption1" weight={600} color="system.white">
+                            {currentGhostItem} ({currentGhostIndex + 1}/{ghostItemIds.length})
                         </BaseText>
-                    </TouchableOpacity>
-                </View>
+                    </View>
+                )}
+
+                {/* Template Select Button - Only show when no ghost items selected */}
+                {!hasGhostItems && (
+                    <View style={styles.templateButtonContainer}>
+                        <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Select a template
+                            </BaseText>
+                        </TouchableOpacity>
+                    </View>
+                )}
 
                 {/* Flash effect overlay */}
                 <Animated.View style={[styles.flashOverlay, flashOverlayStyle]} pointerEvents="none" />
 
-                {/* Bottom Controls */}
-                <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
-                    {/* Gallery Thumbnail */}
-                    <View style={styles.galleryContainer}>
-                        <TouchableOpacity style={styles.galleryThumbnail} activeOpacity={0.8}>
-                            <View style={styles.galleryThumbnailPlaceholder} />
-                        </TouchableOpacity>
+                {/* Checkmark animation */}
+                <Animated.View style={[styles.checkmarkOverlay, checkmarkAnimStyle]}>
+                    <View style={styles.checkmarkCircle}>
+                        <IconSymbol name="checkmark" size={48} color={colors.system.white} />
                     </View>
+                </Animated.View>
 
-                    {/* Shutter Button Container - Takes photo directly */}
-                    <View style={styles.shutterButtonContainer}>
+                {/* Bottom Controls - با یک backdrop مشترک */}
+                <View style={[styles.bottomControlsWrapper, { paddingBottom: insets.bottom + 16 }]}>
+                    {/* Ghost item thumbnails - only show when has ghost items */}
+                    {hasGhostItems && (
+                        <View style={styles.thumbnailsContainer}>
+                            <FlatList
+                                data={ghostItemIds}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.thumbnailsList}
+                                keyExtractor={(item) => item}
+                                renderItem={({ item, index }) => {
+                                    const photo = capturedPhotos.find((p) => p.templateId === item);
+                                    const isActive = index === currentGhostIndex;
+                                    const isCompleted = !!photo;
+
+                                    return (
+                                        <TouchableOpacity
+                                            onPress={() => {
+                                                if (photo) {
+                                                    // Can retake this photo
+                                                    setCurrentGhostIndex(index);
+                                                }
+                                            }}
+                                            style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
+                                        >
+                                            {photo ? (
+                                                <>
+                                                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                                                    <View style={styles.thumbnailCheck}>
+                                                        <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
+                                                    </View>
+                                                </>
+                                            ) : (
+                                                <View style={styles.thumbnailPlaceholder}>
+                                                    <BaseText type="Caption2" color="labels.tertiary">
+                                                        {index + 1}
+                                                    </BaseText>
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    );
+                                }}
+                            />
+                        </View>
+                    )}
+
+                    <View style={styles.bottomControls}>
+                        {/* Gallery Thumbnail */}
+                        <TouchableOpacity style={styles.galleryThumbnail} activeOpacity={0.8}>
+                            {capturedPhotos.length > 0 ? <Image source={{ uri: capturedPhotos[capturedPhotos.length - 1].uri }} style={styles.galleryThumbnailImage} /> : <View style={styles.galleryThumbnailPlaceholder} />}
+                        </TouchableOpacity>
+
+                        {/* Shutter Button */}
                         <Animated.View style={shutterAnimStyle}>
                             <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
                                 <View style={styles.shutterOuter}>
@@ -247,18 +398,34 @@ export default function CameraScreen() {
                                 </View>
                             </TouchableOpacity>
                         </Animated.View>
-                    </View>
 
-                    {/* Switch Camera Container */}
-                    <View style={styles.switchCameraContainer}>
+                        {/* Switch Camera */}
                         <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCamera} activeOpacity={0.7}>
-                            <View style={styles.switchCameraBg}>
-                                <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color={colors.system.white} />
-                            </View>
+                            <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color={colors.system.white} />
                         </TouchableOpacity>
                     </View>
                 </View>
             </CameraView>
+
+            {/* Guide Modal */}
+            <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
+                <View style={styles.guideModalContainer}>
+                    <View style={[styles.guideModalContent, { paddingBottom: insets.bottom + 20 }]}>
+                        <Image source={require("@/assets/gost/Guid.png")} style={styles.guideImage} contentFit="contain" />
+                        <BaseText type="Title2" weight={600} color="labels.primary" className="mt-4 text-center">
+                            {getTemplateName()}
+                        </BaseText>
+                        <BaseText type="Body" color="labels.secondary" className="mt-2 text-center px-8">
+                            Place The Head Between Lines and keep eye line leveled.
+                        </BaseText>
+                        <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseGuide} activeOpacity={0.8}>
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Close
+                            </BaseText>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -308,6 +475,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "rgba(0,0,0,0.5)",
+        borderRadius: 22,
     },
     closeButton: {
         width: 44,
@@ -321,6 +489,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "rgba(0,0,0,0.5)",
+        borderRadius: 22,
     },
     patientInfo: {
         flexDirection: "row",
@@ -332,6 +501,15 @@ const styles = StyleSheet.create({
     patientTextContainer: {
         alignItems: "flex-start",
     },
+    templateBadge: {
+        position: "absolute",
+        top: 120,
+        alignSelf: "center",
+        backgroundColor: "rgba(0,0,0,0.6)",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
     templateButtonContainer: {
         position: "absolute",
         bottom: 180,
@@ -342,48 +520,100 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     templateButton: {
-        backgroundColor: "#00c7be", // MINT_COLOR
+        backgroundColor: MINT_COLOR,
         paddingHorizontal: 24,
         paddingVertical: 14,
-        borderRadius: 999, // Fully rounded
+        borderRadius: 999,
         minWidth: 200,
         alignItems: "center",
         justifyContent: "center",
     },
-    bottomControls: {
+    ghostOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    ghostFrame: {
+        width: width * 0.85,
+        height: width * 0.85,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    ghostImage: {
+        width: "100%",
+        height: "100%",
+        opacity: 0.5,
+    },
+    bottomControlsWrapper: {
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        paddingTop: 16,
+    },
+    thumbnailsContainer: {
+        marginBottom: 16,
+        paddingHorizontal: 20,
+    },
+    thumbnailsList: {
+        gap: 10,
+    },
+    thumbnail: {
+        width: THUMBNAIL_SIZE,
+        height: THUMBNAIL_SIZE,
+        borderRadius: 8,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        justifyContent: "center",
+        alignItems: "center",
+        borderWidth: 2,
+        borderColor: "transparent",
+        overflow: "hidden",
+    },
+    thumbnailActive: {
+        borderColor: colors.system.blue,
+    },
+    thumbnailCompleted: {
+        borderColor: MINT_COLOR,
+    },
+    thumbnailImage: {
+        width: "100%",
+        height: "100%",
+    },
+    thumbnailCheck: {
+        position: "absolute",
+        top: 2,
+        right: 2,
+    },
+    thumbnailPlaceholder: {
+        width: "100%",
+        height: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    bottomControls: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
         paddingHorizontal: 30,
-        paddingTop: 20,
-    },
-    galleryContainer: {
-        backgroundColor: "rgba(0,0,0,0.4)",
-        borderRadius: 12,
-        padding: 4,
     },
     galleryThumbnail: {
         width: 50,
         height: 50,
         borderRadius: 8,
         overflow: "hidden",
+        backgroundColor: "rgba(255,255,255,0.2)",
+    },
+    galleryThumbnailImage: {
+        width: "100%",
+        height: "100%",
     },
     galleryThumbnailPlaceholder: {
         width: "100%",
         height: "100%",
-        backgroundColor: "rgba(255,255,255,0.2)",
         borderWidth: 2,
         borderColor: "rgba(255,255,255,0.3)",
         borderRadius: 8,
-    },
-    shutterButtonContainer: {
-        backgroundColor: "rgba(0,0,0,0.4)",
-        borderRadius: 50,
-        padding: 6,
     },
     shutterButton: {
         width: 76,
@@ -408,30 +638,30 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    switchCameraContainer: {
-        backgroundColor: "rgba(0,0,0,0.4)",
-        borderRadius: 30,
-        padding: 4,
-    },
     switchCameraButton: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        overflow: "hidden",
         justifyContent: "center",
         alignItems: "center",
-    },
-    switchCameraBg: {
-        width: "100%",
-        height: "100%",
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "rgba(0,0,0,0.5)",
-        borderRadius: 25,
+        backgroundColor: "rgba(255,255,255,0.2)",
     },
     flashOverlay: {
         ...StyleSheet.absoluteFillObject,
         backgroundColor: colors.system.white,
+    },
+    checkmarkOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    checkmarkCircle: {
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: MINT_COLOR,
+        justifyContent: "center",
+        alignItems: "center",
     },
     gridContainer: {
         ...StyleSheet.absoluteFillObject,
@@ -449,5 +679,32 @@ const styles = StyleSheet.create({
         height: 1,
         left: 0,
         right: 0,
+    },
+    guideModalContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.7)",
+    },
+    guideModalContent: {
+        backgroundColor: colors.system.white,
+        borderRadius: 20,
+        padding: 20,
+        alignItems: "center",
+        width: width * 0.85,
+    },
+    guideImage: {
+        width: "100%",
+        height: width * 0.5,
+        borderRadius: 10,
+    },
+    closeGuideButton: {
+        marginTop: 20,
+        backgroundColor: MINT_COLOR,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 12,
+        width: "80%",
+        alignItems: "center",
     },
 });

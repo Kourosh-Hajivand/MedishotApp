@@ -36,12 +36,6 @@ export default function CameraLayout() {
                 }}
             />
             <Stack.Screen
-                name="capture"
-                options={{
-                    animation: "fade",
-                }}
-            />
-            <Stack.Screen
                 name="review"
                 options={{
                     animation: "slide_from_right",

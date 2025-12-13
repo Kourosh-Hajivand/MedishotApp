@@ -45,17 +45,24 @@ export default function SelectGhostItemsScreen() {
     const handleContinue = () => {
         if (selectedItems.length === 0) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push({
-            pathname: "/camera/capture" as any,
-            params: {
-                patientId,
-                patientName,
-                patientAvatar,
-                doctorName,
-                templateId,
-                ghostItems: JSON.stringify(selectedItems),
-            },
-        });
+
+        // Close this modal and go back to camera with ghost items
+        router.dismiss();
+
+        // Navigate to camera with ghost items params
+        setTimeout(() => {
+            router.replace({
+                pathname: "/camera" as any,
+                params: {
+                    patientId,
+                    patientName,
+                    patientAvatar,
+                    doctorName,
+                    templateId,
+                    ghostItems: JSON.stringify(selectedItems),
+                },
+            });
+        }, 100);
     };
 
     const handleClose = () => {

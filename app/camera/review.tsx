@@ -55,20 +55,17 @@ export default function ReviewScreen() {
     const handleRetake = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Go back to capture with current photo's ghost item selected
-        const updatedPhotos = capturedPhotos.filter((p) => p.id !== currentPhoto.id);
+        // Go back to camera with ghost items to retake
         const allGhostItems = capturedPhotos.map((p) => p.templateId);
 
         router.replace({
-            pathname: "/(fullmodals)/camera/capture" as any,
+            pathname: "/camera" as any,
             params: {
                 patientId,
                 patientName,
                 patientAvatar,
                 doctorName,
-                templateId: "template-1", // Default template
                 ghostItems: JSON.stringify(allGhostItems),
-                retakeGhostId: currentPhoto.templateId,
             },
         });
     };
