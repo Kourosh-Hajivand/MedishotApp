@@ -9,16 +9,41 @@ import React, { useState } from "react";
 import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LayoutPattern } from "./create-template/types";
+import { getItemLayoutStyle } from "./create-template/utils";
 
-// Ghost items mapping - using PNG
+// Ghost items mapping - using PNG (renamed files without spaces)
 const GHOST_IMAGES: Record<string, any> = {
-    face: require("@/assets/gost/face.png"),
-    leftFace: require("@/assets/gost/leftFace.png"),
-    tooth: require("@/assets/gost/toth.png"),
+    face: require("@/assets/gost/Face.png"),
+    faceTurnRight: require("@/assets/gost/Face-turn_right.png"),
+    faceTurnLeft: require("@/assets/gost/Face-turn_left.png"),
+    faceDown: require("@/assets/gost/Face-down.png"),
+    faceRightSide: require("@/assets/gost/Face-_right_side.png"),
+    faceLeftSide: require("@/assets/gost/Face-_left_side.png"),
+    upperTeethFront: require("@/assets/gost/upper_teeth-close_up-front.png"),
+    upperTeethRightSide: require("@/assets/gost/upper_teeth-close_up-_right_side.png"),
+    upperTeethLeftSide: require("@/assets/gost/upper_teeth-close_up-_left_side.png"),
+    upperJawDownView: require("@/assets/gost/upper_jaw_teeth-_down_view.png"),
+    lowerJawUpView: require("@/assets/gost/lower_jaw_teeth-_up_view.png"),
+    allTeethOpenRightSide: require("@/assets/gost/all_teeth-open_right_side.png"),
+    allTeethOpenMouthLeftSide: require("@/assets/gost/all_teeth-open_mouth-left_side.png"),
+    allTeethOpenLeftSide: require("@/assets/gost/all_teeth-open_left_side.png"),
+    allTeethFrontOpen: require("@/assets/gost/all_teeth-front_-_open.png"),
+    allTeethFrontClosed: require("@/assets/gost/all_teeth-front_-_closed.png"),
+    allTeethOpenMouthFront: require("@/assets/gost/all_teeth_open_mouth-front.png"),
+    allTeethOpenMouthRightSide: require("@/assets/gost/all_teeth-open_mouth-right_side.png"),
 };
 
 const { width } = Dimensions.get("window");
 const TEMPLATE_SIZE = (width - 60) / 2;
+
+type TemplateType = {
+    id: string;
+    name: string;
+    ghostItems: string[];
+    previewCount: number;
+    layoutPattern: LayoutPattern;
+};
 
 export default function TemplateSelectScreen() {
     const insets = useSafeAreaInsets();
@@ -31,7 +56,7 @@ export default function TemplateSelectScreen() {
     }>();
 
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-    const [customTemplates, setCustomTemplates] = useState<typeof STATIC_TEMPLATES>([]);
+    const [customTemplates, setCustomTemplates] = useState<TemplateType[]>([]);
 
     // Add new template when coming back from create-template
     React.useEffect(() => {
@@ -50,31 +75,49 @@ export default function TemplateSelectScreen() {
         }
     }, [newTemplate]);
 
-    // Static templates with ghost items inside - using placeholder icons temporarily
-    const STATIC_TEMPLATES = [
+    // Static templates with ghost items inside
+    const STATIC_TEMPLATES: TemplateType[] = [
         {
-            id: "template-1",
-            name: "Template 1",
-            ghostItems: ["face", "tooth"],
-            previewCount: 2,
-        },
-        {
-            id: "template-2",
-            name: "Template 2",
-            ghostItems: ["face", "leftFace"],
-            previewCount: 2,
-        },
-        {
-            id: "template-3",
-            name: "Template 3",
-            ghostItems: ["tooth", "leftFace"],
-            previewCount: 2,
-        },
-        {
-            id: "template-4",
-            name: "Template 4",
-            ghostItems: ["face", "tooth", "leftFace"],
+            id: "template-face-complete",
+            name: "Face Complete",
+            ghostItems: ["face", "faceRightSide", "faceLeftSide"],
             previewCount: 3,
+            layoutPattern: "left-tall",
+        },
+        {
+            id: "template-face-angles",
+            name: "Face Angles",
+            ghostItems: ["face", "faceTurnRight", "faceTurnLeft", "faceDown"],
+            previewCount: 4,
+            layoutPattern: "grid-2x2",
+        },
+        {
+            id: "template-all-teeth-front",
+            name: "All Teeth Front",
+            ghostItems: ["allTeethFrontOpen", "allTeethFrontClosed"],
+            previewCount: 2,
+            layoutPattern: "left-right",
+        },
+        {
+            id: "template-all-teeth-sides",
+            name: "All Teeth Sides",
+            ghostItems: ["allTeethOpenRightSide", "allTeethOpenLeftSide"],
+            previewCount: 2,
+            layoutPattern: "left-right",
+        },
+        {
+            id: "template-upper-teeth",
+            name: "Upper Teeth",
+            ghostItems: ["upperTeethFront", "upperTeethRightSide", "upperTeethLeftSide"],
+            previewCount: 3,
+            layoutPattern: "left-tall",
+        },
+        {
+            id: "template-jaw-views",
+            name: "Jaw Views",
+            ghostItems: ["upperJawDownView", "lowerJawUpView"],
+            previewCount: 2,
+            layoutPattern: "left-right",
         },
     ];
 
@@ -109,7 +152,7 @@ export default function TemplateSelectScreen() {
 
         // Close this modal and go back to camera with ghost items
         router.dismiss();
-        
+
         // Navigate to camera with template params
         setTimeout(() => {
             router.replace({
@@ -121,6 +164,7 @@ export default function TemplateSelectScreen() {
                     doctorName,
                     templateId: selectedTemplate,
                     ghostItems: JSON.stringify(template.ghostItems),
+                    layoutPattern: template.layoutPattern || "left-right",
                 },
             });
         }, 100);
@@ -131,37 +175,33 @@ export default function TemplateSelectScreen() {
         router.back();
     };
 
-    const renderTemplateItem = ({ item, index }: { item: (typeof STATIC_TEMPLATES)[0]; index: number }) => {
+    const renderTemplateItem = ({ item, index }: { item: (typeof STATIC_TEMPLATES)[0] | (typeof customTemplates)[0]; index: number }) => {
         const isSelected = isTemplateSelected(item.id);
+        const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
 
         return (
             <Animated.View entering={FadeInDown.delay(index * 50).springify()} layout={Layout.springify()}>
                 <TouchableOpacity style={[styles.templateCard, isSelected && styles.templateCardSelected]} onPress={() => handleTemplateSelect(item.id)} activeOpacity={0.8}>
                     <View style={[styles.templateImageContainer, isSelected && styles.templateImageContainerSelected]}>
-                        {/* Preview of ghost items inside template - using actual ghost images */}
+                        {/* Preview of ghost items inside template - using actual ghost images with layout pattern */}
                         <View style={styles.templatePreview}>
-                            {item.ghostItems.map((ghostId: string, idx: number) => (
-                                <View key={idx} style={styles.templatePreviewImageContainer}>
-                                    {GHOST_IMAGES[ghostId] ? (
-                                        <Image source={GHOST_IMAGES[ghostId]} style={styles.templatePreviewImage} contentFit="contain" />
-                                    ) : (
-                                        <IconSymbol name="photo" size={32} color={colors.labels.secondary} />
-                                    )}
-                                </View>
-                            ))}
+                            {item.ghostItems.map((ghostId: string, idx: number) => {
+                                const layoutStyle = getItemLayoutStyle(idx, item.ghostItems.length, layoutPattern, TEMPLATE_SIZE);
+                                return (
+                                    <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
+                                        {GHOST_IMAGES[ghostId] ? <Image source={GHOST_IMAGES[ghostId]} style={styles.templatePreviewImage} contentFit="contain" /> : <IconSymbol name="photo" size={32} color={colors.labels.secondary} />}
+                                    </Animated.View>
+                                );
+                            })}
                         </View>
                     </View>
-
-                    <BaseText type="Caption2" weight={isSelected ? 600 : 400} color={isSelected ? "system.blue" : "labels.primary"} className="mt-1 text-center" numberOfLines={1}>
-                        {item.name}
-                    </BaseText>
                 </TouchableOpacity>
             </Animated.View>
         );
     };
 
     return (
-        <View style={[styles.container, { paddingTop: 12 }]}>
+        <View style={[styles.container, { paddingTop: 0 }]}>
             {/* Header */}
             <View style={styles.header}>
                 <Host style={{ width: 60, height: 36 }}>
@@ -169,12 +209,6 @@ export default function TemplateSelectScreen() {
                         Close
                     </Button>
                 </Host>
-
-                <View style={styles.headerCenter}>
-                    <BaseText type="Headline" weight={600} color="labels.primary">
-                        Ready Templates
-                    </BaseText>
-                </View>
 
                 <TouchableOpacity style={styles.addButton} onPress={handleCreateCustomTemplate} activeOpacity={0.7}>
                     <BaseText type="Subhead" weight={600} style={{ color: MINT_COLOR }}>
@@ -195,7 +229,7 @@ export default function TemplateSelectScreen() {
             />
 
             {/* Continue Button */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
                 <TouchableOpacity style={[styles.continueButton, !selectedTemplate && styles.continueButtonDisabled]} onPress={handleContinue} activeOpacity={0.8} disabled={!selectedTemplate}>
                     <BaseText type="Body" weight={600} color="system.white">
                         Continue
@@ -231,7 +265,7 @@ const styles = StyleSheet.create({
     addButton: {
         paddingHorizontal: 12,
         paddingVertical: 6,
-        width: 60,
+        width: 120,
         alignItems: "flex-end",
     },
     templatesGrid: {
@@ -262,20 +296,15 @@ const styles = StyleSheet.create({
         borderColor: MINT_COLOR,
         borderWidth: 2,
         backgroundColor: colors.system.white,
+        margin: -1, // جبران کردن فضای border اضافی برای جلوگیری از پرش
     },
     templatePreview: {
         width: "100%",
         height: "100%",
-        flexDirection: "row",
-        flexWrap: "wrap",
-        justifyContent: "center",
-        alignItems: "center",
-        gap: 8,
-        padding: 8,
+        position: "relative",
     },
     templatePreviewImageContainer: {
-        width: "40%",
-        height: "40%",
+        position: "absolute",
         justifyContent: "center",
         alignItems: "center",
     },

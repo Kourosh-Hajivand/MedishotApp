@@ -42,6 +42,8 @@ export default function RootLayout() {
                             <Stack.Screen options={{ presentation: "modal" }} name="(modals)/add-practice-member" />
                                 <Stack.Screen options={{ presentation: "modal" }} name="(fullmodals)" />
                             <Stack.Screen name="patients" />
+                            <Stack.Screen name="camera" />
+                            <Stack.Screen options={{ presentation: "modal", animation: "slide_from_bottom" }} name="template-select-test" />
                         </Stack>
                     </TabletWrapper>
 
