@@ -10,15 +10,19 @@ export default function SelectGenderScreen() {
     const params = useLocalSearchParams<{ callbackKey?: string; currentValue?: string }>();
     const navigation = useNavigation();
     const safeAreaInsets = useSafeAreaInsets();
-    const selectedGender = params.currentValue || "";
+    // Convert lowercase value from backend to uppercase for display
+    const selectedGender = params.currentValue ? params.currentValue.charAt(0).toUpperCase() + params.currentValue.slice(1).toLowerCase() : "";
 
     const genders = ["Male", "Female", "Other"];
 
     const handleSelectGender = (gender: string) => {
+        // Convert to lowercase for backend (Male -> male, Female -> female, Other -> other)
+        const genderLowercase = gender.toLowerCase();
+
         // Call the callback if it exists
         const callback = params.callbackKey ? getPickerCallback(params.callbackKey) : null;
         if (callback) {
-            callback(gender);
+            callback(genderLowercase);
             if (params.callbackKey) {
                 removePickerCallback(params.callbackKey);
             }
@@ -49,13 +53,16 @@ export default function SelectGenderScreen() {
     return (
         <View style={[styles.container, { paddingTop: safeAreaInsets.top }]}>
             <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-                {genders.map((gender, index) => (
-                    <TouchableOpacity key={index} style={[styles.optionButton, selectedGender === gender && styles.selectedOption]} onPress={() => handleSelectGender(gender)} activeOpacity={0.7}>
-                        <BaseText type="Body" color={selectedGender === gender ? "system.blue" : "labels.primary"} weight={selectedGender === gender ? "600" : "400"}>
-                            {gender}
-                        </BaseText>
-                    </TouchableOpacity>
-                ))}
+                {genders.map((gender, index) => {
+                    const isSelected = selectedGender.toLowerCase() === gender.toLowerCase();
+                    return (
+                        <TouchableOpacity key={index} style={[styles.optionButton, isSelected && styles.selectedOption]} onPress={() => handleSelectGender(gender)} activeOpacity={0.7}>
+                            <BaseText type="Body" color={isSelected ? "system.blue" : "labels.primary"} weight={isSelected ? "600" : "400"}>
+                                {gender}
+                            </BaseText>
+                        </TouchableOpacity>
+                    );
+                })}
             </ScrollView>
         </View>
     );

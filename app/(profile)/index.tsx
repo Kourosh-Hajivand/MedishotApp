@@ -2,7 +2,7 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import themeColors from "@/theme/colors";
-import { useGetPracticeList } from "@/utils/hook";
+import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Switch } from "@expo/ui/swift-ui";
@@ -17,7 +17,20 @@ export default function Index() {
     const { profile, isAuthenticated, logout: handleLogout } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { setSelectedPractice, selectedPractice } = useProfileStore();
-    console.log(practiceList?.data.map((practice) => practice.role));
+    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    console.log("================selectedPractice====================");
+    console.log(selectedPractice);
+
+    // Get current user's role in the selected practice
+    const currentUserRole = React.useMemo(() => {
+        if (!selectedPractice || !practiceMembers?.data || !profile?.email) {
+            return selectedPractice?.role; // Fallback to practice role
+        }
+
+        // Find current user in practice members by email
+        const currentMember = practiceMembers.data.find((member) => member.email === profile.email);
+        return currentMember?.role || selectedPractice.role;
+    }, [selectedPractice, practiceMembers?.data, profile?.email]);
 
     const navigation = useNavigation();
 
@@ -74,15 +87,35 @@ export default function Index() {
             ),
         });
     }, [navigation, handleLogout, selectedPractice, canEdit, handleEditPress]);
-    const menuItems: { lable: string; icon: IconSymbolName; href: string }[] = [
-        { lable: "Personal Profile", icon: "person.circle.fill", href: "/profile-detail" },
-        { lable: "Practice Overview", icon: "chart.bar.xaxis", href: "/practice-overview" },
-        { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team" },
-        { lable: "Print Information", icon: "printer.fill", href: "/print-information" },
-        { lable: "Subscription", icon: "dollarsign.circle.fill", href: "/subscription" },
-        { lable: "Notification", icon: "bell.fill", href: "/notification" },
-        { lable: "Archive", icon: "tray.fill", href: "/archive" },
-    ];
+    // Filter menu items based on user role
+    const filteredMenuItems = React.useMemo(() => {
+        const allMenuItems: { lable: string; icon: IconSymbolName; href: string; roles?: string[] }[] = [
+            { lable: "Personal Profile", icon: "person.circle.fill", href: "/profile-detail" },
+            { lable: "Practice Overview", icon: "chart.bar.xaxis", href: "/practice-overview", roles: ["owner", "admin"] },
+            { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team", roles: ["owner", "admin"] },
+            { lable: "Print Information", icon: "printer.fill", href: "/print-information", roles: ["owner", "admin"] },
+            { lable: "Subscription", icon: "dollarsign.circle.fill", href: "/subscription", roles: ["owner", "admin"] },
+            { lable: "Notification", icon: "bell.fill", href: "/notification" },
+            { lable: "Archive", icon: "tray.fill", href: "/archive" },
+        ];
+
+        const userRole = currentUserRole;
+
+        // staff (admin) can see: Personal Profile, Practice Team, Notification, Archive
+        if (userRole === "admin") {
+            return allMenuItems.filter((item) => item.lable === "Personal Profile" || item.lable === "Practice Team" || item.lable === "Notification" || item.lable === "Archive");
+        }
+
+        // doctor can see: Personal Profile, Archive, Notification
+        if (userRole === "doctor") {
+            return allMenuItems.filter((item) => item.lable === "Personal Profile" || item.lable === "Archive" || item.lable === "Notification");
+        }
+
+        // owner and others see all items (or items without role restriction)
+        return allMenuItems.filter((item) => !item.roles || item.roles.includes(userRole || ""));
+    }, [currentUserRole]);
+
+    const menuItems = filteredMenuItems;
 
     return (
         <View className="flex-1 bg-white  gap-4" style={{ paddingTop: insets.top + 110 }}>

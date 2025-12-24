@@ -20,7 +20,7 @@ export default function PracticeTeamScreen() {
     const { selectedPractice, setSelectedPractice } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const navigation = useNavigation();
-    console.log("====================================");
+    console.log("practiceMembers?.data====================================");
     console.log(practiceMembers?.data);
     console.log("====================================");
 
@@ -118,7 +118,7 @@ export default function PracticeTeamScreen() {
                                     <BaseText type="Title3" weight="500" color="system.black" lineBreakMode="tail" numberOfLines={1}>
                                         {selectedPractice?.name}
                                     </BaseText>
-                                    <BaseText type="Callout" weight="400" color="labels.secondary" className="capitalize">
+                                    <BaseText type="Callout" weight="400" color="labels.secondary" style={{ textTransform: "capitalize" }}>
                                         {selectedPractice?.role}
                                     </BaseText>
                                 </View>
@@ -182,7 +182,7 @@ export default function PracticeTeamScreen() {
                                             <BaseText type="Callout" weight="500" color="system.black">
                                                 {member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email}
                                             </BaseText>
-                                            <BaseText type="Footnote" weight="400" color="labels.secondary">
+                                            <BaseText type="Footnote" weight="400" color="labels.secondary" className="capitalize">
                                                 {member.role}
                                             </BaseText>
                                         </View>

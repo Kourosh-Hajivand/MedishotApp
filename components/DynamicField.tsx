@@ -175,7 +175,6 @@ export const DynamicInputList: React.FC<DynamicInputListProps & { paramKey: stri
                             borderTopRightRadius: items.length > 0 ? 0 : 99,
                             borderBottomLeftRadius: items.length > 0 ? 20 : 99,
                             borderBottomRightRadius: items.length > 0 ? 20 : 99,
-                            marginTop: items.length > 0 ? 0 : 12,
                         },
                     ]}
                 >

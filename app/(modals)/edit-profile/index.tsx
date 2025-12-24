@@ -102,7 +102,8 @@ export default function EditProfileScreen() {
                     first_name: data.first_name,
                     last_name: data.last_name,
                     ...(data.birth_date && { birth_date: data.birth_date }),
-                    ...(data.gender && { gender: data.gender as "male" | "female" | "other" }),
+                    // Ensure gender is lowercase for backend
+                    ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
                     ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
                     ...(formData.uploadedFilename && { profile_photo: formData.uploadedFilename }),
                 };

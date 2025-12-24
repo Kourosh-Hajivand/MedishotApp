@@ -96,7 +96,7 @@ export interface AddMemberDto {
     first_name: string;
     last_name: string;
     email: string;
-    role: "owner" | "admin" | "member" | "doctor";
+    role: "staff" | "doctor"; // Only staff and doctor can be assigned when creating a member
     birth_date?: string; // YYYY-MM-DD format
     gender?: "male" | "female" | "other";
     metadata?: string; // JSON string containing phones, emails, addresses, urls
@@ -104,7 +104,7 @@ export interface AddMemberDto {
 }
 
 export interface UpdateMemberRoleDto {
-    role: "owner" | "admin" | "member" | "viewer" | "doctor";
+    role: "staff" | "doctor"; // Only staff and doctor can be assigned
 }
 
 export interface TransferOwnershipDto {

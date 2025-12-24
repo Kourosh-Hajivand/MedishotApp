@@ -50,9 +50,11 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                             params: { callbackKey, currentValue: value || "" },
                         });
                     } else if (type === "gender") {
+                        // Convert lowercase value to uppercase for display in select screen
+                        const displayValue = value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : "";
                         router.push({
                             pathname: "/(modals)/select-gender",
-                            params: { callbackKey, currentValue: value || "" },
+                            params: { callbackKey, currentValue: displayValue },
                         });
                     }
                 };
@@ -74,7 +76,13 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                             ]}
                         >
                             <BaseText type="Body" color={value ? "labels.primary" : "labels.tertiary"}>
-                                {value ? (type === "date" ? formatDateDisplay(value) : value) : placeholder || label}
+                                {value
+                                    ? type === "date"
+                                        ? formatDateDisplay(value)
+                                        : type === "gender"
+                                          ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+                                          : value
+                                    : placeholder || label}
                             </BaseText>
                         </TouchableOpacity>
 

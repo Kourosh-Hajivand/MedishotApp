@@ -216,9 +216,9 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 setValue("birth_date", params.birthDate);
             }
             if (params.gender) {
-                // Convert "Male"/"Female" to lowercase for form
+                // Convert to lowercase for form (backend format)
                 const genderValue = params.gender.toLowerCase();
-                setValue("gender", genderValue === "male" ? "Male" : genderValue === "female" ? "Female" : params.gender);
+                setValue("gender", genderValue);
             }
 
             // Set scanned ID card image if available (don't set as profile image)

@@ -129,7 +129,8 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 first_name: initialData.first_name || "",
                 last_name: initialData.last_name || "",
                 birth_date: initialData.birth_date || "",
-                gender: initialData.gender || "",
+                // Keep gender in lowercase for form (backend format)
+                gender: initialData.gender ? initialData.gender.toLowerCase() : "",
             });
             // Set existing image URL if available
             if (initialData.profile_photo_url && !localImageUri) {
@@ -152,11 +153,11 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                     // Use ref to always get the latest value (avoid closure issues)
                     const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
                     return {
-                    formData: getValues(),
-                    phones,
-                    emails,
-                    addresses,
-                    urls,
+                        formData: getValues(),
+                        phones,
+                        emails,
+                        addresses,
+                        urls,
                         uploadedFilename: currentUploadedFilename,
                     };
                 },
@@ -258,7 +259,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                     <View className="border-b border-border">
                         <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} />
                     </View>
-                    <View className={`${initialData?.email === "create" ? "border-b border-border" : ""}`}>
+                    <View className={`${initialData?.email && initialData.email !== "create" ? "border-b border-border" : ""}`}>
                         <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                     </View>
 
@@ -272,7 +273,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                         </View>
                     )}
                 </View>
-                <View className="gap-1">
+                <View className="gap-4">
                     <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
                     <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
                     <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
