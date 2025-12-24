@@ -4,7 +4,7 @@ import { ControlledPickerInput } from "@/components/input/ControlledPickerInput"
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { spacing } from "@/styles/spaces";
-import colors from "@/theme/colors";
+import themeColors from "@/theme/colors";
 import { useAddMember, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,10 +21,13 @@ interface AddMemberFormData {
     email: string;
     birth_date?: string;
     gender?: string;
-    role: "admin" | "member" | "doctor";
+    role: "member" | "doctor";
 }
 
-const roleOptions = ["Admin", "Member", "Doctor"];
+const roleOptions = [
+    { label: "Staff", value: "member" as const },
+    { label: "Doctor", value: "doctor" as const },
+];
 
 // Dynamic input configs
 const phoneConfig: DynamicInputConfig = {
@@ -84,9 +87,8 @@ export default function AddPracticeMemberForm() {
     });
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
-    const [selectedRoleIndex, setSelectedRoleIndex] = React.useState(2);
+    const [selectedRoleIndex, setSelectedRoleIndex] = React.useState(0);
 
     // States for dynamic inputs
     const [phones, setPhones] = useState<DynamicFieldItem[]>([]);
@@ -94,9 +96,7 @@ export default function AddPracticeMemberForm() {
     const [addresses, setAddresses] = useState<DynamicFieldItem[]>([]);
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
-            setUploadedFilename(response.filename);
-        },
+        () => {},
         (error) => {
             console.error("Error uploading image:", error.message);
         },
@@ -116,7 +116,7 @@ export default function AddPracticeMemberForm() {
                 email: z.string().email("Please enter a valid email address"),
                 birth_date: z.string().optional(),
                 gender: z.string().optional(),
-                role: z.enum(["admin", "member", "doctor"]),
+                role: z.enum(["member", "doctor"]),
             }),
         ),
         defaultValues: {
@@ -141,7 +141,7 @@ export default function AddPracticeMemberForm() {
                 role: memberData.role || "member",
             });
             // Set role index
-            const roleIndex = roleOptions.findIndex((option) => option.toLowerCase() === (memberData.role || "member"));
+            const roleIndex = roleOptions.findIndex((option) => option.value === (memberData.role || "member"));
             if (roleIndex !== -1) {
                 setSelectedRoleIndex(roleIndex);
             }
@@ -173,47 +173,50 @@ export default function AddPracticeMemberForm() {
         }
     };
 
-    const onSubmit = (data: AddMemberFormData) => {
-        if (isEditMode && memberData) {
-            // Update member role only
-            updateMemberRole({
-                practiceId: parseInt(practiceId),
-                memberId: memberData.id,
-                data: { role: data.role },
-            });
-        } else {
-            // Add new member
-            // Map DynamicFieldItem arrays to the format expected by API and include in metadata
-            const phonesData = phones.length > 0 ? phones.map((phone) => ({ label: phone.label, value: typeof phone.value === "string" ? phone.value : "" })) : undefined;
-            const emailsData = emails.length > 0 ? emails.map((email) => ({ label: email.label, value: typeof email.value === "string" ? email.value : "" })) : undefined;
-            const addressesData = addresses.length > 0 ? addresses.map((address) => ({ label: address.label, value: address.value })) : undefined;
-            const urlsData = urls.length > 0 ? urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;
+    const onSubmit = React.useCallback(
+        (data: AddMemberFormData) => {
+            if (isEditMode && memberData) {
+                // Update member role only
+                updateMemberRole({
+                    practiceId: parseInt(practiceId),
+                    memberId: memberData.id,
+                    data: { role: data.role },
+                });
+            } else {
+                // Add new member
+                // Map DynamicFieldItem arrays to the format expected by API and include in metadata
+                const phonesData = phones.length > 0 ? phones.map((phone) => ({ label: phone.label, value: typeof phone.value === "string" ? phone.value : "" })) : undefined;
+                const emailsData = emails.length > 0 ? emails.map((email) => ({ label: email.label, value: typeof email.value === "string" ? email.value : "" })) : undefined;
+                const addressesData = addresses.length > 0 ? addresses.map((address) => ({ label: address.label, value: address.value })) : undefined;
+                const urlsData = urls.length > 0 ? urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;
 
-            // Build metadata object
-            const metadataObject: any = {};
-            if (phonesData) metadataObject.phones = phonesData;
-            if (emailsData) metadataObject.emails = emailsData;
-            if (addressesData) metadataObject.addresses = addressesData;
-            if (urlsData) metadataObject.urls = urlsData;
+                // Build metadata object
+                const metadataObject: any = {};
+                if (phonesData) metadataObject.phones = phonesData;
+                if (emailsData) metadataObject.emails = emailsData;
+                if (addressesData) metadataObject.addresses = addressesData;
+                if (urlsData) metadataObject.urls = urlsData;
 
-            addMember({
-                practiceId: parseInt(practiceId),
-                data: {
-                    first_name: data.first_name,
-                    last_name: data.last_name,
-                    email: data.email,
-                    role: data.role,
-                    ...(data.birth_date && { birth_date: data.birth_date }),
-                    ...(data.gender && { gender: data.gender as "male" | "female" | "other" }),
-                    // ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
-                    // ...(uploadedFilename && { profile_photo: uploadedFilename }),
-                },
-            });
-        }
-    };
+                addMember({
+                    practiceId: parseInt(practiceId),
+                    data: {
+                        first_name: data.first_name,
+                        last_name: data.last_name,
+                        email: data.email,
+                        role: data.role,
+                        ...(data.birth_date && { birth_date: data.birth_date }),
+                        ...(data.gender && { gender: data.gender as "male" | "female" | "other" }),
+                        // ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
+                        // ...(uploadedFilename && { profile_photo: uploadedFilename }),
+                    },
+                });
+            }
+        },
+        [isEditMode, memberData, updateMemberRole, addMember, practiceId, phones, emails, addresses, urls],
+    );
 
     useEffect(() => {
-        const defaultRoleIndex = roleOptions.findIndex((option) => option.toLowerCase() === "member");
+        const defaultRoleIndex = roleOptions.findIndex((option) => option.value === "member");
         if (defaultRoleIndex !== -1) {
             setSelectedRoleIndex(defaultRoleIndex);
         }
@@ -223,7 +226,7 @@ export default function AddPracticeMemberForm() {
         navigation.setOptions({
             headerRight: () => <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} ButtonStyle="Filled" size="Medium" />,
         });
-    }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode]);
+    }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode, onSubmit]);
 
     return (
         <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -231,7 +234,7 @@ export default function AddPracticeMemberForm() {
                 <ImagePickerWrapper onImageSelected={handleImageSelected} disabled={isEditMode}>
                     <View style={styles.avatarWrapper}>
                         {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
-                        {!isEditMode && <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>}
+                        {!isEditMode && <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={themeColors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>}
                     </View>
                 </ImagePickerWrapper>
                 <View style={styles.titleContainer}>
@@ -277,11 +280,11 @@ export default function AddPracticeMemberForm() {
                                             variant="menu"
                                             onOptionSelected={({ nativeEvent: { index } }) => {
                                                 setSelectedRoleIndex(index);
-                                                const roleValue = roleOptions[index].toLowerCase() as "admin" | "member" | "doctor";
+                                                const roleValue = roleOptions[index]?.value ?? "member";
                                                 onChange(roleValue);
                                                 setValue("role", roleValue);
                                             }}
-                                            options={roleOptions}
+                                            options={roleOptions.map((o) => o.label)}
                                         />
                                     )}
                                 />
@@ -319,7 +322,7 @@ const styles = StyleSheet.create({
         width: 90,
         height: 90,
         borderRadius: 45,
-        backgroundColor: colors.system.gray2,
+        backgroundColor: themeColors.system.gray2,
         alignItems: "center",
         justifyContent: "center",
         position: "relative",
@@ -333,11 +336,11 @@ const styles = StyleSheet.create({
         position: "absolute",
         bottom: 0,
         right: 0,
-        backgroundColor: colors.system.blue,
+        backgroundColor: themeColors.system.blue,
         borderRadius: 999,
         padding: spacing["1"],
         borderWidth: 1,
-        borderColor: colors.system.white,
+        borderColor: themeColors.system.white,
     },
     titleContainer: {
         marginTop: spacing["4"],

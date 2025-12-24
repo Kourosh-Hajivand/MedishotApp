@@ -77,8 +77,9 @@ const urlConfig: DynamicInputConfig = {
 
 export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialData, title, subtitle, onFormReady }) => {
     const insets = useSafeAreaInsets();
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
-    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+    const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
+    const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
+    const uploadedFilenameRef = React.useRef<string | null>(null); // Ref to always have latest value
 
     // States for dynamic inputs
     const [phones, setPhones] = useState<DynamicFieldItem[]>([]);
@@ -88,10 +89,20 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            setUploadedFilename(response.filename);
+            console.log("✅ [uploadImage] Success callback triggered");
+            console.log("✅ [uploadImage] Response:", response);
+            // Handle both wrapped and unwrapped response structures
+            const responseAny = response as any;
+            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            console.log("✅ [uploadImage] Filename:", filename);
+            setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
+            uploadedFilenameRef.current = filename; // Also update ref to always have latest value
+            console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
         (error) => {
-            console.error("Error uploading image:", error.message);
+            console.error("❌ [uploadImage] Error callback triggered");
+            console.error("❌ [uploadImage] Error uploading image:", error);
+            console.error("❌ [uploadImage] Error message:", error.message);
         },
     );
 
@@ -117,13 +128,18 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             reset({
                 first_name: initialData.first_name || "",
                 last_name: initialData.last_name || "",
-                birth_date: "",
-                gender: "",
+                birth_date: initialData.birth_date || "",
+                gender: initialData.gender || "",
             });
-            // TODO: Set image if available
+            // Set existing image URL if available
+            if (initialData.profile_photo_url && !localImageUri) {
+                console.log("🖼️ [INIT] Setting existing profile image:", initialData.profile_photo_url);
+                setUploadedFilename(initialData.profile_photo_url);
+                uploadedFilenameRef.current = initialData.profile_photo_url;
+            }
             // TODO: Set dynamic fields from initialData if available
         }
-    }, [initialData, mode, reset]);
+    }, [initialData, mode, reset, localImageUri]);
 
     // Expose form methods to parent
     useEffect(() => {
@@ -132,21 +148,26 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 handleSubmit,
                 control,
                 errors,
-                getFormData: () => ({
+                getFormData: () => {
+                    // Use ref to always get the latest value (avoid closure issues)
+                    const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
+                    return {
                     formData: getValues(),
                     phones,
                     emails,
                     addresses,
                     urls,
-                    uploadedFilename,
-                }),
+                        uploadedFilename: currentUploadedFilename,
+                    };
+                },
             });
         }
     }, [onFormReady, handleSubmit, control, errors, phones, emails, addresses, urls, uploadedFilename, getValues]);
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
+        console.log("📸 [handleImageSelected] Image selected:", result.uri);
         Keyboard.dismiss();
-        setSelectedImage(result.uri);
+        setLocalImageUri(result.uri); // Save local URI for preview
 
         try {
             const filename = result.uri.split("/").pop() || "image.jpg";
@@ -159,9 +180,15 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 name: filename,
             } as any;
 
+            console.log("📤 [handleImageSelected] Preparing to upload file:", {
+                uri: file.uri,
+                type: file.type,
+                name: file.name,
+            });
+            console.log("📤 [handleImageSelected] Calling uploadImage...");
             uploadImage(file);
         } catch (error) {
-            console.error("Error preparing image for upload:", error);
+            console.error("❌ [handleImageSelected] Error preparing image for upload:", error);
         }
     };
 
@@ -173,7 +200,39 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             <View style={styles.avatarContainer}>
                 <ImagePickerWrapper onImageSelected={handleImageSelected}>
                     <View style={styles.avatarWrapper}>
-                        {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
+                        {isUploading ? (
+                            // Show loading indicator while uploading
+                            <ActivityIndicator size="small" color={colors.system.gray6} />
+                        ) : localImageUri ? (
+                            // Show preview after upload is complete (new image)
+                            <Image
+                                source={{ uri: localImageUri }}
+                                style={styles.avatarImage}
+                                onError={(error) => {
+                                    console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
+                                    console.error("❌ [Image] Failed URI:", localImageUri);
+                                }}
+                                onLoad={() => {
+                                    console.log("✅ [Image] Local image loaded successfully:", localImageUri);
+                                }}
+                            />
+                        ) : initialData?.profile_photo_url ? (
+                            // Show existing image from server
+                            <Image
+                                source={{ uri: initialData.profile_photo_url }}
+                                style={styles.avatarImage}
+                                onError={(error) => {
+                                    console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
+                                    console.error("❌ [Image] Failed URI:", initialData.profile_photo_url);
+                                }}
+                                onLoad={() => {
+                                    console.log("✅ [Image] Existing image loaded successfully:", initialData.profile_photo_url);
+                                }}
+                            />
+                        ) : (
+                            // Show default avatar when no image
+                            <AvatarIcon width={50} height={50} strokeWidth={0} />
+                        )}
                         <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
                     </View>
                 </ImagePickerWrapper>

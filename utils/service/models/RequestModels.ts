@@ -174,6 +174,11 @@ export interface CreatePatientRequest {
     addresses?: PatientAddress[];
     links?: PatientLink[];
     metadata?: PatientMetadata;
+    /**
+     * OpenAPI: `profile` (multipart/form-data)
+     * Backward compatible: some parts of the app still pass `image`
+     */
+    profile?: File | string;
     image?: File | string;
     id_card?: File | string;
 }
@@ -189,6 +194,11 @@ export interface UpdatePatientRequest {
     addresses?: PatientAddress[];
     links?: PatientLink[];
     metadata?: PatientMetadata;
+    /**
+     * OpenAPI: `profile` (multipart/form-data)
+     * Backward compatible: some parts of the app still pass `image`
+     */
+    profile?: File | string;
     image?: File | string;
     id_card?: File | string;
 }

@@ -17,7 +17,7 @@ export default function layout() {
             <Stack.Screen
                 name="index"
                 options={{
-                    headerTitle: "Profile",
+                    headerTitle: "Settings",
                 }}
             />
             <Stack.Screen
@@ -67,6 +67,12 @@ export default function layout() {
                 name="profile-detail"
                 options={{
                     headerTitle: "Profile Details",
+                }}
+            />
+            <Stack.Screen
+                name="practice-detail"
+                options={{
+                    headerTitle: "Practice Details",
                 }}
             />
         </Stack>

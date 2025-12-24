@@ -3,13 +3,16 @@ import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useGetPatientById } from "@/utils/hook";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Image as RNImage, TouchableOpacity, View } from "react-native";
+import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import TextRecognition from "react-native-text-recognition";
 import { blurValue } from "./_layout";
 
 type RowKind = "header" | "tabs" | "content";
@@ -64,6 +67,32 @@ export default function PatientDetailsScreen() {
             (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot send message");
         } catch {
             Alert.alert("Error", "Error sending message");
+        }
+    };
+
+    const scanDocument = async () => {
+        try {
+            const { scannedImages } = await DocumentScanner.scanDocument({
+                maxNumDocuments: 1,
+            });
+
+            if (scannedImages && scannedImages.length > 0) {
+                const imagePath = scannedImages[0];
+
+                const path = imagePath.replace("file://", "");
+
+                const lines = await TextRecognition.recognize(path);
+                const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
+                console.log("OCR:", fullText);
+                // Parse the extracted data
+                const parsed = parseUSIDCardData(fullText, imagePath);
+                console.log("Parsed ID Card Data:", parsed);
+                // TODO: Save parsed data to patient record
+                Alert.alert("Success", "ID card scanned successfully!");
+            }
+        } catch (error) {
+            console.error("Document scan or OCR failed:", error);
+            Alert.alert("Error", "Failed to scan document. Please try again.");
         }
     };
 
@@ -192,7 +221,7 @@ export default function PatientDetailsScreen() {
                                     Fill consent
                                 </BaseText>
                             </TouchableOpacity>
-                            <TouchableOpacity className="flex-1 items-center justify-center gap-2">
+                            <TouchableOpacity className="flex-1 items-center justify-center gap-2" onPress={scanDocument}>
                                 <IconSymbol name="person.text.rectangle" color={colors.system.blue} size={26} />
                                 <BaseText type="Footnote" color="labels.primary">
                                     Add ID

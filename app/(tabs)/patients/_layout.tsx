@@ -1,15 +1,13 @@
+import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
-import { BackButton } from "@/components/button/ui/BackButton";
-import { IconSymbol } from "@/components/ui/icon-symbol";
-import colors from "@/theme/colors.shared";
-import { useGetPracticeList } from "@/utils/hook";
+import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { forceReloadProfileSelection, loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
 import { router, Stack } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Animated, TouchableOpacity, View } from "react-native";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
@@ -17,9 +15,39 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 export const blurValue = new Animated.Value(0);
 
 export default function PatientsLayout() {
-    const { logout: handleLogout, profile, isAuthenticated } = useAuth();
+    const { logout: handleLogout, isAuthenticated } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
-    const { selectedPractice, viewMode, setSelectedPractice, setViewMode, isLoaded, isLoading } = useProfileStore();
+    const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
+    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+
+    // Filter doctors from members
+    const doctors = useMemo(() => {
+        return practiceMembers?.data?.filter((member) => member.role === "doctor") ?? [];
+    }, [practiceMembers?.data]);
+
+    // Check if user can see doctor filter (only owner or admin)
+    const canSeeDoctorFilter = useMemo(() => {
+        return selectedPractice?.role === "owner" || selectedPractice?.role === "admin";
+    }, [selectedPractice?.role]);
+
+    // Calculate width based on practice name length
+    const headerButtonWidth = useMemo(() => {
+        const practiceName = selectedPractice?.name ?? "";
+        const characterCount = practiceName.length;
+
+        // Base width: avatar (35px) + gap (8px) + padding (16px on each side = 32px)
+        const baseWidth = 35 + 8 + 8;
+
+        // Approximate width per character for Body font (around 8-9px per character)
+        const charWidth = 8.5;
+        const textWidth = characterCount * charWidth;
+
+        // Total width
+        const totalWidth = baseWidth + textWidth;
+
+        // Clamp between minimum (100) and maximum (220)
+        return Math.max(100, Math.min(220, totalWidth));
+    }, [selectedPractice?.name]);
 
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {
@@ -62,9 +90,32 @@ export default function PatientsLayout() {
                                             <Button systemImage="arrow.up">A → Z</Button>
                                             <Button systemImage="arrow.down">Z → A</Button>
                                         </Submenu>
-                                        <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
-                                            Logout
-                                        </Button>
+                                        {canSeeDoctorFilter && (
+                                            <Submenu button={<Button systemImage="line.3.horizontal.decrease">Doctor Filter</Button>}>
+                                                <Button
+                                                    systemImage="line.3.horizontal.decrease.circle"
+                                                    onPress={() => {
+                                                        setSelectedDoctor(null);
+                                                    }}
+                                                >
+                                                    All
+                                                </Button>
+                                                {doctors.length > 0 ? (
+                                                    doctors.map((doctor) => (
+                                                        <Button
+                                                            key={doctor.id}
+                                                            onPress={() => {
+                                                                setSelectedDoctor(doctor.id);
+                                                            }}
+                                                        >
+                                                            {doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
+                                                        </Button>
+                                                    ))
+                                                ) : (
+                                                    <Button disabled>No doctors found</Button>
+                                                )}
+                                            </Submenu>
+                                        )}
                                     </ContextMenu.Items>
 
                                     <ContextMenu.Trigger>
@@ -79,49 +130,28 @@ export default function PatientsLayout() {
                         ),
                         headerLeft: () => (
                             // <Switch key={index} label={practice.name} variant="switch" value={selectedProfile === "practice" && selectedPractice?.id === practice.id} onValueChange={() => setSelectedProfile("practice", practice)} />
-                            <Host style={{ width: 35 }}>
+                            <Host style={{ width: headerButtonWidth }}>
                                 <ContextMenu activationMethod="longPress">
                                     <ContextMenu.Items>
-                                        {practiceList?.data.map((practice, index) =>
-                                            practice.role === "owner" ? (
-                                                <Submenu button={<Button>{practice.name}</Button>}>
-                                                    <Switch
-                                                        label={`View as Owner`}
-                                                        variant="switch"
-                                                        value={viewMode === "owner" && selectedPractice?.id === practice.id}
-                                                        onValueChange={() => {
-                                                            setSelectedPractice(practice);
-                                                            setViewMode("owner");
-                                                        }}
-                                                    />
-                                                    <Switch
-                                                        label={`View as Doctor`}
-                                                        variant="switch"
-                                                        value={viewMode === "doctor" && selectedPractice?.id === practice.id}
-                                                        onValueChange={() => {
-                                                            setSelectedPractice(practice);
-                                                            setViewMode("doctor");
-                                                        }}
-                                                    />
-                                                </Submenu>
-                                            ) : (
-                                                <Switch
-                                                    key={index}
-                                                    label={practice.name}
-                                                    variant="switch"
-                                                    value={selectedPractice?.id === practice.id}
-                                                    onValueChange={() => {
-                                                        setSelectedPractice(practice);
-                                                        setViewMode("doctor");
-                                                    }}
-                                                />
-                                            ),
-                                        )}
+                                        {practiceList?.data.map((practice, index) => (
+                                            <Switch
+                                                key={index}
+                                                label={practice.name}
+                                                variant="switch"
+                                                value={selectedPractice?.id === practice.id}
+                                                onValueChange={() => {
+                                                    setSelectedPractice(practice);
+                                                }}
+                                            />
+                                        ))}
                                     </ContextMenu.Items>
 
                                     <ContextMenu.Trigger>
-                                        <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: 35, backgroundColor: "white", borderRadius: 100 }} className="flex-row items-center gap-2">
-                                            <Avatar name={viewMode === "doctor" ? (profile?.first_name ?? "") : (selectedPractice?.name ?? "")} size={35} />
+                                        <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: headerButtonWidth, backgroundColor: "white", borderRadius: 100 }} className="flex-row  bg-white items-center gap-2 overflow-hidden pr-2">
+                                            <Avatar name={selectedPractice?.name ?? ""} size={35} imageUrl={selectedPractice?.image?.url} />
+                                            <BaseText lineBreakMode="tail" numberOfLines={1} type="Body" weight="400" color="labels.secondary" className="line-clamp-1 truncate">
+                                                {selectedPractice?.name}
+                                            </BaseText>
                                         </TouchableOpacity>
                                     </ContextMenu.Trigger>
                                 </ContextMenu>
@@ -139,7 +169,6 @@ export default function PatientsLayout() {
                         },
                     }}
                 />
-
             </Stack>
         </BottomSheetModalProvider>
     );
@@ -159,7 +188,7 @@ function AnimatedBlurBackground() {
             style={{
                 flex: 1,
 
-                borderBottomColor: "rgba(0,0,0,0.15)",
+                borderBottomColor: "rgba(0,0,0,0.1)",
             }}
         />
     );

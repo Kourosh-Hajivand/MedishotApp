@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { ProfileFormData, ProfileFormScreen } from "@/screens/auth/ProfileFormScreen";
-import { useUpdateProfile } from "@/utils/hook";
+import { useUpdateProfileFull } from "@/utils/hook";
+import { UpdateProfileFullBody } from "@/utils/service/models/RequestModels";
 import { People } from "@/utils/service/models/ResponseModels";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
@@ -22,16 +23,22 @@ export default function EditProfileScreen() {
         }
         return null;
     }, [params.profile]);
-    console.log("====================================");
-    console.log(profile);
-    console.log("====================================");
+
+    console.log("🔄 [EditProfile] Profile data:", profile);
 
     const formRef = useRef<{
         handleSubmit: UseFormHandleSubmit<ProfileFormData>;
-        getFormData: () => any;
+        getFormData: () => {
+            formData: ProfileFormData;
+            phones: any[];
+            emails: any[];
+            addresses: any[];
+            urls: any[];
+            uploadedFilename: string | null;
+        };
     } | null>(null);
 
-    const { mutate: updateProfile, isPending } = useUpdateProfile(() => {
+    const { mutate: updateProfile, isPending } = useUpdateProfileFull(() => {
         router.back();
     });
 
@@ -39,15 +46,104 @@ export default function EditProfileScreen() {
         formRef.current = form;
     }, []);
 
-    const handleSave = () => {
-        if (formRef.current) {
-            formRef.current.handleSubmit((data: ProfileFormData) => {
-                const formData = formRef.current?.getFormData();
-                // TODO: Include phones, emails, addresses, urls, uploadedFilename in the request
-                updateProfile(data);
-            })();
+    const handleSave = useCallback(() => {
+        if (!formRef.current) {
+            console.error("❌ [handleSave] Form ref is not ready!");
+            return;
         }
-    };
+
+        formRef.current.handleSubmit(
+            (data: ProfileFormData) => {
+                const formData = formRef.current?.getFormData();
+                if (!formData) {
+                    console.error("❌ [handleSave] Form data is null!");
+                    return;
+                }
+
+                console.log("🔍 [handleSave] Form data:", formData);
+                console.log("🔍 [handleSave] Uploaded filename:", formData.uploadedFilename);
+
+                // Build metadata object from dynamic fields
+                const metadataObject: any = {};
+
+                if (formData.phones && formData.phones.length > 0) {
+                    const phonesData = formData.phones.map((phone) => ({
+                        type: phone.label,
+                        value: phone.value,
+                    }));
+                    if (phonesData.length > 0) metadataObject.phones = phonesData;
+                }
+
+                if (formData.emails && formData.emails.length > 0) {
+                    const emailsData = formData.emails.map((email) => ({
+                        type: email.label,
+                        value: email.value,
+                    }));
+                    if (emailsData.length > 0) metadataObject.emails = emailsData;
+                }
+
+                if (formData.addresses && formData.addresses.length > 0) {
+                    const addressesData = formData.addresses.map((address) => ({
+                        type: address.label,
+                        value: address.value,
+                    }));
+                    if (addressesData.length > 0) metadataObject.addresses = addressesData;
+                }
+
+                if (formData.urls && formData.urls.length > 0) {
+                    const urlsData = formData.urls.map((url) => ({
+                        type: url.label,
+                        value: url.value,
+                    }));
+                    if (urlsData.length > 0) metadataObject.urls = urlsData;
+                }
+
+                const payload: UpdateProfileFullBody = {
+                    first_name: data.first_name,
+                    last_name: data.last_name,
+                    ...(data.birth_date && { birth_date: data.birth_date }),
+                    ...(data.gender && { gender: data.gender as "male" | "female" | "other" }),
+                    ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
+                    ...(formData.uploadedFilename && { profile_photo: formData.uploadedFilename }),
+                };
+
+                // Log all data being sent to backend
+                console.log("═══════════════════════════════════════════════════════════");
+                console.log("📤 [handleSave] DATA BEING SENT TO BACKEND:");
+                console.log("═══════════════════════════════════════════════════════════");
+                console.log("📋 Payload (JSON):", JSON.stringify(payload, null, 2));
+                console.log("📋 Payload (Object):", payload);
+                console.log("───────────────────────────────────────────────────────────");
+                console.log("📝 Form Data:", {
+                    first_name: data.first_name,
+                    last_name: data.last_name,
+                    birth_date: data.birth_date,
+                    gender: data.gender,
+                });
+                console.log("📞 Phone Numbers:", formData.phones);
+                console.log("📧 Email Addresses:", formData.emails);
+                console.log("📍 Addresses:", formData.addresses);
+                console.log("🔗 URL Links:", formData.urls);
+                console.log("🖼️ Profile Photo Filename:", formData.uploadedFilename);
+                console.log("═══════════════════════════════════════════════════════════");
+
+                console.log("🔄 [handleSave] Calling updateProfile mutation...");
+                updateProfile(payload, {
+                    onSuccess: (response) => {
+                        console.log("✅ [updateProfile] Success Response:", response);
+                    },
+                    onError: (error) => {
+                        console.error("❌ [updateProfile] Error:", error);
+                        console.error("❌ [updateProfile] Error Details:", JSON.stringify(error, null, 2));
+                    },
+                });
+            },
+            (errors) => {
+                // Validation failed - errors are handled by form
+                console.log("❌ [handleSave] Validation errors:", errors);
+            },
+        )();
+    }, [updateProfile]);
 
     // Set header right button
     useLayoutEffect(() => {
@@ -60,7 +156,7 @@ export default function EditProfileScreen() {
                 </TouchableOpacity>
             ),
         });
-    }, [navigation, isPending]);
+    }, [navigation, handleSave, isPending]);
 
     return <ProfileFormScreen mode="edit" initialData={profile} title="Edit Profile" subtitle="Update your profile information." onFormReady={handleFormReady} />;
 }

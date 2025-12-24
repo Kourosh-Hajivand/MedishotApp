@@ -1,24 +1,21 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
-import { People, Practice } from "../service/models/ResponseModels";
+import { Practice } from "../service/models/ResponseModels";
 
 type ViewMode = "doctor" | "owner";
-
-export type SettingView = { type: "profile"; profile: People | null } | { type: "practice"; practice: Practice };
 
 interface StoredProfileSelection {
     selectedPractice: Practice | null;
     viewMode: ViewMode;
-    settingView: SettingView;
 }
 
 interface ProfileStore {
     selectedPractice: Practice | null;
     viewMode: ViewMode;
-    settingView: SettingView;
+    selectedDoctor: string | null; // null means "all", otherwise doctor id
     setSelectedPractice: (practice: Practice) => Promise<void>;
     setViewMode: (mode: ViewMode) => Promise<void>;
-    setSettingView: (view: SettingView) => Promise<void>;
+    setSelectedDoctor: (doctorId: string | null) => void;
     resetSelection: () => Promise<void>;
     isLoaded: boolean;
     isLoading: boolean;
@@ -26,15 +23,6 @@ interface ProfileStore {
 
 const STORAGE_KEY = "profile_selection";
 const DEFAULT_VIEW_MODE: ViewMode = "doctor";
-const DEFAULT_SETTING_VIEW: SettingView = { type: "profile", profile: null };
-
-const buildSettingViewFromPractice = (practice?: Practice | null): SettingView => {
-    if (practice) {
-        return { type: "practice", practice };
-    }
-
-    return DEFAULT_SETTING_VIEW;
-};
 
 const selectDefaultPractice = (practiceList?: Practice[]) => {
     if (!practiceList || practiceList.length === 0) {
@@ -52,29 +40,12 @@ const determineDefaultViewMode = (practice: Practice | null): ViewMode => {
     return DEFAULT_VIEW_MODE;
 };
 
-const normalizeSettingView = (rawView: SettingView | null | undefined, selectedPractice: Practice | null): SettingView => {
-    if (rawView?.type === "profile") {
-        return DEFAULT_SETTING_VIEW;
-    }
-
-    if (rawView?.type === "practice" && rawView.practice) {
-        if (selectedPractice && rawView.practice.id !== selectedPractice.id) {
-            return { type: "practice", practice: selectedPractice };
-        }
-
-        return { type: "practice", practice: rawView.practice };
-    }
-
-    return buildSettingViewFromPractice(selectedPractice);
-};
-
 async function persistProfileSelection() {
     try {
-        const { selectedPractice, viewMode, settingView } = useProfileStore.getState();
+        const { selectedPractice, viewMode } = useProfileStore.getState();
         const payload: StoredProfileSelection = {
             selectedPractice,
             viewMode,
-            settingView,
         };
 
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -86,12 +57,10 @@ async function persistProfileSelection() {
 async function initializeDefaultSelection(practiceList?: Practice[]) {
     const defaultPractice = selectDefaultPractice(practiceList) ?? null;
     const defaultViewMode = determineDefaultViewMode(defaultPractice);
-    const defaultSettingView = buildSettingViewFromPractice(defaultPractice);
 
     useProfileStore.setState({
         selectedPractice: defaultPractice,
         viewMode: defaultViewMode,
-        settingView: defaultSettingView,
         isLoaded: true,
         isLoading: false,
     });
@@ -102,7 +71,6 @@ async function initializeDefaultSelection(practiceList?: Practice[]) {
             JSON.stringify({
                 selectedPractice: defaultPractice,
                 viewMode: defaultViewMode,
-                settingView: defaultSettingView,
             }),
         );
     } catch (error) {
@@ -113,22 +81,26 @@ async function initializeDefaultSelection(practiceList?: Practice[]) {
 export const useProfileStore = create<ProfileStore>((set, get) => ({
     selectedPractice: null,
     viewMode: DEFAULT_VIEW_MODE,
-    settingView: DEFAULT_SETTING_VIEW,
+    selectedDoctor: null,
     isLoaded: false,
     isLoading: false,
 
     setSelectedPractice: async (practice) => {
+        // Reset selectedDoctor to "all" if user role is owner or admin
+        const shouldResetDoctor = practice.role === "owner" || practice.role === "admin";
+
         set({
             selectedPractice: practice,
+            selectedDoctor: shouldResetDoctor ? null : get().selectedDoctor,
         });
 
-        if (get().settingView.type === "practice") {
-            set({
-                settingView: { type: "practice", practice },
-            });
-        }
-
         await persistProfileSelection();
+    },
+
+    setSelectedDoctor: (doctorId: string | null) => {
+        set({
+            selectedDoctor: doctorId,
+        });
     },
 
     setViewMode: async (mode) => {
@@ -139,26 +111,11 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         await persistProfileSelection();
     },
 
-    setSettingView: async (view) => {
-        if (view.type === "practice") {
-            set({
-                selectedPractice: view.practice,
-                settingView: { type: "practice", practice: view.practice },
-            });
-        } else {
-            set({
-                settingView: DEFAULT_SETTING_VIEW,
-            });
-        }
-
-        await persistProfileSelection();
-    },
-
     resetSelection: async () => {
         set({
             selectedPractice: null,
             viewMode: DEFAULT_VIEW_MODE,
-            settingView: DEFAULT_SETTING_VIEW,
+            selectedDoctor: null,
         });
 
         try {
@@ -198,42 +155,36 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
         console.log("stored data:", stored);
 
         if (stored) {
-            const parsed = JSON.parse(stored) as Partial<StoredProfileSelection> & { selectedProfile?: unknown };
+            const parsed = JSON.parse(stored) as Partial<StoredProfileSelection> & { selectedProfile?: unknown; settingView?: unknown };
 
-            if (parsed.selectedProfile !== undefined || !parsed.viewMode) {
+            if (parsed.selectedProfile !== undefined || parsed.settingView !== undefined || !parsed.viewMode) {
                 console.log("Old data structure detected, recreating default state");
                 await AsyncStorage.removeItem(STORAGE_KEY);
                 await initializeDefaultSelection(practiceList);
             } else {
                 let selectedPractice = parsed.selectedPractice ?? null;
                 let viewMode = parsed.viewMode ?? DEFAULT_VIEW_MODE;
-                let settingViewInput = parsed.settingView;
                 let needsPersistence = false;
 
                 if (!selectedPractice && practiceList && practiceList.length > 0) {
                     selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                     viewMode = determineDefaultViewMode(selectedPractice);
-                    settingViewInput = { type: "practice", practice: selectedPractice };
                     needsPersistence = true;
                 }
-
-                const settingView = normalizeSettingView(settingViewInput, selectedPractice);
 
                 useProfileStore.setState({
                     selectedPractice,
                     viewMode,
-                    settingView,
                     isLoaded: true,
                     isLoading: false,
                 });
 
-                if (!parsed.settingView || needsPersistence) {
+                if (needsPersistence) {
                     await AsyncStorage.setItem(
                         STORAGE_KEY,
                         JSON.stringify({
                             selectedPractice,
                             viewMode,
-                            settingView,
                         }),
                     );
                 }
@@ -260,7 +211,6 @@ export const validateAndSetDefaultSelection = async (practiceList?: Practice[]) 
             const fallbackPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
             useProfileStore.setState({
                 selectedPractice: fallbackPractice,
-                settingView: currentState.settingView.type === "practice" ? { type: "practice", practice: fallbackPractice } : currentState.settingView,
             });
 
             await persistProfileSelection();
@@ -275,7 +225,6 @@ export const forceReloadProfileSelection = async (practiceList?: Practice[]) => 
     useProfileStore.setState({
         selectedPractice: null,
         viewMode: DEFAULT_VIEW_MODE,
-        settingView: DEFAULT_SETTING_VIEW,
         isLoaded: false,
         isLoading: false,
     });

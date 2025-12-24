@@ -1,3 +1,4 @@
+import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -85,7 +86,7 @@ export default function CreateTemplateScreen() {
         // Create template preview array
         const preview = selectedItems.map((itemId) => {
             const item = TEMPLATE_ITEMS.find((i) => i.id === itemId);
-            return item?.image || require("@/assets/gost/Face.png");
+            return item?.image || GHOST_ASSETS.face;
         });
 
         // Navigate back to template-select with new template data

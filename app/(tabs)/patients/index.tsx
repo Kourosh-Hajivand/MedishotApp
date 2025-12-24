@@ -1,6 +1,7 @@
 import { SearchGlyphIcon } from "@/assets/icons";
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
+import BaseButton from "@/components/button/BaseButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
@@ -13,7 +14,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -315,11 +316,30 @@ export default function PatientsScreen() {
                     </BaseText>
                 </View>
             ) : (
-                <View style={styles.noResults} className=" flex-1 items-center  justify-center">
-                    <IconSymbol name="person.2" color={colors.labels.secondary} size={40} />
-                    <BaseText type="Body" lineBreakMode="tail" numberOfLines={1} color="labels.secondary" weight={500}>
-                        No patients found
-                    </BaseText>
+                <View style={[styles.emptyStateContainer, { paddingTop: headerHeight + spacing["5"] }]}>
+                    <View style={styles.emptyStateCard}>
+                        <View style={{ backgroundColor: colors.system.gray6 }} className="flex-row items-center gap-3 ">
+                            <View style={styles.emptyStateContent}>
+                                {/* Avatars */}
+                                <View style={styles.avatarsContainer}>
+                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/2421f0e4-5d62-40ac-83d2-ba605aff86ae" }} style={[styles.avatar, styles.avatarLarge]} />
+                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/05fdd0e9-546c-43a4-b164-e485d7c3ac39" }} style={[styles.avatar, styles.avatarMedium]} />
+                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/fc5e9eef-bfd4-4ff3-bd11-0d7559b757e0" }} style={[styles.avatar, styles.avatarSmall]} />
+                                </View>
+
+                                {/* Text and Button */}
+                                <View style={styles.textContainer}>
+                                    <BaseText type="Body" color="labels.primary" weight="600" style={styles.title}>
+                                        Let's add your first patient
+                                    </BaseText>
+                                    <BaseText type="Footnote" color="labels.secondary" weight="400" style={styles.subtitle}>
+                                        Create a profile and keep their clinic details at your fingertips.
+                                    </BaseText>
+                                    <BaseButton label="Add Patient" ButtonStyle="Tinted" size="Medium" rounded={true} onPress={() => router.push("/(modals)/add-patient/photo")} leftIcon={<IconSymbol name="plus" size={16} color={colors.system.blue} />} style={styles.addButton} />
+                                </View>
+                            </View>
+                        </View>
+                    </View>
                 </View>
             )}
 
@@ -354,4 +374,70 @@ const styles = StyleSheet.create({
     alphabetItem: { paddingHorizontal: spacing["1"], marginVertical: 1 },
     activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
     noResults: { alignItems: "center", justifyContent: "center", gap: spacing["1"] },
+    emptyStateContainer: {
+        flex: 1,
+        backgroundColor: "white",
+        paddingHorizontal: spacing["5"],
+        paddingBottom: spacing["10"],
+    },
+    emptyStateCard: {
+        backgroundColor: colors.system.gray6,
+        borderRadius: 24,
+        padding: spacing["5"],
+        width: "100%",
+    },
+    emptyStateContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing["3"],
+    },
+    avatarsContainer: {
+        position: "relative",
+        width: 100,
+        height: 100,
+    },
+    avatar: {
+        position: "absolute",
+        borderRadius: 9999,
+        borderWidth: 2,
+        borderColor: colors.system.white,
+    },
+    avatarLarge: {
+        width: 62,
+        height: 62,
+        top: 0,
+        left: 0,
+    },
+    avatarMedium: {
+        width: 42,
+        height: 42,
+        top: 46,
+        left: 33,
+    },
+    avatarSmall: {
+        width: 33,
+        height: 33,
+        top: 70,
+        left: 7,
+    },
+    textContainer: {
+        flex: 1,
+        gap: spacing["1"],
+    },
+    title: {
+        fontSize: 17,
+        lineHeight: 22,
+        letterSpacing: -0.43,
+        marginBottom: 4,
+    },
+    subtitle: {
+        fontSize: 13,
+        lineHeight: 18,
+        letterSpacing: -0.08,
+        marginBottom: spacing["1"],
+    },
+    addButton: {
+        marginTop: spacing["1"],
+        alignSelf: "flex-start",
+    },
 });

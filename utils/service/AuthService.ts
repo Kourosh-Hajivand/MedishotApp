@@ -17,7 +17,7 @@ export const AuthService = {
     login: async (body: LoginBody): Promise<LoginResponse> => {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + login(), body);
-            storeTokens(response.data.data.token);
+            await storeTokens(response.data.data.token);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -42,7 +42,7 @@ export const AuthService = {
     completeRegistration: async (body: CompleteRegistrationBody): Promise<CompleteRegistrationResponse> => {
         try {
             const response: AxiosResponse<CompleteRegistrationResponse> = await axiosInstance.post(baseUrl + completeRegistration(), body);
-            storeTokens(response.data.data.token);
+            await storeTokens(response.data.data.token);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -66,17 +66,15 @@ export const AuthService = {
 
     refresh: async (): Promise<LoginResponse> => {
         try {
-            const response: AxiosResponse<LoginResponse> = await axios.post(
-                baseUrl + refresh(),
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${(await import("../helper/tokenStorage")).getTokens().then((tokens) => tokens.refreshToken)}`,
-                    },
-                },
-            );
+            const { refreshToken } = await (await import("../helper/tokenStorage")).getTokens();
+            if (!refreshToken) {
+                throw new Error("Missing refresh token");
+            }
+
+            // NOTE: refresh endpoint is public on axiosInstance baseURL, but needs Bearer refresh token.
+            const response: AxiosResponse<LoginResponse> = await axios.post(baseUrl + refresh(), {}, { headers: { Authorization: `Bearer ${refreshToken}` } });
             if (response.data.data.token) {
-                (await import("../helper/tokenStorage")).storeTokens(response.data.data.token);
+                await (await import("../helper/tokenStorage")).storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -161,7 +159,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<VerifyOtpCodeResponse> = await axiosInstance.post(baseUrl + verifyOtpCode(), body);
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {

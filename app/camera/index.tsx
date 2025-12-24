@@ -1,3 +1,4 @@
+import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -22,27 +23,7 @@ const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "off", icon: "bolt.slash", label: "Off" },
 ];
 
-// Ghost items mapping - using PNG (renamed files without spaces)
-const GHOST_ITEMS_MAP: Record<string, any> = {
-    face: require("@/assets/gost/Face.png"),
-    faceTurnRight: require("@/assets/gost/Face-turn_right.png"),
-    faceTurnLeft: require("@/assets/gost/Face-turn_left.png"),
-    faceDown: require("@/assets/gost/Face-down.png"),
-    faceRightSide: require("@/assets/gost/Face-_right_side.png"),
-    faceLeftSide: require("@/assets/gost/Face-_left_side.png"),
-    upperTeethFront: require("@/assets/gost/upper_teeth-close_up-front.png"),
-    upperTeethRightSide: require("@/assets/gost/upper_teeth-close_up-_right_side.png"),
-    upperTeethLeftSide: require("@/assets/gost/upper_teeth-close_up-_left_side.png"),
-    upperJawDownView: require("@/assets/gost/upper_jaw_teeth-_down_view.png"),
-    lowerJawUpView: require("@/assets/gost/lower_jaw_teeth-_up_view.png"),
-    allTeethOpenRightSide: require("@/assets/gost/all_teeth-open_right_side.png"),
-    allTeethOpenMouthLeftSide: require("@/assets/gost/all_teeth-open_mouth-left_side.png"),
-    allTeethOpenLeftSide: require("@/assets/gost/all_teeth-open_left_side.png"),
-    allTeethFrontOpen: require("@/assets/gost/all_teeth-front_-_open.png"),
-    allTeethFrontClosed: require("@/assets/gost/all_teeth-front_-_closed.png"),
-    allTeethOpenMouthFront: require("@/assets/gost/all_teeth_open_mouth-front.png"),
-    allTeethOpenMouthRightSide: require("@/assets/gost/all_teeth-open_mouth-right_side.png"),
-};
+const GHOST_ITEMS_MAP = GHOST_ASSETS;
 
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
@@ -59,7 +40,18 @@ export default function CameraScreen() {
     }>();
 
     // Parse ghost items from params
-    const ghostItemIds: string[] = ghostItems ? JSON.parse(ghostItems) : [];
+    const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
+
+    const ghostItemIds: GhostItemId[] = React.useMemo(() => {
+        if (!ghostItems) return [];
+        try {
+            const parsed = JSON.parse(ghostItems);
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(isGhostItemId);
+        } catch {
+            return [];
+        }
+    }, [ghostItems]);
     const hasGhostItems = ghostItemIds.length > 0;
 
     const [cameraState, setCameraState] = useState<CameraState>({
@@ -98,7 +90,6 @@ export default function CameraScreen() {
             face: "Face Template",
             faceTurnRight: "Face Turn Right Template",
             faceTurnLeft: "Face Turn Left Template",
-            faceDown: "Face Down Template",
             faceRightSide: "Face Right Side Template",
             faceLeftSide: "Face Left Side Template",
             upperTeethFront: "Upper Teeth Front Template",

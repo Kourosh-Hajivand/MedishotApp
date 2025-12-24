@@ -6,33 +6,12 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutPattern } from "./create-template/types";
 import { getItemLayoutStyle } from "./create-template/utils";
-
-// Ghost items mapping - using PNG (renamed files without spaces)
-const GHOST_IMAGES: Record<string, any> = {
-    face: require("@/assets/gost/Face.png"),
-    faceTurnRight: require("@/assets/gost/Face-turn_right.png"),
-    faceTurnLeft: require("@/assets/gost/Face-turn_left.png"),
-    faceDown: require("@/assets/gost/Face-down.png"),
-    faceRightSide: require("@/assets/gost/Face-_right_side.png"),
-    faceLeftSide: require("@/assets/gost/Face-_left_side.png"),
-    upperTeethFront: require("@/assets/gost/upper_teeth-close_up-front.png"),
-    upperTeethRightSide: require("@/assets/gost/upper_teeth-close_up-_right_side.png"),
-    upperTeethLeftSide: require("@/assets/gost/upper_teeth-close_up-_left_side.png"),
-    upperJawDownView: require("@/assets/gost/upper_jaw_teeth-_down_view.png"),
-    lowerJawUpView: require("@/assets/gost/lower_jaw_teeth-_up_view.png"),
-    allTeethOpenRightSide: require("@/assets/gost/all_teeth-open_right_side.png"),
-    allTeethOpenMouthLeftSide: require("@/assets/gost/all_teeth-open_mouth-left_side.png"),
-    allTeethOpenLeftSide: require("@/assets/gost/all_teeth-open_left_side.png"),
-    allTeethFrontOpen: require("@/assets/gost/all_teeth-front_-_open.png"),
-    allTeethFrontClosed: require("@/assets/gost/all_teeth-front_-_closed.png"),
-    allTeethOpenMouthFront: require("@/assets/gost/all_teeth_open_mouth-front.png"),
-    allTeethOpenMouthRightSide: require("@/assets/gost/all_teeth-open_mouth-right_side.png"),
-};
+import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
 
 const { width } = Dimensions.get("window");
 const TEMPLATE_SIZE = (width - 60) / 2;
@@ -87,8 +66,8 @@ export default function TemplateSelectScreen() {
         {
             id: "template-face-angles",
             name: "Face Angles",
-            ghostItems: ["face", "faceTurnRight", "faceTurnLeft", "faceDown"],
-            previewCount: 4,
+            ghostItems: ["face", "faceTurnRight", "faceTurnLeft"],
+            previewCount: 3,
             layoutPattern: "grid-2x2",
         },
         {
@@ -189,7 +168,11 @@ export default function TemplateSelectScreen() {
                                 const layoutStyle = getItemLayoutStyle(idx, item.ghostItems.length, layoutPattern, TEMPLATE_SIZE);
                                 return (
                                     <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
-                                        {GHOST_IMAGES[ghostId] ? <Image source={GHOST_IMAGES[ghostId]} style={styles.templatePreviewImage} contentFit="contain" /> : <IconSymbol name="photo" size={32} color={colors.labels.secondary} />}
+                                        {GHOST_ASSETS[ghostId as keyof typeof GHOST_ASSETS] ? (
+                                            <Image source={GHOST_ASSETS[ghostId as keyof typeof GHOST_ASSETS]} style={styles.templatePreviewImage} contentFit="contain" />
+                                        ) : (
+                                            <IconSymbol name="photo" size={32} color={colors.labels.secondary} />
+                                        )}
                                     </Animated.View>
                                 );
                             })}
@@ -218,15 +201,57 @@ export default function TemplateSelectScreen() {
             </View>
 
             {/* Templates Grid */}
-            <FlatList
-                data={[...customTemplates, ...STATIC_TEMPLATES]} // Custom templates first
-                renderItem={renderTemplateItem}
-                keyExtractor={(item) => item.id}
-                numColumns={2}
-                contentContainerStyle={styles.templatesGrid}
-                showsVerticalScrollIndicator={false}
-                columnWrapperStyle={styles.templateRow}
-            />
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Custom Templates Section */}
+                {customTemplates.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeaderFirst}>
+                            <BaseText type="Headline" weight={600} color="labels.primary">
+                                Custom Templates
+                            </BaseText>
+                        </View>
+                        <View style={styles.templatesGrid}>
+                            {customTemplates
+                                .reduce((rows: TemplateType[][], item, index) => {
+                                    if (index % 2 === 0) {
+                                        rows.push([item]);
+                                    } else {
+                                        rows[rows.length - 1].push(item);
+                                    }
+                                    return rows;
+                                }, [])
+                                .map((row, rowIndex) => (
+                                    <View key={`custom-row-${rowIndex}`} style={styles.templateRow}>
+                                        {row.map((item, itemIndex) => renderTemplateItem({ item, index: rowIndex * 2 + itemIndex }))}
+                                        {row.length === 1 && <View style={styles.templateCard} />}
+                                    </View>
+                                ))}
+                        </View>
+                    </>
+                )}
+
+                {/* Ready Templates Section */}
+                <View style={styles.sectionHeader}>
+                    <BaseText type="Headline" weight={600} color="labels.primary">
+                        Ready Templates
+                    </BaseText>
+                </View>
+                <View style={styles.templatesGrid}>
+                    {STATIC_TEMPLATES.reduce((rows: TemplateType[][], item, index) => {
+                        if (index % 2 === 0) {
+                            rows.push([item]);
+                        } else {
+                            rows[rows.length - 1].push(item);
+                        }
+                        return rows;
+                    }, []).map((row, rowIndex) => (
+                        <View key={`static-row-${rowIndex}`} style={styles.templateRow}>
+                            {row.map((item, itemIndex) => renderTemplateItem({ item, index: customTemplates.length + rowIndex * 2 + itemIndex }))}
+                            {row.length === 1 && <View style={styles.templateCard} />}
+                        </View>
+                    ))}
+                </View>
+            </ScrollView>
 
             {/* Continue Button */}
             <View style={[styles.footer, { paddingBottom: insets.bottom }]}>
@@ -268,12 +293,33 @@ const styles = StyleSheet.create({
         width: 120,
         alignItems: "flex-end",
     },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 20,
+    },
     templatesGrid: {
-        padding: 20,
+        paddingHorizontal: 20,
+        paddingTop: 0,
+        paddingBottom: 0,
+    },
+    sectionHeader: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginTop: 8,
+        marginBottom: 8,
+    },
+    sectionHeaderFirst: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        marginTop: 0,
+        marginBottom: 8,
     },
     templateRow: {
+        flexDirection: "row",
         justifyContent: "space-between",
-        gap: 12,
+        gap: 10,
         marginBottom: 16,
     },
     templateCard: {

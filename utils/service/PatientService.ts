@@ -119,8 +119,10 @@ const PatientService = {
                 });
             }
 
-            if (payload.image) {
-                formData.append("image", payload.image);
+            // OpenAPI expects `profile` - keep backward compatibility with `image`
+            const profile = payload.profile ?? payload.image;
+            if (profile) {
+                formData.append("profile", profile);
             }
 
             if (payload.id_card) {
@@ -209,15 +211,18 @@ const PatientService = {
                 });
             }
 
-            if (payload.image) {
-                formData.append("image", payload.image);
+            // OpenAPI expects `profile` - keep backward compatibility with `image`
+            const profile = payload.profile ?? payload.image;
+            if (profile) {
+                formData.append("profile", profile);
             }
 
             if (payload.id_card) {
                 formData.append("id_card", payload.id_card);
             }
 
-            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.put(baseUrl + update(patientId), formData, {
+            // OpenAPI: POST /patients/{patient}/update
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + update(patientId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;

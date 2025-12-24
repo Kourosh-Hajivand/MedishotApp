@@ -1,62 +1,47 @@
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
-import colors from "@/theme/colors";
+import themeColors from "@/theme/colors";
 import { useGetPracticeList } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { People } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host, Image, Switch } from "@expo/ui/swift-ui";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useNavigation } from "expo-router";
-import { SymbolViewProps } from "expo-symbols";
-import React, { ComponentProps, useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const profileIcons = {
-    practiceOverview: require("../../assets/icons/profile/Practice Overview.png"),
-    practiceTeam: require("../../assets/icons/profile/Practice Team.png"),
-    printInformation: require("../../assets/icons/profile/Print Information.png"),
-    subscription: require("../../assets/icons/profile/Subscription.png"),
-    notification: require("../../assets/icons/profile/Notfication.png"),
-};
-type IconMapping = Record<SymbolViewProps["name"], ComponentProps<typeof MaterialIcons>["name"]>;
-type IconSymbolName = keyof typeof MAPPING;
-const MAPPING = {
-    "house.fill": "home",
-    "paperplane.fill": "send",
-    "chevron.left.forwardslash.chevron.right": "code",
-    "chevron.right": "chevron-right",
-} as IconMapping;
-
-export default function index() {
+type IconSymbolName = "person.circle.fill" | "chart.bar.xaxis" | "person.2.fill" | "printer.fill" | "dollarsign.circle.fill" | "bell.fill" | "tray.fill";
+export default function Index() {
     const insets = useSafeAreaInsets();
     const { profile, isAuthenticated, logout: handleLogout } = useAuth();
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
-    const { setSettingView, settingView } = useProfileStore();
-    console.log("====================================");
-    console.log("profile", profile);
-    console.log("settingView", settingView);
-    console.log("====================================");
+    const { setSelectedPractice, selectedPractice } = useProfileStore();
+    console.log(practiceList?.data.map((practice) => practice.role));
+
     const navigation = useNavigation();
 
-    const handleEditPress = () => {
-        if (settingView.type === "profile" && profile) {
-            router.push({
-                pathname: "/(modals)/edit-profile",
-                params: { profile: JSON.stringify(profile) },
-            });
-        } else if (settingView.type === "practice" && settingView.practice?.role === "owner" && settingView.practice) {
+    // Force view to "practice" (no switching back to own profile)
+    useEffect(() => {
+        const firstPractice = practiceList?.data?.[0];
+        if (!firstPractice) return;
+
+        if (!selectedPractice) {
+            setSelectedPractice(firstPractice);
+        }
+    }, [practiceList?.data, selectedPractice, setSelectedPractice]);
+
+    const handleEditPress = React.useCallback(() => {
+        if (selectedPractice?.role === "owner" && selectedPractice) {
             router.push({
                 pathname: "/(modals)/edit-practice",
-                params: { practice: JSON.stringify(settingView.practice) },
+                params: { practice: JSON.stringify(selectedPractice) },
             });
         }
-    };
+    }, [selectedPractice]);
 
     // Check if edit button should be shown
-    const canEdit = settingView.type === "profile" || (settingView.type === "practice" && settingView.practice?.role === "owner");
+    const canEdit = selectedPractice?.role === "owner";
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -69,7 +54,7 @@ export default function index() {
                             </Button>
                             {canEdit && (
                                 <Button systemImage="square.and.pencil" onPress={handleEditPress}>
-                                    Edit {settingView.type === "profile" ? "Profile" : "Practice"}
+                                    Edit Practice
                                 </Button>
                             )}
                             <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
@@ -88,8 +73,9 @@ export default function index() {
                 </Host>
             ),
         });
-    }, [navigation, handleLogout, settingView, canEdit, handleEditPress]);
+    }, [navigation, handleLogout, selectedPractice, canEdit, handleEditPress]);
     const menuItems: { lable: string; icon: IconSymbolName; href: string }[] = [
+        { lable: "Personal Profile", icon: "person.circle.fill", href: "/profile-detail" },
         { lable: "Practice Overview", icon: "chart.bar.xaxis", href: "/practice-overview" },
         { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team" },
         { lable: "Print Information", icon: "printer.fill", href: "/print-information" },
@@ -99,74 +85,88 @@ export default function index() {
     ];
 
     return (
-        <View className="flex-1 bg-white px-4" style={{ paddingTop: insets.top + 100 }}>
-            <Host style={{ width: "100%", height: 68 }}>
-                <ContextMenu activationMethod="longPress">
-                    <ContextMenu.Items>
-                        <Switch
-                            label={"View as " + profile?.first_name + " " + profile?.last_name}
-                            variant="switch"
-                            value={settingView.type === "profile" && settingView.profile?.id === profile?.id}
-                            onValueChange={() => {
-                                setSettingView({ type: "profile", profile: profile as People });
-                            }}
-                        />
-                        {practiceList?.data.map((practice, index) => (
-                            <Switch
-                                key={index}
-                                label={"View as " + practice.name}
-                                variant="switch"
-                                value={settingView.type === "practice" && settingView.practice?.id === practice.id}
-                                onValueChange={() => {
-                                    setSettingView({ type: "practice", practice: practice });
+        <View className="flex-1 bg-white  gap-4" style={{ paddingTop: insets.top + 110 }}>
+            <View className="px-4">
+                <Host style={{ width: "100%", height: 68 }}>
+                    <ContextMenu activationMethod="longPress">
+                        <ContextMenu.Items>
+                            {practiceList?.data.map((practice) => (
+                                <Switch
+                                    key={practice.id}
+                                    label={practice.name}
+                                    color="red"
+                                    variant="switch"
+                                    value={selectedPractice?.id === practice.id}
+                                    onValueChange={() => {
+                                        setSelectedPractice(practice);
+                                    }}
+                                />
+                            ))}
+                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>
+                                Create a Practice
+                            </Button>
+                        </ContextMenu.Items>
+
+                        <ContextMenu.Trigger>
+                            <TouchableOpacity
+                                disabled={!(selectedPractice?.role === "owner")}
+                                className="w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] rounded-[12px]"
+                                onPress={() => {
+                                    if (selectedPractice?.role === "owner") {
+                                        router.push("/(profile)/practice-detail");
+                                    }
                                 }}
-                            />
-                        ))}
-                    </ContextMenu.Items>
-
-                    <ContextMenu.Trigger>
-                        <TouchableOpacity className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] ${settingView.type === "profile" ? "rounded-full" : "rounded-[12px]"}`} onPress={() => router.push("/(profile)/profile-detail")}>
-                            <View className="flex-row items-center gap-2">
-                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} />
-                                <View className="flex-1 ">
-                                    <BaseText type="Title3" weight="500" color="system.black">
-                                        {settingView.type === "profile" ? profile?.first_name + " " + profile?.last_name : settingView.practice?.name}
-                                    </BaseText>
-                                    <BaseText type="Callout" weight="400" color="labels.secondary" className="capitalize">
-                                        {settingView.type}
-                                    </BaseText>
+                            >
+                                <View className="flex-row items-center gap-2">
+                                    <Avatar size={60} rounded={8} name={selectedPractice?.name ?? ""} imageUrl={selectedPractice?.image?.url} />
+                                    <View className="flex-1 ">
+                                        <BaseText type="Title3" weight="500" color="system.black" lineBreakMode="tail" numberOfLines={1}>
+                                            {selectedPractice?.name ?? ""}
+                                        </BaseText>
+                                        <BaseText type="Callout" weight="400" color="labels.secondary" className="capitalize">
+                                            {selectedPractice?.role === "owner" ? "Owner" : "Member"}
+                                        </BaseText>
+                                    </View>
                                 </View>
-                            </View>
-                            <View className="flex-1">
-                                <IconSymbol name="chevron.up.chevron.down" size={14} color={colors.labels.secondary} />
-                            </View>
-                        </TouchableOpacity>
-                    </ContextMenu.Trigger>
-                </ContextMenu>
-            </Host>
+                                <View className="flex-1">
+                                    <IconSymbol name="chevron.up.chevron.down" size={14} color={themeColors.labels.secondary} />
+                                </View>
+                            </TouchableOpacity>
+                        </ContextMenu.Trigger>
+                    </ContextMenu>
+                </Host>
+            </View>
 
-            <View className="w-full">
-                {menuItems.map((item, index) => (
-                    <TouchableOpacity
-                        key={index}
-                        onPress={() => router.push(item.href as any)}
-                        className="flex-row items-center justify-between py-4 pr-4 pl-2"
-                        style={{
-                            borderBottomWidth: index !== menuItems.length - 1 ? 0.5 : 0,
-                            borderBottomColor: colors.system.gray5,
-                        }}
-                    >
-                        <View className="flex-row items-center gap-3">
-                            <View className="p-1 bg-system-blue rounded">
-                                <IconSymbol name={item.icon as any} size={18} color={colors.system.white} />
+            <View className="w-full pt-0 border-t border-border">
+                <View className="px-4">
+                    {menuItems.map((item, index) => (
+                        <TouchableOpacity
+                            key={index}
+                            onPress={() => router.push(item.href as any)}
+                            className="flex-row items-center justify-between py-5 pr-4 pl-2"
+                            style={{
+                                borderBottomWidth: index !== menuItems.length - 1 ? 0.5 : 0,
+                                borderBottomColor: themeColors.system.gray5,
+                            }}
+                        >
+                            <View className="flex-row items-center gap-3">
+                                <View className="p-1 bg-system-blue rounded-md" style={{ position: "relative" }}>
+                                    {/* Shadow clone (reliable cross-platform shadow for the glyph itself) */}
+                                    <View style={{ position: "absolute", left: 3.5, top: 5 }}>
+                                        <IconSymbol name={item.icon as any} size={18} color={"rgba(0,0,0,0.25)"} />
+                                    </View>
+
+                                    {/* Main icon */}
+                                    <IconSymbol name={item.icon as any} size={18} color={themeColors.system.white} />
+                                </View>
+                                <BaseText type="Body" weight="400" color="system.black">
+                                    {item.lable}
+                                </BaseText>
                             </View>
-                            <BaseText type="Body" weight="400" color="system.black">
-                                {item.lable}
-                            </BaseText>
-                        </View>
-                        <IconSymbol name="chevron.right" size={14} color={colors.labels.secondary} />
-                    </TouchableOpacity>
-                ))}
+                            <IconSymbol name="chevron.right" size={14} color={themeColors.labels.secondary} />
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
         </View>
     );

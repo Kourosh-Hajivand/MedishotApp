@@ -73,7 +73,8 @@ export const routes = {
         create: (practiseId: string | number) => `${practiseId}/patients`,
 
         getById: (patientId: string | number) => `patients/${patientId}`,
-        update: (patientId: string | number) => `patients/${patientId}`,
+        // OpenAPI: POST /patients/{patient}/update (multipart/form-data)
+        update: (patientId: string | number) => `patients/${patientId}/update`,
         delete: (patientId: string | number) => `patients/${patientId}`,
 
         // Media

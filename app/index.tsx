@@ -11,8 +11,8 @@ export default function IndexRoute() {
     const { isAuthenticated, profile, isProfileLoading } = useAuth();
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const [shouldRedirectToWelcome, setShouldRedirectToWelcome] = useState(false);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const profileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const profileTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Timeout برای جلوگیری از ماندن در initial loading state
     useEffect(() => {

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function PracticeOverviewScreen() {
     const insets = useSafeAreaInsets();
-    const { settingView } = useProfileStore();
+    const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
     const [isExpanded, setIsExpanded] = useState(true);
     const tabs = ["Overview", "Team", "Activities"];
@@ -32,13 +32,13 @@ export default function PracticeOverviewScreen() {
                     <TouchableOpacity onPress={() => setIsExpanded(!isExpanded)} activeOpacity={0.7} className="flex items-center justify-between ">
                         <View className="flex-row items-center justify-between p-2 pr-4">
                             <View className="flex-row items-center gap-2 flex-1">
-                                <Avatar size={54} rounded={settingView.type === "profile" ? 99 : 8} name={profile?.first_name ?? ""} />
+                                <Avatar size={54} rounded={8} name={selectedPractice?.name ?? ""} imageUrl={selectedPractice?.image?.url} />
                                 <View className="flex-1">
                                     <BaseText type="Title3" weight="400" color="system.black">
-                                        {settingView.type === "profile" ? profile?.first_name + " " + profile?.last_name : settingView.type === "practice" ? settingView.practice?.name : ""}
+                                        {selectedPractice?.name ?? ""}
                                     </BaseText>
                                     <BaseText type="Callout" weight="400" color="labels.secondary" className="capitalize">
-                                        {settingView.type}
+                                        Practice
                                     </BaseText>
                                 </View>
                             </View>
@@ -54,7 +54,7 @@ export default function PracticeOverviewScreen() {
                                             owner:{" "}
                                         </BaseText>
                                         <BaseText type="Callout" weight="400" color="labels.primary" className="capitalize">
-                                            {settingView.type === "practice" ? settingView.practice?.created_by?.first_name + " " + settingView.practice?.created_by?.last_name : ""}
+                                            {selectedPractice?.created_by?.first_name + " " + selectedPractice?.created_by?.last_name}
                                         </BaseText>
                                     </View>
                                     <View>
@@ -62,7 +62,7 @@ export default function PracticeOverviewScreen() {
                                             subscription plan:{" "}
                                         </BaseText>
                                         <BaseText type="Callout" weight="400" color="labels.primary" className="capitalize">
-                                            {settingView.type === "practice" ? settingView.practice?.role : ""}
+                                            {selectedPractice?.role ?? ""}
                                         </BaseText>
                                     </View>
                                 </View>
@@ -72,7 +72,7 @@ export default function PracticeOverviewScreen() {
                                             date created:{" "}
                                         </BaseText>
                                         <BaseText type="Callout" weight="400" color="labels.primary">
-                                            {settingView.type === "practice" && settingView.practice?.created_at ? formatDate(settingView.practice.created_at) : ""}
+                                            {selectedPractice?.created_at ? formatDate(selectedPractice.created_at) : ""}
                                         </BaseText>
                                     </View>
                                     <View>
@@ -80,7 +80,7 @@ export default function PracticeOverviewScreen() {
                                             total patient:{" "}
                                         </BaseText>
                                         <BaseText type="Callout" weight="400" color="labels.primary">
-                                            {settingView.type === "practice" ? (settingView.practice?.patients_count ?? 0) : ""}
+                                            {selectedPractice?.patients_count ?? 0}
                                         </BaseText>
                                     </View>
                                 </View>
