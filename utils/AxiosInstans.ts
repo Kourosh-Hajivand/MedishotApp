@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getTokens, removeTokens } from "./helper/tokenStorage";
+import { storeFailedRequest } from "./helper/failedRequestStorage";
 import { AuthService } from "./service/AuthService";
 
 import { router } from "expo-router";
@@ -9,6 +10,9 @@ const axiosInstance = axios.create({
     baseURL: routes.baseUrl,
     timeout: 30000, // 30 ثانیه timeout برای تمام requests
 });
+
+// Flag to prevent multiple redirects to error page
+let isRedirectingToError = false;
 
 axiosInstance.interceptors.request.use(async (config) => {
     const tokens = await getTokens();
@@ -21,6 +25,8 @@ axiosInstance.interceptors.request.use(async (config) => {
 
 axiosInstance.interceptors.response.use(
     (response) => {
+        // Reset redirect flag on successful response
+        isRedirectingToError = false;
         return response;
     },
     async (error) => {
@@ -28,15 +34,66 @@ axiosInstance.interceptors.response.use(
 
         // Log detailed error information
         if (error.response) {
-            console.error("Axios Error Response:", {
+            const requestUrl = error.config?.url || "Unknown";
+            const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
+            const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
+            
+            console.error("🚨 Axios Error Response:", {
                 status: error.response.status,
+                method: requestMethod,
+                url: fullUrl,
+                endpoint: requestUrl,
                 data: error.response.data,
                 headers: error.response.headers,
             });
+            
+            // Log a more readable error message
+            console.error(`❌ API Error [${requestMethod}] ${fullUrl}:`, error.response.data?.message || error.response.data?.exception || "Unknown error");
         } else if (error.request) {
-            console.error("Axios Error Request:", error.request);
+            const requestUrl = error.config?.url || "Unknown";
+            const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
+            const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
+            
+            console.error("🚨 Axios Error Request (No Response):", {
+                method: requestMethod,
+                url: fullUrl,
+                endpoint: requestUrl,
+            });
         } else {
-            console.error("Axios Error Message:", error.message);
+            console.error("🚨 Axios Error Message:", error.message);
+        }
+
+        // Handle 500 Internal Server Error
+        if (error.response?.status === 500 && !isRedirectingToError) {
+            isRedirectingToError = true;
+            console.warn("Server error (500) detected, redirecting to error page...");
+            
+            // Store failed request for retry
+            if (originalRequest) {
+                const failedRequest = {
+                    url: originalRequest.url || "",
+                    method: (originalRequest.method || "GET").toUpperCase(),
+                    baseURL: originalRequest.baseURL,
+                    data: originalRequest.data,
+                    params: originalRequest.params,
+                    headers: originalRequest.headers as Record<string, string>,
+                };
+                await storeFailedRequest(failedRequest);
+            }
+            
+            // Navigate to error page
+            try {
+                router.replace("/error");
+            } catch (navError) {
+                console.error("Failed to navigate to error page:", navError);
+            }
+            
+            // Reset flag after a delay to allow retry
+            setTimeout(() => {
+                isRedirectingToError = false;
+            }, 2000);
+            
+            throw error;
         }
 
         // Handle 401 Unauthorized errors

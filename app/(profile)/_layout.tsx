@@ -48,6 +48,7 @@ export default function layout() {
             <Stack.Screen
                 name="subscription"
                 options={{
+                    headerLargeTitle: false,
                     headerTitle: "Subscription",
                 }}
             />
