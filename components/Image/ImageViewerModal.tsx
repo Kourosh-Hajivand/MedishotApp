@@ -27,21 +27,43 @@ interface ThumbnailItemProps {
     index: number;
     isActive: boolean;
     onPress: () => void;
+    scrollProgress: ReturnType<typeof useSharedValue<number>>;
+    currentIndexShared: ReturnType<typeof useSharedValue<number>>; // Shared value for worklet access
 }
 
-const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, isActive, onPress }) => {
-    const thumbnailWidth = useSharedValue(isActive ? 50 : 30);
-    const thumbnailMargin = useSharedValue(isActive ? 4 : 0);
+const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive, onPress, scrollProgress, currentIndexShared }) => {
+    const animatedThumbnailStyle = useAnimatedStyle(() => {
+        // Calculate active progress based on current index and scroll progress
+        const currentIdx = currentIndexShared.value;
+        const distance = index - currentIdx;
+        const progress = scrollProgress.value;
 
-    React.useEffect(() => {
-        thumbnailWidth.value = withTiming(isActive ? 50 : 30, { duration: 250 });
-        thumbnailMargin.value = withTiming(isActive ? 4 : 0, { duration: 250 });
-    }, [isActive]);
+        let activeProgress = 0; // 0 = inactive, 1 = fully active
 
-    const animatedThumbnailStyle = useAnimatedStyle(() => ({
-        width: thumbnailWidth.value,
-        marginHorizontal: thumbnailMargin.value,
-    }));
+        if (distance === 0) {
+            // Current thumbnail - becomes less active as we drag away
+            activeProgress = 1 - Math.abs(progress);
+        } else if (distance === 1 && progress > 0) {
+            // Next thumbnail (index = currentIdx + 1) - becomes active when dragging right
+            activeProgress = progress;
+        } else if (distance === -1 && progress < 0) {
+            // Previous thumbnail (index = currentIdx - 1) - becomes active when dragging left
+            activeProgress = Math.abs(progress);
+        }
+
+        // Clamp activeProgress between 0 and 1
+        activeProgress = Math.max(0, Math.min(1, activeProgress));
+
+        // Interpolate width: 30 (inactive) -> 50 (active)
+        const width = 30 + activeProgress * 20;
+        // Interpolate margin: 0 (inactive) -> 4 (active)
+        const margin = activeProgress * 4;
+
+        return {
+            width: width,
+            marginHorizontal: margin,
+        };
+    });
 
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
@@ -70,6 +92,94 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const savedScale = useSharedValue(1);
     const savedTranslateX = useSharedValue(0);
     const savedTranslateY = useSharedValue(0);
+    const scrollProgress = useSharedValue(0); // Progress of swipe: -1 to 1 (left to right)
+    const currentIndexShared = useSharedValue(initialIndex); // Shared value for current index
+
+    const scrollThumbnailToPosition = React.useCallback(
+        (currentPage: number, animated: boolean = false) => {
+            if (thumbnailScrollRef.current) {
+                isThumbnailProgrammaticScroll.current = true;
+                const activeThumbnailWidth = 50;
+                const inactiveThumbnailWidth = 30;
+                const thumbnailGap = 4;
+                const activeThumbnailMargin = 4;
+                const padding = width / 2 - 25;
+
+                // Calculate which thumbnail is currently active (rounded)
+                const roundedIndex = Math.round(currentPage);
+                const fromIndex = Math.floor(currentPage);
+                const toIndex = Math.min(Math.ceil(currentPage), images.length - 1);
+                const progress = currentPage - fromIndex;
+
+                // Calculate center position for each thumbnail index
+                const getThumbnailCenter = (idx: number, isActive: boolean) => {
+                    let position = padding;
+                    for (let i = 0; i < idx; i++) {
+                        const prevIsActive = i === roundedIndex;
+                        const prevMargin = prevIsActive ? activeThumbnailMargin : 0;
+                        const prevWidth = prevIsActive ? activeThumbnailWidth : inactiveThumbnailWidth;
+                        position += prevMargin + prevWidth + prevMargin + thumbnailGap;
+                    }
+                    const thumbMargin = isActive ? activeThumbnailMargin : 0;
+                    const thumbWidth = isActive ? activeThumbnailWidth : inactiveThumbnailWidth;
+                    position += thumbMargin + thumbWidth / 2;
+                    return position;
+                };
+
+                // Interpolate between two adjacent thumbnails
+
+                const fromPosition = getThumbnailCenter(fromIndex, fromIndex === roundedIndex);
+                const toPosition = fromIndex === toIndex ? fromPosition : getThumbnailCenter(toIndex, toIndex === roundedIndex);
+
+                // Interpolate smoothly between positions
+                const thumbnailCenterPosition = fromPosition + (toPosition - fromPosition) * progress;
+
+                // Calculate scroll position to center the thumbnail
+                const scrollPosition = thumbnailCenterPosition - width / 2;
+
+                // Calculate total width for max scroll
+                let totalWidth = padding;
+                for (let i = 0; i < images.length; i++) {
+                    if (i === Math.round(currentPage)) {
+                        totalWidth += activeThumbnailMargin + activeThumbnailWidth + activeThumbnailMargin + thumbnailGap;
+                    } else {
+                        totalWidth += inactiveThumbnailWidth + thumbnailGap;
+                    }
+                }
+                totalWidth -= thumbnailGap;
+                totalWidth += padding;
+                const maxScroll = Math.max(0, totalWidth - width);
+
+                thumbnailScrollRef.current.scrollTo({
+                    x: Math.max(0, Math.min(scrollPosition, maxScroll)),
+                    animated,
+                });
+
+                if (animated) {
+                    setTimeout(() => {
+                        isThumbnailProgrammaticScroll.current = false;
+                    }, 300);
+                } else {
+                    setTimeout(() => {
+                        isThumbnailProgrammaticScroll.current = false;
+                    }, 50);
+                }
+            }
+        },
+        [images.length],
+    );
+
+    const scrollThumbnailToIndex = React.useCallback(
+        (index: number, animated: boolean = true) => {
+            scrollThumbnailToPosition(index, animated);
+        },
+        [scrollThumbnailToPosition],
+    );
+
+    // Keep currentIndexShared in sync with currentIndex
+    React.useEffect(() => {
+        currentIndexShared.value = currentIndex;
+    }, [currentIndex]);
 
     // Reset zoom when changing images and scroll thumbnail
     React.useEffect(() => {
@@ -81,60 +191,34 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         // Scroll thumbnail to center current image - iOS-like smooth behavior
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                if (thumbnailScrollRef.current) {
-                    isThumbnailProgrammaticScroll.current = true;
-                    const activeThumbnailWidth = 50;
-                    const inactiveThumbnailWidth = 30;
-                    const thumbnailGap = 4;
-                    const activeThumbnailMargin = 4;
-                    const padding = width / 2 - 25; // Left padding
-
-                    // Calculate position of active thumbnail center
-                    let thumbnailCenterPosition = padding;
-                    for (let i = 0; i < currentIndex; i++) {
-                        thumbnailCenterPosition += inactiveThumbnailWidth + thumbnailGap;
-                    }
-                    // Add left margin and half width for active thumbnail
-                    thumbnailCenterPosition += activeThumbnailMargin + activeThumbnailWidth / 2;
-
-                    // Calculate scroll position to center the thumbnail
-                    // We want: scrollPosition + width/2 = thumbnailCenterPosition
-                    const scrollPosition = thumbnailCenterPosition - width / 2;
-
-                    // Calculate total width for max scroll
-                    let totalWidth = padding;
-                    for (let i = 0; i < images.length; i++) {
-                        if (i === currentIndex) {
-                            totalWidth += activeThumbnailMargin + activeThumbnailWidth + activeThumbnailMargin + thumbnailGap;
-                        } else {
-                            totalWidth += inactiveThumbnailWidth + thumbnailGap;
-                        }
-                    }
-                    totalWidth -= thumbnailGap; // Remove last gap
-                    totalWidth += padding; // Add right padding
-                    const maxScroll = Math.max(0, totalWidth - width);
-
-                    thumbnailScrollRef.current.scrollTo({
-                        x: Math.max(0, Math.min(scrollPosition, maxScroll)),
-                        animated: true,
-                    });
-                    // Reset flag after animation
-                    setTimeout(() => {
-                        isThumbnailProgrammaticScroll.current = false;
-                    }, 300);
-                }
+                scrollThumbnailToIndex(currentIndex, true);
             });
         });
-    }, [currentIndex]);
+    }, [currentIndex, scrollThumbnailToIndex]);
 
     const handleScroll = (event: any) => {
         // Don't update index if scroll is programmatic (from thumbnail click)
-        // We only update on momentum scroll end to prevent intermediate index changes
         if (isProgrammaticScroll.current) {
+            scrollProgress.value = 0;
             return;
         }
-        // Don't update index during scroll - let momentum scroll end handle it
-        // This prevents thumbnail from changing one by one when clicking
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const currentPage = offsetX / width;
+        const index = Math.round(currentPage);
+
+        // Calculate scroll progress: -1 (swiping left) to 1 (swiping right)
+        const progress = currentPage - index;
+        scrollProgress.value = progress;
+
+        // Update currentIndexShared to current rounded index
+        // ThumbnailItem will calculate which thumbnail should be active based on progress
+        currentIndexShared.value = index;
+
+        // Smoothly scroll thumbnail gallery to match exact current position (including fractional part)
+        // This creates perfectly smooth animation during drag
+        if (currentPage >= 0 && currentPage < images.length) {
+            scrollThumbnailToPosition(currentPage, false);
+        }
     };
 
     const handleThumbnailScroll = (event: any) => {
@@ -185,8 +269,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const handleMomentumScrollEnd = (event: any) => {
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / width);
+        scrollProgress.value = withTiming(0, { duration: 200 }); // Smoothly reset progress
+
         if (index !== currentIndex && index >= 0 && index < images.length) {
             setCurrentIndex(index);
+            currentIndexShared.value = index;
+            // Smoothly scroll thumbnail gallery to final position
+            scrollThumbnailToIndex(index, true);
+        } else if (index === currentIndex) {
+            // Even if index didn't change, ensure thumbnail is centered
+            scrollThumbnailToIndex(index, true);
         }
     };
 
@@ -474,8 +566,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         imageUri={imageUri}
                                         index={index}
                                         isActive={index === currentIndex}
+                                        currentIndexShared={currentIndexShared}
+                                        scrollProgress={scrollProgress}
                                         onPress={() => {
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            scrollProgress.value = 0;
                                             isProgrammaticScroll.current = true;
                                             setCurrentIndex(index);
                                             flatListRef.current?.scrollToIndex({ index, animated: true });
