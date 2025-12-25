@@ -1,4 +1,5 @@
 import { BaseButton, BaseText } from "@/components";
+import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
@@ -15,6 +16,9 @@ export default function SubscriptionScreen() {
     const { data: plansData, isLoading: isLoadingPlans } = useGetPlans(!!selectedPractice?.id);
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
+    console.log("====================================");
+    console.log(plansData);
+    console.log("====================================");
     // Calculate days remaining
     const daysRemaining = useMemo(() => {
         if (!subscriptionData?.data?.ends_at) return null;
@@ -36,44 +40,68 @@ export default function SubscriptionScreen() {
         return colors.system.blue;
     };
 
-    // Format price
-    const formatPrice = (price: number, currency: string = "USD", interval: "month" | "year") => {
-        const symbol = currency === "USD" ? "$" : currency;
-        if (interval === "year") {
-            return `${symbol}${price}`;
+    // Format price - display exactly as received from API
+    const formatPrice = (price: string | number, currency: string = "usd", billingInterval: string) => {
+        const priceNum = typeof price === "string" ? parseFloat(price) : price;
+        const symbol = currency.toLowerCase() === "usd" ? "$" : currency.toUpperCase();
+        const interval = billingInterval?.toLowerCase();
+
+        if (interval === "yearly" || interval === "year") {
+            return `${symbol}${priceNum}`;
         }
-        return `${symbol}${price} / month`;
+        return `${symbol}${priceNum} / month`;
     };
 
-    // Calculate annual price (monthly * 12)
-    const calculateAnnualPrice = (monthlyPrice: number) => {
-        return monthlyPrice * 12;
+    // Get annual price from plans - find yearly version of the plan
+    const getAnnualPrice = (plan: any, allPlans: any[]) => {
+        // Find yearly version of the same plan (by name/slug)
+        const yearlyPlan = allPlans?.find((p) => p.name?.toLowerCase() === plan.name?.toLowerCase() && (p.billing_interval?.toLowerCase() === "yearly" || p.billing_interval?.toLowerCase() === "year"));
+        if (yearlyPlan) {
+            return typeof yearlyPlan.price === "string" ? parseFloat(yearlyPlan.price) : yearlyPlan.price;
+        }
+        return null;
     };
 
-    // Get plan features text
+    // Get plan features text - use display_name if available, otherwise format based on feature_key
     const getPlanFeatures = (plan: any) => {
         const features: string[] = [];
         plan.features?.forEach((feature: any) => {
-            if (feature.feature_type === "limit") {
-                if (feature.feature_key === "doctors" || feature.feature_key === "staff") {
-                    features.push(`${feature.feature_value} Doctors / Staff`);
-                } else if (feature.feature_key === "practices") {
-                    features.push(`${feature.feature_value} Practice${feature.feature_value > 1 ? "s" : ""}`);
-                } else if (feature.feature_key === "patients") {
-                    if (feature.feature_value === "unlimited" || feature.feature_value === "-1") {
+            // Use display_name if available
+            if (feature.display_name) {
+                features.push(feature.display_name);
+                return;
+            }
+
+            // Otherwise, format based on feature_key and feature_type
+            const featureKey = feature.feature_key?.toLowerCase();
+            const featureType = feature.feature_type?.toLowerCase();
+            const featureValue = feature.feature_value;
+
+            if (featureType === "limit" || featureType?.includes("limit")) {
+                if (featureKey?.includes("doctor")) {
+                    features.push(`${featureValue} Doctors / Staff`);
+                } else if (featureKey?.includes("practice")) {
+                    features.push(`${featureValue} Practice${parseInt(featureValue) > 1 ? "s" : ""}`);
+                } else if (featureKey?.includes("patient")) {
+                    if (featureValue === "unlimited" || featureValue === "-1") {
                         features.push("Unlimited Patients");
                     } else {
-                        features.push(`${feature.feature_value} Patients`);
+                        features.push(`${featureValue} Patients`);
                     }
-                } else if (feature.feature_key === "storage") {
-                    if (feature.feature_value === "unlimited" || feature.feature_value === "-1") {
+                } else if (featureKey?.includes("storage")) {
+                    if (featureValue === "unlimited" || featureValue === "-1") {
                         features.push("Unlimited Cloud Storage");
                     } else {
-                        features.push(`${feature.feature_value} Cloud Storage`);
+                        features.push(`${featureValue} Cloud Storage`);
                     }
+                } else {
+                    // Generic limit feature
+                    features.push(`${featureValue} ${featureKey?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) || ""}`);
                 }
-            } else if (feature.feature_type === "boolean" && feature.feature_value === "true") {
-                features.push(feature.display_name || feature.description);
+            } else if (featureType === "boolean" && featureValue === "true") {
+                features.push(feature.description || featureKey?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) || "");
+            } else if (feature.description) {
+                features.push(feature.description);
             }
         });
         return features;
@@ -92,7 +120,9 @@ export default function SubscriptionScreen() {
         );
     }
 
-    const monthlyPrice = currentPlan?.billing_interval === "month" ? currentPlan.price : currentPlan?.price ? currentPlan.price / 12 : 0;
+    // Get current plan price - use exactly as received from API
+    const currentPlanPrice = currentPlan?.price || 0;
+    const currentPlanBillingInterval = currentPlan?.billing_interval || "monthly";
     const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
 
     return (
@@ -163,9 +193,7 @@ export default function SubscriptionScreen() {
                 {/* Chevron Circle */}
                 <View style={styles.chevronContainer}>
                     <View style={styles.chevronCircle}>
-                        <BaseText type="Subhead" weight="400" color="labels.primary" style={{ transform: [{ rotate: "180deg" }] }}>
-                            􀆇
-                        </BaseText>
+                        <IconSymbol name="chevron.down" size={16} color={colors.system.black} />
                     </View>
                 </View>
             </View>
@@ -184,8 +212,9 @@ export default function SubscriptionScreen() {
                     const planColor = getPlanColor(plan.name);
                     const isCurrentPlan = currentPlan?.id === plan.id;
                     const features = getPlanFeatures(plan);
-                    const monthlyPrice = plan.billing_interval === "month" ? plan.price : plan.price / 12;
-                    const annualPrice = calculateAnnualPrice(monthlyPrice);
+                    const planPrice = plan.price; // Use price exactly as received from API
+                    const planBillingInterval = plan.billing_interval || "monthly";
+                    const annualPrice = getAnnualPrice(plan, plansData?.data || []);
 
                     // Create gradient background for plan header
                     const gradientColors: [string, string, string, string, string] =
@@ -200,33 +229,35 @@ export default function SubscriptionScreen() {
                                 <View style={styles.planHeaderWrapper}>
                                     <View style={styles.planHeaderContent}>
                                         <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
-                                            <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }}>
+                                            <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
                                                 {plan.name}
                                             </BaseText>
                                             <BaseText type="Title3" weight="600" style={{ color: planColor }}>
-                                                {formatPrice(monthlyPrice, plan.currency, "month")}
+                                                {formatPrice(planPrice, plan.currency, planBillingInterval)}
                                             </BaseText>
                                         </LinearGradient>
-                                        <View style={styles.annualBadge}>
-                                            <BaseText type="Footnote" weight="400" color="labels.primary">
-                                                Annual:
-                                            </BaseText>
-                                            <BaseText type="Callout" weight="400" color="labels.primary">
-                                                {formatPrice(annualPrice, plan.currency, "year")}
-                                            </BaseText>
-                                        </View>
+                                        {annualPrice !== null && (
+                                            <View style={styles.annualBadge}>
+                                                <BaseText type="Footnote" weight="400" color="labels.primary">
+                                                    Annual:
+                                                </BaseText>
+                                                <BaseText type="Callout" weight="400" color="labels.primary">
+                                                    {formatPrice(annualPrice, plan.currency, "yearly")}
+                                                </BaseText>
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
 
                                 {/* Plan Features */}
                                 <View style={styles.planFeatures}>
                                     {features.map((feature, index) => (
-                                        <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
-                                            <BaseText type="Body" weight="400" color="labels.tertiary">
-                                                􀅼
+                                        <View key={index} style={styles.featureItemContainer}>
+                                            <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
+                                            <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                {" " + feature}
                                             </BaseText>
-                                            {" " + feature}
-                                        </BaseText>
+                                        </View>
                                     ))}
                                 </View>
                             </View>
@@ -276,7 +307,7 @@ const styles = StyleSheet.create({
         fontSize: 44,
         lineHeight: 41,
         letterSpacing: 0.4,
-        paddingTop: 3,
+        paddingTop: 10,
         paddingBottom: spacing["2"], // 8px
     },
     daysRemaining: {
@@ -317,6 +348,11 @@ const styles = StyleSheet.create({
         letterSpacing: -0.43,
         marginBottom: 0,
     },
+    featureItemContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing["1"], // 10px
+    },
     currentPlanFooter: {
         flexDirection: "row",
         alignItems: "center",
@@ -341,7 +377,6 @@ const styles = StyleSheet.create({
         borderColor: "#d8d8d8",
         alignItems: "center",
         justifyContent: "center",
-        transform: [{ rotate: "180deg" }],
     },
     premiumSection: {
         backgroundColor: "#f9f9f9",

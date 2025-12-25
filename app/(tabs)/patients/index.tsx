@@ -6,7 +6,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
 import { openCallForPatient, openMessageForPatient } from "@/utils/helper/communication";
-import { useGetPatients } from "@/utils/hook";
+import { useGetPatients, useGetPracticeMembers } from "@/utils/hook";
+import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
@@ -23,11 +24,37 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function PatientsScreen() {
     const { selectedPractice, viewMode } = useProfileStore();
+    const { profile, isAuthenticated } = useAuth();
+    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
     const { q } = useLocalSearchParams<{ q?: string }>();
 
-    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: viewMode === "doctor" ? selectedPractice?.id : undefined });
+    // Get current user's role in the selected practice
+    const currentUserRole = useMemo(() => {
+        if (!selectedPractice || !practiceMembers?.data || !profile?.email) {
+            return selectedPractice?.role; // Fallback to practice role
+        }
+
+        // Find current user in practice members by email
+        const currentMember = practiceMembers.data.find((member) => member.email === profile.email);
+        return currentMember?.role || selectedPractice.role;
+    }, [selectedPractice, practiceMembers?.data, profile?.email]);
+
+    // Determine doctor_id based on user role
+    const doctorId = useMemo(() => {
+        // If role is "owner" or "admin" (staff), don't pass doctor_id
+        if (currentUserRole === "owner" || currentUserRole === "admin" || currentUserRole === "member") {
+            return undefined;
+        }
+        // If role is "doctor", pass current user's id
+        if (currentUserRole === "doctor" && profile?.id) {
+            return profile.id;
+        }
+        return undefined;
+    }, [currentUserRole, profile?.id]);
+
+    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
     console.log("====================================");
     console.log(patients?.data);
     console.log("====================================");
