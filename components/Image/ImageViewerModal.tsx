@@ -22,6 +22,33 @@ interface ImageViewerModalProps {
     patientData?: Patient;
 }
 
+interface ThumbnailItemProps {
+    imageUri: string;
+    index: number;
+    isActive: boolean;
+    onPress: () => void;
+}
+
+const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, isActive, onPress }) => {
+    const thumbnailWidth = useSharedValue(isActive ? 50 : 40);
+
+    React.useEffect(() => {
+        thumbnailWidth.value = withTiming(isActive ? 50 : 30, { duration: 200 });
+    }, [isActive]);
+
+    const animatedThumbnailStyle = useAnimatedStyle(() => ({
+        width: thumbnailWidth.value,
+    }));
+
+    return (
+        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+            <Animated.View style={[styles.thumbnail, isActive && styles.thumbnailActive, animatedThumbnailStyle]}>
+                <Image source={{ uri: imageUri }} style={styles.thumbnailImage} contentFit="cover" />
+            </Animated.View>
+        </TouchableOpacity>
+    );
+};
+
 export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, patientData }) => {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
@@ -50,12 +77,32 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 if (thumbnailScrollRef.current) {
-                    const thumbnailWidth = 50;
+                    const activeThumbnailWidth = 50;
+                    const inactiveThumbnailWidth = 30; // Use actual inactive width
                     const thumbnailGap = 4;
-                    const thumbnailSize = thumbnailWidth + thumbnailGap;
-                    const centerOffset = width / 2 - thumbnailWidth / 2;
-                    const scrollPosition = currentIndex * thumbnailSize - centerOffset;
-                    const maxScroll = Math.max(0, (images.length - 1) * thumbnailSize - width + thumbnailWidth);
+                    const activeThumbnailMargin = 8; // Margin for active thumbnail
+
+                    // Calculate total width before current index
+                    let totalWidthBefore = 0;
+                    for (let i = 0; i < currentIndex; i++) {
+                        totalWidthBefore += inactiveThumbnailWidth + thumbnailGap;
+                    }
+
+                    // Center offset calculation - center the active thumbnail (including margins)
+                    const centerOffset = width / 2 - (activeThumbnailWidth + activeThumbnailMargin * 2) / 2;
+                    const scrollPosition = totalWidthBefore - centerOffset;
+
+                    // Calculate max scroll (total width - screen width)
+                    let totalWidth = 0;
+                    for (let i = 0; i < images.length; i++) {
+                        if (i === currentIndex) {
+                            totalWidth += activeThumbnailWidth + activeThumbnailMargin * 2 + thumbnailGap;
+                        } else {
+                            totalWidth += inactiveThumbnailWidth + thumbnailGap;
+                        }
+                    }
+                    totalWidth -= thumbnailGap; // Remove last gap
+                    const maxScroll = Math.max(0, totalWidth - width);
 
                     thumbnailScrollRef.current.scrollTo({
                         x: Math.max(0, Math.min(scrollPosition, maxScroll)),
@@ -67,8 +114,41 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     }, [currentIndex]);
 
     const handleScroll = (event: any) => {
-        // Don't update index during scroll - let momentum scroll end handle it
-        // This prevents jumpy behavior
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const index = Math.round(offsetX / width);
+        // Update index during scroll for smooth thumbnail sync
+        if (index !== currentIndex && index >= 0 && index < images.length) {
+            setCurrentIndex(index);
+        }
+    };
+
+    const handleThumbnailScroll = (event: any) => {
+        const scrollX = event.nativeEvent.contentOffset.x;
+        const activeThumbnailWidth = 50;
+        const inactiveThumbnailWidth = 30;
+        const thumbnailGap = 4;
+        const activeThumbnailMargin = 8; // Margin for active thumbnail
+        const centerX = scrollX + width / 2;
+        const padding = width / 2 - 25;
+
+        // Find which thumbnail is at center
+        let currentWidth = padding;
+        for (let i = 0; i < images.length; i++) {
+            const isActive = i === currentIndex;
+            const thumbWidth = isActive ? activeThumbnailWidth : inactiveThumbnailWidth;
+            const thumbMargin = isActive ? activeThumbnailMargin : 0;
+            const thumbStart = currentWidth + thumbMargin;
+            const thumbEnd = currentWidth + thumbMargin + thumbWidth;
+
+            if (centerX >= thumbStart && centerX <= thumbEnd) {
+                if (i !== currentIndex) {
+                    setCurrentIndex(i);
+                    flatListRef.current?.scrollToIndex({ index: i, animated: true });
+                }
+                break;
+            }
+            currentWidth = currentWidth + thumbMargin + thumbWidth + thumbMargin + thumbnailGap;
+        }
     };
 
     const handleMomentumScrollEnd = (event: any) => {
@@ -161,12 +241,22 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
             });
 
         const panGesture = Gesture.Pan()
-            .enabled(true)
-            .activeOffsetX([-5, 5])
-            .failOffsetY([-10, 10])
+            .activeOffsetY([-10, 10])
+            .failOffsetX([-50, 50]) // Fail horizontal pan when not zoomed - allow FlatList to handle swipe
+            .manualActivation(true)
+            .onTouchesDown((e, state) => {
+                // Only activate pan gesture when zoomed
+                if (scale.value > 1) {
+                    state.activate();
+                } else {
+                    state.fail();
+                }
+            })
             .onStart(() => {
-                savedTranslateX.value = translateX.value;
-                savedTranslateY.value = translateY.value;
+                if (scale.value > 1) {
+                    savedTranslateX.value = translateX.value;
+                    savedTranslateY.value = translateY.value;
+                }
             })
             .onUpdate((e) => {
                 if (scale.value > 1) {
@@ -174,8 +264,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                     translateX.value = savedTranslateX.value + e.translationX;
                     translateY.value = savedTranslateY.value + e.translationY;
                 }
-                // When not zoomed, don't translate - let FlatList handle scrolling naturally
-                // This prevents the overlay effect where next image appears on current
+                // When not zoomed, don't interfere - let FlatList handle horizontal swipe
             })
             .onEnd((e) => {
                 if (scale.value > 1 && imageSize.width > 0 && imageSize.height > 0) {
@@ -197,8 +286,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                         translateY.value = withTiming(0, { duration: 200 });
                     }
                 } else {
-                    // When not zoomed, let FlatList handle swipe naturally
-                    // Don't interfere with FlatList's native scroll behavior
+                    // When not zoomed, reset translation
                     translateX.value = withTiming(0, { duration: 200 });
                     translateY.value = withTiming(0, { duration: 200 });
                 }
@@ -228,10 +316,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
             .numberOfTaps(1)
             .maxDuration(250)
             .onEnd(() => {
-                // Only toggle controls if not zoomed
-                if (scale.value <= 1) {
-                    runOnJS(toggleControls)();
-                }
+                // Always toggle controls, even when zoomed
+                runOnJS(toggleControls)();
             });
 
         return Gesture.Simultaneous(Gesture.Simultaneous(pinchGesture, panGesture), Gesture.Exclusive(doubleTapGesture, singleTapGesture));
@@ -348,22 +434,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
                     {/* Bottom Bar with Thumbnails and Actions */}
                     <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
-                        {/* Thumbnail Gallery */}
-                        <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} decelerationRate="fast">
-                            {images.map((imageUri, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    onPress={() => {
-                                        setCurrentIndex(index);
-                                        flatListRef.current?.scrollToIndex({ index, animated: true });
-                                    }}
-                                    style={[styles.thumbnail, index === currentIndex && styles.thumbnailActive]}
-                                    activeOpacity={0.7}
-                                >
-                                    <Image source={{ uri: imageUri }} style={styles.thumbnailImage} contentFit="cover" />
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                        {/* Thumbnail Gallery - Hide when zoomed */}
+                        {!isZoomed && (
+                            <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} decelerationRate="fast" onScroll={handleThumbnailScroll} scrollEventThrottle={16}>
+                                {images.map((imageUri, index) => (
+                                    <ThumbnailItem
+                                        key={index}
+                                        imageUri={imageUri}
+                                        index={index}
+                                        isActive={index === currentIndex}
+                                        onPress={() => {
+                                            setCurrentIndex(index);
+                                            flatListRef.current?.scrollToIndex({ index, animated: true });
+                                        }}
+                                    />
+                                ))}
+                            </ScrollView>
+                        )}
 
                         {/* Action Buttons */}
                         <View style={styles.actionButtonsContainer}>
@@ -462,23 +549,22 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     thumbnailScroll: {
-        marginBottom: 16,
+        marginBottom: 6,
     },
     thumbnailContainer: {
-        flexDirection: "row",
-        paddingHorizontal: width / 2 - 25, // Center first/last thumbnails
+        flexDirection: "row", // Center first/last thumbnails (active width / 2)
+        alignItems: "center",
+        paddingHorizontal: width / 2 - 25,
         gap: 4,
     },
     thumbnail: {
-        width: 50,
         height: 50,
         borderRadius: 6,
         overflow: "hidden",
-        borderWidth: 2,
-        borderColor: "transparent",
+        borderWidth: 0,
     },
     thumbnailActive: {
-        borderColor: colors.system.white,
+        marginHorizontal: 8,
     },
     thumbnailImage: {
         width: "100%",
@@ -487,7 +573,6 @@ const styles = StyleSheet.create({
     actionButtonsContainer: {
         alignItems: "center",
         justifyContent: "center",
-        paddingVertical: 8,
     },
     locationPill: {
         flexDirection: "row",
