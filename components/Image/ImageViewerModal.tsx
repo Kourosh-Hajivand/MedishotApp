@@ -30,19 +30,22 @@ interface ThumbnailItemProps {
 }
 
 const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, isActive, onPress }) => {
-    const thumbnailWidth = useSharedValue(isActive ? 50 : 40);
+    const thumbnailWidth = useSharedValue(isActive ? 50 : 30);
+    const thumbnailMargin = useSharedValue(isActive ? 4 : 0);
 
     React.useEffect(() => {
-        thumbnailWidth.value = withTiming(isActive ? 50 : 30, { duration: 200 });
+        thumbnailWidth.value = withTiming(isActive ? 50 : 30, { duration: 250 });
+        thumbnailMargin.value = withTiming(isActive ? 4 : 0, { duration: 250 });
     }, [isActive]);
 
     const animatedThumbnailStyle = useAnimatedStyle(() => ({
         width: thumbnailWidth.value,
+        marginHorizontal: thumbnailMargin.value,
     }));
 
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-            <Animated.View style={[styles.thumbnail, isActive && styles.thumbnailActive, animatedThumbnailStyle]}>
+            <Animated.View style={[styles.thumbnail, animatedThumbnailStyle]}>
                 <Image source={{ uri: imageUri }} style={styles.thumbnailImage} contentFit="cover" />
             </Animated.View>
         </TouchableOpacity>
@@ -83,7 +86,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                     const activeThumbnailWidth = 50;
                     const inactiveThumbnailWidth = 30;
                     const thumbnailGap = 4;
-                    const activeThumbnailMargin = 8;
+                    const activeThumbnailMargin = 4;
                     const padding = width / 2 - 25; // Left padding
 
                     // Calculate position of active thumbnail center
@@ -126,15 +129,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
     const handleScroll = (event: any) => {
         // Don't update index if scroll is programmatic (from thumbnail click)
+        // We only update on momentum scroll end to prevent intermediate index changes
         if (isProgrammaticScroll.current) {
             return;
         }
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offsetX / width);
-        // Update index during scroll for smooth thumbnail sync
-        if (index !== currentIndex && index >= 0 && index < images.length) {
-            setCurrentIndex(index);
-        }
+        // Don't update index during scroll - let momentum scroll end handle it
+        // This prevents thumbnail from changing one by one when clicking
     };
 
     const handleThumbnailScroll = (event: any) => {
@@ -146,7 +146,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         const activeThumbnailWidth = 50;
         const inactiveThumbnailWidth = 30;
         const thumbnailGap = 4;
-        const activeThumbnailMargin = 8;
+        const activeThumbnailMargin = 4;
         const centerX = scrollX + width / 2;
         const padding = width / 2 - 25;
 
@@ -161,6 +161,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
             if (centerX >= thumbStart && centerX <= thumbEnd) {
                 if (i !== currentIndex) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     isProgrammaticScroll.current = true;
                     setCurrentIndex(i);
                     // No animation when dragging - instant change
@@ -474,13 +475,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         index={index}
                                         isActive={index === currentIndex}
                                         onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                             isProgrammaticScroll.current = true;
                                             setCurrentIndex(index);
                                             flatListRef.current?.scrollToIndex({ index, animated: true });
-                                            // Reset flag after animation
+                                            // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
                                             setTimeout(() => {
                                                 isProgrammaticScroll.current = false;
-                                            }, 300);
+                                            }, 500);
                                         }}
                                     />
                                 ))}
@@ -597,9 +599,6 @@ const styles = StyleSheet.create({
         borderRadius: 6,
         overflow: "hidden",
         borderWidth: 0,
-    },
-    thumbnailActive: {
-        marginHorizontal: 8,
     },
     thumbnailImage: {
         width: "100%",
