@@ -53,6 +53,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
     const thumbnailScrollRef = useRef<ScrollView>(null);
+    const isProgrammaticScroll = useRef(false);
+    const isThumbnailProgrammaticScroll = useRef(false);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
@@ -77,43 +79,56 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
                 if (thumbnailScrollRef.current) {
+                    isThumbnailProgrammaticScroll.current = true;
                     const activeThumbnailWidth = 50;
-                    const inactiveThumbnailWidth = 30; // Use actual inactive width
+                    const inactiveThumbnailWidth = 30;
                     const thumbnailGap = 4;
-                    const activeThumbnailMargin = 8; // Margin for active thumbnail
+                    const activeThumbnailMargin = 8;
+                    const padding = width / 2 - 25; // Left padding
 
-                    // Calculate total width before current index
-                    let totalWidthBefore = 0;
+                    // Calculate position of active thumbnail center
+                    let thumbnailCenterPosition = padding;
                     for (let i = 0; i < currentIndex; i++) {
-                        totalWidthBefore += inactiveThumbnailWidth + thumbnailGap;
+                        thumbnailCenterPosition += inactiveThumbnailWidth + thumbnailGap;
                     }
+                    // Add left margin and half width for active thumbnail
+                    thumbnailCenterPosition += activeThumbnailMargin + activeThumbnailWidth / 2;
 
-                    // Center offset calculation - center the active thumbnail (including margins)
-                    const centerOffset = width / 2 - (activeThumbnailWidth + activeThumbnailMargin * 2) / 2;
-                    const scrollPosition = totalWidthBefore - centerOffset;
+                    // Calculate scroll position to center the thumbnail
+                    // We want: scrollPosition + width/2 = thumbnailCenterPosition
+                    const scrollPosition = thumbnailCenterPosition - width / 2;
 
-                    // Calculate max scroll (total width - screen width)
-                    let totalWidth = 0;
+                    // Calculate total width for max scroll
+                    let totalWidth = padding;
                     for (let i = 0; i < images.length; i++) {
                         if (i === currentIndex) {
-                            totalWidth += activeThumbnailWidth + activeThumbnailMargin * 2 + thumbnailGap;
+                            totalWidth += activeThumbnailMargin + activeThumbnailWidth + activeThumbnailMargin + thumbnailGap;
                         } else {
                             totalWidth += inactiveThumbnailWidth + thumbnailGap;
                         }
                     }
                     totalWidth -= thumbnailGap; // Remove last gap
+                    totalWidth += padding; // Add right padding
                     const maxScroll = Math.max(0, totalWidth - width);
 
                     thumbnailScrollRef.current.scrollTo({
                         x: Math.max(0, Math.min(scrollPosition, maxScroll)),
                         animated: true,
                     });
+                    // Reset flag after animation
+                    setTimeout(() => {
+                        isThumbnailProgrammaticScroll.current = false;
+                    }, 300);
                 }
             });
         });
     }, [currentIndex]);
 
     const handleScroll = (event: any) => {
+        // Don't update index if scroll is programmatic (from thumbnail click)
+        if (isProgrammaticScroll.current) {
+            return;
+        }
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / width);
         // Update index during scroll for smooth thumbnail sync
@@ -123,11 +138,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     };
 
     const handleThumbnailScroll = (event: any) => {
+        // Don't update index if scroll is programmatic (from useEffect)
+        if (isThumbnailProgrammaticScroll.current) {
+            return;
+        }
         const scrollX = event.nativeEvent.contentOffset.x;
         const activeThumbnailWidth = 50;
         const inactiveThumbnailWidth = 30;
         const thumbnailGap = 4;
-        const activeThumbnailMargin = 8; // Margin for active thumbnail
+        const activeThumbnailMargin = 8;
         const centerX = scrollX + width / 2;
         const padding = width / 2 - 25;
 
@@ -142,12 +161,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
             if (centerX >= thumbStart && centerX <= thumbEnd) {
                 if (i !== currentIndex) {
+                    isProgrammaticScroll.current = true;
                     setCurrentIndex(i);
-                    flatListRef.current?.scrollToIndex({ index: i, animated: true });
+                    // No animation when dragging - instant change
+                    flatListRef.current?.scrollToIndex({ index: i, animated: false });
+                    // Reset flag immediately since no animation
+                    setTimeout(() => {
+                        isProgrammaticScroll.current = false;
+                    }, 50);
                 }
                 break;
             }
-            currentWidth = currentWidth + thumbMargin + thumbWidth + thumbMargin + thumbnailGap;
+            // Move to next thumbnail position
+            if (isActive) {
+                currentWidth += activeThumbnailMargin + thumbWidth + activeThumbnailMargin + thumbnailGap;
+            } else {
+                currentWidth += thumbWidth + thumbnailGap;
+            }
         }
     };
 
@@ -444,8 +474,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         index={index}
                                         isActive={index === currentIndex}
                                         onPress={() => {
+                                            isProgrammaticScroll.current = true;
                                             setCurrentIndex(index);
                                             flatListRef.current?.scrollToIndex({ index, animated: true });
+                                            // Reset flag after animation
+                                            setTimeout(() => {
+                                                isProgrammaticScroll.current = false;
+                                            }, 300);
                                         }}
                                     />
                                 ))}
