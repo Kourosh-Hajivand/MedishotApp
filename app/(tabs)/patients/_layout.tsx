@@ -2,7 +2,7 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
-import { forceReloadProfileSelection, loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
+import { loadProfileSelection, useProfileStore, validateAndSetDefaultSelection } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
@@ -51,17 +51,15 @@ export default function PatientsLayout() {
 
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0) {
-            loadProfileSelection(practiceList.data);
+            // First load: load from storage or set default
+            if (!isLoaded) {
+                loadProfileSelection(practiceList.data);
+            } else {
+                // After initial load: only validate that selected practice still exists
+                validateAndSetDefaultSelection(practiceList.data);
+            }
         }
-    }, [practiceList?.data]);
-
-    // Force reload profile selection when user authentication changes
-    useEffect(() => {
-        if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0) {
-            console.log("User authenticated, force reloading profile selection with practice list:", practiceList.data);
-            forceReloadProfileSelection(practiceList.data);
-        }
-    }, [isAuthenticated, practiceList?.data]);
+    }, [practiceList?.data, isLoaded]);
 
     return (
         <BottomSheetModalProvider>
