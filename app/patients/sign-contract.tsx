@@ -7,8 +7,8 @@ import { useCreateContract, useGetContractTemplate, useGetPatientById, useGetPra
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { BottomSheetBackdrop, BottomSheetModal } from "@gorhom/bottom-sheet";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, ScrollView, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SignatureCanvas, { SignatureViewRef } from "react-native-signature-canvas";
@@ -38,12 +38,17 @@ const defaultPracticeSettings: PracticeSettings = {
 export default function SignContractScreen() {
     const { patientId, templateId } = useLocalSearchParams<{ patientId: string; templateId: string }>();
     const insets = useSafeAreaInsets();
+    const navigation = useNavigation();
     const { selectedPractice } = useProfileStore();
     const { profile: me } = useAuth();
 
     const { data: contractTemplate, isLoading: isLoadingTemplate } = useGetContractTemplate(templateId || "", !!templateId);
     const { data: patientData, isLoading: isLoadingPatient } = useGetPatientById(patientId || "");
     const { data: practiceData, isLoading: isLoadingPractice } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
+
+    console.log("=============== patientData?.data=====================");
+    console.log(patientData?.data);
+    console.log("====================================");
 
     const [signature, setSignature] = useState<string | null>(null);
     const [signatureUri, setSignatureUri] = useState<string | null>(null);
@@ -92,6 +97,73 @@ export default function SignContractScreen() {
         return metadata?.print_settings || defaultPracticeSettings;
     }, [metadata]);
 
+    const handleSubmit = useCallback(() => {
+        if (!signature || !uploadedSignatureFilename) {
+            Alert.alert("Error", "Please sign the contract first");
+            return;
+        }
+
+        createContract({
+            patientId: patientId || "",
+            data: {
+                contract_template_id: Number(templateId),
+                signature_image: uploadedSignatureFilename,
+            },
+        });
+    }, [signature, uploadedSignatureFilename, patientId, templateId, createContract]);
+
+    // Setup header with patient info and Done button - MUST be before early returns
+    const patient = patientData?.data;
+    useLayoutEffect(() => {
+        if (!patient) {
+            // Set default header when patient is not loaded
+            navigation.setOptions({
+                headerTitle: "",
+                headerTitleAlign: "center",
+
+                headerRight: () => (
+                    <TouchableOpacity onPress={handleSubmit} disabled={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature} className="px-4 py-2">
+                        <BaseText type="Body" color={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature ? "labels.tertiary" : "system.blue"} weight={600}>
+                            Done
+                        </BaseText>
+                    </TouchableOpacity>
+                ),
+            });
+            return;
+        }
+
+        const patientName = `${patient.first_name} ${patient.last_name}`;
+        const patientImageUrl = patient.profile_image?.url;
+        const photoDate = patient.profile_image?.created_at ? new Date(patient.profile_image.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : patient.created_at ? new Date(patient.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
+
+        navigation.setOptions({
+            headerTitle: () => (
+                <View className="flex-row items-center gap-1  max-w-[200px]">
+                    <Avatar name={patientName} haveRing color={patient.doctor?.color} size={42} />
+                    <View className="gap-0.5">
+                        <BaseText type="Subhead" weight={600} color="labels.primary" numberOfLines={1}>
+                            {patientName}
+                        </BaseText>
+                        {photoDate && (
+                            <BaseText type="Caption2" color="labels.secondary" numberOfLines={1}>
+                                {photoDate}
+                            </BaseText>
+                        )}
+                    </View>
+                </View>
+            ),
+            headerTitleAlign: "center",
+            // headerLeft: () => <BackButton noText onPress={() => router.back()} />,
+            headerRight: () => (
+                <TouchableOpacity onPress={handleSubmit} disabled={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature} className="px-2 py-2">
+                    <BaseText type="Body" color={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature ? "labels.tertiary" : "system.blue"} weight={600}>
+                        Done
+                    </BaseText>
+                </TouchableOpacity>
+            ),
+        });
+    }, [patient, signature, uploadedSignatureFilename, isSubmitting, isUploadingSignature, navigation, handleSubmit]);
+
     const isLoading = isLoadingTemplate || isLoadingPatient || isLoadingPractice;
 
     if (isLoading) {
@@ -102,7 +174,6 @@ export default function SignContractScreen() {
         );
     }
 
-    const patient = patientData?.data;
     const practice = practiceData?.data;
     const template = contractTemplate?.data;
 
@@ -156,21 +227,6 @@ export default function SignContractScreen() {
         setShowSignatureModal(false);
     };
 
-    const handleSubmit = () => {
-        if (!signature || !uploadedSignatureFilename) {
-            Alert.alert("Error", "Please sign the contract first");
-            return;
-        }
-
-        createContract({
-            patientId: patientId || "",
-            data: {
-                contract_template_id: Number(templateId),
-                signature_image: uploadedSignatureFilename,
-            },
-        });
-    };
-
     // Helper function to replace placeholders in text
     const replacePlaceholders = (text: string): string => {
         if (!patient || !practice) return text;
@@ -199,17 +255,17 @@ export default function SignContractScreen() {
     };
 
     return (
-        <View className="flex-1">
-            <ScrollView className="flex-1 px-5 py-5" contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingTop: headerHeight }}>
+        <View className="flex-1" style={{ paddingTop: headerHeight }}>
+            <ScrollView className="flex-1 px-5 py-5 " contentContainerStyle={{ paddingBottom: insets.bottom + 20, gap: 28 }}>
                 {/* Header with Practice Info - Based on print_settings */}
-                <View className="flex-row items-center justify-between mb-6">
-                    <View className="flex-row items-center gap-3">
+                <View className="flex-row items-center justify-between ">
+                    <View className="flex-row items-center gap-2">
                         {printSettings.avatar === "logo" && practice.image?.url ? (
                             <Image source={{ uri: practice.image.url }} className="w-10 h-10 rounded-full" />
                         ) : printSettings.avatar === "profile_picture" && patient.doctor?.profile_photo_url ? (
                             <Avatar name={`${me?.first_name} ${me?.last_name}`} size={40} imageUrl={me?.profile_photo_url || undefined} />
                         ) : null}
-                        <View className="gap-1">
+                        <View className="gap-0">
                             {printSettings.practiceName && (
                                 <BaseText type="Subhead" weight={600} color="labels.primary">
                                     {practice.name}
@@ -253,12 +309,12 @@ export default function SignContractScreen() {
                 </View>
 
                 {/* Contract Title */}
-                <BaseText type="Title2" weight={600} color="labels.primary" className="mb-6">
+                <BaseText type="Body" weight={600} color="labels.primary">
                     {template.title}
                 </BaseText>
 
                 {/* Contract Body */}
-                <View className="mb-6">
+                <View>
                     {Array.isArray(template.body) ? (
                         // New format: array of body items
                         template.body.map((item, index) => {
@@ -316,7 +372,7 @@ export default function SignContractScreen() {
                                                 return (
                                                     <React.Fragment key={lineIndex}>
                                                         {parts.map((part, partIndex) => (
-                                                            <BaseText key={partIndex} type="Body" color={part.isHighlight ? "system.blue" : "labels.primary"}>
+                                                            <BaseText key={partIndex} type="Subhead" color={part.isHighlight ? "system.blue" : "labels.primary"}>
                                                                 {part.text}
                                                             </BaseText>
                                                         ))}
@@ -334,7 +390,7 @@ export default function SignContractScreen() {
                         })
                     ) : (
                         // Old format: string
-                        <BaseText type="Body" color="labels.primary" style={{ lineHeight: 21 }}>
+                        <BaseText type="Subhead" color="labels.primary" style={{ lineHeight: 21 }}>
                             {replacePlaceholders(typeof template.body === "string" ? template.body : String(template.body || ""))
                                 .split("\n")
                                 .map((line, index) => (
@@ -349,7 +405,7 @@ export default function SignContractScreen() {
 
                 {/* Signature Section */}
                 <View className="gap-4 flex-row items-center my-6">
-                    <BaseText type="Body" color="labels.primary">
+                    <BaseText type="Subhead" color="labels.primary">
                         Patient Signature:
                     </BaseText>
                     {signature ? (

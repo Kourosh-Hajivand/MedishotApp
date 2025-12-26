@@ -55,7 +55,7 @@ export default function PatientsScreen() {
     }, [currentUserRole, profile?.id]);
 
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
-    console.log("====================================");
+    console.log("================= patients?.data===================");
     console.log(patients?.data);
     console.log("====================================");
     const currentPatients = patients?.data;
@@ -315,7 +315,7 @@ export default function PatientsScreen() {
                                         style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
                                         className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
                                     >
-                                        <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url} />
+                                        <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
                                         <BaseText type="Callout" weight={500} color="labels.primary">
                                             {item.full_name}
                                         </BaseText>

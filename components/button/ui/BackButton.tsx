@@ -4,13 +4,15 @@ import { ChevronLeftIcon } from "../../../assets/icons";
 import { spacing } from "../../../styles/spaces";
 import { BaseText } from "../../text/BaseText";
 
-export const BackButton = ({ onPress }: { onPress: () => void }) => {
+export const BackButton = ({ onPress, noText = false }: { onPress: () => void; noText?: boolean }) => {
     return (
         <TouchableOpacity onPress={onPress} className="flex-row px-2  items-center gap-2">
             <ChevronLeftIcon strokeWidth={0} />
-            <BaseText type="Body" color="system.blue" weight={"400"}>
-                Back
-            </BaseText>
+            {!noText && (
+                <BaseText type="Body" color="system.blue" weight={"400"}>
+                    Back
+                </BaseText>
+            )}
         </TouchableOpacity>
     );
 };

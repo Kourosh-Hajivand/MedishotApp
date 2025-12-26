@@ -45,41 +45,39 @@ export default function SelectContractScreen() {
     const contracts = contractsData?.data || [];
 
     return (
-        <View className="flex-1" style={{ backgroundColor: colors.system.gray6, paddingTop: headerHeight }}>
-            <View className="flex-1 px-4 py-5">
-                <FlatList
-                    data={contracts}
-                    numColumns={2}
-                    keyExtractor={(item) => String(item.id)}
-                    contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-                    columnWrapperStyle={{ gap: ITEM_GAP }}
-                    ItemSeparatorComponent={() => <View style={{ height: ITEM_GAP }} />}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity onPress={() => handleSelectContract(item.id)} className="rounded-lg overflow-hidden" style={{ width: ITEM_WIDTH }}>
-                            <View className="p-3 gap-2">
-                                <BaseText type="Subhead" weight={600} color="labels.primary" numberOfLines={2}>
-                                    {item.title}
-                                </BaseText>
-                                <View
-                                    className="rounded overflow-hidden bg-white"
-                                    style={{
-                                        aspectRatio: 1190 / 1684,
-                                        width: "100%",
-                                    }}
-                                >
-                                    {item.image ? (
-                                        <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
-                                    ) : (
-                                        <View className="flex-1 items-center justify-center">
-                                            <IconSymbol name="doc.text" color={colors.labels.tertiary} size={40} />
-                                        </View>
-                                    )}
-                                </View>
+        <View className="flex-1" style={{ backgroundColor: colors.system.gray6 }}>
+            <FlatList
+                data={contracts}
+                numColumns={2}
+                keyExtractor={(item) => String(item.id)}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingTop: headerHeight, paddingHorizontal: 8 }}
+                columnWrapperStyle={{ gap: ITEM_GAP }}
+                ItemSeparatorComponent={() => <View style={{ height: ITEM_GAP }} />}
+                renderItem={({ item }) => (
+                    <TouchableOpacity onPress={() => handleSelectContract(item.id)} className="rounded-lg overflow-hidden" style={{ width: ITEM_WIDTH }}>
+                        <View className="p-3 gap-2">
+                            <BaseText type="Subhead" weight={600} color="labels.primary" numberOfLines={2}>
+                                {item.title}
+                            </BaseText>
+                            <View
+                                className="rounded overflow-hidden bg-white"
+                                style={{
+                                    aspectRatio: 1190 / 1684,
+                                    width: "100%",
+                                }}
+                            >
+                                {item.image ? (
+                                    <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
+                                ) : (
+                                    <View className="flex-1 items-center justify-center">
+                                        <IconSymbol name="doc.text" color={colors.labels.tertiary} size={40} />
+                                    </View>
+                                )}
                             </View>
-                        </TouchableOpacity>
-                    )}
-                />
-            </View>
+                        </View>
+                    </TouchableOpacity>
+                )}
+            />
         </View>
     );
 }

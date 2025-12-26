@@ -174,14 +174,16 @@ export default function PatientDetailsScreen() {
 
     // ترتیب آیتم‌ها: Header → Tabs(sticky) → Content
     const DATA: { key: RowKind }[] = [{ key: "header" }, { key: "tabs" }, { key: "content" }];
-
+    console.log("==patient?.data==== patient?.data=================== patient?.data===========");
+    console.log(patient?.data);
+    console.log("====================================");
     const renderRow = ({ item }: { item: { key: RowKind } }) => {
         if (item.key === "header") {
             return (
                 <>
                     <View className="items-center justify-center mb-6">
                         <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], opacity: avatarOpacity, alignItems: "center" }}>
-                            <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing imageUrl={patient?.data?.profile_image?.url} />
+                            <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing color={patient?.data?.doctor?.color} imageUrl={patient?.data?.profile_image?.url} />
                         </Animated.View>
 
                         <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>

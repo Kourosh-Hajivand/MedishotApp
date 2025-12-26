@@ -40,7 +40,7 @@ export default function PatientsLayout() {
                 <Stack.Screen
                     name="sign-contract"
                     options={{
-                        title: "Sign Contract",
+                        headerTitle: "",
                         headerTransparent: true,
                         headerShown: true,
                     }}
