@@ -1,5 +1,6 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
+const path = require("path");
 
 const config = getDefaultConfig(__dirname);
 
@@ -19,6 +20,9 @@ config.resolver = {
     ...config.resolver,
     assetExts: config.resolver.assetExts.filter((ext) => ext !== "svg"),
     sourceExts: [...config.resolver.sourceExts, "svg"],
+    alias: {
+        "@": path.resolve(__dirname),
+    },
 };
 
 // Enable watch mode for better style reloading

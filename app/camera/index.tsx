@@ -1,4 +1,5 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
+import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -65,6 +66,7 @@ export default function CameraScreen() {
     const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
     const [currentGhostIndex, setCurrentGhostIndex] = useState(0);
     const [showGuideModal, setShowGuideModal] = useState(false);
+    const [showSampleModal, setShowSampleModal] = useState(false);
 
     // Show guide modal when ghost items are available
     useEffect(() => {
@@ -84,33 +86,30 @@ export default function CameraScreen() {
     const isLastGhost = currentGhostIndex === ghostItemIds.length - 1;
     const allPhotosCaptures = capturedPhotos.length === ghostItemIds.length && hasGhostItems;
 
-    // Get template name for guide modal
+    // Get template metadata
     const getTemplateName = () => {
-        const nameMap: Record<string, string> = {
-            face: "Face Template",
-            faceTurnRight: "Face Turn Right Template",
-            faceTurnLeft: "Face Turn Left Template",
-            faceRightSide: "Face Right Side Template",
-            faceLeftSide: "Face Left Side Template",
-            upperTeethFront: "Upper Teeth Front Template",
-            upperTeethRightSide: "Upper Teeth Right Side Template",
-            upperTeethLeftSide: "Upper Teeth Left Side Template",
-            upperJawDownView: "Upper Jaw Down View Template",
-            lowerJawUpView: "Lower Jaw Up View Template",
-            allTeethOpenRightSide: "All Teeth Open Right Side Template",
-            allTeethOpenMouthLeftSide: "All Teeth Open Mouth Left Side Template",
-            allTeethOpenLeftSide: "All Teeth Open Left Side Template",
-            allTeethFrontOpen: "All Teeth Front Open Template",
-            allTeethFrontClosed: "All Teeth Front Closed Template",
-            allTeethOpenMouthFront: "All Teeth Open Mouth Front Template",
-            allTeethOpenMouthRightSide: "All Teeth Open Mouth Right Side Template",
-        };
-        return nameMap[currentGhostItem || ""] || "Template";
+        if (!currentGhostItem) return "Template";
+        return getGhostName(currentGhostItem);
+    };
+
+    const getTemplateDescription = () => {
+        if (!currentGhostItem) return "Follow the guide lines to position correctly.";
+        return getGhostDescription(currentGhostItem);
     };
 
     const handleCloseGuide = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setShowGuideModal(false);
+    };
+
+    const handleShowSample = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowSampleModal(true);
+    };
+
+    const handleCloseSample = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setShowSampleModal(false);
     };
 
     // Simple toggle functions
@@ -331,13 +330,13 @@ export default function CameraScreen() {
                 </View>
 
                 {/* Template Badge - shows current ghost name */}
-                {hasGhostItems && (
+                {/* {hasGhostItems && (
                     <View style={styles.templateBadge}>
                         <BaseText type="Caption1" weight={600} color="system.white">
                             {currentGhostItem} ({currentGhostIndex + 1}/{ghostItemIds.length})
                         </BaseText>
                     </View>
-                )}
+                )} */}
 
                 {/* Template Select Button - Only show when no ghost items selected */}
                 {!hasGhostItems && (
@@ -365,6 +364,14 @@ export default function CameraScreen() {
                     {/* Ghost item thumbnails - only show when has ghost items */}
                     {hasGhostItems && (
                         <View style={styles.thumbnailsContainer}>
+                            {/* Sample Button */}
+                            <TouchableOpacity style={styles.sampleButton} onPress={handleShowSample} activeOpacity={0.8}>
+                                <IconSymbol name="photo.fill" size={18} color={colors.system.white} />
+                                <BaseText type="Caption1" weight={600} color="system.white" style={{ marginLeft: 6 }}>
+                                    Sample
+                                </BaseText>
+                            </TouchableOpacity>
+
                             <FlatList
                                 data={ghostItemIds}
                                 horizontal
@@ -375,14 +382,17 @@ export default function CameraScreen() {
                                     const photo = capturedPhotos.find((p) => p.templateId === item);
                                     const isActive = index === currentGhostIndex;
                                     const isCompleted = !!photo;
+                                    const iconSource = getGhostIcon(item);
+
+                                    // Debug
+                                    if (index === 0 && !photo) {
+                                        console.log("🔍 Icon debug:", { item, iconSource, hasIcon: !!iconSource });
+                                    }
 
                                     return (
                                         <TouchableOpacity
                                             onPress={() => {
-                                                if (photo) {
-                                                    // Can retake this photo
-                                                    setCurrentGhostIndex(index);
-                                                }
+                                                setCurrentGhostIndex(index);
                                             }}
                                             style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
                                         >
@@ -393,6 +403,15 @@ export default function CameraScreen() {
                                                         <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
                                                     </View>
                                                 </>
+                                            ) : iconSource ? (
+                                                <Image
+                                                    source={iconSource}
+                                                    style={styles.thumbnailIcon}
+                                                    contentFit="contain"
+                                                    onError={(error) => {
+                                                        console.log("Icon load error for:", item, error);
+                                                    }}
+                                                />
                                             ) : (
                                                 <View style={styles.thumbnailPlaceholder}>
                                                     <BaseText type="Caption2" color="labels.tertiary">
@@ -431,7 +450,7 @@ export default function CameraScreen() {
             </CameraView>
 
             {/* Guide Modal */}
-            <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
+            {/* <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
                 <View style={styles.guideModalContainer}>
                     <View style={[styles.guideModalContent, { paddingBottom: insets.bottom }]}>
                         <Image source={require("@/assets/gost/Guid.png")} style={styles.guideImage} contentFit="contain" />
@@ -442,6 +461,30 @@ export default function CameraScreen() {
                             Place The Head Between Lines and keep eye line leveled.
                         </BaseText>
                         <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseGuide} activeOpacity={0.8}>
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Close
+                            </BaseText>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal> */}
+
+            {/* Sample Modal */}
+            <Modal visible={showSampleModal} transparent animationType="fade" onRequestClose={handleCloseSample}>
+                <View style={styles.guideModalContainer}>
+                    <View style={[styles.guideModalContent, { paddingBottom: insets.bottom }]}>
+                        {currentGhostItem && (
+                            <>
+                                <Image source={getGhostSample(currentGhostItem)} style={styles.guideImage} contentFit="contain" />
+                                <BaseText type="Title1" weight={600} color="labels.primary" align="center" className="mt-4 text-center">
+                                    {getTemplateName()}
+                                </BaseText>
+                                <BaseText type="Body" align="center" color="labels.primary" className="text-center mt-2 px-8">
+                                    {getTemplateDescription()}
+                                </BaseText>
+                            </>
+                        )}
+                        <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseSample} activeOpacity={0.8}>
                             <BaseText type="Body" weight={600} color="system.white">
                                 Close
                             </BaseText>
@@ -578,6 +621,18 @@ const styles = StyleSheet.create({
     thumbnailsContainer: {
         marginBottom: 16,
         paddingHorizontal: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    sampleButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "rgba(0,199,190,0.8)",
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginRight: 8,
     },
     thumbnailsList: {
         gap: 10,
@@ -613,6 +668,12 @@ const styles = StyleSheet.create({
         height: "100%",
         justifyContent: "center",
         alignItems: "center",
+        overflow: "hidden",
+    },
+    thumbnailIcon: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 8,
     },
     bottomControls: {
         flexDirection: "row",

@@ -69,3 +69,50 @@ export const GHOST_ITEMS: GhostItem[] = [
 ];
 
 export const getGhostImage = (id: GhostItemId) => GHOST_ASSETS[id];
+
+// Ghost Icons - Using paths from separate ghost-icons folder
+export const GHOST_ICONS: Record<GhostItemId, GhostImageSource> = {
+    face: require("@/assets/ghost-icons/Face icon.jpg"),
+    frontFaceSmile: require("@/assets/ghost-icons/Face icon-1.jpg"),
+    faceTurnRight: require("@/assets/ghost-icons/Face-turn right - icon.jpg"),
+    faceTurnLeft: require("@/assets/ghost-icons/Face-turn left - icon.jpg"),
+    faceRightSide: require("@/assets/ghost-icons/Face- right side - icon.jpg"),
+    faceLeftSide: require("@/assets/ghost-icons/Face- left side - icon.jpg"),
+    upperTeethFront: require("@/assets/ghost-icons/upper teeth-close up-front - icon.jpg"),
+    upperTeethRightSide: require("@/assets/ghost-icons/upper teeth-close up- right side - icon.jpg"),
+    upperTeethLeftSide: require("@/assets/ghost-icons/upper teeth-close up- left side - icon.jpg"),
+    upperJawDownView: require("@/assets/ghost-icons/upper jaw teeth- down view - icon.jpg"),
+    lowerJawUpView: require("@/assets/ghost-icons/lower jaw teeth- up view - icon.jpg"),
+    allTeethOpenRightSide: require("@/assets/ghost-icons/all teeth-open right side - icon.jpg"),
+    allTeethOpenMouthLeftSide: require("@/assets/ghost-icons/all teeth-open mouth-left side - icon.jpg"),
+    allTeethOpenLeftSide: require("@/assets/ghost-icons/all teeth-open left side - icon.jpg"),
+    allTeethFrontOpen: require("@/assets/ghost-icons/all teeth-front - open - icon.jpg"),
+    allTeethFrontClosed: require("@/assets/ghost-icons/all teeth-front - closed - icon.jpg"),
+    allTeethOpenMouthFront: require("@/assets/ghost-icons/all teeth open mouth-front - icon.jpg"),
+    allTeethOpenMouthRightSide: require("@/assets/ghost-icons/all teeth-open mouth-right side - icon.jpg"),
+};
+
+// Ghost Samples - Using paths from separate ghost-samples folder
+export const GHOST_SAMPLES: Record<GhostItemId, GhostImageSource> = {
+    face: require("@/assets/ghost-samples/Face - sample.jpg"),
+    frontFaceSmile: require("@/assets/ghost-samples/Front Face Smile - sample.jpg"),
+    faceTurnRight: require("@/assets/ghost-samples/Face-turn left - sample.jpg"),
+    faceTurnLeft: require("@/assets/ghost-samples/Face-turn left - sample.jpg"),
+    faceRightSide: require("@/assets/ghost-samples/Face- right side - sample.jpg"),
+    faceLeftSide: require("@/assets/ghost-samples/Face- left side - sample.jpg"),
+    upperTeethFront: require("@/assets/ghost-samples/upper teeth-close up-front - sample.jpg"),
+    upperTeethRightSide: require("@/assets/ghost-samples/upper teeth-close up- right side - sample.jpg"),
+    upperTeethLeftSide: require("@/assets/ghost-samples/upper teeth-close up- left side - sample.jpg"),
+    upperJawDownView: require("@/assets/ghost-samples/upper jaw teeth- down view - sample.jpg"),
+    lowerJawUpView: require("@/assets/ghost-samples/lower jaw teeth - sample - sample.jpg"),
+    allTeethOpenRightSide: require("@/assets/ghost-samples/all teeth-open right side - sample.jpg"),
+    allTeethOpenMouthLeftSide: require("@/assets/ghost-samples/all teeth-open mouth-left side - sample.jpg"),
+    allTeethOpenLeftSide: require("@/assets/ghost-samples/all teeth-open left side - sample.jpg"),
+    allTeethFrontOpen: require("@/assets/ghost-samples/all teeth-front - open - sample.jpg"),
+    allTeethFrontClosed: require("@/assets/ghost-samples/all teeth-front - closed - sample.jpg"),
+    allTeethOpenMouthFront: require("@/assets/ghost-samples/all teeth open mouth- - sample.jpg"),
+    allTeethOpenMouthRightSide: require("@/assets/ghost-samples/all teeth-open mouth-right side - sample.jpg"),
+};
+
+export const getGhostIcon = (id: GhostItemId) => GHOST_ICONS[id];
+export const getGhostSample = (id: GhostItemId) => GHOST_SAMPLES[id];
