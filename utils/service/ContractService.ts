@@ -2,13 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { CreateContractDto } from "./models/RequestModels";
-import {
-    ContractTemplateListResponse,
-    ContractTemplateDetailResponse,
-    PatientContractListResponse,
-    PatientContractDetailResponse,
-    CreateContractResponse,
-} from "./models/ResponseModels";
+import { ContractTemplateDetailResponse, ContractTemplateListResponse, CreateContractResponse, PatientContractDetailResponse, PatientContractListResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -101,4 +95,3 @@ export const ContractService = {
         }
     },
 };
-

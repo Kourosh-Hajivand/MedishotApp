@@ -215,7 +215,17 @@ export default function PatientDetailsScreen() {
                                     Take photo
                                 </BaseText>
                             </TouchableOpacity>
-                            <TouchableOpacity className="flex-1 items-center justify-center gap-2 border-r border-border">
+                            <TouchableOpacity
+                                className="flex-1 items-center justify-center gap-2 border-r border-border"
+                                onPress={() => {
+                                    router.push({
+                                        pathname: "/(modals)/select-contract",
+                                        params: {
+                                            patientId: id,
+                                        },
+                                    });
+                                }}
+                            >
                                 <IconSymbol name="checklist" color={colors.system.blue} size={26} />
                                 <BaseText type="Footnote" color="labels.primary">
                                     Fill consent

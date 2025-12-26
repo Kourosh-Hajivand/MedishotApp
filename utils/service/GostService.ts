@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { GostListResponse, GostDetailResponse } from "./models/ResponseModels";
+import { GostDetailResponse, GostListResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -44,4 +44,3 @@ export const GostService = {
         }
     },
 };
-

@@ -1,10 +1,10 @@
 export * from "./AuthService";
+export { ContractService } from "./ContractService";
+export { GostService } from "./GostService";
 export { default as Mapbox } from "./MapBox";
 export { default as MediaService } from "./MediaService";
 export { default as PatientService } from "./PatientService";
 export { PracticeService } from "./PracticeService";
 export { SubscriptionService } from "./SubscriptionService";
-export { UploadService } from "./UploadService";
-export { ContractService } from "./ContractService";
-export { GostService } from "./GostService";
 export { TemplateService } from "./TemplateService";
+export { UploadService } from "./UploadService";

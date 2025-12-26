@@ -1,8 +1,8 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto, CheckoutDto } from "./models/RequestModels";
-import { ApiResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse, CheckoutSessionResponse, CheckoutSuccessResponse } from "./models/ResponseModels";
+import { CheckoutDto, SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto } from "./models/RequestModels";
+import { ApiResponse, CheckoutSessionResponse, CheckoutSuccessResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -137,9 +137,7 @@ export const SubscriptionService = {
     // Handle successful checkout
     checkoutSuccess: async (practiceId: number, sessionId: string): Promise<CheckoutSuccessResponse> => {
         try {
-            const response: AxiosResponse<CheckoutSuccessResponse> = await axiosInstance.get(
-                baseUrl + checkoutSuccess(practiceId) + `?session_id=${sessionId}`
-            );
+            const response: AxiosResponse<CheckoutSuccessResponse> = await axiosInstance.get(baseUrl + checkoutSuccess(practiceId) + `?session_id=${sessionId}`);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

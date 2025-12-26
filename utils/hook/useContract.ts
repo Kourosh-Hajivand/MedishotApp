@@ -1,12 +1,6 @@
 import { ContractService } from "@/utils/service";
 import { CreateContractDto } from "@/utils/service/models/RequestModels";
-import {
-    ContractTemplateListResponse,
-    ContractTemplateDetailResponse,
-    PatientContractListResponse,
-    PatientContractDetailResponse,
-    CreateContractResponse,
-} from "@/utils/service/models/ResponseModels";
+import { ContractTemplateDetailResponse, ContractTemplateListResponse, CreateContractResponse, PatientContractDetailResponse, PatientContractListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -66,4 +60,3 @@ export const useCreateContract = (onSuccess?: (data: CreateContractResponse) => 
         },
     });
 };
-

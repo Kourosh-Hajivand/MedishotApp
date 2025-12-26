@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { EditPatientMediaRequest, UploadPatientMediaRequest, UploadMediaWithTemplateRequest } from "./models/RequestModels";
+import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
 import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "./models/ResponseModels";
 
 const {
@@ -66,13 +66,9 @@ const MediaService = {
                 }
             });
 
-            const response: AxiosResponse<PatientMediaWithTemplateResponse> = await axiosInstance.post(
-                baseUrl + uploadMediaWithTemplate(patientId),
-                formData,
-                {
-                    headers: { "Content-Type": "multipart/form-data" },
-                }
-            );
+            const response: AxiosResponse<PatientMediaWithTemplateResponse> = await axiosInstance.post(baseUrl + uploadMediaWithTemplate(patientId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
             return response.data;
         } catch (error) {
             console.error("Error in UploadPatientMediaWithTemplate:", error);

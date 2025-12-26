@@ -1,5 +1,5 @@
 import { GostService } from "@/utils/service";
-import { GostListResponse, GostDetailResponse } from "@/utils/service/models/ResponseModels";
+import { GostDetailResponse, GostListResponse } from "@/utils/service/models/ResponseModels";
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -22,4 +22,3 @@ export const useGetGostById = (id: string | number, enabled: boolean = true): Us
         enabled: isAuthenticated === true && enabled && !!id,
     });
 };
-

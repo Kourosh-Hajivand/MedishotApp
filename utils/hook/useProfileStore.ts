@@ -135,10 +135,22 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
         return;
     }
 
-    // اگر قبلاً لود شده و selectedPractice وجود دارد، از فراخوانی مکرر جلوگیری کن
-    if (currentState.isLoaded && currentState.selectedPractice) {
-        console.log("Already loaded with practice, skipping...");
+    // اگر practiceList وجود ندارد، صبر کن تا لود شود
+    if (!practiceList || practiceList.length === 0) {
+        console.log("Practice list not available yet, skipping...");
         return;
+    }
+
+    // اگر قبلاً لود شده و selectedPractice وجود دارد، بررسی کن که آیا هنوز معتبر است
+    if (currentState.isLoaded && currentState.selectedPractice) {
+        const isValidPractice = practiceList.some((p) => p.id === currentState.selectedPractice?.id);
+        if (isValidPractice) {
+            console.log("Already loaded with valid practice, skipping...");
+            return;
+        } else {
+            console.log("Stored practice is no longer valid, reloading...");
+            useProfileStore.setState({ isLoaded: false });
+        }
     }
 
     // اگر isLoaded است اما selectedPractice وجود ندارد، isLoaded را reset کن
@@ -166,6 +178,18 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 let viewMode = parsed.viewMode ?? DEFAULT_VIEW_MODE;
                 let needsPersistence = false;
 
+                // بررسی اینکه آیا selectedPractice هنوز در لیست practiceList موجود است
+                if (selectedPractice) {
+                    const isValidPractice = practiceList.some((p) => p.id === selectedPractice?.id);
+                    if (!isValidPractice) {
+                        console.log("Stored practice is no longer valid, selecting default");
+                        selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
+                        viewMode = determineDefaultViewMode(selectedPractice);
+                        needsPersistence = true;
+                    }
+                }
+
+                // اگر هیچ پرکتیسی انتخاب نشده بود، اولین پرکتیس را انتخاب کن
                 if (!selectedPractice && practiceList && practiceList.length > 0) {
                     selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                     viewMode = determineDefaultViewMode(selectedPractice);
@@ -194,10 +218,23 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
         }
     } catch (error) {
         console.error("خطا در بارگذاری انتخاب practice:", error);
-        useProfileStore.setState({
-            isLoaded: true,
-            isLoading: false,
-        });
+        // در صورت خطا، اولین پرکتیس را انتخاب کن
+        if (practiceList && practiceList.length > 0) {
+            const defaultPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
+            const defaultViewMode = determineDefaultViewMode(defaultPractice);
+            useProfileStore.setState({
+                selectedPractice: defaultPractice,
+                viewMode: defaultViewMode,
+                isLoaded: true,
+                isLoading: false,
+            });
+            await persistProfileSelection();
+        } else {
+            useProfileStore.setState({
+                isLoaded: true,
+                isLoading: false,
+            });
+        }
     }
 };
 

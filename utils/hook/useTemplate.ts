@@ -1,5 +1,5 @@
 import { TemplateService } from "@/utils/service";
-import { TemplateListResponse, TemplateDetailResponse } from "@/utils/service/models/ResponseModels";
+import { TemplateDetailResponse, TemplateListResponse } from "@/utils/service/models/ResponseModels";
 import { useQuery, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -22,4 +22,3 @@ export const useGetTemplateById = (id: string | number, enabled: boolean = true)
         enabled: isAuthenticated === true && enabled && !!id,
     });
 };
-

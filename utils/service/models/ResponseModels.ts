@@ -491,10 +491,21 @@ export interface CheckoutSuccessResponse {
 }
 
 // ============= Contract Responses =============
+export interface ContractTemplateBodyItem {
+    type: "paragraph" | "radio_group" | "checkbox_group" | "text_input" | "textarea";
+    data: {
+        content?: string; // For paragraph type
+        label?: string; // For form fields
+        options?: string[]; // For radio_group, checkbox_group
+        placeholder?: string; // For text inputs
+    };
+}
+
 export interface ContractTemplate {
     id: number;
     title: string;
-    body: string;
+    body: ContractTemplateBodyItem[] | string; // Support both old string format and new array format
+    image?: string | null;
     is_active: boolean;
     created_at: string;
     updated_at: string;

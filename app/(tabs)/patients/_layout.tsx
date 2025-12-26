@@ -2,7 +2,7 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
-import { forceReloadProfileSelection, loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
+import { loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
@@ -49,19 +49,22 @@ export default function PatientsLayout() {
         return Math.max(100, Math.min(220, totalWidth));
     }, [selectedPractice?.name]);
 
+    // Load profile selection when practice list is available
     useEffect(() => {
-        if (practiceList?.data && practiceList.data.length > 0) {
-            loadProfileSelection(practiceList.data);
+        if (practiceList?.data && practiceList.data.length > 0 && isAuthenticated === true) {
+            const currentState = useProfileStore.getState();
+            // فقط اگر هنوز لود نشده یا selectedPractice معتبر نیست، لود کن
+            if (!currentState.isLoaded || !currentState.selectedPractice) {
+                loadProfileSelection(practiceList.data);
+            } else {
+                // بررسی کن که selectedPractice هنوز معتبر است
+                const isValidPractice = practiceList.data.some((p) => p.id === currentState.selectedPractice?.id);
+                if (!isValidPractice) {
+                    loadProfileSelection(practiceList.data);
+                }
+            }
         }
-    }, [practiceList?.data]);
-
-    // Force reload profile selection when user authentication changes
-    useEffect(() => {
-        if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0) {
-            console.log("User authenticated, force reloading profile selection with practice list:", practiceList.data);
-            forceReloadProfileSelection(practiceList.data);
-        }
-    }, [isAuthenticated, practiceList?.data]);
+    }, [practiceList?.data?.length, isAuthenticated, isLoaded, selectedPractice?.id]);
 
     return (
         <BottomSheetModalProvider>

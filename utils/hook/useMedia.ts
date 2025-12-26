@@ -1,5 +1,5 @@
 import MediaService from "@/utils/service/MediaService";
-import { EditPatientMediaRequest, UploadPatientMediaRequest, UploadMediaWithTemplateRequest } from "@/utils/service/models/RequestModels";
+import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
 import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 
