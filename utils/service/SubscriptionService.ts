@@ -1,13 +1,13 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto } from "./models/RequestModels";
-import { ApiResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "./models/ResponseModels";
+import { SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto, CheckoutDto } from "./models/RequestModels";
+import { ApiResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse, CheckoutSessionResponse, CheckoutSuccessResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
     plans: { list: listPlans, getById: getPlanById },
-    subscriptions: { getStatus, subscribe, cancel, resume, swap, updateAddonLimit },
+    subscriptions: { getStatus, subscribe, checkout, checkoutSuccess, checkoutCancel, cancel, resume, swap, updateAddonLimit },
 } = routes;
 
 export const SubscriptionService = {
@@ -114,6 +114,49 @@ export const SubscriptionService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to update addon limit");
+            }
+            throw error;
+        }
+    },
+
+    // ============= Checkout =============
+
+    // Create checkout session
+    createCheckout: async (practiceId: number, data: CheckoutDto): Promise<CheckoutSessionResponse> => {
+        try {
+            const response: AxiosResponse<CheckoutSessionResponse> = await axiosInstance.post(baseUrl + checkout(practiceId), data);
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to create checkout session");
+            }
+            throw error;
+        }
+    },
+
+    // Handle successful checkout
+    checkoutSuccess: async (practiceId: number, sessionId: string): Promise<CheckoutSuccessResponse> => {
+        try {
+            const response: AxiosResponse<CheckoutSuccessResponse> = await axiosInstance.get(
+                baseUrl + checkoutSuccess(practiceId) + `?session_id=${sessionId}`
+            );
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to process checkout success");
+            }
+            throw error;
+        }
+    },
+
+    // Handle cancelled checkout
+    checkoutCancel: async (practiceId: number, planId?: number): Promise<void> => {
+        try {
+            const url = baseUrl + checkoutCancel(practiceId) + (planId ? `?plan_id=${planId}` : "");
+            await axiosInstance.get(url);
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to process checkout cancel");
             }
             throw error;
         }

@@ -232,3 +232,36 @@ export interface UpdateAddonLimitDto {
     addon_key: string;
     quantity: number;
 }
+
+export interface CheckoutDto {
+    plan_id: number;
+    success_url: string;
+    cancel_url: string;
+}
+
+// ============= Contract Models =============
+export interface CreateContractDto {
+    contract_template_id: number;
+    body?: string; // Optional override for contract body (JSON string)
+    signature_image: File | string; // File or Livewire temp filename
+}
+
+// ============= Gost Models =============
+// No request models needed for GET endpoints
+
+// ============= Template Models =============
+// No request models needed for GET endpoints
+
+// ============= Media with Template Models =============
+export interface UploadMediaWithTemplateImage {
+    gost_id: number;
+    media: File | string; // File or Livewire temp filename
+    notes?: string;
+}
+
+export interface UploadMediaWithTemplateRequest {
+    template_id: number;
+    type?: string;
+    data?: string; // JSON string
+    images: UploadMediaWithTemplateImage[];
+}

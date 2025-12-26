@@ -1,6 +1,6 @@
 import MediaService from "@/utils/service/MediaService";
-import { EditPatientMediaRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
-import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
+import { EditPatientMediaRequest, UploadPatientMediaRequest, UploadMediaWithTemplateRequest } from "@/utils/service/models/RequestModels";
+import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 
 // ============= Query Hooks (GET) =============
@@ -126,6 +126,23 @@ export const useUnbookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkRespon
         onSuccess: (data, mediaId) => {
             // Invalidate all media queries to refresh bookmark status
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMediaWithTemplateResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaWithTemplateResponse, Error, { patientId: number | string; data: UploadMediaWithTemplateRequest }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ patientId, data }: { patientId: number | string; data: UploadMediaWithTemplateRequest }) => MediaService.uploadPatientMediaWithTemplate(patientId, data),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientMedia", variables.patientId],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {

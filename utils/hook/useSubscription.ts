@@ -1,6 +1,6 @@
 import { SubscriptionService } from "@/utils/service";
-import { SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "@/utils/service/models/ResponseModels";
+import { SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto, CheckoutDto } from "@/utils/service/models/RequestModels";
+import { ApiResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse, CheckoutSessionResponse, CheckoutSuccessResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -113,6 +113,49 @@ export const useUpdateAddonLimit = (onSuccess?: (data: ApiResponse<any>) => void
                 queryKey: ["GetSubscriptionStatus", variables.practiceId],
             });
             onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+// ============= Checkout Hooks =============
+
+export const useCreateCheckout = (onSuccess?: (data: CheckoutSessionResponse) => void, onError?: (error: Error) => void): UseMutationResult<CheckoutSessionResponse, Error, { practiceId: number; data: CheckoutDto }> => {
+    return useMutation({
+        mutationFn: ({ practiceId, data }: { practiceId: number; data: CheckoutDto }) => SubscriptionService.createCheckout(practiceId, data),
+        onSuccess: (data) => {
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useCheckoutSuccess = (onSuccess?: (data: CheckoutSuccessResponse) => void, onError?: (error: Error) => void): UseMutationResult<CheckoutSuccessResponse, Error, { practiceId: number; sessionId: string }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ practiceId, sessionId }: { practiceId: number; sessionId: string }) => SubscriptionService.checkoutSuccess(practiceId, sessionId),
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries({
+                queryKey: ["GetSubscriptionStatus", variables.practiceId],
+            });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useCheckoutCancel = (onSuccess?: () => void, onError?: (error: Error) => void): UseMutationResult<void, Error, { practiceId: number; planId?: number }> => {
+    return useMutation({
+        mutationFn: ({ practiceId, planId }: { practiceId: number; planId?: number }) => SubscriptionService.checkoutCancel(practiceId, planId),
+        onSuccess: () => {
+            onSuccess?.();
         },
         onError: (error) => {
             onError?.(error);

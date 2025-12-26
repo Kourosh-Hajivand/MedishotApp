@@ -1,12 +1,12 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { EditPatientMediaRequest, UploadPatientMediaRequest } from "./models/RequestModels";
-import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, TempUploadResponse } from "./models/ResponseModels";
+import { EditPatientMediaRequest, UploadPatientMediaRequest, UploadMediaWithTemplateRequest } from "./models/RequestModels";
+import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { getMedia, uploadMedia, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
+    patients: { getMedia, uploadMedia, uploadMediaWithTemplate, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
     media: { tempUpload },
 } = routes;
 
@@ -40,6 +40,44 @@ const MediaService = {
             console.error("Error in UploadPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Upload patient media failed");
+            }
+            throw error;
+        }
+    },
+
+    uploadPatientMediaWithTemplate: async (patientId: string | number, payload: UploadMediaWithTemplateRequest): Promise<PatientMediaWithTemplateResponse> => {
+        try {
+            const formData = new FormData();
+            formData.append("template_id", String(payload.template_id));
+
+            if (payload.type) {
+                formData.append("type", payload.type);
+            }
+
+            if (payload.data) {
+                formData.append("data", typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data));
+            }
+
+            payload.images.forEach((image, index) => {
+                formData.append(`images[${index}][gost_id]`, String(image.gost_id));
+                formData.append(`images[${index}][media]`, image.media);
+                if (image.notes) {
+                    formData.append(`images[${index}][notes]`, image.notes);
+                }
+            });
+
+            const response: AxiosResponse<PatientMediaWithTemplateResponse> = await axiosInstance.post(
+                baseUrl + uploadMediaWithTemplate(patientId),
+                formData,
+                {
+                    headers: { "Content-Type": "multipart/form-data" },
+                }
+            );
+            return response.data;
+        } catch (error) {
+            console.error("Error in UploadPatientMediaWithTemplate:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Upload patient media with template failed");
             }
             throw error;
         }

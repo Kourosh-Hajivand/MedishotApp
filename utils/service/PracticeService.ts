@@ -82,7 +82,7 @@ export const PracticeService = {
     // Update practice
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(baseUrl + update(practiceId), data, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + update(practiceId), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -138,7 +138,7 @@ export const PracticeService = {
     // Update member role
     updateMemberRole: async (practiceId: number, memberId: string | number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.put(baseUrl + updateMemberRole(practiceId, memberId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + updateMemberRole(practiceId, memberId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -285,7 +285,7 @@ export const PracticeService = {
     // Update practice tag
     updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(baseUrl + updateTag(practiceId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + updateTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -352,7 +352,7 @@ export const PracticeService = {
     // Update practice template
     updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(baseUrl + updateTemplate(practiceId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

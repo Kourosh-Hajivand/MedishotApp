@@ -130,7 +130,7 @@ export const AuthService = {
                 }
             }
 
-            const response: AxiosResponse<UpdateProfileResponse> = await axiosInstance.put(baseUrl + updateProfileFull(), formData, {
+            const response: AxiosResponse<UpdateProfileResponse> = await axiosInstance.post(baseUrl + updateProfileFull(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;

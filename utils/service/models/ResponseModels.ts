@@ -468,3 +468,179 @@ export interface SubscriptionStatus {
 export interface SubscriptionStatusResponse {
     data: SubscriptionStatus;
 }
+
+export interface CheckoutSessionResponse {
+    success: boolean;
+    message: string;
+    data: {
+        session_id: string;
+        checkout_url: string;
+    };
+}
+
+export interface CheckoutSuccessResponse {
+    success: boolean;
+    message: string;
+    data: {
+        session_id: string;
+        checkout_url: string;
+        payment_status: string;
+        customer: string;
+        subscription: string | null;
+    };
+}
+
+// ============= Contract Responses =============
+export interface ContractTemplate {
+    id: number;
+    title: string;
+    body: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ContractTemplateListResponse {
+    data: ContractTemplate[];
+}
+
+export interface ContractTemplateDetailResponse {
+    data: ContractTemplate;
+}
+
+export interface PatientContract {
+    id: number;
+    patient_id: number;
+    contract_template_id: number;
+    body: string;
+    signed_at: string | null;
+    created_at: string;
+    updated_at: string;
+    contract_template: ContractTemplate;
+}
+
+export interface PatientContractListResponse {
+    data: PatientContract[];
+}
+
+export interface PatientContractDetailResponse {
+    data: PatientContract;
+}
+
+export interface CreateContractResponse {
+    message: string;
+    data: PatientContract;
+}
+
+// ============= Gost Responses =============
+export interface Gost {
+    id: number;
+    name: string;
+    description: string | null;
+    image: string | null;
+    gost_image: string | null;
+    icon: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface GostListResponse {
+    success: boolean;
+    data: {
+        data: Gost[];
+        current_page: number;
+        per_page: number;
+        total: number;
+    };
+}
+
+export interface GostDetailResponse {
+    success: boolean;
+    data: Gost;
+}
+
+// ============= Template Responses =============
+export interface TemplateGridLayout {
+    row: number;
+    col: number;
+    gost_id: number;
+}
+
+export interface Template {
+    id: number;
+    name: string;
+    description: string | null;
+    grid_layout: TemplateGridLayout[] | null;
+    image: string | null;
+    gost_image: string | null;
+    icon: string | null;
+    gosts_count?: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface TemplateListResponse {
+    success: boolean;
+    data: {
+        data: Template[];
+        current_page: number;
+        per_page: number;
+        total: number;
+    };
+}
+
+export interface TemplateGost {
+    id: number;
+    name: string;
+    description: string | null;
+    image: string | null;
+    gost_image: string | null;
+    icon: string | null;
+    pivot: {
+        template_id: number;
+        gost_id: number;
+        order: number;
+    };
+    created_at: string;
+    updated_at: string;
+}
+
+export interface TemplateWithGosts extends Template {
+    gosts: TemplateGost[];
+}
+
+export interface TemplateDetailResponse {
+    success: boolean;
+    data: TemplateWithGosts;
+}
+
+// ============= Patient Media With Template Responses =============
+export interface PatientMediaImage {
+    id: number;
+    patient_media_id: number;
+    gost_id: number;
+    notes: string | null;
+    image: string | null;
+    gost: Gost;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PatientMediaWithTemplate {
+    id: number;
+    patient_id: number;
+    template_id: number | null;
+    type: string | null;
+    data: Record<string, any> | null;
+    taker_id: number | null;
+    template: Template | null;
+    images: PatientMediaImage[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PatientMediaWithTemplateResponse {
+    success: boolean;
+    message: string;
+    data: PatientMediaWithTemplate;
+}
