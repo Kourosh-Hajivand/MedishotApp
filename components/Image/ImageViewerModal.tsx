@@ -1,7 +1,8 @@
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { Patient } from "@/utils/service/models/ResponseModels";
-import { Button, Host, HStack } from "@expo/ui/swift-ui";
+import { Button, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
+import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -10,7 +11,6 @@ import { Dimensions, Modal, ScrollView, StyleSheet, TouchableOpacity, View } fro
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BaseText } from "../text/BaseText";
 
 const { width, height } = Dimensions.get("window");
 
@@ -54,8 +54,8 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
         // Clamp activeProgress between 0 and 1
         activeProgress = Math.max(0, Math.min(1, activeProgress));
 
-        // Interpolate width: 30 (inactive) -> 50 (active)
-        const width = 30 + activeProgress * 20;
+        // Interpolate width: 24 (inactive) -> 40 (active)
+        const width = 24 + activeProgress * 16;
         // Interpolate margin: 0 (inactive) -> 4 (active)
         const margin = activeProgress * 4;
 
@@ -78,8 +78,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
     const thumbnailScrollRef = useRef<ScrollView>(null);
+    const thumbnailScrollPosition = useRef(0);
     const isProgrammaticScroll = useRef(false);
     const isThumbnailProgrammaticScroll = useRef(false);
+    const lastThumbnailIndex = useRef(initialIndex);
+    const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
@@ -99,11 +102,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         (currentPage: number, animated: boolean = false) => {
             if (thumbnailScrollRef.current) {
                 isThumbnailProgrammaticScroll.current = true;
-                const activeThumbnailWidth = 50;
-                const inactiveThumbnailWidth = 30;
+                const activeThumbnailWidth = 40;
+                const inactiveThumbnailWidth = 24;
                 const thumbnailGap = 4;
                 const activeThumbnailMargin = 4;
-                const padding = width / 2 - 25;
+                const padding = width / 2 - 20;
 
                 // Calculate which thumbnail is currently active (rounded)
                 const roundedIndex = Math.round(currentPage);
@@ -171,14 +174,64 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
     const scrollThumbnailToIndex = React.useCallback(
         (index: number, animated: boolean = true) => {
-            scrollThumbnailToPosition(index, animated);
+            if (thumbnailScrollRef.current) {
+                isThumbnailProgrammaticScroll.current = true;
+                const activeThumbnailWidth = 40;
+                const inactiveThumbnailWidth = 24;
+                const thumbnailGap = 4;
+                const activeThumbnailMargin = 4;
+                const padding = width / 2 - 20;
+
+                // Calculate target center position for the thumbnail at index
+                let targetCenterPosition = padding;
+                for (let i = 0; i < index; i++) {
+                    targetCenterPosition += inactiveThumbnailWidth + thumbnailGap;
+                }
+                // Add margin and half width for active thumbnail
+                targetCenterPosition += activeThumbnailMargin + activeThumbnailWidth / 2;
+
+                // Calculate target scroll position to center the thumbnail
+                const targetScrollPosition = targetCenterPosition - width / 2;
+
+                // Calculate total width for max scroll
+                let totalWidth = padding;
+                for (let i = 0; i < images.length; i++) {
+                    if (i === index) {
+                        totalWidth += activeThumbnailMargin + activeThumbnailWidth + activeThumbnailMargin + thumbnailGap;
+                    } else {
+                        totalWidth += inactiveThumbnailWidth + thumbnailGap;
+                    }
+                }
+                totalWidth -= thumbnailGap;
+                totalWidth += padding;
+                const maxScroll = Math.max(0, totalWidth - width);
+
+                const finalScrollPosition = Math.max(0, Math.min(targetScrollPosition, maxScroll));
+
+                thumbnailScrollRef.current.scrollTo({
+                    x: finalScrollPosition,
+                    animated,
+                });
+
+                if (animated) {
+                    // Longer timeout for smooth animation (matching iOS animation duration)
+                    setTimeout(() => {
+                        isThumbnailProgrammaticScroll.current = false;
+                    }, 500);
+                } else {
+                    setTimeout(() => {
+                        isThumbnailProgrammaticScroll.current = false;
+                    }, 50);
+                }
+            }
         },
-        [scrollThumbnailToPosition],
+        [images.length],
     );
 
-    // Keep currentIndexShared in sync with currentIndex
+    // Keep currentIndexShared and lastThumbnailIndex in sync with currentIndex
     React.useEffect(() => {
         currentIndexShared.value = currentIndex;
+        lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
 
     // Reset zoom when changing images and scroll thumbnail
@@ -189,11 +242,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         setIsZoomed(false);
 
         // Scroll thumbnail to center current image - iOS-like smooth behavior
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                scrollThumbnailToIndex(currentIndex, true);
-            });
-        });
+        // Use a delay to allow thumbnail animation to start first for smoother transition
+        setTimeout(() => {
+            scrollThumbnailToIndex(currentIndex, true);
+        }, 200);
     }, [currentIndex, scrollThumbnailToIndex]);
 
     const handleScroll = (event: any) => {
@@ -222,19 +274,35 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     };
 
     const handleThumbnailScroll = (event: any) => {
+        // Update scroll position ref
+        thumbnailScrollPosition.current = event.nativeEvent.contentOffset.x;
+
         // Don't update index if scroll is programmatic (from useEffect)
         if (isThumbnailProgrammaticScroll.current) {
             return;
         }
+
+        // During drag, only track position - don't update image
+        // This allows free smooth dragging without interference
+        // Image will be updated in handleThumbnailScrollEnd
+    };
+
+    const handleThumbnailScrollEnd = (event: any) => {
+        // Don't update index if scroll is programmatic (from useEffect)
+        if (isThumbnailProgrammaticScroll.current) {
+            return;
+        }
+
+        // Find which thumbnail is at center after drag ends and update image
         const scrollX = event.nativeEvent.contentOffset.x;
-        const activeThumbnailWidth = 50;
-        const inactiveThumbnailWidth = 30;
+        const activeThumbnailWidth = 40;
+        const inactiveThumbnailWidth = 24;
         const thumbnailGap = 4;
         const activeThumbnailMargin = 4;
         const centerX = scrollX + width / 2;
-        const padding = width / 2 - 25;
+        const padding = width / 2 - 20;
 
-        // Find which thumbnail is at center
+        // Find which thumbnail is at center after drag ends
         let currentWidth = padding;
         for (let i = 0; i < images.length; i++) {
             const isActive = i === currentIndex;
@@ -245,15 +313,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
             if (centerX >= thumbStart && centerX <= thumbEnd) {
                 if (i !== currentIndex) {
+                    // Update to the thumbnail that's at center after drag ends
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     isProgrammaticScroll.current = true;
                     setCurrentIndex(i);
-                    // No animation when dragging - instant change
-                    flatListRef.current?.scrollToIndex({ index: i, animated: false });
-                    // Reset flag immediately since no animation
+                    currentIndexShared.value = i;
+                    flatListRef.current?.scrollToIndex({ index: i, animated: true });
                     setTimeout(() => {
                         isProgrammaticScroll.current = false;
-                    }, 50);
+                    }, 500);
                 }
                 break;
             }
@@ -505,29 +573,34 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
             <GestureHandlerRootView style={styles.container}>
                 <View style={styles.container}>
                     {/* Header */}
-                    <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ top: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
-                        <View style={styles.headerContent}>
-                            <TouchableOpacity onPress={onClose} activeOpacity={0.7} style={styles.backButton}>
-                                <Host style={{ width: 36, height: 36 }}>
+                    <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
+                        <View style={styles.actionButtonsContainer}>
+                            <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                                <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
                                     <Button systemImage="chevron.left" variant="glass" onPress={onClose} />
-                                </Host>
-                            </TouchableOpacity>
-
-                            {/* Location Pill */}
-                            <TouchableOpacity style={styles.locationPill} activeOpacity={0.8}>
-                                <BaseText type="Caption1" weight={500} color="labels.primary">
-                                    Tehran
-                                </BaseText>
-                                <BaseText type="Caption2" weight={400} color="labels.secondary" style={{ marginLeft: 4 }}>
-                                    {patientData?.updated_at ? getRelativeTime(patientData.updated_at) : "Now"}
-                                </BaseText>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity onPress={() => {}} activeOpacity={0.7} style={styles.menuButton}>
-                                <Host style={{ width: 36, height: 36 }}>
-                                    <Button systemImage="ellipsis" variant="glass" onPress={() => {}} />
-                                </Host>
-                            </TouchableOpacity>
+                                    <Spacer />
+                                    <VStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 150 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                        spacing={4}
+                                    >
+                                        <Text size={14}>{patientData?.full_name ?? ""}</Text>
+                                        <Text weight="light" size={12}>
+                                            {patientData?.updated_at ? getRelativeTime(patientData.updated_at) : "Now"}
+                                        </Text>
+                                    </VStack>
+                                    <Spacer />
+                                    <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="ellipsis" variant="glass" onPress={() => {}} />
+                                </HStack>
+                            </Host>
                         </View>
                     </Animated.View>
 
@@ -559,7 +632,18 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                     <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                         {/* Thumbnail Gallery - Hide when zoomed */}
                         {!isZoomed && (
-                            <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} decelerationRate="fast" onScroll={handleThumbnailScroll} scrollEventThrottle={16}>
+                            <ScrollView
+                                ref={thumbnailScrollRef}
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.thumbnailContainer}
+                                style={styles.thumbnailScroll}
+                                decelerationRate="fast"
+                                onScroll={handleThumbnailScroll}
+                                onScrollEndDrag={handleThumbnailScrollEnd}
+                                onMomentumScrollEnd={handleThumbnailScrollEnd}
+                                scrollEventThrottle={16}
+                            >
                                 {images.map((imageUri, index) => (
                                     <ThumbnailItem
                                         key={index}
@@ -587,10 +671,28 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                         {/* Action Buttons */}
                         <View style={styles.actionButtonsContainer}>
                             <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                                <HStack alignment="center" spacing={20}>
+                                <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
                                     <Button systemImage="square.and.arrow.up" variant="glass" controlSize="regular" onPress={() => {}} />
-                                    <Button systemImage="slider.horizontal.3" variant="glass" controlSize="regular" onPress={handleEditPress} />
-                                    <Button systemImage="trash" variant="glass" controlSize="regular" onPress={handleEditPress} />
+                                    <Spacer />
+                                    <HStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 150, height: 40 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                        spacing={4}
+                                    >
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="heart" variant="plain" controlSize="regular" onPress={handleEditPress} />
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="info.circle" variant="plain" controlSize="regular" onPress={handleEditPress} />
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleEditPress} />
+                                    </HStack>
+                                    <Spacer />
+                                    <Button systemImage="archivebox" variant="glass" controlSize="regular" onPress={handleEditPress} />
                                 </HStack>
                             </Host>
                         </View>
@@ -611,18 +713,9 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         right: 0,
-        paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 16,
         zIndex: 10,
     },
-    headerContent: {
-        width: "100%",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        minHeight: 44,
-    },
+
     backButton: {
         width: 36,
         height: 36,
@@ -686,11 +779,11 @@ const styles = StyleSheet.create({
     thumbnailContainer: {
         flexDirection: "row", // Center first/last thumbnails (active width / 2)
         alignItems: "center",
-        paddingHorizontal: width / 2 - 25,
+        paddingHorizontal: width / 2 - 20,
         gap: 4,
     },
     thumbnail: {
-        height: 50,
+        height: 40,
         borderRadius: 6,
         overflow: "hidden",
         borderWidth: 0,

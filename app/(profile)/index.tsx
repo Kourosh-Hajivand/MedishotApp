@@ -95,7 +95,7 @@ export default function Index() {
             { lable: "Practice Team", icon: "person.2.fill", href: "/practice-team", roles: ["owner", "admin"] },
             { lable: "Print Information", icon: "printer.fill", href: "/print-information", roles: ["owner", "admin"] },
             { lable: "Subscription", icon: "dollarsign.circle.fill", href: "/subscription", roles: ["owner", "admin"] },
-            { lable: "Notification", icon: "bell.fill", href: "/notification" },
+            // { lable: "Notification", icon: "bell.fill", href: "/notification" },
             { lable: "Archive", icon: "tray.fill", href: "/archive" },
         ];
 

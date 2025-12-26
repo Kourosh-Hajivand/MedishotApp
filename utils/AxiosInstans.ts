@@ -1,6 +1,6 @@
 import axios from "axios";
-import { getTokens, removeTokens } from "./helper/tokenStorage";
 import { storeFailedRequest } from "./helper/failedRequestStorage";
+import { getTokens, removeTokens } from "./helper/tokenStorage";
 import { AuthService } from "./service/AuthService";
 
 import { router } from "expo-router";
@@ -37,7 +37,7 @@ axiosInstance.interceptors.response.use(
             const requestUrl = error.config?.url || "Unknown";
             const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
             const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
-            
+
             console.error("🚨 Axios Error Response:", {
                 status: error.response.status,
                 method: requestMethod,
@@ -46,14 +46,14 @@ axiosInstance.interceptors.response.use(
                 data: error.response.data,
                 headers: error.response.headers,
             });
-            
+
             // Log a more readable error message
             console.error(`❌ API Error [${requestMethod}] ${fullUrl}:`, error.response.data?.message || error.response.data?.exception || "Unknown error");
         } else if (error.request) {
             const requestUrl = error.config?.url || "Unknown";
             const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
             const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
-            
+
             console.error("🚨 Axios Error Request (No Response):", {
                 method: requestMethod,
                 url: fullUrl,
@@ -67,7 +67,7 @@ axiosInstance.interceptors.response.use(
         if (error.response?.status === 500 && !isRedirectingToError) {
             isRedirectingToError = true;
             console.warn("Server error (500) detected, redirecting to error page...");
-            
+
             // Store failed request for retry
             if (originalRequest) {
                 const failedRequest = {
@@ -80,19 +80,19 @@ axiosInstance.interceptors.response.use(
                 };
                 await storeFailedRequest(failedRequest);
             }
-            
+
             // Navigate to error page
             try {
                 router.replace("/error");
             } catch (navError) {
                 console.error("Failed to navigate to error page:", navError);
             }
-            
+
             // Reset flag after a delay to allow retry
             setTimeout(() => {
                 isRedirectingToError = false;
             }, 2000);
-            
+
             throw error;
         }
 

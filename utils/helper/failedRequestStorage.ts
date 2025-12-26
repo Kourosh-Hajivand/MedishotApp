@@ -48,4 +48,3 @@ export const clearFailedRequest = async (): Promise<void> => {
         console.error("Failed to clear failed request:", error);
     }
 };
-
