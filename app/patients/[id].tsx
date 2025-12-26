@@ -202,7 +202,7 @@ export default function PatientDetailsScreen() {
                                 className="flex-1 items-center justify-center gap-2 border-r border-border"
                                 onPress={() => {
                                     router.push({
-                                        pathname: "/template-select-test" as any, // TEMP: برای تست - باز کردن template-select به صورت modal
+                                        pathname: "/camera" as any,
                                         params: {
                                             patientId: id,
                                             patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,

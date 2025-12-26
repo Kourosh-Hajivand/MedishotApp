@@ -433,12 +433,12 @@ export default function CameraScreen() {
             {/* Guide Modal */}
             <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
                 <View style={styles.guideModalContainer}>
-                    <View style={[styles.guideModalContent, { paddingBottom: insets.bottom + 20 }]}>
+                    <View style={[styles.guideModalContent, { paddingBottom: insets.bottom }]}>
                         <Image source={require("@/assets/gost/Guid.png")} style={styles.guideImage} contentFit="contain" />
-                        <BaseText type="Title2" weight={600} color="labels.primary" className="mt-4 text-center">
+                        <BaseText type="Title1" weight={600} color="labels.primary" className="mt-4 text-center">
                             {getTemplateName()}
                         </BaseText>
-                        <BaseText type="Body" color="labels.secondary" className="mt-2 text-center px-8">
+                        <BaseText type="Body" align="center" color="labels.primary" className="text-center mt-2 px-8">
                             Place The Head Between Lines and keep eye line leveled.
                         </BaseText>
                         <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseGuide} activeOpacity={0.8}>
@@ -544,10 +544,10 @@ const styles = StyleSheet.create({
     },
     templateButton: {
         backgroundColor: MINT_COLOR,
-        paddingHorizontal: 24,
-        paddingVertical: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
         borderRadius: 999,
-        minWidth: 200,
+
         alignItems: "center",
         justifyContent: "center",
     },
@@ -718,8 +718,7 @@ const styles = StyleSheet.create({
     },
     guideImage: {
         width: "100%",
-        height: width * 0.5,
-        borderRadius: 10,
+        height: width * 0.9,
     },
     closeGuideButton: {
         marginTop: 20,
@@ -727,7 +726,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 12,
-        width: "80%",
+        width: "70%",
         alignItems: "center",
     },
 });

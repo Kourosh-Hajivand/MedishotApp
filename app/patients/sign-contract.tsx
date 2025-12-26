@@ -54,13 +54,51 @@ export default function SignContractScreen() {
     const [signatureUri, setSignatureUri] = useState<string | null>(null);
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [uploadedSignatureFilename, setUploadedSignatureFilename] = useState<string | null>(null);
+    const [radioGroupAnswers, setRadioGroupAnswers] = useState<Record<number, string | null>>({});
+
+    // Initialize radio groups with default "yes" value when template loads
+    React.useEffect(() => {
+        const template = contractTemplate?.data;
+        if (template && Array.isArray(template.body)) {
+            const defaultAnswers: Record<number, string> = {};
+            template.body.forEach((item, index) => {
+                if (item.type === "radio_group" && item.data.options && item.data.options.length > 0) {
+                    // Set default to "yes" if available, otherwise first option
+                    const defaultOption = item.data.options.includes("yes") ? "yes" : item.data.options[0];
+                    defaultAnswers[index] = defaultOption;
+                }
+            });
+            if (Object.keys(defaultAnswers).length > 0) {
+                setRadioGroupAnswers((prev) => {
+                    // Only set if not already set (to preserve user changes)
+                    const updated = { ...prev };
+                    Object.keys(defaultAnswers).forEach((key) => {
+                        const index = Number(key);
+                        if (updated[index] === null || updated[index] === undefined) {
+                            updated[index] = defaultAnswers[index];
+                        }
+                    });
+                    return updated;
+                });
+            }
+        }
+    }, [contractTemplate?.data]);
 
     const { mutate: uploadSignature, isPending: isUploadingSignature } = useTempUpload(
         (response) => {
-            const filename = (response as any)?.filename || response.filename || null;
-            setUploadedSignatureFilename(filename);
+            console.log("Upload response:", response);
+            // Handle both wrapped and unwrapped response structures
+            const responseAny = response as any;
+            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            console.log("Setting uploadedSignatureFilename:", filename);
+            if (filename) {
+                setUploadedSignatureFilename(filename);
+            } else {
+                console.error("No filename in response:", response);
+            }
         },
         (error) => {
+            console.error("Upload error:", error);
             Alert.alert("Error", error.message || "Failed to upload signature");
         },
     );
@@ -97,6 +135,9 @@ export default function SignContractScreen() {
         return metadata?.print_settings || defaultPracticeSettings;
     }, [metadata]);
 
+    // Radio groups are now optional - they default to "yes" but user can change them
+    // We don't need to check if they're answered anymore
+
     const handleSubmit = useCallback(() => {
         if (!signature || !uploadedSignatureFilename) {
             Alert.alert("Error", "Please sign the contract first");
@@ -114,6 +155,20 @@ export default function SignContractScreen() {
 
     // Setup header with patient info and Done button - MUST be before early returns
     const patient = patientData?.data;
+    const isDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature;
+
+    // Debug logging
+    React.useEffect(() => {
+        console.log("Signature state:", {
+            signature: !!signature,
+            signatureUri: !!signatureUri,
+            uploadedSignatureFilename,
+            isUploadingSignature,
+            isSubmitting,
+            isDoneDisabled,
+        });
+    }, [signature, signatureUri, uploadedSignatureFilename, isUploadingSignature, isSubmitting, isDoneDisabled]);
+
     useLayoutEffect(() => {
         if (!patient) {
             // Set default header when patient is not loaded
@@ -121,13 +176,16 @@ export default function SignContractScreen() {
                 headerTitle: "",
                 headerTitleAlign: "center",
 
-                headerRight: () => (
-                    <TouchableOpacity onPress={handleSubmit} disabled={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature} className="px-4 py-2">
-                        <BaseText type="Body" color={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature ? "labels.tertiary" : "system.blue"} weight={600}>
-                            Done
-                        </BaseText>
-                    </TouchableOpacity>
-                ),
+                headerRight: () => {
+                    const currentIsDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature;
+                    return (
+                        <TouchableOpacity onPress={handleSubmit} disabled={currentIsDoneDisabled} className="px-4 py-2">
+                            <BaseText type="Body" color={currentIsDoneDisabled ? "labels.tertiary" : "system.blue"} weight={600}>
+                                Done
+                            </BaseText>
+                        </TouchableOpacity>
+                    );
+                },
             });
             return;
         }
@@ -154,13 +212,16 @@ export default function SignContractScreen() {
             ),
             headerTitleAlign: "center",
             // headerLeft: () => <BackButton noText onPress={() => router.back()} />,
-            headerRight: () => (
-                <TouchableOpacity onPress={handleSubmit} disabled={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature} className="px-2 py-2">
-                    <BaseText type="Body" color={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature ? "labels.tertiary" : "system.blue"} weight={600}>
-                        Done
-                    </BaseText>
-                </TouchableOpacity>
-            ),
+            headerRight: () => {
+                const currentIsDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature;
+                return (
+                    <TouchableOpacity onPress={handleSubmit} disabled={currentIsDoneDisabled} className="px-2 py-2">
+                        <BaseText type="Body" color={currentIsDoneDisabled ? "labels.tertiary" : "system.blue"} weight={600}>
+                            Done
+                        </BaseText>
+                    </TouchableOpacity>
+                );
+            },
         });
     }, [patient, signature, uploadedSignatureFilename, isSubmitting, isUploadingSignature, navigation, handleSubmit]);
 
@@ -384,7 +445,21 @@ export default function SignContractScreen() {
                                     </View>
                                 );
                             } else if (item.type === "radio_group" && item.data.label) {
-                                return <RadioGroupComponent key={index} label={item.data.label} options={item.data.options || []} />;
+                                return (
+                                    <RadioGroupComponent
+                                        key={index}
+                                        index={index}
+                                        label={item.data.label}
+                                        options={item.data.options || []}
+                                        selectedOption={radioGroupAnswers[index] || null}
+                                        onSelect={(option) => {
+                                            setRadioGroupAnswers((prev) => ({
+                                                ...prev,
+                                                [index]: option,
+                                            }));
+                                        }}
+                                    />
+                                );
                             }
                             return null;
                         })
@@ -404,18 +479,18 @@ export default function SignContractScreen() {
                 </View>
 
                 {/* Signature Section */}
-                <View className="gap-4 flex-row items-center my-6">
+                <View className="gap-4 flex-row items-center">
                     <BaseText type="Subhead" color="labels.primary">
                         Patient Signature:
                     </BaseText>
                     {signature ? (
-                        <TouchableOpacity onPress={() => setShowSignatureModal(true)} className="bg-white rounded-xl p-4 items-center justify-center border-2 border-dashed" style={{ minHeight: 150, borderColor: colors.system.gray4 }}>
+                        <TouchableOpacity onPress={() => setShowSignatureModal(true)} className="bg-white rounded-xl items-center justify-center border-2 border-dashed overflow-hidden" style={{ flex: 1, aspectRatio: 1, borderColor: colors.system.gray4 }}>
                             {signatureUri && signatureUri.startsWith("data:") ? (
-                                <Image source={{ uri: signatureUri }} className="w-full h-32" resizeMode="contain" />
+                                <Image source={{ uri: signatureUri }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                             ) : signatureUri ? (
-                                <Image source={{ uri: signatureUri }} className="w-full h-32" resizeMode="contain" />
+                                <Image source={{ uri: signatureUri }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                             ) : (
-                                <Image source={{ uri: `data:image/svg+xml;base64,${signature}` }} className="w-full h-32" resizeMode="contain" />
+                                <Image source={{ uri: `data:image/svg+xml;base64,${signature}` }} style={{ width: "100%", height: "100%" }} resizeMode="contain" />
                             )}
                         </TouchableOpacity>
                     ) : (
@@ -443,17 +518,15 @@ export default function SignContractScreen() {
 }
 
 // Radio Group Component
-function RadioGroupComponent({ label, options }: { label: string; options: string[] }) {
-    const [selectedOption, setSelectedOption] = useState<string | null>(null);
-
+function RadioGroupComponent({ index, label, options, selectedOption, onSelect }: { index: number; label: string; options: string[]; selectedOption: string | null; onSelect: (option: string) => void }) {
     return (
         <View className="mb-4">
-            <BaseText type="Body" weight={600} color="labels.primary" className="mb-3">
+            <BaseText type="Subhead" weight={600} color="labels.primary" className="mb-3">
                 {label}
             </BaseText>
             <View className="flex-row gap-6">
-                {options.map((option, index) => (
-                    <TouchableOpacity key={index} onPress={() => setSelectedOption(option)} className="flex-row items-center gap-2">
+                {options.map((option, optionIndex) => (
+                    <TouchableOpacity key={optionIndex} onPress={() => onSelect(option)} className="flex-row items-center gap-2">
                         <View
                             className="w-6 h-6 rounded-full border-2 relative"
                             style={{
@@ -464,7 +537,7 @@ function RadioGroupComponent({ label, options }: { label: string; options: strin
                         >
                             {selectedOption === option && <View className="rounded-full  flex-1 w-3 h-3 bg-system-blue absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />}
                         </View>
-                        <BaseText type="Body" color={selectedOption === option ? "labels.primary" : "labels.primary"}>
+                        <BaseText type="Subhead" color={selectedOption === option ? "labels.primary" : "labels.primary"}>
                             {option.charAt(0).toUpperCase() + option.slice(1)}
                         </BaseText>
                     </TouchableOpacity>
@@ -479,7 +552,7 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
     const signatureRef = useRef<SignatureViewRef>(null);
 
-    const snapPoints = useMemo(() => ["75%"], []);
+    const snapPoints = useMemo(() => ["60%"], []);
 
     const renderBackdrop = useCallback((props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
 
@@ -617,7 +690,7 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
 
                 {/* Canvas */}
                 <View className="flex-1 px-5 py-0">
-                    <View className="flex-1 bg-white rounded-xl overflow-hidden" style={{ minHeight: 300 }}>
+                    <View className="bg-white rounded-xl overflow-hidden" style={{ aspectRatio: 1, width: "100%" }}>
                         <SignatureCanvas
                             ref={signatureRef}
                             onOK={handleSignature}
@@ -627,10 +700,10 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
                             webStyle={webStyle}
                             autoClear={false}
                             imageType="image/png"
-                            style={{ flex: 1 }}
+                            style={{ width: "100%", height: "100%" }}
                             nestedScrollEnabled={true}
                             androidLayerType="hardware"
-                            webviewContainerStyle={{ flex: 1 }}
+                            webviewContainerStyle={{ width: "100%", height: "100%" }}
                             scrollable={false}
                             showsVerticalScrollIndicator={false}
                         />
