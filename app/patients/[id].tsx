@@ -13,6 +13,7 @@ import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Image as RNIma
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
+import { ConsentTabContent } from "./ConsentTabContent";
 import { blurValue } from "./_layout";
 
 type RowKind = "header" | "tabs" | "content";
@@ -355,7 +356,7 @@ export default function PatientDetailsScreen() {
                         images={[firstImageUri || `https://picsum.photos/200/300?random=0`, ...Array.from({ length: 49 }, (_, i) => `https://picsum.photos/200/300?random=${i + 1}`)]}
                     />
                 )}
-                {activeTab === 1 && <BaseText className="p-5 flex-1 h-full">📝 Consent details...</BaseText>}
+                {activeTab === 1 && <ConsentTabContent patientId={id} />}
                 {activeTab === 2 && <BaseText className="p-5">🪪 ID info...</BaseText>}
                 {activeTab === 3 && <BaseText className="p-5">📊 Activity log...</BaseText>}
             </View>
