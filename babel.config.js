@@ -3,12 +3,12 @@ module.exports = function (api) {
     return {
         presets: [
             [
-                "babel-preset-expo", 
-                { 
-                    jsxImportSource: "react-native-css-interop/jsx-runtime" 
-                }
-            ], 
-            "nativewind/babel"
+                "babel-preset-expo",
+                {
+                    jsxImportSource: "react-native-css-interop/jsx-runtime",
+                },
+            ],
+            "nativewind/babel",
         ],
         plugins: [
             [

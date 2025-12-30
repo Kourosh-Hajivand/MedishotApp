@@ -70,6 +70,15 @@ export const ContractService = {
                 formData.append("signature_image", data.signature_image);
             }
 
+            // Optional contract file
+            if (data.contract_file) {
+                if (typeof data.contract_file === "string") {
+                    formData.append("contract_file", data.contract_file);
+                } else {
+                    formData.append("contract_file", data.contract_file);
+                }
+            }
+
             const response: AxiosResponse<CreateContractResponse> = await axiosInstance.post(baseUrl + createContract(patientId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });

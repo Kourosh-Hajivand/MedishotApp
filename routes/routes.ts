@@ -54,14 +54,14 @@ export const routes = {
         getTags: (practiseId: string | number) => `practises/${practiseId}/tags`,
         createTag: (practiseId: string | number) => `practises/${practiseId}/tags`,
         getTag: (practiseId: string | number, tagId: string | number) => `practises/${practiseId}/tags/${tagId}`,
-        updateTag: (practiseId: string | number, tagId: string | number) => `practises/${practiseId}/tags/${tagId}/update`,
+        updateTag: (practiseId: string | number, tagId: string | number) => `practises/${practiseId}/tags/${tagId}`,
         deleteTag: (practiseId: string | number, tagId: string | number) => `practises/${practiseId}/tags/${tagId}`,
 
         // Templates
         getTemplates: (practiseId: string | number) => `practises/${practiseId}/templates`,
         createTemplate: (practiseId: string | number) => `practises/${practiseId}/templates`,
         getTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
-        updateTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}/update`,
+        updateTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
         deleteTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
 
         // Patients

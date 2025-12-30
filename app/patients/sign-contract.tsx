@@ -46,8 +46,8 @@ export default function SignContractScreen() {
     const { data: patientData, isLoading: isLoadingPatient } = useGetPatientById(patientId || "");
     const { data: practiceData, isLoading: isLoadingPractice } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
 
-    console.log("=============== patientData?.data=====================");
-    console.log(patientData?.data);
+    console.log("=============== THIS IS THE CONTRACT TEMPLATE=====================");
+    console.log(contractTemplate?.data);
     console.log("====================================");
 
     const [signature, setSignature] = useState<string | null>(null);
@@ -89,12 +89,15 @@ export default function SignContractScreen() {
             console.log("Upload response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
+            // Try to get id first (from backend), then filename (Livewire temp filename)
+            const id = (responseAny?.data?.id ?? response.id) || null;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("Setting uploadedSignatureFilename:", filename);
-            if (filename) {
-                setUploadedSignatureFilename(filename);
+            const signatureId = id || filename;
+            console.log("Setting uploadedSignatureFilename:", signatureId);
+            if (signatureId) {
+                setUploadedSignatureFilename(String(signatureId));
             } else {
-                console.error("No filename in response:", response);
+                console.error("No id or filename in response:", response);
             }
         },
         (error) => {
@@ -139,19 +142,59 @@ export default function SignContractScreen() {
     // We don't need to check if they're answered anymore
 
     const handleSubmit = useCallback(() => {
+        console.log("=============handleSubmit CALLED=======================");
+        console.log("signature:", !!signature, "uploadedSignatureFilename:", uploadedSignatureFilename);
+
         if (!signature || !uploadedSignatureFilename) {
+            console.log("❌ Validation failed - signature or uploadedSignatureFilename is missing");
             Alert.alert("Error", "Please sign the contract first");
             return;
         }
 
-        createContract({
+        console.log("✅ Validation passed, building body data...");
+
+        // Build body array with selectedValue for radio groups
+        const template = contractTemplate?.data;
+        let bodyString: string | undefined = undefined;
+        let bodyArray: any[] = [];
+
+        if (template && Array.isArray(template.body)) {
+            // Deep clone the body array and add selectedValue to radio groups
+            bodyArray = template.body.map((item, index) => {
+                if (item.type === "radio_group" && radioGroupAnswers[index] !== null && radioGroupAnswers[index] !== undefined) {
+                    // Add selectedValue field to radio_group items
+                    // Convert "yes" to true, "no" to false
+                    const selectedValue = radioGroupAnswers[index] === "yes";
+                    return {
+                        ...item,
+                        data: {
+                            ...item.data,
+                            selectedValue: selectedValue, // true for "yes", false for "no"
+                        },
+                    };
+                }
+                // Return other items as-is (paragraph, etc.)
+                return item;
+            });
+
+            // Convert body array to JSON string
+            bodyString = JSON.stringify(bodyArray);
+        } else if (template && typeof template.body === "string") {
+            // If body is a string (old format), keep it as is
+            bodyString = template.body;
+        }
+
+        const requestData = {
             patientId: patientId || "",
             data: {
                 contract_template_id: Number(templateId),
                 signature_image: uploadedSignatureFilename,
+                body: bodyString,
             },
-        });
-    }, [signature, uploadedSignatureFilename, patientId, templateId, createContract]);
+        };
+
+        createContract(requestData);
+    }, [signature, uploadedSignatureFilename, patientId, templateId, createContract, contractTemplate, radioGroupAnswers]);
 
     // Setup header with patient info and Done button - MUST be before early returns
     const patient = patientData?.data;
@@ -159,7 +202,7 @@ export default function SignContractScreen() {
 
     // Debug logging
     React.useEffect(() => {
-        console.log("Signature state:", {
+        console.log("📊 Signature state:", {
             signature: !!signature,
             signatureUri: !!signatureUri,
             uploadedSignatureFilename,

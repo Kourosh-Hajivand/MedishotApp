@@ -96,7 +96,7 @@ export interface AddMemberDto {
     first_name: string;
     last_name: string;
     email: string;
-    role: "staff" | "doctor"; // Only staff and doctor can be assigned when creating a member
+    role: "owner" | "admin" | "member" | "doctor"; // OpenAPI: enum values
     birth_date?: string; // YYYY-MM-DD format
     gender?: "male" | "female" | "other";
     metadata?: string; // JSON string containing phones, emails, addresses, urls
@@ -104,7 +104,7 @@ export interface AddMemberDto {
 }
 
 export interface UpdateMemberRoleDto {
-    role: "staff" | "doctor"; // Only staff and doctor can be assigned
+    role: "owner" | "admin" | "member" | "viewer"; // OpenAPI: update role enum
 }
 
 export interface TransferOwnershipDto {
@@ -244,6 +244,7 @@ export interface CreateContractDto {
     contract_template_id: number;
     body?: string; // Optional override for contract body (JSON string)
     signature_image: File | string; // File or Livewire temp filename
+    contract_file?: File | string; // Optional contract file (PDF, DOCX, etc.)
 }
 
 // ============= Gost Models =============

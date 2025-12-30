@@ -157,7 +157,7 @@ export interface Member {
     first_name: string | null;
     last_name: string | null;
     email: string;
-    role: "owner" | "admin" | "member" | "viewer" | "doctor";
+    role: "owner" | "admin" | "member" | "viewer" | "doctor"; // OpenAPI: includes "doctor"
     status: "active";
     patients_count: number;
     taken_images_count: number;
@@ -403,9 +403,10 @@ export interface PatientMediaBookmarkResponse {
 
 // ============= File Upload Responses =============
 export interface TempUploadResponse {
-    filename: string;
-    size: number;
-    mime_type: string;
+    filename?: string; // Livewire temp filename
+    id?: string | number; // File ID from backend
+    size?: number;
+    mime_type?: string;
 }
 
 // ============= Practice Statistics Responses =============
@@ -505,7 +506,8 @@ export interface ContractTemplate {
     id: number;
     title: string;
     body: ContractTemplateBodyItem[] | string; // Support both old string format and new array format
-    image?: string | null;
+    preview_image?: string | null; // OpenAPI: preview_image
+    image?: string | null; // Backward compatibility
     is_active: boolean;
     created_at: string;
     updated_at: string;
@@ -528,6 +530,7 @@ export interface PatientContract {
     created_at: string;
     updated_at: string;
     contract_template: ContractTemplate;
+    contract_file?: Media | null; // OpenAPI: contract_file
 }
 
 export interface PatientContractListResponse {
@@ -577,6 +580,15 @@ export interface TemplateGridLayout {
     gost_id: number;
 }
 
+export interface TemplateCell {
+    id: number;
+    row_index: number;
+    column_index: number;
+    gost: Gost;
+    created_at: string;
+    updated_at: string;
+}
+
 export interface Template {
     id: number;
     name: string;
@@ -585,7 +597,8 @@ export interface Template {
     image: string | null;
     gost_image: string | null;
     icon: string | null;
-    gosts_count?: number;
+    cells_count?: number; // OpenAPI: cells_count
+    gosts_count?: number; // Backward compatibility
     created_at: string;
     updated_at: string;
 }
@@ -616,13 +629,17 @@ export interface TemplateGost {
     updated_at: string;
 }
 
+export interface TemplateWithCells extends Template {
+    cells: TemplateCell[]; // OpenAPI: cells array
+}
+
 export interface TemplateWithGosts extends Template {
-    gosts: TemplateGost[];
+    gosts: TemplateGost[]; // Backward compatibility
 }
 
 export interface TemplateDetailResponse {
     success: boolean;
-    data: TemplateWithGosts;
+    data: TemplateWithCells;
 }
 
 // ============= Patient Media With Template Responses =============
@@ -644,7 +661,7 @@ export interface PatientMediaWithTemplate {
     type: string | null;
     data: Record<string, any> | null;
     taker_id: number | null;
-    template: Template | null;
+    template: Template | null; // OpenAPI: template field
     images: PatientMediaImage[];
     created_at: string;
     updated_at: string;

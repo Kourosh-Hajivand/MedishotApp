@@ -82,7 +82,7 @@ export const PracticeService = {
     // Update practice
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + update(practiceId), data, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(baseUrl + update(practiceId), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -109,10 +109,15 @@ export const PracticeService = {
 
     // ============= Practice Members =============
 
-    // Get practice members
-    getMembers: async (practiceId: number): Promise<PracticeMembersResponse> => {
+    // Get practice members with optional role filter
+    getMembers: async (practiceId: number, params?: { role?: "owner" | "doctor" | "staff" }): Promise<PracticeMembersResponse> => {
         try {
-            const response: AxiosResponse<PracticeMembersResponse> = await axiosInstance.get(baseUrl + getMembers(practiceId));
+            const queryParams = new URLSearchParams();
+            if (params?.role) {
+                queryParams.append("role", params.role);
+            }
+            const url = baseUrl + getMembers(practiceId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const response: AxiosResponse<PracticeMembersResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -285,7 +290,7 @@ export const PracticeService = {
     // Update practice tag
     updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + updateTag(practiceId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(baseUrl + updateTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -352,7 +357,7 @@ export const PracticeService = {
     // Update practice template
     updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + updateTemplate(practiceId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(baseUrl + updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
