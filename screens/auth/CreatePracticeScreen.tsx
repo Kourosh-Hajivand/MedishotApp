@@ -1,4 +1,5 @@
 import { useCreatePractice } from "@/utils/hook";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -113,11 +114,16 @@ export const CreatePracticeScreen: React.FC = () => {
         }
     };
 
+    const { setSelectedPractice } = useProfileStore();
     const {
         mutate: createPractice,
         isPending,
         error,
-    } = useCreatePractice(() => {
+    } = useCreatePractice((data) => {
+        // Switch to the newly created practice
+        if (data?.data) {
+            setSelectedPractice(data.data);
+        }
         router.replace("/(tabs)/patients");
         storeTokens(token);
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });

@@ -3,7 +3,9 @@ import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
 import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useAuth } from "./useAuth";
+import { persistProfileSelection, useProfileStore } from "./useProfileStore";
 
 // ============= Query Hooks (GET) =============
 
@@ -22,11 +24,35 @@ export const useGetPracticeList = (enabled: boolean = true): UseQueryResult<Prac
 
 export const useGetPracticeById = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeDetailResponse, Error> => {
     const { isAuthenticated } = useAuth();
-    return useQuery({
+    const { selectedPractice } = useProfileStore();
+
+    const queryResult = useQuery({
         queryKey: ["GetPracticeById", practiceId],
         queryFn: () => PracticeService.getPracticeById(practiceId),
         enabled: isAuthenticated === true && enabled && !!practiceId,
     });
+
+    // If fetched practice is the selected practice, update the store with full data
+    // We use setState directly to avoid calling setSelectedPractice which would trigger another API call
+    useEffect(() => {
+        if (queryResult.data?.data && selectedPractice?.id === practiceId) {
+            // Only update if the fetched data is actually different to avoid unnecessary updates
+            const fetchedPractice = queryResult.data.data;
+            const currentPractice = selectedPractice;
+
+            // Check if data has actually changed (simple comparison by checking if any key is different)
+            const hasChanged = !currentPractice || currentPractice.name !== fetchedPractice.name || JSON.stringify(currentPractice.metadata) !== JSON.stringify(fetchedPractice.metadata) || currentPractice.image?.url !== fetchedPractice.image?.url || currentPractice.role !== fetchedPractice.role;
+
+            if (hasChanged) {
+                // Update store directly without triggering another API call
+                useProfileStore.setState({ selectedPractice: fetchedPractice });
+                // Persist the updated selection
+                persistProfileSelection();
+            }
+        }
+    }, [queryResult.data?.data, selectedPractice?.id, practiceId]);
+
+    return queryResult;
 };
 
 export const useGetPracticeMembers = (practiceId: number, enabled: boolean = true): UseQueryResult<PracticeMembersResponse, Error> => {

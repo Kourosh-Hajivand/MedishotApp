@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { Practice } from "../service/models/ResponseModels";
+import { PracticeService } from "../service/PracticeService";
 
 type ViewMode = "doctor" | "owner";
 
@@ -40,7 +41,7 @@ const determineDefaultViewMode = (practice: Practice | null): ViewMode => {
     return DEFAULT_VIEW_MODE;
 };
 
-async function persistProfileSelection() {
+export async function persistProfileSelection() {
     try {
         const { selectedPractice, viewMode } = useProfileStore.getState();
         const payload: StoredProfileSelection = {
@@ -89,12 +90,28 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         // Reset selectedDoctor to "all" if user role is owner or admin
         const shouldResetDoctor = practice.role === "owner" || practice.role === "admin";
 
+        // Set practice immediately for UI responsiveness
         set({
             selectedPractice: practice,
             selectedDoctor: shouldResetDoctor ? null : get().selectedDoctor,
         });
 
         await persistProfileSelection();
+
+        // Fetch full practice data from API and update store
+        try {
+            const fullPracticeData = await PracticeService.getPracticeById(practice.id);
+            
+            if (fullPracticeData?.data) {
+                set({
+                    selectedPractice: fullPracticeData.data,
+                });
+                await persistProfileSelection();
+            }
+        } catch (error) {
+            console.error("خطا در دریافت اطلاعات کامل practice:", error);
+            // If fetch fails, keep the practice data we already have
+        }
     },
 
     setSelectedDoctor: (doctorId: string | null) => {

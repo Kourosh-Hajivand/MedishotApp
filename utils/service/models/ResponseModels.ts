@@ -459,11 +459,34 @@ export interface PlanDetailResponse {
 }
 
 export interface SubscriptionStatus {
-    subscribed: boolean;
-    plan: Plan | null;
-    ends_at: string | null;
-    on_grace_period: boolean;
-    trial_ends_at: string | null;
+    // Standard subscription status structure
+    subscribed?: boolean;
+    plan?: Plan | null;
+    ends_at?: string | null;
+    on_grace_period?: boolean;
+    trial_ends_at?: string | null;
+    
+    // New API structure
+    current_plan?: Plan;
+    has_subscription?: boolean;
+    is_active?: boolean;
+    is_on_grace_period?: boolean;
+    is_on_trial?: boolean;
+    limits?: {
+        current_doctor_count?: number;
+        doctor_limit?: number;
+        remaining_doctor_slots?: number;
+        [key: string]: any;
+    };
+    
+    // Support for practice detail response structure
+    current_subscription?: {
+        ends_at: string | null;
+        plan: Plan;
+        stripe_id: string;
+        stripe_status: string;
+        trial_ends_at: string | null;
+    };
 }
 
 export interface SubscriptionStatusResponse {

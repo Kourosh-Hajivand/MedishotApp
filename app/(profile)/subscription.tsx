@@ -17,20 +17,29 @@ export default function SubscriptionScreen() {
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
     console.log("====================================");
-    console.log(plansData);
+    console.log("Subscription Data:", subscriptionData);
+    console.log("Plans Data:", plansData);
     console.log("====================================");
+
+    // Get current subscription - handle multiple possible response structures
+    // Priority: current_subscription (from practice detail) > current_plan (new API) > plan (old API) > direct data
+    const subscriptionDataObj = subscriptionData?.data || {};
+    const currentSubscription = subscriptionDataObj.current_subscription || subscriptionDataObj;
+
     // Calculate days remaining
     const daysRemaining = useMemo(() => {
-        if (!subscriptionData?.data?.ends_at) return null;
-        const endDate = new Date(subscriptionData.data.ends_at);
+        const endsAt = subscriptionDataObj.ends_at || currentSubscription?.ends_at;
+        if (!endsAt) return null;
+        const endDate = new Date(endsAt);
         const today = new Date();
         const diffTime = endDate.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays > 0 ? diffDays : 0;
-    }, [subscriptionData?.data?.ends_at]);
+    }, [subscriptionDataObj.ends_at, currentSubscription?.ends_at]);
 
-    // Get current plan
-    const currentPlan = subscriptionData?.data?.plan;
+    // Get current plan - handle multiple possible response structures
+    // Priority: current_plan (new API) > current_subscription.plan > plan (old API)
+    const currentPlan = subscriptionDataObj.current_plan || currentSubscription?.plan || subscriptionDataObj.plan || null;
 
     // Get plan color based on plan name
     const getPlanColor = (planName: string) => {
@@ -155,40 +164,87 @@ export default function SubscriptionScreen() {
                 </View>
 
                 {/* Current Plan Card */}
-                {currentPlan && (
-                    <View style={styles.currentPlanCard}>
-                        <View style={styles.currentPlanCardContent}>
-                            {/* Plan Header with Gradient Background */}
-                            <View style={styles.currentPlanCardHeader}>
-                                <BaseText type="Title3" weight="600" color="labels.primary">
-                                    {currentPlan.name}
-                                </BaseText>
-                            </View>
+                {currentPlan &&
+                    (() => {
+                        const planColor = getPlanColor(currentPlan.name);
+                        const planPrice = currentPlan.price || "0.00";
+                        const planBillingInterval = currentPlan.billing_interval || "monthly";
+                        const annualPrice = getAnnualPrice(currentPlan, plansData?.data || []);
 
-                            {/* Plan Features */}
-                            <View style={styles.currentPlanFeatures}>
-                                {currentPlanFeatures.map((feature, index) => (
-                                    <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
-                                        <BaseText type="Body" weight="400" color="labels.tertiary">
-                                            􀅼
-                                        </BaseText>
-                                        {" " + feature}
-                                    </BaseText>
-                                ))}
-                            </View>
-                        </View>
+                        // Create gradient background for plan header
+                        const gradientColors: [string, string, string, string, string] =
+                            planColor === colors.system.blue
+                                ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
+                                : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
 
-                        {/* Footer with Time Left */}
-                        <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.currentPlanFooter}>
-                            <BaseText type="Body" weight="400" color="labels.primary">
-                                Time left:
-                            </BaseText>
-                            <BaseText type="Body" weight="600" color="labels.primary">
-                                {daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} Days Remaining` : "Expired"}
-                            </BaseText>
-                        </LinearGradient>
-                    </View>
-                )}
+                        const statusText = (() => {
+                            // Check new API structure first
+                            const isActive = subscriptionDataObj.is_active;
+                            const hasSubscription = subscriptionDataObj.has_subscription;
+                            const stripeStatus = "stripe_status" in (currentSubscription || {}) ? (currentSubscription as any).stripe_status : null;
+
+                            // Priority: new API (is_active) > stripe_status > default
+                            if (isActive !== undefined) {
+                                if (isActive) {
+                                    return daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} Days Remaining` : "Active";
+                                }
+                                return "Inactive";
+                            }
+
+                            if (stripeStatus === "active") {
+                                return daysRemaining !== null && daysRemaining > 0 ? `${daysRemaining} Days Remaining` : daysRemaining === null ? "Active" : "Expired";
+                            }
+
+                            return hasSubscription ? "Active" : stripeStatus || "Inactive";
+                        })();
+
+                        return (
+                            <View style={styles.planCard}>
+                                <View style={styles.planCardInner}>
+                                    {/* Plan Header */}
+                                    <View style={styles.planHeaderWrapper}>
+                                        <View style={styles.planHeaderContent}>
+                                            <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
+                                                <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
+                                                    {currentPlan.name}
+                                                </BaseText>
+                                                <BaseText type="Title3" weight="600" style={{ color: planColor }}>
+                                                    {formatPrice(planPrice, currentPlan.currency || "usd", planBillingInterval)}
+                                                </BaseText>
+                                            </LinearGradient>
+                                            {annualPrice !== null && (
+                                                <View style={styles.annualBadge}>
+                                                    <BaseText type="Footnote" weight="400" color="labels.primary">
+                                                        Annual:
+                                                    </BaseText>
+                                                    <BaseText type="Callout" weight="400" color="labels.primary">
+                                                        {formatPrice(annualPrice, currentPlan.currency || "usd", "yearly")}
+                                                    </BaseText>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    {/* Plan Features */}
+                                    <View style={styles.planFeatures}>
+                                        {currentPlanFeatures.map((feature, index) => (
+                                            <View key={index} style={styles.featureItemContainer}>
+                                                <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
+                                                <BaseText type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                    {" " + feature}
+                                                </BaseText>
+                                            </View>
+                                        ))}
+                                    </View>
+                                </View>
+
+                                {/* Footer with Status */}
+                                <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
+                                    <BaseButton label={`Current Plan - ${statusText}`} onPress={() => {}} disabled={true} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} />
+                                </LinearGradient>
+                            </View>
+                        );
+                    })()}
 
                 {/* Chevron Circle */}
                 <View style={styles.chevronContainer}>
@@ -283,12 +339,13 @@ const styles = StyleSheet.create({
         paddingBottom: spacing["6"],
     },
     currentPlanSection: {
-        backgroundColor: "#ffffff",
+        backgroundColor: "#f9f9f9",
         borderBottomWidth: 3,
         borderBottomColor: "rgba(0, 0, 0, 0.08)",
         paddingTop: 0,
         paddingBottom: spacing["3"], // 12px
         paddingHorizontal: spacing["4"], // 16px
+        gap: spacing["2.5"], // 10px - gap between header and card
     },
     currentPlanHeaderContent: {
         alignItems: "center",
@@ -321,27 +378,6 @@ const styles = StyleSheet.create({
         height: 22,
         width: "100%",
     },
-    currentPlanCard: {
-        backgroundColor: "#ffffff",
-        borderRadius: 12,
-        overflow: "hidden",
-        marginTop: spacing["2.5"], // 10px - gap between header and card
-    },
-    currentPlanCardContent: {
-        padding: spacing["4"], // 16px
-        gap: spacing["2.5"], // 10px
-    },
-    currentPlanCardHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: spacing["2"], // 8px
-        paddingVertical: spacing["1"], // 4px
-        borderRadius: 8,
-        backgroundColor: "rgba(120, 120, 128, 0.08)",
-    },
-    currentPlanFeatures: {
-        gap: 0,
-    },
     featureItem: {
         fontSize: 17,
         lineHeight: 28,
@@ -352,12 +388,6 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: spacing["1"], // 10px
-    },
-    currentPlanFooter: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: spacing["4"], // 16px
     },
     chevronContainer: {
         position: "absolute",
@@ -379,7 +409,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     premiumSection: {
-        backgroundColor: "#f9f9f9",
+        backgroundColor: "#ffffff",
         padding: spacing["4"], // 16px
         gap: spacing["2.5"], // 10px
     },
