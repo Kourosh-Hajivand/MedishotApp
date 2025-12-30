@@ -2,6 +2,7 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetPatientContracts } from "@/utils/hook";
+import { router } from "expo-router";
 import React from "react";
 import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View } from "react-native";
 
@@ -46,8 +47,13 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
                                 key={contract.id}
                                 style={{ width: "47%" }}
                                 onPress={() => {
-                                    // TODO: Navigate to contract detail view
-                                    console.log("Contract pressed:", contract.id);
+                                    router.push({
+                                        pathname: "/patients/contract/[contractId]",
+                                        params: {
+                                            contractId: String(contract.id),
+                                            patientId: patientId,
+                                        },
+                                    });
                                 }}
                             >
                                 <View className="gap-2.5">
@@ -59,7 +65,7 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
                                             {formatDate(contractDate)}
                                         </BaseText>
                                     </View>
-                                    <View className="aspect-[1190/1684] border border-system-gray6 rounded-md overflow-hidden bg-system-gray6">
+                                    <View className="aspect-[816/1056] border border-system-gray6 rounded-md overflow-hidden bg-system-gray6">
                                         {imageUrl ? (
                                             <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
                                         ) : (
@@ -77,4 +83,3 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
         </View>
     );
 }
-

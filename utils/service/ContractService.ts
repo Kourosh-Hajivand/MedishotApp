@@ -13,9 +13,11 @@ export const ContractService = {
     // ============= Contract Templates =============
 
     // Get all active contract templates
-    getContractTemplates: async (): Promise<ContractTemplateListResponse> => {
+    getContractTemplates: async (patientId?: string | number): Promise<ContractTemplateListResponse> => {
         try {
-            const response: AxiosResponse<ContractTemplateListResponse> = await axiosInstance.get(baseUrl + listTemplates());
+            const url = baseUrl + listTemplates();
+            const params = patientId ? { patient_id: patientId } : undefined;
+            const response: AxiosResponse<ContractTemplateListResponse> = await axiosInstance.get(url, { params });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

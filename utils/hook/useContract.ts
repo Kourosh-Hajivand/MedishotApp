@@ -6,11 +6,11 @@ import { useAuth } from "./useAuth";
 
 // ============= Query Hooks (GET) =============
 
-export const useGetContractTemplates = (enabled: boolean = true): UseQueryResult<ContractTemplateListResponse, Error> => {
+export const useGetContractTemplates = (patientId?: string | number, enabled: boolean = true): UseQueryResult<ContractTemplateListResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({
-        queryKey: ["GetContractTemplates"],
-        queryFn: () => ContractService.getContractTemplates(),
+        queryKey: ["GetContractTemplates", patientId],
+        queryFn: () => ContractService.getContractTemplates(patientId),
         enabled: isAuthenticated === true && enabled,
     });
 };

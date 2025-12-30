@@ -16,7 +16,7 @@ export default function SelectContractScreen() {
     const { patientId } = useLocalSearchParams<{ patientId: string }>();
     const headerHeight = useHeaderHeight();
     const insets = useSafeAreaInsets();
-    const { data: contractsData, isLoading } = useGetContractTemplates();
+    const { data: contractsData, isLoading } = useGetContractTemplates(patientId ? Number(patientId) : undefined);
 
     const handleSelectContract = (templateId: number) => {
         // Dismiss the modal first
@@ -44,6 +44,17 @@ export default function SelectContractScreen() {
 
     const contracts = contractsData?.data || [];
 
+    if (contracts.length === 0) {
+        return (
+            <View className="flex-1 items-center justify-center" style={{ paddingTop: headerHeight, paddingBottom: insets.bottom + 20 }}>
+                <IconSymbol name="doc.text" color={colors.labels.tertiary} size={64} />
+                <BaseText type="Body" color="labels.secondary" className="mt-4 text-center px-6">
+                    No contract templates available
+                </BaseText>
+            </View>
+        );
+    }
+
     return (
         <View className="flex-1" style={{ backgroundColor: colors.system.gray6 }}>
             <FlatList
@@ -62,12 +73,12 @@ export default function SelectContractScreen() {
                             <View
                                 className="rounded overflow-hidden bg-white"
                                 style={{
-                                    aspectRatio: 1190 / 1684,
+                                    aspectRatio: 816 / 1056, // US Letter aspect ratio
                                     width: "100%",
                                 }}
                             >
-                                {item.image ? (
-                                    <Image source={{ uri: item.image }} className="w-full h-full" resizeMode="cover" />
+                                {item.preview_image ? (
+                                    <Image source={{ uri: item.preview_image }} className="w-full h-full" resizeMode="cover" />
                                 ) : (
                                     <View className="flex-1 items-center justify-center">
                                         <IconSymbol name="doc.text" color={colors.labels.tertiary} size={40} />

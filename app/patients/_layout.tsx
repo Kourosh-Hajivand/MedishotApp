@@ -37,14 +37,6 @@ export default function PatientsLayout() {
                         headerBackground: () => <AnimatedWhiteBackground />,
                     }}
                 />
-                <Stack.Screen
-                    name="sign-contract"
-                    options={{
-                        headerTitle: "",
-                        headerTransparent: true,
-                        headerShown: true,
-                    }}
-                />
             </Stack>
         </BottomSheetModalProvider>
     );
