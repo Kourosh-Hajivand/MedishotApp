@@ -1,5 +1,4 @@
-import { GHOST_ITEMS } from "@/assets/gost/ghostAssets";
-import { LayoutPatternOption, TemplateItem } from "./types";
+import { LayoutPatternOption } from "./types";
 
 export const LAYOUT_PATTERNS_2_ITEMS: LayoutPatternOption[] = [
     { id: "left-right", name: "Left Right" },
@@ -46,7 +45,5 @@ export const LAYOUT_PATTERNS_9_ITEMS: LayoutPatternOption[] = [
     { id: "grid-3x3-full-alt", name: "Top Large" },
     { id: "grid-3x3-full-horizontal", name: "Left Large" },
 ];
-
-export const TEMPLATE_ITEMS: TemplateItem[] = GHOST_ITEMS;
 
 export const MINT_COLOR = "#00c7be";

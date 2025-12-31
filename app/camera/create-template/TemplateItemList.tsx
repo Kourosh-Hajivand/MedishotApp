@@ -1,9 +1,9 @@
+import colors from "@/theme/colors";
 import { Image } from "expo-image";
 import React from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import colors from "@/theme/colors";
-import { TemplateItem } from "./types";
 import { MINT_COLOR } from "./constants";
+import { TemplateItem } from "./types";
 
 interface TemplateItemListProps {
     items: TemplateItem[];
@@ -23,7 +23,7 @@ export const TemplateItemList: React.FC<TemplateItemListProps> = ({ items, selec
                         <TouchableOpacity key={item.id} style={[styles.card, isSelected && styles.cardSelected]} onPress={() => onToggle(item.id)} activeOpacity={0.8} disabled={isDisabled}>
                             <View style={[styles.itemContainer, isSelected && styles.itemContainerSelected, isDisabled && styles.itemContainerDisabled]}>
                                 <View style={styles.imageContainer}>
-                                    <Image source={item.image} style={[styles.image, isDisabled && styles.imageDisabled]} contentFit="contain" />
+                                    <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={[styles.image, isDisabled && styles.imageDisabled]} contentFit="contain" />
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -86,4 +86,3 @@ const styles = StyleSheet.create({
         opacity: 0.8,
     },
 });
-

@@ -29,5 +29,5 @@ export interface LayoutPatternOption {
 export interface TemplateItem {
     id: string;
     name: string;
-    image: any;
+    image: string | any; // Can be URL string or require() asset
 }

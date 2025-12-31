@@ -575,23 +575,45 @@ export interface CreateContractResponse {
 }
 
 // ============= Gost Responses =============
+export interface GostImage {
+    id: number;
+    url: string;
+}
+
 export interface Gost {
     id: number;
     name: string;
     description: string | null;
-    image: string | null;
-    gost_image: string | null;
-    icon: string | null;
+    image: GostImage | null;
+    gost_image: GostImage | null;
+    icon: GostImage | null;
     created_at: string;
     updated_at: string;
 }
 
 export interface GostListResponse {
     success: boolean;
-    data: {
-        data: Gost[];
+    message: string | null;
+    data: Gost[];
+    links?: {
+        first: string | null;
+        last: string | null;
+        prev: string | null;
+        next: string | null;
+    };
+    meta?: {
         current_page: number;
+        from: number;
+        last_page: number;
+        links: Array<{
+            url: string | null;
+            label: string;
+            page: number | null;
+            active: boolean;
+        }>;
+        path: string;
         per_page: number;
+        to: number;
         total: number;
     };
 }

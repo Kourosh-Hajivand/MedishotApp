@@ -41,6 +41,7 @@ export default function PatientDetailsScreen() {
     }, []);
 
     const screenWidth = Dimensions.get("window").width;
+    const screenHeight = Dimensions.get("window").height;
     const tabWidth = (screenWidth - 32) / tabs.length;
     const translateX = useRef(new Animated.Value(0)).current;
 
@@ -315,7 +316,7 @@ export default function PatientDetailsScreen() {
         }
 
         return (
-            <View style={{ flex: 1, backgroundColor: colors.system.white }}>
+            <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
                 {activeTab === 0 && (
                     <GalleryWithMenu
                         menuItems={[
@@ -357,8 +358,16 @@ export default function PatientDetailsScreen() {
                     />
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                {activeTab === 2 && <BaseText className="p-5">🪪 ID info...</BaseText>}
-                {activeTab === 3 && <BaseText className="p-5">📊 Activity log...</BaseText>}
+                {activeTab === 2 && (
+                    <View style={{ flex: 1, minHeight: screenHeight }}>
+                        <BaseText className="p-5">🪪 ID info...</BaseText>
+                    </View>
+                )}
+                {activeTab === 3 && (
+                    <View style={{ flex: 1, minHeight: screenHeight }}>
+                        <BaseText className="p-5">📊 Activity log...</BaseText>
+                    </View>
+                )}
             </View>
         );
     };
@@ -379,9 +388,7 @@ export default function PatientDetailsScreen() {
                 contentOffset={{ x: 0, y: -headerHeight }}
                 contentInsetAdjustmentBehavior="never"
                 scrollIndicatorInsets={{ top: headerHeight, bottom: safe.bottom }}
-                contentContainerStyle={{
-                    paddingBottom: 100,
-                }}
+                contentContainerStyle={{}}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
             />
         </View>

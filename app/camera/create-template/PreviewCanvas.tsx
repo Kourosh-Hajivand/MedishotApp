@@ -32,7 +32,7 @@ export const PreviewCanvas: React.FC<PreviewCanvasProps> = ({ selectedItems, tem
                         const layoutStyle = getItemLayoutStyle(index, selectedItems.length, selectedLayout);
                         return (
                             <Animated.View key={itemId} layout={Layout.springify()} entering={FadeIn.delay(index * 50).springify()} style={[styles.previewItem, layoutStyle]}>
-                                <Image source={item.image} style={styles.previewImage} contentFit="contain" />
+                                <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={styles.previewImage} contentFit="contain" />
                             </Animated.View>
                         );
                     })}

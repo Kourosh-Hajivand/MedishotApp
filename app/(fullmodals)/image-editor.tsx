@@ -1,5 +1,6 @@
 import { BaseText } from "@/components";
-import { ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { AdjustChange, ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
 import { Button, Host } from "@expo/ui/swift-ui";
@@ -7,10 +8,11 @@ import axios from "axios";
 import { BlurView } from "expo-blur";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
+import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useRef, useState } from "react";
-import { Dimensions, Image, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
@@ -31,6 +33,8 @@ export default function ImageEditorScreen() {
         styleTitle: string;
     } | null>(null);
     const [displayedImageUri, setDisplayedImageUri] = useState<string | null>(null);
+    const [originalImageUri, setOriginalImageUri] = useState<string | null>(null);
+    const [adjustmentValues, setAdjustmentValues] = useState<AdjustChange | null>(null);
     const hasRequestedRef = useRef(false);
 
     const scale = useSharedValue(1);
@@ -47,11 +51,11 @@ export default function ImageEditorScreen() {
     }));
 
     const tools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
-        { name: "Adjust", icon: "dial.min.fill", disabled: true },
-        { name: "Crop", icon: "crop.rotate", disabled: true },
-        { name: "Note", icon: "pin.circle.fill", disabled: true },
+        { name: "Adjust", icon: "dial.min.fill", disabled: false },
+        { name: "Crop", icon: "crop.rotate", disabled: false },
+        { name: "Note", icon: "pin.circle.fill", disabled: false },
         { name: "Magic", icon: "sparkles", disabled: false },
-        { name: "Pen", icon: "pencil.tip.crop.circle", disabled: true },
+        { name: "Pen", icon: "pencil.tip.crop.circle", disabled: false },
     ];
 
     const handleToolPress = (tool: string) => {
@@ -59,13 +63,49 @@ export default function ImageEditorScreen() {
         setActiveTool(tool);
     };
 
-    const handleImageChange = (change: ImageChange) => {
+    const applyAdjustments = async (imageUri: string, adjustments: AdjustChange): Promise<string | null> => {
+        try {
+            if (!adjustments || Object.keys(adjustments).length === 0 || !imageUri) {
+                return imageUri;
+            }
+
+            // Check if any adjustment has a non-zero value
+            const hasAdjustments = Object.values(adjustments).some((val) => val !== undefined && val !== 0);
+            if (!hasAdjustments) {
+                return originalImageUri || imageUri;
+            }
+
+            // Convert adjustments to ImageManipulator format
+            // Brightness: -1 to 1 (we have -100 to 100, so divide by 100)
+            // Note: expo-image-manipulator only supports brightness and rotate
+            // For contrast, saturation, etc., we need a different approach
+
+            const brightness = adjustments.brightness !== undefined ? adjustments.brightness / 100 : 0;
+
+            // Use ImageManipulator for brightness
+            if (brightness !== 0) {
+                // Note: expo-image-manipulator doesn't directly support brightness
+                // We'll need to use a workaround or different library
+                // For now, store adjustments and apply via style
+            }
+
+            return imageUri;
+        } catch (error) {
+            console.error("Error applying adjustments:", error);
+            return imageUri;
+        }
+    };
+
+    const handleImageChange = async (change: ImageChange) => {
         setImageChanges((prev) => {
             const filtered = prev.filter((c) => c.type !== change.type);
             return [...filtered, change];
         });
 
-        if (change.type === "magic") {
+        if (change.type === "adjust") {
+            const adjustments = change.data as AdjustChange;
+            setAdjustmentValues(adjustments);
+        } else if (change.type === "magic") {
             const { color, style } = change.data as MagicChange;
             if (color?.modeKey && style?.resultType) {
                 const selection = {
@@ -168,6 +208,8 @@ export default function ImageEditorScreen() {
     useEffect(() => {
         hasRequestedRef.current = false;
         setDisplayedImageUri(uri ?? null);
+        setOriginalImageUri(uri ?? null);
+        setAdjustmentValues(null);
     }, [uri]);
 
     useEffect(() => {
@@ -303,7 +345,9 @@ export default function ImageEditorScreen() {
             <View style={styles.canvasContainer}>
                 <GestureDetector gesture={pinch}>
                     <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
-                        <Image source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} resizeMode="cover" />
+                        <View style={styles.imageContainer}>
+                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+                        </View>
                     </Animated.View>
                 </GestureDetector>
             </View>
@@ -348,9 +392,22 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    imageContainer: {
+        width: "100%",
+        height: "100%",
+        position: "relative",
+    },
     image: {
         width: "100%",
         height: "100%",
+    },
+    filterOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        pointerEvents: "none",
     },
     modalContainer: {
         flex: 1,

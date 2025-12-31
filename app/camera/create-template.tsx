@@ -2,16 +2,17 @@ import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useGetGosts } from "@/utils/hook/useGost";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR, TEMPLATE_ITEMS } from "./create-template/constants";
+import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR } from "./create-template/constants";
 import { LayoutPatternSelector } from "./create-template/LayoutPatternSelector";
 import { PreviewCanvas } from "./create-template/PreviewCanvas";
 import { TemplateItemList } from "./create-template/TemplateItemList";
-import { LayoutPattern } from "./create-template/types";
+import { LayoutPattern, TemplateItem } from "./create-template/types";
 
 export default function CreateTemplateScreen() {
     const insets = useSafeAreaInsets();
@@ -22,15 +23,30 @@ export default function CreateTemplateScreen() {
         doctorName: string;
     }>();
 
+    const { data: gostsData, isLoading: isLoadingGosts } = useGetGosts();
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const [selectedLayout, setSelectedLayout] = useState<LayoutPattern>("left-right");
 
+    // Convert Gost[] to TemplateItem[]
+    const templateItems: TemplateItem[] = useMemo(() => {
+        if (!gostsData?.data || !Array.isArray(gostsData.data)) return [];
+        return gostsData.data.map((gost) => {
+            // Use gost_image.url first, fallback to image.url, then default
+            const imageUrl = gost.gost_image?.url || gost.image?.url || null;
+            return {
+                id: String(gost.id),
+                name: gost.name,
+                image: imageUrl || GHOST_ASSETS.face,
+            };
+        });
+    }, [gostsData?.data]);
+
     // Auto-select first item and center it when component mounts
     useEffect(() => {
-        if (selectedItems.length === 0 && TEMPLATE_ITEMS.length > 0) {
-            setSelectedItems([TEMPLATE_ITEMS[0].id]);
+        if (selectedItems.length === 0 && templateItems.length > 0) {
+            setSelectedItems([templateItems[0].id]);
         }
-    }, []);
+    }, [templateItems.length]);
 
     // Auto-select default layout based on number of selected items
     useEffect(() => {
@@ -85,7 +101,7 @@ export default function CreateTemplateScreen() {
 
         // Create template preview array
         const preview = selectedItems.map((itemId) => {
-            const item = TEMPLATE_ITEMS.find((i) => i.id === itemId);
+            const item = templateItems.find((i) => i.id === itemId);
             return item?.image || GHOST_ASSETS.face;
         });
 
@@ -148,16 +164,24 @@ export default function CreateTemplateScreen() {
                     </BaseText>
                 </View>
 
-                {/* Preview Canvas */}
-                <View style={styles.previewContainer}>
-                    <PreviewCanvas selectedItems={selectedItems} templateItems={TEMPLATE_ITEMS} selectedLayout={selectedLayout} />
+                {isLoadingGosts ? (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={MINT_COLOR} />
+                    </View>
+                ) : (
+                    <>
+                        {/* Preview Canvas */}
+                        <View style={styles.previewContainer}>
+                            <PreviewCanvas selectedItems={selectedItems} templateItems={templateItems} selectedLayout={selectedLayout} />
 
-                    {/* Layout Pattern Selector - Show for 2+ items */}
-                    {selectedItems.length >= 2 && <LayoutPatternSelector patterns={getPatterns()} selectedLayout={selectedLayout} onSelect={handleLayoutSelect} />}
-                </View>
+                            {/* Layout Pattern Selector - Show for 2+ items */}
+                            {selectedItems.length >= 2 && <LayoutPatternSelector patterns={getPatterns()} selectedLayout={selectedLayout} onSelect={handleLayoutSelect} />}
+                        </View>
 
-                {/* Template Items Selection */}
-                <TemplateItemList items={TEMPLATE_ITEMS} selectedItems={selectedItems} onToggle={handleItemToggle} maxSelection={9} />
+                        {/* Template Items Selection */}
+                        <TemplateItemList items={templateItems} selectedItems={selectedItems} onToggle={handleItemToggle} maxSelection={9} />
+                    </>
+                )}
             </ScrollView>
 
             {/* Footer */}
@@ -225,5 +249,11 @@ const styles = StyleSheet.create({
     },
     createButtonDisabled: {
         backgroundColor: colors.system.gray3,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: 200,
     },
 });
