@@ -20,6 +20,9 @@ export default function PatientsLayout() {
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
 
+    console.log("====================================");
+    console.log(practiceList?.data);
+    console.log("====================================");
     // Filter doctors from members
     const doctors = useMemo(() => {
         return practiceMembers?.data?.filter((member) => member.role === "doctor") ?? [];

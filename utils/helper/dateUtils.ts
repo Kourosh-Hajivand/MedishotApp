@@ -1,8 +1,12 @@
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import timezone from "dayjs/plugin/timezone";
+import utc from "dayjs/plugin/utc";
 
-// تنظیم plugin
+// تنظیم plugins
 dayjs.extend(relativeTime);
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 /**
  * تبدیل تاریخ به relative time (مثل "just now", "2 minutes ago")
@@ -12,7 +16,8 @@ dayjs.extend(relativeTime);
 export const getRelativeTime = (dateString: string): string => {
     if (!dateString) return "";
 
-    const date = dayjs(dateString);
+    // Parse UTC date and convert to local timezone
+    const date = dayjs.utc(dateString).local();
     const now = dayjs();
 
     // اگر تاریخ در آینده باشد
@@ -76,7 +81,8 @@ export const getRelativeTime = (dateString: string): string => {
 export const getRelativeTimeWithDayjs = (dateString: string): string => {
     if (!dateString) return "";
 
-    const date = dayjs(dateString);
+    // Parse UTC date and convert to local timezone
+    const date = dayjs.utc(dateString).local();
     return date.fromNow();
 };
 
@@ -89,7 +95,8 @@ export const getRelativeTimeWithDayjs = (dateString: string): string => {
 export const formatDate = (dateString: string, format: string = "MMMM D, YYYY"): string => {
     if (!dateString) return "";
 
-    const date = dayjs(dateString);
+    // Parse UTC date and convert to local timezone
+    const date = dayjs.utc(dateString).local();
     if (!date.isValid()) return "";
 
     return date.format(format);

@@ -104,6 +104,18 @@ export default function EditPracticeScreen() {
         }
     }, [data, setValue]);
 
+    // Set form values when metadata is parsed
+    useEffect(() => {
+        if (metadata && practice) {
+            setValue("practiceName", practice.name || "");
+            setValue("website", metadata?.website?.replace("https://", "") || "");
+            setValue("phoneNumber", metadata?.phone?.replace(/-/g, "") || "");
+            setValue("address", metadata?.address || "");
+            setValue("zipCode", metadata?.zipcode?.toString() || "");
+            setValue("email", metadata?.email || "");
+        }
+    }, [metadata, practice, setValue]);
+
     // Initialize uploadedFilename with existing image URL if in edit mode
     useEffect(() => {
         if (practice?.image?.url && !localImageUri) {
@@ -197,6 +209,9 @@ export default function EditPracticeScreen() {
                 }),
             };
 
+            console.log("====================================");
+            console.log("updateData:", updateData);
+            console.log("====================================");
             if (currentUploadedFilename) {
                 console.log("📤 [onSubmit] Submitting image filename:", currentUploadedFilename);
                 updateData.image = currentUploadedFilename;
@@ -232,7 +247,7 @@ export default function EditPracticeScreen() {
             updatePractice({
                 id: practice.id,
                 data: updateData,
-        });
+            });
         },
         [practice, uploadedFilename, localImageUri, metadata, updatePractice],
     );
@@ -257,6 +272,8 @@ export default function EditPracticeScreen() {
     console.log("🖼️ [RENDER] isUploading:", isUploading);
     console.log("🖼️ [RENDER] isPending:", isPending);
     console.log("🖼️ [RENDER] practice?.image?.url:", practice?.image?.url);
+
+    console.log("🖼️ practice:", practice);
 
     return (
         <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
@@ -297,7 +314,14 @@ export default function EditPracticeScreen() {
                                 // Show default avatar when no image
                                 <AvatarIcon width={50} height={50} strokeWidth={0} />
                             )}
-                            <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
+                            {isUploading ? (
+                                <View></View>
+                            ) : (
+                                <View style={styles.plusButton}>
+                                    {" "}
+                                    <PlusIcon width={14} height={14} strokeWidth={0} />
+                                </View>
+                            )}
                         </View>
                     </ImagePickerWrapper>
                     <View style={styles.titleContainer}>

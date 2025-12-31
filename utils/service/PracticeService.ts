@@ -82,7 +82,7 @@ export const PracticeService = {
     // Update practice
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(baseUrl + update(practiceId), data, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + update(practiceId), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -118,7 +118,7 @@ export const PracticeService = {
             }
             const url = baseUrl + getMembers(practiceId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
             const response: AxiosResponse<PracticeMembersResponse | Member[]> = await axiosInstance.get(url);
-            
+
             // Handle both array response and wrapped response
             if (Array.isArray(response.data)) {
                 // If response is directly an array, wrap it
@@ -127,7 +127,7 @@ export const PracticeService = {
                     data: response.data,
                 };
             }
-            
+
             // If response is already wrapped, return as is
             return response.data;
         } catch (error) {

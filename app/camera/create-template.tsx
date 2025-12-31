@@ -165,7 +165,6 @@ export default function CreateTemplateScreen() {
             description: `Template with ${selectedItems.length} items`,
             grid_layout: getGridLayout(selectedLayout),
             layout_pattern: selectedLayout,
-            is_active: true,
             gosts: gosts,
         };
 

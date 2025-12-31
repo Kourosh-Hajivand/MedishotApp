@@ -3,6 +3,7 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { useCreateContract, useGetContractTemplate, useGetPatientById, useGetPracticeById, useTempUpload } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
@@ -367,7 +368,7 @@ export default function SignContractScreen() {
 
         const patientName = `${patient.first_name} ${patient.last_name}`;
         const patientImageUrl = patient.profile_image?.url;
-        const photoDate = patient.profile_image?.created_at ? new Date(patient.profile_image.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : patient.created_at ? new Date(patient.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
+        const photoDate = patient.profile_image?.created_at ? formatDate(patient.profile_image.created_at, "MMM D, YYYY") : patient.created_at ? formatDate(patient.created_at, "MMM D, YYYY") : "";
 
         navigation.setOptions({
             headerRight: () => {

@@ -1,5 +1,6 @@
 import Avatar from "@/components/avatar";
 import { BaseText } from "@/components/text/BaseText";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
 import { Button, Host, Picker } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
@@ -38,7 +39,7 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
                                 {activity.description}
                             </BaseText>
                             <BaseText type="Caption1" weight={400} color="labels.secondary">
-                                {activity.created_at}
+                                {activity.created_at ? formatDate(activity.created_at, "MMM D, YYYY") : ""}
                             </BaseText>
                         </View>
                     </View>

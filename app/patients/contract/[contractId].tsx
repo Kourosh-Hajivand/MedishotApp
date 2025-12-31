@@ -2,6 +2,7 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { useGetContract, useGetPatientById } from "@/utils/hook";
 import { useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect } from "react";
@@ -39,7 +40,7 @@ export default function ContractDetailScreen() {
 
         const patientName = `${patient.first_name} ${patient.last_name}`;
         const patientImageUrl = patient.profile_image?.url;
-        const photoDate = patient.profile_image?.created_at ? new Date(patient.profile_image.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : patient.created_at ? new Date(patient.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "";
+        const photoDate = patient.profile_image?.created_at ? formatDate(patient.profile_image.created_at, "MMM D, YYYY") : patient.created_at ? formatDate(patient.created_at, "MMM D, YYYY") : "";
 
         navigation.setOptions({
             headerTitle: "",

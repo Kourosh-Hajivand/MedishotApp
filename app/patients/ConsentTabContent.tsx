@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { useGetPatientContracts } from "@/utils/hook";
 import { router } from "expo-router";
 import React from "react";
@@ -27,12 +28,6 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
             </View>
         );
     }
-
-    const formatDate = (dateString: string | null) => {
-        if (!dateString) return "";
-        const date = new Date(dateString);
-        return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-    };
 
     return (
         <View className="flex-1 bg-white">
@@ -62,7 +57,7 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
                                             {contract.contract_template?.title || "Untitled Contract"}
                                         </BaseText>
                                         <BaseText type="Caption2" color="labels.secondary">
-                                            {formatDate(contractDate)}
+                                            {contractDate ? formatDate(contractDate, "MMM D, YYYY") : ""}
                                         </BaseText>
                                     </View>
                                     <View className="aspect-[816/1056] border border-system-gray6 rounded-md overflow-hidden">

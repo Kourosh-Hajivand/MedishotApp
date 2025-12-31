@@ -3,6 +3,7 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { useAuth } from "@/utils/hook/useAuth";
 import { People } from "@/utils/service/models/ResponseModels";
 import { router, useNavigation } from "expo-router";
@@ -101,7 +102,7 @@ const ProfileDetails = ({ profile }: { profile?: People | null }) => {
         { label: "Full Name", value: fullName },
         { label: "Email", value: profile?.email },
         { label: "Verified", value: profile?.is_verified ? "Yes" : profile?.is_verified === false ? "No" : null },
-        { label: "Member Since", value: profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : null },
+        { label: "Member Since", value: profile?.created_at ? formatDate(profile.created_at) : null },
     ];
 
     // Filter only fields that have values
