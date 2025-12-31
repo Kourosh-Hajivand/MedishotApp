@@ -1,11 +1,10 @@
-import { BaseButton, BaseText, ControlledInput } from "@/components";
+import { BaseButton, BaseText, ControlledInput, KeyboardAwareScrollView } from "@/components";
 import { useResetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z
@@ -39,7 +38,10 @@ export default function NewPassword() {
         resetPassword({ password: data.password, password_confirmation: data.confirmPassword });
     };
     return (
-        <ScrollView contentContainerClassName="flex-1 bg-white">
+        <KeyboardAwareScrollView
+            backgroundColor="white"
+            contentContainerClassName="flex-1 bg-white"
+        >
             <View className="flex-1 px-10 justify-between pb-[30%] ">
                 <View style={{ paddingTop: insets.top + 40, gap: 71 }}>
                     <View className="gap-2">
@@ -59,6 +61,6 @@ export default function NewPassword() {
                 </View>
                 <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 }

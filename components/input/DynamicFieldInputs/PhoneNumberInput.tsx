@@ -42,6 +42,8 @@ export const PhoneNumberInput: React.FC<Props> = ({ value, onChangeText, placeho
             onChangeText={handleChange}
             keyboardType="phone-pad"
             maxLength={14} // (XXX) XXX-XXXX
+            returnKeyType={props.returnKeyType || "next"}
+            blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
         />
     );
 };

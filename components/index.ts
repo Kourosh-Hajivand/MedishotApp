@@ -4,6 +4,7 @@ export { FloatingActionButton } from "./button/ui/FloatingActionButton";
 export { default as OutlineButton } from "./button/ui/OutlineButton";
 export { DynamicInputList } from "./DynamicField";
 export { default as ImagePickerWrapper } from "./ImagePickerWrapper";
+export { KeyboardAwareScrollView } from "./KeyboardAwareScrollView";
 export { default as ControlledInput } from "./input/ControlledInput";
 export { default as OTPInput } from "./input/OTPInput";
 export { default as SearchBox } from "./input/searchbox/searchbox";

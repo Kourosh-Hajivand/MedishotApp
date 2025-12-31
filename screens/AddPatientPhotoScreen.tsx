@@ -17,10 +17,9 @@ import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ActivityIndicator, Image, Pressable, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-import { BaseText, ControlledInput, DynamicInputList } from "../components";
+import { BaseText, ControlledInput, DynamicInputList, KeyboardAwareScrollView } from "../components";
 const schema = z.object({
     first_name: z.string().min(1, "First Name is required."),
     last_name: z.string().min(1, "Last Name is required."),
@@ -792,7 +791,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     console.log("🖼️ [RENDER] displaySelectedImage:", displaySelectedImage);
 
     return (
-        <ScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
+        <KeyboardAwareScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
             <View className="flex-1 bg-system-gray6 gap-8">
                 <View className="items-center justify-center gap-5">
                     <View className="gap-4 ">
@@ -894,6 +893,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                 </View>
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 };

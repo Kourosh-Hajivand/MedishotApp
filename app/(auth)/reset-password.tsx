@@ -1,11 +1,10 @@
-import { BaseButton, BaseText, ControlledInput } from "@/components";
+import { BaseButton, BaseText, ControlledInput, KeyboardAwareScrollView } from "@/components";
 import { useForgetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { KeyboardAvoidingView, Platform, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z.object({
@@ -37,8 +36,11 @@ export default function ResetPassword() {
         resetPassword(data);
     };
     return (
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "white" }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}>
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <>
+            <KeyboardAwareScrollView
+                backgroundColor="white"
+                contentContainerStyle={{ flexGrow: 1 }}
+            >
                 <View className="flex-1 px-10" style={{ paddingTop: insets.top + 40 }}>
                     <View className="gap-10" style={{ gap: 71 }}>
                         <View className="gap-2">
@@ -56,10 +58,10 @@ export default function ResetPassword() {
                         </View>
                     </View>
                 </View>
-            </ScrollView>
+            </KeyboardAwareScrollView>
             <View style={{ paddingBottom: insets.bottom + 40 || 40, paddingHorizontal: 40, backgroundColor: "white" }}>
                 <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
             </View>
-        </KeyboardAvoidingView>
+        </>
     );
 }

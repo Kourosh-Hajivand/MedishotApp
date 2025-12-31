@@ -143,6 +143,9 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
                                         secureTextEntry={type === "password" && !showPassword}
                                         keyboardType={name === "phoneNumber" ? "phone-pad" : type === "number" ? "numeric" : "default"}
                                         textAlign={centerText ? "center" : "left"}
+                                        returnKeyType={props.returnKeyType || (type === "password" && name === "confirmPassword" ? "done" : "next")}
+                                        onSubmitEditing={props.onSubmitEditing || undefined}
+                                        blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
                                         style={[
                                             styles.textInput,
                                             {

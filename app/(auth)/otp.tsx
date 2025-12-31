@@ -1,11 +1,10 @@
-import { BaseButton, BaseText, OTPInput } from "@/components";
+import { BaseButton, BaseText, KeyboardAwareScrollView, OTPInput } from "@/components";
 import { storeTokens } from "@/utils/helper/tokenStorage";
 import { useCompleteRegistration, useInitiateRegistration, useVerifyOtpCode } from "@/utils/hook";
 import { Button, Host } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useState } from "react";
-import { View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function OTPScreen() {
@@ -99,7 +98,10 @@ export default function OTPScreen() {
     };
 
     return (
-        <ScrollView contentContainerClassName="flex-1 bg-white">
+        <KeyboardAwareScrollView
+            backgroundColor="white"
+            contentContainerClassName="flex-1 bg-white"
+        >
             <View className="flex-1 px-10 justify-between pb-[30%] ">
                 <View style={{ paddingTop: insets.top + 40, gap: 71 }}>
                     <View className="gap-2">
@@ -133,6 +135,6 @@ export default function OTPScreen() {
                     </View>
                 </View>
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 }

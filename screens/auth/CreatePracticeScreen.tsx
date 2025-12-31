@@ -6,11 +6,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, KeyboardTypeOptions, Platform, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
-import { BaseText, ControlledInput, ImagePickerWrapper } from "../../components";
+import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "../../components";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
@@ -175,8 +175,11 @@ export const CreatePracticeScreen: React.FC = () => {
         });
     }, [navigation, handleSubmit, onSubmit, isPending]);
     return (
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView
+            style={styles.scrollView}
+            backgroundColor={colors.background}
+            contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }}
+        >
                 <View style={styles.avatarContainer}>
                     <ImagePickerWrapper onImageSelected={handleImageSelected}>
                         <View style={styles.avatarWrapper}>
@@ -220,8 +223,7 @@ export const CreatePracticeScreen: React.FC = () => {
                         </BaseText>
                     )}
                 </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
     );
 };
 

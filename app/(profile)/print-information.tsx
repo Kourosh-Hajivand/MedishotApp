@@ -1,3 +1,4 @@
+import { KeyboardAwareScrollView } from "@/components";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
 import { useGetPracticeById, useUpdatePractice } from "@/utils/hook";
@@ -5,7 +6,7 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Host, HStack, Picker, Switch, Text, VStack } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface PracticeSettings {
@@ -120,7 +121,7 @@ export default function PrintInformationScreen() {
     };
 
     return (
-        <ScrollView style={[styles.container, { paddingTop: insets.top + headerHeight }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <KeyboardAwareScrollView style={[styles.container, { paddingTop: insets.top + headerHeight }]} contentContainerStyle={styles.contentContainer} backgroundColor="#ffffff">
             <Host style={{ flex: 1, paddingTop: insets.top + headerHeight + 160 }}>
                 <VStack spacing={16}>
                     {/* Avatar Picker */}
@@ -141,7 +142,7 @@ export default function PrintInformationScreen() {
                     <Switch label="Practice Social Media" variant="switch" value={settings.practiceSocialMedia} onValueChange={isPending ? undefined : (value) => handleToggle("practiceSocialMedia", value)} />
                 </VStack>
             </Host>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 }
 

@@ -1,8 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Image, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Platform, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { BaseButton, BaseText } from "../components";
+import { BaseButton, BaseText, KeyboardAwareScrollView } from "../components";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared.js";
 
@@ -21,7 +21,11 @@ export const AddPatientReviewScreen: React.FC = () => {
 
     return (
         <SafeAreaView style={styles.container} className="flex-1 bg-white">
-            <ScrollView style={styles.scrollView} className="flex-1 px-4 pt-6">
+            <KeyboardAwareScrollView
+                style={styles.scrollView}
+                className="flex-1 px-4 pt-6"
+                backgroundColor="white"
+            >
                 <View style={styles.content} className="space-y-6">
                     {/* Patient Photo */}
                     {photoUri && (
@@ -70,7 +74,7 @@ export const AddPatientReviewScreen: React.FC = () => {
 
                     <BaseButton onPress={() => router.back()} label="Edit Information" ButtonStyle="Plain" className="text-blue-500" />
                 </View>
-            </ScrollView>
+            </KeyboardAwareScrollView>
         </SafeAreaView>
     );
 };

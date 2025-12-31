@@ -1,5 +1,5 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
-import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper } from "@/components";
+import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
@@ -10,8 +10,7 @@ import { People } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useEffect, useState } from "react";
 import { Control, FieldErrors, useForm, UseFormHandleSubmit } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, StyleSheet, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { ActivityIndicator, Image, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 
@@ -197,7 +196,10 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const displaySubtitle = subtitle || (mode === "create" ? "Start by completing your profile." : "Update your profile information.");
 
     return (
-        <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}
+        >
             <View style={styles.avatarContainer}>
                 <ImagePickerWrapper onImageSelected={handleImageSelected}>
                     <View style={styles.avatarWrapper}>
@@ -280,7 +282,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                     <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                 </View>
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 };
 

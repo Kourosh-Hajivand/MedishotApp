@@ -3,9 +3,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
 import React from "react";
 import { useForm } from "react-hook-form";
-import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BaseButton, BaseText, ControlledInput } from "../../components";
+import { BaseButton, BaseText, ControlledInput, KeyboardAwareScrollView } from "../../components";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared.js";
 import { SignUpFormData, signUpSchema } from "../../utils/schema";
@@ -45,7 +45,11 @@ export const SignUpScreen: React.FC = () => {
     };
 
     return (
-        <ScrollView style={styles.scrollView} contentContainerStyle={{ flex: 1, backgroundColor: colors.background }}>
+        <KeyboardAwareScrollView
+            style={styles.scrollView}
+            backgroundColor={colors.background}
+            contentContainerStyle={{ flex: 1, backgroundColor: colors.background }}
+        >
             <View style={styles.content} className="flex-1  px-10 ">
                 <View className="flex-1 items-center  justify-between gap-10">
                     <View style={{ paddingTop: insets.top + 40 }} className="w-full items-center justify-start  flex-1 ">
@@ -86,7 +90,7 @@ export const SignUpScreen: React.FC = () => {
                     </View>
                 </View>
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 };
 

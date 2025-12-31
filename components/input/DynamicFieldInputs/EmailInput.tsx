@@ -24,6 +24,8 @@ export const EmailInput: React.FC<Props> = ({ value, onChangeText, placeholder =
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            returnKeyType={props.returnKeyType || "next"}
+            blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
         />
     );
 };

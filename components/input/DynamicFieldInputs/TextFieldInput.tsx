@@ -21,6 +21,8 @@ export const TextFieldInput: React.FC<Props> = ({ value, onChangeText, placehold
             placeholderTextColor={"rgba(60, 60, 67, 0.30)"}
             value={value}
             onChangeText={onChangeText}
+            returnKeyType={props.returnKeyType || "next"}
+            blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
         />
     );
 };

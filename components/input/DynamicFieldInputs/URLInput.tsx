@@ -24,6 +24,8 @@ export const URLInput: React.FC<Props> = ({ value, onChangeText, placeholder = "
             keyboardType="url"
             autoCapitalize="none"
             autoCorrect={false}
+            returnKeyType={props.returnKeyType || "next"}
+            blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
         />
     );
 };

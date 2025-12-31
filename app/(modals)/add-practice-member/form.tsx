@@ -1,5 +1,5 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
-import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper } from "@/components";
+import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -178,7 +178,6 @@ export default function AddPracticeMemberForm() {
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
         console.log("📸 [handleImageSelected] Image selected:", result.uri);
-        Keyboard.dismiss();
         setLocalImageUri(result.uri); // Save local URI for preview
 
         try {
@@ -285,7 +284,10 @@ export default function AddPracticeMemberForm() {
     }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode, onSubmit]);
 
     return (
-        <ScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <KeyboardAwareScrollView
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}
+        >
             <View style={styles.avatarContainer}>
                 <ImagePickerWrapper onImageSelected={handleImageSelected} disabled={isEditMode}>
                     <View style={styles.avatarWrapper}>
@@ -400,7 +402,7 @@ export default function AddPracticeMemberForm() {
                     </View>
                 )}
             </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
     );
 }
 

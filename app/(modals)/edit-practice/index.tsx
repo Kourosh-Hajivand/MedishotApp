@@ -1,5 +1,5 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
-import { BaseText, ControlledInput, ImagePickerWrapper } from "@/components";
+import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "@/utils/helper/HelperFunction";
@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, KeyboardAvoidingView, KeyboardTypeOptions, Platform, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Image, KeyboardTypeOptions, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -146,7 +146,6 @@ export default function EditPracticeScreen() {
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
         console.log("📸 [handleImageSelected] Image selected:", result.uri);
-        Keyboard.dismiss();
         setLocalImageUri(result.uri); // Save local URI for preview
 
         try {
@@ -276,92 +275,97 @@ export default function EditPracticeScreen() {
     console.log("🖼️ practice:", practice);
 
     return (
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 30 : 0}>
-            <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 10 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <View style={styles.avatarContainer}>
-                    <ImagePickerWrapper onImageSelected={handleImageSelected}>
-                        <View style={styles.avatarWrapper}>
-                            {isUploading ? (
-                                // Show loading indicator while uploading
-                                <ActivityIndicator size="small" color={colors.system.gray6} />
-                            ) : localImageUri ? (
-                                // Show preview after upload is complete (new image)
-                                <Image
-                                    source={{ uri: localImageUri }}
-                                    style={styles.avatarImage}
-                                    onError={(error) => {
-                                        console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
-                                        console.error("❌ [Image] Failed URI:", localImageUri);
-                                    }}
-                                    onLoad={() => {
-                                        console.log("✅ [Image] Local image loaded successfully:", localImageUri);
-                                    }}
-                                />
-                            ) : practice?.image?.url ? (
-                                // Show existing image from server
-                                <Image
-                                    source={{ uri: practice.image.url }}
-                                    style={styles.avatarImage}
-                                    onError={(error) => {
-                                        console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
-                                        console.error("❌ [Image] Failed URI:", practice.image?.url);
-                                    }}
-                                    onLoad={() => {
-                                        console.log("✅ [Image] Existing image loaded successfully:", practice.image?.url);
-                                    }}
-                                />
-                            ) : (
-                                // Show default avatar when no image
-                                <AvatarIcon width={50} height={50} strokeWidth={0} />
-                            )}
-                            {isUploading ? (
-                                <View></View>
-                            ) : (
-                                <View style={styles.plusButton}>
-                                    {" "}
-                                    <PlusIcon width={14} height={14} strokeWidth={0} />
-                                </View>
-                            )}
-                        </View>
-                    </ImagePickerWrapper>
-                    <View style={styles.titleContainer}>
-                        <BaseText type="Title1" weight="700" color="system.black">
-                            Edit Practice
-                        </BaseText>
-                        <BaseText type="Body" color="labels.secondary" align="center">
-                            Update your practice information.
-                        </BaseText>
-                    </View>
-                </View>
-
-                {/* Form */}
-                <View style={styles.formContainer}>
-                    {[
-                        { name: "practiceName", label: "Practice Name" },
-                        { name: "website", label: "Website", optional: true },
-                        { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true },
-                        { name: "email", label: "Email", keyboardType: "email-address", optional: true },
-                        { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", optional: true },
-                        { name: "address", label: "Address", optional: true },
-                    ].map((f, i) => (
-                        <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
-                            <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
-                                {f.label}
-                            </BaseText>
-                            <View style={styles.inputWrapper}>
-                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+        <KeyboardAwareScrollView
+            style={styles.scrollView}
+            backgroundColor={colors.background}
+            contentContainerStyle={{
+                flexGrow: 1,
+                paddingTop: insets.top + 10,
+            }}
+        >
+            <View style={styles.avatarContainer}>
+                <ImagePickerWrapper onImageSelected={handleImageSelected}>
+                    <View style={styles.avatarWrapper}>
+                        {isUploading ? (
+                            // Show loading indicator while uploading
+                            <ActivityIndicator size="small" color={colors.system.gray6} />
+                        ) : localImageUri ? (
+                            // Show preview after upload is complete (new image)
+                            <Image
+                                source={{ uri: localImageUri }}
+                                style={styles.avatarImage}
+                                onError={(error) => {
+                                    console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
+                                    console.error("❌ [Image] Failed URI:", localImageUri);
+                                }}
+                                onLoad={() => {
+                                    console.log("✅ [Image] Local image loaded successfully:", localImageUri);
+                                }}
+                            />
+                        ) : practice?.image?.url ? (
+                            // Show existing image from server
+                            <Image
+                                source={{ uri: practice.image.url }}
+                                style={styles.avatarImage}
+                                onError={(error) => {
+                                    console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
+                                    console.error("❌ [Image] Failed URI:", practice.image?.url);
+                                }}
+                                onLoad={() => {
+                                    console.log("✅ [Image] Existing image loaded successfully:", practice.image?.url);
+                                }}
+                            />
+                        ) : (
+                            // Show default avatar when no image
+                            <AvatarIcon width={50} height={50} strokeWidth={0} />
+                        )}
+                        {isUploading ? (
+                            <View></View>
+                        ) : (
+                            <View style={styles.plusButton}>
+                                {" "}
+                                <PlusIcon width={14} height={14} strokeWidth={0} />
                             </View>
-                        </View>
-                    ))}
-
-                    {error?.message && (
-                        <BaseText color="system.red" type="Caption2" className="mt-2">
-                            {error?.message}
-                        </BaseText>
-                    )}
+                        )}
+                    </View>
+                </ImagePickerWrapper>
+                <View style={styles.titleContainer}>
+                    <BaseText type="Title1" weight="700" color="system.black">
+                        Edit Practice
+                    </BaseText>
+                    <BaseText type="Body" color="labels.secondary" align="center">
+                        Update your practice information.
+                    </BaseText>
                 </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
+            </View>
+
+            {/* Form */}
+            <View style={styles.formContainer}>
+                {[
+                    { name: "practiceName", label: "Practice Name" },
+                    { name: "website", label: "Website", optional: true },
+                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true },
+                    { name: "email", label: "Email", keyboardType: "email-address", optional: true },
+                    { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", optional: true },
+                    { name: "address", label: "Address", optional: true },
+                ].map((f, i) => (
+                    <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
+                        <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
+                            {f.label}
+                        </BaseText>
+                        <View style={styles.inputWrapper}>
+                            <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                        </View>
+                    </View>
+                ))}
+
+                {error?.message && (
+                    <BaseText color="system.red" type="Caption2" className="mt-2">
+                        {error?.message}
+                    </BaseText>
+                )}
+            </View>
+        </KeyboardAwareScrollView>
     );
 }
 
