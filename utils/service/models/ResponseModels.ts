@@ -236,13 +236,43 @@ export interface PracticeTagResponse {
 
 export interface PracticeTemplate {
     id: number;
-    practise_id: number;
+    practise_id: number | null; // null for global templates
     name: string;
-    description?: string;
-    content?: object;
+    description?: string | null;
+    grid_layout?: {
+        rows?: number;
+        columns?: number;
+    } | null;
+    layout_pattern?:
+        | "left-right"
+        | "top-bottom"
+        | "left-tall"
+        | "top-wide"
+        | "right-tall"
+        | "top-two"
+        | "grid-2x2"
+        | "grid-2x2-alt"
+        | "grid-2x2-vertical"
+        | "grid-2x3"
+        | "grid-2x3-alt"
+        | "grid-2x3-horizontal"
+        | "grid-3x2"
+        | "grid-3x3"
+        | "grid-3x3-alt"
+        | "grid-3x3-horizontal"
+        | "grid-4x2"
+        | "grid-2x4"
+        | "grid-3x3-full"
+        | "grid-3x3-full-alt"
+        | "grid-3x3-full-horizontal"
+        | null;
     is_active: boolean;
+    image?: string | null; // URL to template's main image
+    cells_count?: number; // Number of cells in this template (included in list view)
     created_at: string;
     updated_at: string;
+    // Legacy field - kept for backward compatibility
+    content?: object;
 }
 
 export interface PracticeTemplatesResponse {

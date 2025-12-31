@@ -1,9 +1,12 @@
+import { BaseText } from "@/components";
+import { IconSymbol } from "@/components/ui/icon-symbol";
+import colors from "@/theme/colors";
 import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useState } from "react";
-import { Dimensions, FlatList, TouchableOpacity } from "react-native";
+import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
 import { ImageViewerModal } from "./ImageViewerModal";
@@ -81,6 +84,21 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initia
         </Host>
     );
 
+    // Show empty state if no images
+    if (!images || images.length === 0) {
+        return (
+            <View style={styles.emptyContainer}>
+                <IconSymbol name="photo" color={colors.labels.tertiary} size={64} />
+                <BaseText type="Title2" weight="600" color="labels.secondary" style={styles.emptyTitle}>
+                    No Images
+                </BaseText>
+                <BaseText type="Body" color="labels.tertiary" style={styles.emptyDescription}>
+                    This patient doesn't have any images yet.
+                </BaseText>
+            </View>
+        );
+    }
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
@@ -93,3 +111,20 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initia
         </GestureHandlerRootView>
     );
 };
+
+const styles = StyleSheet.create({
+    emptyContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 32,
+        paddingVertical: 64,
+    },
+    emptyTitle: {
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    emptyDescription: {
+        textAlign: "center",
+    },
+});

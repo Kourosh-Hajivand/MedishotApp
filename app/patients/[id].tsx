@@ -6,10 +6,11 @@ import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useGetPatientById } from "@/utils/hook";
+import { useGetPatientMedia } from "@/utils/hook/useMedia";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Image as RNImage, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
@@ -22,6 +23,7 @@ export default function PatientDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const navigation = useNavigation();
     const { data: patient, isLoading } = useGetPatientById(id);
+    const { data: patientMediaData, isLoading: isLoadingMedia } = useGetPatientMedia(id, !!id);
     console.log("====================================");
     console.log(patient?.data);
     console.log("====================================");
@@ -30,15 +32,14 @@ export default function PatientDetailsScreen() {
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
-    const [firstImageUri, setFirstImageUri] = useState<string>("");
 
-    useEffect(() => {
-        const imageSource = require("../../assets/images/img_0944.jpg");
-        const resolved = RNImage.resolveAssetSource(imageSource);
-        if (resolved?.uri) {
-            setFirstImageUri(resolved.uri);
+    // Extract image URLs from patient media
+    const patientImages = useMemo(() => {
+        if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) {
+            return [];
         }
-    }, []);
+        return patientMediaData.data.map((media) => media.media?.url).filter((url): url is string => !!url);
+    }, [patientMediaData?.data]);
 
     const screenWidth = Dimensions.get("window").width;
     const screenHeight = Dimensions.get("window").height;
@@ -210,6 +211,7 @@ export default function PatientDetailsScreen() {
                                             patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,
                                             patientAvatar: patient?.data?.profile_image?.url || "",
                                             doctorName: `Dr. ${patient?.data?.doctor?.first_name || ""} ${patient?.data?.doctor?.last_name || ""}`,
+                                            doctorColor: patient?.data?.doctor?.color || "",
                                         },
                                     });
                                 }}
@@ -354,7 +356,7 @@ export default function PatientDetailsScreen() {
                             },
                         ]}
                         patientData={patient?.data}
-                        images={[firstImageUri || `https://picsum.photos/200/300?random=0`, ...Array.from({ length: 49 }, (_, i) => `https://picsum.photos/200/300?random=${i + 1}`)]}
+                        images={patientImages}
                     />
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}

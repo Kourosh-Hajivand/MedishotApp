@@ -36,8 +36,8 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
 
     return (
         <View className="flex-1 bg-white">
-            <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 20 }}>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 20 }}>
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 20 }}>
+                <View className="flex-row flex-wrap" style={{ marginHorizontal: -10 }}>
                     {contracts.map((contract) => {
                         const contractDate = contract.signed_at || contract.created_at;
                         const imageUrl = contract.contract_file?.url || contract.contract_template?.preview_image || contract.contract_template?.image;
@@ -45,7 +45,7 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
                         return (
                             <TouchableOpacity
                                 key={contract.id}
-                                style={{ width: "47%" }}
+                                style={{ width: "47%", marginHorizontal: "1.5%", marginBottom: 20 }}
                                 onPress={() => {
                                     router.push({
                                         pathname: "/patients/contract/[contractId]",
@@ -65,7 +65,7 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
                                             {formatDate(contractDate)}
                                         </BaseText>
                                     </View>
-                                    <View className="aspect-[816/1056] border border-system-gray6 rounded-md overflow-hidden bg-system-gray6">
+                                    <View className="aspect-[816/1056] border border-system-gray6 rounded-md overflow-hidden">
                                         {imageUrl ? (
                                             <Image source={{ uri: imageUrl }} className="w-full h-full" resizeMode="cover" />
                                         ) : (

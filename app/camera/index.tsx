@@ -31,13 +31,14 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
 
-    const { patientId, patientName, patientAvatar, doctorName, ghostItems, templateId } = useLocalSearchParams<{
+    const { patientId, patientName, patientAvatar, doctorName, ghostItems, templateId, doctorColor } = useLocalSearchParams<{
         patientId: string;
         patientName: string;
         patientAvatar?: string;
         doctorName: string;
         ghostItems?: string;
         templateId?: string;
+        doctorColor?: string;
     }>();
 
     // Parse ghost items from params
@@ -304,7 +305,7 @@ export default function CameraScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.patientInfo}>
-                        <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} />
+                        <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={doctorColor as string} />
                         <View style={styles.patientTextContainer}>
                             <BaseText type="Subhead" weight={600} color="system.white">
                                 {patientName || "Patient Name"}

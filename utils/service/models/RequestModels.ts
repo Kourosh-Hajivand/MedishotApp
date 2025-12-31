@@ -121,18 +121,55 @@ export interface UpdateTagDto {
     color?: string;
 }
 
+export interface GridLayout {
+    rows?: number;
+    columns?: number;
+}
+
+export type LayoutPattern =
+    | "left-right"
+    | "top-bottom"
+    | "left-tall"
+    | "top-wide"
+    | "right-tall"
+    | "top-two"
+    | "grid-2x2"
+    | "grid-2x2-alt"
+    | "grid-2x2-vertical"
+    | "grid-2x3"
+    | "grid-2x3-alt"
+    | "grid-2x3-horizontal"
+    | "grid-3x2"
+    | "grid-3x3"
+    | "grid-3x3-alt"
+    | "grid-3x3-horizontal"
+    | "grid-4x2"
+    | "grid-2x4"
+    | "grid-3x3-full"
+    | "grid-3x3-full-alt"
+    | "grid-3x3-full-horizontal";
+
+export interface CreateTemplateGost {
+    gost_id: number;
+    order: number;
+}
+
 export interface CreateTemplateDto {
-    name: string;
+    name: string; // Required
     description?: string;
-    content?: object;
+    grid_layout?: GridLayout;
+    layout_pattern?: LayoutPattern;
     is_active?: boolean;
+    gosts?: number[]; // Array of gost IDs as numbers
 }
 
 export interface UpdateTemplateDto {
     name?: string;
     description?: string;
-    content?: object;
+    grid_layout?: GridLayout;
+    layout_pattern?: LayoutPattern;
     is_active?: boolean;
+    gosts?: number[]; // Array of gost IDs in order
 }
 
 // ============= Patient Models =============

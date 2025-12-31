@@ -3,10 +3,14 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetGosts } from "@/utils/hook/useGost";
+import { useCreatePracticeTemplate } from "@/utils/hook/usePractice";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { CreateTemplateDto } from "@/utils/service/models/RequestModels";
+import { PracticeTemplateResponse } from "@/utils/service/models/ResponseModels";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR } from "./create-template/constants";
 import { LayoutPatternSelector } from "./create-template/LayoutPatternSelector";
@@ -23,9 +27,28 @@ export default function CreateTemplateScreen() {
         doctorName: string;
     }>();
 
+    const { selectedPractice } = useProfileStore();
     const { data: gostsData, isLoading: isLoadingGosts } = useGetGosts();
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const [selectedLayout, setSelectedLayout] = useState<LayoutPattern>("left-right");
+
+    const { mutate: createTemplate, isPending: isCreatingTemplate } = useCreatePracticeTemplate(
+        (data: PracticeTemplateResponse) => {
+            console.log("✅ Template created successfully:", data);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert("Success", "Template created successfully", [
+                {
+                    text: "OK",
+                    onPress: () => router.back(),
+                },
+            ]);
+        },
+        (error: Error) => {
+            console.error("❌ Error creating template:", error);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert("Error", error.message || "Failed to create template");
+        },
+    );
 
     // Convert Gost[] to TemplateItem[]
     const templateItems: TemplateItem[] = useMemo(() => {
@@ -97,30 +120,80 @@ export default function CreateTemplateScreen() {
     const handleCreateTemplate = () => {
         if (selectedItems.length === 0) return;
 
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        if (!selectedPractice?.id) {
+            Alert.alert("Error", "Please select a practice first");
+            return;
+        }
 
-        // Create template preview array
-        const preview = selectedItems.map((itemId) => {
-            const item = templateItems.find((i) => i.id === itemId);
-            return item?.image || GHOST_ASSETS.face;
-        });
+        // Build CreateTemplateDto - gosts as array of number IDs
+        const gosts = selectedItems
+            .map((itemId) => {
+                const gostId = parseInt(itemId, 10);
+                if (isNaN(gostId)) {
+                    console.error(`Invalid gost ID: ${itemId}`);
+                    return null;
+                }
+                return gostId;
+            })
+            .filter((gost): gost is number => gost !== null);
 
-        // Navigate back to template-select with new template data
-        const templateData = {
-            id: `custom-${Date.now()}`,
-            name: `Custom Template`,
-            ghostItems: selectedItems,
-            preview: preview,
-            layoutPattern: selectedLayout,
+        // Calculate grid_layout based on selected layout pattern
+        const getGridLayout = (layout: LayoutPattern): { rows?: number; columns?: number } | undefined => {
+            // Extract grid dimensions from layout pattern
+            const gridMatch = layout.match(/grid-(\d+)x(\d+)/);
+            if (gridMatch) {
+                return {
+                    rows: parseInt(gridMatch[1], 10),
+                    columns: parseInt(gridMatch[2], 10),
+                };
+            }
+            // For non-grid layouts, calculate based on item count
+            if (selectedItems.length <= 2) {
+                return { rows: 1, columns: 2 };
+            } else if (selectedItems.length <= 4) {
+                return { rows: 2, columns: 2 };
+            } else if (selectedItems.length <= 6) {
+                return { rows: 2, columns: 3 };
+            } else if (selectedItems.length <= 9) {
+                return { rows: 3, columns: 3 };
+            }
+            return undefined;
         };
 
-        router.back();
-        // Use setTimeout to ensure navigation completes before setting params
-        setTimeout(() => {
-            router.setParams({
-                newTemplate: JSON.stringify(templateData),
-            });
-        }, 100);
+        const templateData: CreateTemplateDto = {
+            name: `Custom Template ${new Date().toLocaleDateString()}`,
+            description: `Template with ${selectedItems.length} items`,
+            grid_layout: getGridLayout(selectedLayout),
+            layout_pattern: selectedLayout,
+            is_active: true,
+            gosts: gosts,
+        };
+
+        // Log the data being sent
+        console.log("====================================");
+        console.log("📤 Creating Template with data:");
+        console.log("Practice ID:", selectedPractice.id);
+        console.log("Template Data:", JSON.stringify(templateData, null, 2));
+        console.log("Selected Items:", selectedItems);
+        console.log("Selected Layout:", selectedLayout);
+        console.log("====================================");
+
+        // Validate data before sending
+        if (gosts.length === 0) {
+            Alert.alert("Error", "No valid gosts selected");
+            return;
+        }
+
+        if (!templateData.name) {
+            Alert.alert("Error", "Template name is required");
+            return;
+        }
+
+        // Call API to create template
+        createTemplate({
+            practiceId: selectedPractice.id,
+            data: templateData,
+        });
     };
 
     const handleClose = () => {
@@ -186,10 +259,14 @@ export default function CreateTemplateScreen() {
 
             {/* Footer */}
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity style={[styles.createButton, selectedItems.length === 0 && styles.createButtonDisabled]} onPress={handleCreateTemplate} activeOpacity={0.8} disabled={selectedItems.length === 0}>
-                    <BaseText type="Body" weight={600} color="system.white">
-                        Create Template
-                    </BaseText>
+                <TouchableOpacity style={[styles.createButton, (selectedItems.length === 0 || isCreatingTemplate) && styles.createButtonDisabled]} onPress={handleCreateTemplate} activeOpacity={0.8} disabled={selectedItems.length === 0 || isCreatingTemplate}>
+                    {isCreatingTemplate ? (
+                        <ActivityIndicator size="small" color={colors.system.white} />
+                    ) : (
+                        <BaseText type="Body" weight={600} color="system.white">
+                            Create Template
+                        </BaseText>
+                    )}
                 </TouchableOpacity>
             </View>
         </View>
