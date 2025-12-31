@@ -181,6 +181,7 @@ export interface CreatePatientRequest {
     profile?: File | string;
     image?: File | string;
     id_card?: File | string;
+    doctor_id?: string | number;
 }
 
 export interface UpdatePatientRequest {

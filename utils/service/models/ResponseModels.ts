@@ -153,7 +153,7 @@ export interface Practice {
 }
 
 export interface Member {
-    id: string; // Format: "user:1" or number as string
+    id: string | number; // Can be "user:1" format, number, or string
     first_name: string | null;
     last_name: string | null;
     email: string;
@@ -162,6 +162,11 @@ export interface Member {
     patients_count: number;
     taken_images_count: number;
     color?: string | null;
+    image?: {
+        id: number;
+        url: string;
+    } | null;
+    type?: string;
     activities?: Array<{
         description: string;
         created_at: string;

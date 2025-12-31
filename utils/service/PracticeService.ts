@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
+import { ApiResponse, Member, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -117,7 +117,18 @@ export const PracticeService = {
                 queryParams.append("role", params.role);
             }
             const url = baseUrl + getMembers(practiceId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
-            const response: AxiosResponse<PracticeMembersResponse> = await axiosInstance.get(url);
+            const response: AxiosResponse<PracticeMembersResponse | Member[]> = await axiosInstance.get(url);
+            
+            // Handle both array response and wrapped response
+            if (Array.isArray(response.data)) {
+                // If response is directly an array, wrap it
+                return {
+                    success: true,
+                    data: response.data,
+                };
+            }
+            
+            // If response is already wrapped, return as is
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

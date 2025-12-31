@@ -1,12 +1,15 @@
 import { AvatarIcon } from "@/assets/icons";
+import Avatar from "@/components/avatar";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { routes } from "@/routes/routes";
 import colors from "@/theme/colors";
-import { useCreatePatient, useGetPatientById, useTempUpload, useUpdatePatient } from "@/utils/hook";
+import { useCreatePatient, useGetPatientById, useGetPracticeMembers, useTempUpload, useUpdatePatient } from "@/utils/hook";
+import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { CreatePatientRequest } from "@/utils/service/models/RequestModels";
+import { Member } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as ImagePicker from "expo-image-picker";
@@ -117,6 +120,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
         phone?: string;
         email?: string;
         scannedImageUri?: string;
+        doctor_id?: string;
+        doctor?: string; // JSON string of doctor object
     }>();
 
     const { data: patient } = useGetPatientById(params.id ?? "");
@@ -149,6 +154,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
         },
     });
     const { selectedPractice } = useProfileStore();
+    const { profile, isAuthenticated } = useAuth();
+    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const firstName = watch("first_name");
     const lastName = watch("last_name");
     const birthDate = watch("birth_date");
@@ -156,6 +163,67 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
     const isEditMode = !!params.id;
+
+    // Get doctor information from params or practice members
+    const selectedDoctor = useMemo(() => {
+        // First, try to get from params.doctor (JSON string)
+        if (params.doctor) {
+            try {
+                return JSON.parse(params.doctor) as Member;
+            } catch {
+                // If parsing fails, continue to other methods
+            }
+        }
+
+        // If doctor_id is provided, find doctor from practice members
+        if (params.doctor_id && practiceMembers?.data) {
+            const doctorId = params.doctor_id;
+            const doctor = practiceMembers.data.find((member) => {
+                const memberId = typeof member.id === "number" ? String(member.id) : member.id.includes(":") ? member.id.split(":")[1] : member.id;
+                return memberId === doctorId && (member.role === "doctor" || member.role === "owner");
+            });
+            if (doctor) return doctor;
+        }
+
+        // If user is doctor, use their own info
+        if (profile && practiceMembers?.data) {
+            const currentMember = practiceMembers.data.find((member) => member.email === profile.email);
+            if (currentMember && (currentMember.role === "doctor" || currentMember.role === "owner")) {
+                return currentMember;
+            }
+        }
+
+        // If patient has doctor info in edit mode
+        if (isEditMode && patient?.data?.doctor) {
+            // Convert patient.doctor (People) to Member format if needed
+            const doctorData = patient.data.doctor;
+            return {
+                id: doctorData.id || "",
+                first_name: doctorData.first_name || null,
+                last_name: doctorData.last_name || null,
+                email: doctorData.email || "",
+                role: "doctor" as const,
+                status: "active" as const,
+                patients_count: 0,
+                taken_images_count: 0,
+                color: doctorData.color || null,
+                image: doctorData.profile_photo_url ? { id: 0, url: doctorData.profile_photo_url } : null,
+                joined_at: "",
+                updated_at: "",
+            } as Member;
+        }
+
+        return null;
+    }, [params.doctor, params.doctor_id, practiceMembers?.data, profile, isEditMode, patient?.data]);
+
+    // Get doctor display name
+    const doctorName = useMemo(() => {
+        if (!selectedDoctor) return "Not assigned";
+        if (selectedDoctor.first_name && selectedDoctor.last_name) {
+            return `Dr. ${selectedDoctor.first_name} ${selectedDoctor.last_name}`;
+        }
+        return selectedDoctor.email;
+    }, [selectedDoctor]);
 
     const { mutate: createPatient, isPending: isCreating } = useCreatePatient(selectedPractice?.id ?? "", () => {
         router.back();
@@ -406,6 +474,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
             first_name: data.first_name,
             last_name: data.last_name,
         };
+
+        // Add doctor_id if provided from route params
+        if (params.doctor_id) {
+            patientData.doctor_id = params.doctor_id;
+        }
 
         const birthDateValue = data.birth_date?.trim();
         if (birthDateValue) {
@@ -771,23 +844,43 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 </View>
 
                 <View className="px-4 gap-4">
-                    <View className="bg-white rounded-2xl  px-4">
-                        <View className="bg-white rounded-2xl px-4">
-                            <View className="border-b border-border ">
+                    <View className="bg-white rounded-2xl">
+                        <View className="bg-white rounded-2xl">
+                            <View>
                                 <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} />
                             </View>
-                            <View className="border-b border-border ">
+                            <View className="border-b border-border w-[96%] ml-auto"></View>
+                            <View>
                                 <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} />
                             </View>
-                            <View className="border-b border-border ">
+                            <View className="border-b border-border w-[96%] ml-auto"></View>
+                            <View>
                                 <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} />
                             </View>
+                            <View className="border-b border-border w-[96%] ml-auto"></View>
                             <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                         </View>
                     </View>
+
+                    {selectedDoctor && (
+                        <View className="bg-white rounded-2xl px-5 p-4 flex-row items-center justify-between ">
+                            <BaseText type="Body" weight="400" color="labels.primary">
+                                Doctor:
+                            </BaseText>
+                            <View className="flex-row items-center gap-2.5">
+                                <Avatar haveRing name={doctorName} size={40} color={selectedDoctor.color} imageUrl={selectedDoctor.image?.url} />
+                                <View>
+                                    <BaseText type="Callout" weight={600} color="labels.primary">
+                                        Dr. {selectedDoctor.first_name} {selectedDoctor.last_name}
+                                    </BaseText>
+                                </View>
+                            </View>
+                        </View>
+                    )}
+
                     {displayIdCardImage && (
                         <View className="bg-white rounded-2xl p-4 flex-row items-start justify-between ">
-                            <BaseText type="Body" weight="500" color="labels.primary">
+                            <BaseText type="Body" weight="400" color="labels.primary">
                                 ID Card
                             </BaseText>
                             <View className="w-[192px] h-[122px] rounded-xl bg-system-gray6 overflow-hidden">

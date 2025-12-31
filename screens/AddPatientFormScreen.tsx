@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import { Dimensions, Image, StyleSheet, View } from "react-native";
 import DocumentScanner from "react-native-document-scanner-plugin";
@@ -9,6 +9,7 @@ import { spacing } from "../styles/spaces";
 import { parseUSIDCardData } from "../utils/helper/HelperFunction";
 
 export const AddPatientFormScreen: React.FC = () => {
+    const params = useLocalSearchParams<{ doctor_id?: string }>();
     const screenWidth = Dimensions.get("window").width;
     const imageWidth = screenWidth * 0.7;
     const imageHeight = screenWidth * 0.6;
@@ -47,19 +48,31 @@ export const AddPatientFormScreen: React.FC = () => {
     const handleContinue = () => {
         if (parsedData && scannedImage) {
             // Encode the parsed data and image as base64 or pass as params
-            const params: any = {
+            const routeParams: any = {
                 ...parsedData,
                 scannedImageUri: scannedImage,
             };
 
+            // Pass doctor_id if provided
+            if (params.doctor_id) {
+                routeParams.doctor_id = params.doctor_id;
+            }
+
             // Navigate to photo screen with parsed data
             router.push({
                 pathname: "/(modals)/add-patient/photo",
-                params: params,
+                params: routeParams,
             });
         } else {
             // If no scan, go to photo screen normally
-            router.push("/(modals)/add-patient/photo");
+            const routeParams: any = {};
+            if (params.doctor_id) {
+                routeParams.doctor_id = params.doctor_id;
+            }
+            router.push({
+                pathname: "/(modals)/add-patient/photo",
+                params: routeParams,
+            });
         }
     };
 
@@ -81,7 +94,21 @@ export const AddPatientFormScreen: React.FC = () => {
             <View className="w-full gap-4 px-10">
                 <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
                 {parsedData && scannedImage && <BaseButton label="Continue with Scanned Data" size="Large" rounded ButtonStyle="Filled" onPress={handleContinue} />}
-                <BaseButton label="Skip" size="Large" ButtonStyle="Plain" onPress={() => router.push("/(modals)/add-patient/photo")} />
+                <BaseButton
+                    label="Skip"
+                    size="Large"
+                    ButtonStyle="Plain"
+                    onPress={() => {
+                        const routeParams: any = {};
+                        if (params.doctor_id) {
+                            routeParams.doctor_id = params.doctor_id;
+                        }
+                        router.push({
+                            pathname: "/(modals)/add-patient/photo",
+                            params: routeParams,
+                        });
+                    }}
+                />
             </View>
         </SafeAreaView>
     );

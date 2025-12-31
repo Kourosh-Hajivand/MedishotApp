@@ -101,7 +101,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         // Fetch full practice data from API and update store
         try {
             const fullPracticeData = await PracticeService.getPracticeById(practice.id);
-            
+
             if (fullPracticeData?.data) {
                 set({
                     selectedPractice: fullPracticeData.data,

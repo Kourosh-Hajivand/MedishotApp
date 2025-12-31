@@ -92,6 +92,9 @@ export default function PracticeTeamScreen() {
             },
         ]);
     };
+    console.log("==============practiceMembers?.datapracticeMembers?.datapracticeMembers?.data======================");
+    console.log(practiceMembers?.data);
+    console.log("====================================");
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + headerHeight }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             <Host style={{ width: "100%", height: 68 }}>
@@ -177,7 +180,7 @@ export default function PracticeTeamScreen() {
                                     }}
                                 >
                                     <View className="flex-row items-center gap-2">
-                                        <Avatar size={54} rounded={99} name={member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email} color={member.color} haveRing />
+                                        <Avatar size={54} imageUrl={member.image?.url} rounded={99} name={member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email} color={member.color} haveRing />
                                         <View>
                                             <BaseText type="Callout" weight="500" color="system.black">
                                                 {member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email}

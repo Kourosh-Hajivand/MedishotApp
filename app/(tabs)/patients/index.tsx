@@ -55,9 +55,6 @@ export default function PatientsScreen() {
     }, [currentUserRole, profile?.id]);
 
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
-    console.log("================= patients?.data===================");
-    console.log(patients?.data);
-    console.log("====================================");
     const currentPatients = patients?.data;
     const isLoading = isPatientsLoading;
 
@@ -100,7 +97,6 @@ export default function PatientsScreen() {
         const keys = Object.keys(filteredGroupedPatients);
         const hashSection = keys.find((key) => key === "#");
         const otherKeys = keys.filter((key) => key !== "#").sort();
-        // بخش "#" را در انتهای لیست قرار بده
         const sortedKeys = hashSection ? [...otherKeys, hashSection] : otherKeys;
         return sortedKeys.map((letter) => ({
             title: letter,
@@ -108,21 +104,17 @@ export default function PatientsScreen() {
         }));
     })();
 
-    // آرایه حروف الفبا برای نمایش در sidebar (شامل "#" اگر وجود داشته باشد)
     const alphabetWithHash = useMemo(() => {
         return sections.some((s) => s.title === "#") ? [...alphabet, "#"] : alphabet;
     }, [sections]);
 
-    // نگه‌داری alphabetWithHash در ref برای استفاده در gesture handlers
     const alphabetWithHashRef = useRef<string[]>(alphabetWithHash);
     useEffect(() => {
         alphabetWithHashRef.current = alphabetWithHash;
     }, [alphabetWithHash]);
 
-    // طول alphabetWithHash را برای استفاده در gesture handlers نگه دار
     const alphabetLengthSV = useSharedValue(alphabetWithHash.length);
 
-    // بروزرسانی طول وقتی sections تغییر می‌کند
     useEffect(() => {
         alphabetLengthSV.value = alphabetWithHash.length;
     }, [alphabetWithHash.length, alphabetLengthSV]);
@@ -131,7 +123,6 @@ export default function PatientsScreen() {
         const sectionIndex = sections.findIndex((sec) => sec.title === letter);
         if (sectionIndex === -1 || !scrollViewRef.current) return;
 
-        // محاسبه offset برای sticky header
         const stickyHeaderHeight = headerHeight || 0;
 
         setTimeout(() => {
@@ -140,8 +131,8 @@ export default function PatientsScreen() {
                     sectionIndex,
                     itemIndex: 0,
                     animated,
-                    viewPosition: 0, // موقعیت در viewport (0 = بالا)
-                    viewOffset: stickyHeaderHeight, // offset برای sticky header
+                    viewPosition: 0,
+                    viewOffset: stickyHeaderHeight,
                 });
             } catch (e) {
                 console.warn("ScrollToLocation error:", e);
@@ -149,7 +140,6 @@ export default function PatientsScreen() {
         }, 50);
     };
 
-    // توابع helper برای gesture handlers
     const handleGestureUpdate = (index: number) => {
         const letter = alphabetWithHashRef.current[index] || "";
         setActiveLetter(letter);
@@ -172,7 +162,7 @@ export default function PatientsScreen() {
         .onBegin((e) => {
             if (alphabetContainerLayout.height === 0) return;
 
-            const relativeX = e.absoluteX - (alphabetContainerLayout.y > 0 ? 0 : 0); // placeholder
+            const relativeX = e.absoluteX - (alphabetContainerLayout.y > 0 ? 0 : 0);
             const relativeY = e.absoluteY - alphabetContainerLayout.y;
 
             if (relativeY < 0 || relativeY > alphabetContainerLayout.height) {
@@ -349,9 +339,9 @@ export default function PatientsScreen() {
                             <View style={styles.emptyStateContent}>
                                 {/* Avatars */}
                                 <View style={styles.avatarsContainer}>
-                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/2421f0e4-5d62-40ac-83d2-ba605aff86ae" }} style={[styles.avatar, styles.avatarLarge]} />
-                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/05fdd0e9-546c-43a4-b164-e485d7c3ac39" }} style={[styles.avatar, styles.avatarMedium]} />
-                                    <Image source={{ uri: "https://www.figma.com/api/mcp/asset/fc5e9eef-bfd4-4ff3-bd11-0d7559b757e0" }} style={[styles.avatar, styles.avatarSmall]} />
+                                    <Image source={require("@/assets/images/fakePatients/Ellipse11.png")} style={[styles.avatar, styles.avatarLarge]} />
+                                    <Image source={require("@/assets/images/fakePatients/Ellipse12.png")} style={[styles.avatar, styles.avatarMedium]} />
+                                    <Image source={require("@/assets/images/fakePatients/Ellipse13.png")} style={[styles.avatar, styles.avatarSmall]} />
                                 </View>
 
                                 {/* Text and Button */}
@@ -362,7 +352,23 @@ export default function PatientsScreen() {
                                     <BaseText type="Footnote" color="labels.secondary" weight="400" style={styles.subtitle}>
                                         Create a profile and keep their clinic details at your fingertips.
                                     </BaseText>
-                                    <BaseButton label="Add Patient" ButtonStyle="Tinted" size="Medium" rounded={true} onPress={() => router.push("/(modals)/add-patient/photo")} leftIcon={<IconSymbol name="plus" size={16} color={colors.system.blue} />} style={styles.addButton} />
+                                    <BaseButton
+                                        label="Add Patient"
+                                        ButtonStyle="Tinted"
+                                        size="Medium"
+                                        rounded={true}
+                                        onPress={() => {
+                                            // If user is staff (admin) or owner, show doctor selection modal first
+                                            if (currentUserRole === "admin" || currentUserRole === "owner") {
+                                                router.push("/(modals)/add-patient/select-doctor");
+                                            } else {
+                                                // Otherwise, go directly to add patient
+                                                router.push("/(modals)/add-patient/photo");
+                                            }
+                                        }}
+                                        leftIcon={<IconSymbol name="plus.circle.fill" size={20} color={colors.system.blue} />}
+                                        style={styles.addButton}
+                                    />
                                 </View>
                             </View>
                         </View>
@@ -416,17 +422,17 @@ const styles = StyleSheet.create({
     emptyStateContent: {
         flexDirection: "row",
         alignItems: "center",
-        gap: spacing["3"],
+        gap: spacing["2"],
     },
     avatarsContainer: {
         position: "relative",
-        width: 100,
+        width: 65,
         height: 100,
     },
     avatar: {
         position: "absolute",
         borderRadius: 9999,
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: colors.system.white,
     },
     avatarLarge: {
@@ -434,22 +440,25 @@ const styles = StyleSheet.create({
         height: 62,
         top: 0,
         left: 0,
+        zIndex: 3,
     },
     avatarMedium: {
         width: 42,
         height: 42,
-        top: 46,
-        left: 33,
+        top: 48,
+        left: -5,
+        zIndex: 2,
     },
     avatarSmall: {
         width: 33,
         height: 33,
-        top: 70,
-        left: 7,
+        top: 65,
+        left: 25,
+        zIndex: 3,
     },
     textContainer: {
         flex: 1,
-        gap: spacing["1"],
+        gap: spacing["0"],
     },
     title: {
         fontSize: 17,

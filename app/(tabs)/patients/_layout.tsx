@@ -106,9 +106,9 @@ export default function PatientsLayout() {
                                                 {doctors.length > 0 ? (
                                                     doctors.map((doctor) => (
                                                         <Button
-                                                            key={doctor.id}
+                                                            key={String(doctor.id)}
                                                             onPress={() => {
-                                                                setSelectedDoctor(doctor.id);
+                                                                setSelectedDoctor(String(doctor.id));
                                                             }}
                                                         >
                                                             {doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
@@ -162,7 +162,7 @@ export default function PatientsLayout() {
                         ),
                         headerSearchBarOptions: {
                             placeholder: "Search patients",
-                            allowToolbarIntegration: true,
+                            allowToolbarIntegration: false,
 
                             onChangeText: (event) => {
                                 router.setParams({

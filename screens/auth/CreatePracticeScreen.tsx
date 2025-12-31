@@ -85,7 +85,7 @@ export const CreatePracticeScreen: React.FC = () => {
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            setUploadedFilename(response.filename);
+            setUploadedFilename(response.filename ?? null);
             console.log("Image uploaded successfully:", response.filename);
         },
         (error) => {

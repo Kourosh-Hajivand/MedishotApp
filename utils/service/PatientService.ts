@@ -129,7 +129,13 @@ const PatientService = {
                 formData.append("id_card", payload.id_card);
             }
 
-            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + create(practiseId), formData, {
+            // Add doctor_id as query parameter if provided
+            let url = baseUrl + create(practiseId);
+            if (payload.doctor_id) {
+                url += `?doctor_id=${payload.doctor_id}`;
+            }
+
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(url, formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
