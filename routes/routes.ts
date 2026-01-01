@@ -79,6 +79,7 @@ export const routes = {
 
         // Media
         getMedia: (patientId: string | number) => `patients/media/${patientId}`,
+        getMediaAlbums: (patientId: string | number) => `patients/media/${patientId}/albums`,
         uploadMedia: (patientId: string | number) => `patients/media/${patientId}`,
         uploadMediaWithTemplate: (patientId: string | number) => `patients/media/${patientId}/with-template`,
         deleteMedia: (patientId: string | number, mediaId: string | number) => `patients/media/${patientId}/${mediaId}`,
@@ -87,6 +88,16 @@ export const routes = {
         editMedia: (mediaId: string | number) => `patients/media/edit-image/${mediaId}`,
         bookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
         unbookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
+
+        // Activities
+        getActivities: (practiseId: string | number, patientId: string | number) => `${practiseId}/patients/${patientId}/activities`,
+
+        // Documents
+        getDocuments: (practiseId: string | number, patientId: string | number) => `${practiseId}/patients/${patientId}/documents`,
+        uploadDocument: (practiseId: string | number, patientId: string | number) => `${practiseId}/patients/${patientId}/documents`,
+        getDocument: (practiseId: string | number, patientId: string | number, documentId: string | number) => `${practiseId}/patients/${patientId}/documents/${documentId}`,
+        updateDocument: (practiseId: string | number, patientId: string | number, documentId: string | number) => `${practiseId}/patients/${patientId}/documents/${documentId}`,
+        deleteDocument: (practiseId: string | number, patientId: string | number, documentId: string | number) => `${practiseId}/patients/${patientId}/documents/${documentId}`,
     },
 
     doctor: {

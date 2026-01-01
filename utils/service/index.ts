@@ -3,6 +3,7 @@ export { ContractService } from "./ContractService";
 export { GostService } from "./GostService";
 export { default as Mapbox } from "./MapBox";
 export { default as MediaService } from "./MediaService";
+export { PatientDocumentService } from "./PatientDocumentService";
 export { default as PatientService } from "./PatientService";
 export { PracticeService } from "./PracticeService";
 export { SubscriptionService } from "./SubscriptionService";

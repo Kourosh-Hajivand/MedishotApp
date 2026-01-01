@@ -2,11 +2,11 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { CreatePatientRequest, UpdatePatientRequest } from "./models/RequestModels";
-import { ApiResponse, DoctorPatientsResponse, PatientDetailResponse, PatientListResponse } from "./models/ResponseModels";
+import { ApiResponse, DoctorPatientsResponse, PatientActivitiesResponse, PatientDetailResponse, PatientListResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { list, create, getById, update, delete: deleteRoute },
+    patients: { list, create, getById, update, delete: deleteRoute, getActivities },
     doctor: { getPatients: getDoctorPatientsRoute },
 } = routes;
 
@@ -249,6 +249,20 @@ const PatientService = {
             console.error("Error in DeletePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Delete patient failed");
+            }
+            throw error;
+        }
+    },
+
+    // Get patient activities
+    getPatientActivities: async (practiseId: string | number, patientId: string | number): Promise<PatientActivitiesResponse> => {
+        try {
+            const response: AxiosResponse<PatientActivitiesResponse> = await axiosInstance.get(baseUrl + getActivities(practiseId, patientId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in GetPatientActivities:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Get patient activities failed");
             }
             throw error;
         }

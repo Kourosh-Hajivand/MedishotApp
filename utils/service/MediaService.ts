@@ -2,11 +2,11 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
-import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "./models/ResponseModels";
+import { PatientMediaAlbumsResponse, PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { getMedia, uploadMedia, uploadMediaWithTemplate, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
+    patients: { getMedia, getMediaAlbums, uploadMedia, uploadMediaWithTemplate, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
     media: { tempUpload },
 } = routes;
 
@@ -20,6 +20,20 @@ const MediaService = {
             console.error("Error in GetPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patient media failed");
+            }
+            throw error;
+        }
+    },
+
+    // Get patient media grouped by gosts (albums)
+    getPatientMediaAlbums: async (patientId: string | number): Promise<PatientMediaAlbumsResponse> => {
+        try {
+            const response: AxiosResponse<PatientMediaAlbumsResponse> = await axiosInstance.get(baseUrl + getMediaAlbums(patientId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in GetPatientMediaAlbums:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Get patient media albums failed");
             }
             throw error;
         }

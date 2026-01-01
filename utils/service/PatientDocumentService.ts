@@ -1,0 +1,116 @@
+import axios, { AxiosResponse } from "axios";
+import { routes } from "../../routes/routes";
+import axiosInstance from "../AxiosInstans";
+import { CreatePatientDocumentRequest, UpdatePatientDocumentRequest } from "./models/RequestModels";
+import { ApiResponse, PatientDocumentDetailResponse, PatientDocumentListResponse } from "./models/ResponseModels";
+
+const {
+    baseUrl,
+    patients: { getDocuments, uploadDocument, getDocument, updateDocument, deleteDocument },
+} = routes;
+
+export const PatientDocumentService = {
+    // ============= Patient Documents =============
+
+    // Get all documents for a patient
+    getPatientDocuments: async (practiseId: string | number, patientId: string | number): Promise<PatientDocumentListResponse> => {
+        try {
+            const response: AxiosResponse<PatientDocumentListResponse> = await axiosInstance.get(baseUrl + getDocuments(practiseId, patientId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get patient documents");
+            }
+            throw error;
+        }
+    },
+
+    // Upload a new document for a patient
+    uploadPatientDocument: async (practiseId: string | number, patientId: string | number, data: CreatePatientDocumentRequest): Promise<PatientDocumentDetailResponse> => {
+        try {
+            const formData = new FormData();
+            formData.append("type", data.type);
+
+            if (data.description) {
+                formData.append("description", data.description);
+            }
+
+            // Support both File and string (Livewire temp filename)
+            if (typeof data.image === "string") {
+                formData.append("image", data.image);
+            } else {
+                formData.append("image", data.image);
+            }
+
+            const response: AxiosResponse<PatientDocumentDetailResponse> = await axiosInstance.post(baseUrl + uploadDocument(practiseId, patientId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to upload patient document");
+            }
+            throw error;
+        }
+    },
+
+    // Get a specific patient document
+    getPatientDocument: async (practiseId: string | number, patientId: string | number, documentId: string | number): Promise<PatientDocumentDetailResponse> => {
+        try {
+            const response: AxiosResponse<PatientDocumentDetailResponse> = await axiosInstance.get(baseUrl + getDocument(practiseId, patientId, documentId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get patient document");
+            }
+            throw error;
+        }
+    },
+
+    // Update a patient document
+    updatePatientDocument: async (practiseId: string | number, patientId: string | number, documentId: string | number, data: UpdatePatientDocumentRequest): Promise<PatientDocumentDetailResponse> => {
+        try {
+            const formData = new FormData();
+
+            if (data.type) {
+                formData.append("type", data.type);
+            }
+
+            if (data.description !== undefined) {
+                formData.append("description", data.description || "");
+            }
+
+            // Support both File and string (Livewire temp filename)
+            if (data.image) {
+                if (typeof data.image === "string") {
+                    formData.append("image", data.image);
+                } else {
+                    formData.append("image", data.image);
+                }
+            }
+
+            const response: AxiosResponse<PatientDocumentDetailResponse> = await axiosInstance.post(baseUrl + updateDocument(practiseId, patientId, documentId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to update patient document");
+            }
+            throw error;
+        }
+    },
+
+    // Delete a patient document
+    deletePatientDocument: async (practiseId: string | number, patientId: string | number, documentId: string | number): Promise<ApiResponse<string>> => {
+        try {
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteDocument(practiseId, patientId, documentId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to delete patient document");
+            }
+            throw error;
+        }
+    },
+};

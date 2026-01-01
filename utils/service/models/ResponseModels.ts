@@ -436,6 +436,17 @@ export interface PatientMediaBookmarkResponse {
     data: null | object;
 }
 
+export interface PatientMediaAlbum {
+    gost: Gost;
+    media: PatientMedia[];
+}
+
+export interface PatientMediaAlbumsResponse {
+    success: true;
+    message: string;
+    data: PatientMediaAlbum[];
+}
+
 // ============= File Upload Responses =============
 export interface TempUploadResponse {
     filename?: string; // Livewire temp filename
@@ -500,7 +511,7 @@ export interface SubscriptionStatus {
     ends_at?: string | null;
     on_grace_period?: boolean;
     trial_ends_at?: string | null;
-    
+
     // New API structure
     current_plan?: Plan;
     has_subscription?: boolean;
@@ -513,7 +524,7 @@ export interface SubscriptionStatus {
         remaining_doctor_slots?: number;
         [key: string]: any;
     };
-    
+
     // Support for practice detail response structure
     current_subscription?: {
         ends_at: string | null;
@@ -751,4 +762,47 @@ export interface PatientMediaWithTemplateResponse {
     success: boolean;
     message: string;
     data: PatientMediaWithTemplate;
+}
+
+// ============= Patient Documents Responses =============
+export interface PatientDocument {
+    id: number;
+    patient_id: number;
+    type: string;
+    description?: string | null;
+    image: Media;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PatientDocumentListResponse {
+    success: true;
+    message: string;
+    data: PatientDocument[];
+}
+
+export interface PatientDocumentDetailResponse {
+    success: true;
+    message: string;
+    data: PatientDocument;
+}
+
+// ============= Patient Activities Responses =============
+export interface ActivityLog {
+    id: number;
+    description: string;
+    event: string;
+    causer?: {
+        id: number;
+        name: string;
+    } | null;
+    properties?: Record<string, any> | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PatientActivitiesResponse {
+    success: true;
+    message: string;
+    data: ActivityLog[];
 }

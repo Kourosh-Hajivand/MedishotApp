@@ -304,3 +304,16 @@ export interface UploadMediaWithTemplateRequest {
     data?: string; // JSON string
     images: UploadMediaWithTemplateImage[];
 }
+
+// ============= Patient Documents Models =============
+export interface CreatePatientDocumentRequest {
+    type: string;
+    description?: string;
+    image: File | string; // File for direct upload or string for Livewire temp filename
+}
+
+export interface UpdatePatientDocumentRequest {
+    type?: string;
+    description?: string;
+    image?: File | string; // File for direct upload or string for Livewire temp filename
+}

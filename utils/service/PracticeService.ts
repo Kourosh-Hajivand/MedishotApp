@@ -301,7 +301,7 @@ export const PracticeService = {
     // Update practice tag
     updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(baseUrl + updateTag(practiceId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + updateTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -368,7 +368,7 @@ export const PracticeService = {
     // Update practice template
     updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(baseUrl + updateTemplate(practiceId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
