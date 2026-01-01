@@ -5,10 +5,10 @@ import BaseButton from "@/components/button/BaseButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
-import { openCallForPatient, openMessageForPatient } from "@/utils/helper/communication";
 import { useGetPatients, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -66,7 +66,7 @@ export default function PatientsScreen() {
 
     const groupedPatients =
         currentPatients?.reduce(
-            (acc: Record<string, { full_name: string; id: number }[]>, patient: any) => {
+            (acc: Record<string, Patient[]>, patient: Patient) => {
                 const firstChar = patient.full_name?.[0]?.toUpperCase();
                 // اگر حرف اول وجود نداشته باشد یا در A-Z نباشد، آن را به بخش "#" اضافه کن
                 const letter = firstChar && alphabet.includes(firstChar) ? firstChar : "#";
@@ -74,7 +74,7 @@ export default function PatientsScreen() {
                 acc[letter].push(patient);
                 return acc;
             },
-            {} as Record<string, { full_name: string; id: number }[]>,
+            {} as Record<string, Patient[]>,
         ) || {};
 
     const [search, setSearch] = useState("");
@@ -92,11 +92,11 @@ export default function PatientsScreen() {
 
     const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
         (acc, letter) => {
-            const items = groupedPatients?.[letter]?.filter((p: any) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
+            const items = groupedPatients?.[letter]?.filter((p: Patient) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
             if (items && items.length > 0) acc[letter] = items;
             return acc;
         },
-        {} as Record<string, { full_name: string; id: number }[]>,
+        {} as Record<string, Patient[]>,
     );
 
     const sections = (() => {
@@ -262,64 +262,114 @@ export default function PatientsScreen() {
                             index,
                         };
                     }}
-                    renderItem={({ item, index, section }) => (
-                        <Host style={{ flex: 1 }}>
-                            <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
-                                <ContextMenu.Items>
-                                    <Button systemImage="creditcard">Add ID</Button>
-                                    <Button systemImage="camera">Take Photo</Button>
-                                    <Button systemImage="text.document">Fill Consent</Button>
-                                    {item.numbers && item.numbers.length > 0 ? (
-                                        <Submenu button={<Button systemImage="message">Message</Button>}>
-                                            {item.numbers.map((number: any, index: number) => {
-                                                const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
-                                                const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-                                                return (
-                                                    <Button key={`message-${index}-${phoneNumber}`} systemImage="message" onPress={() => openMessageForPatient([phoneNumber])}>
-                                                        {phoneType}: {phoneNumber}
-                                                    </Button>
-                                                );
-                                            })}
-                                        </Submenu>
-                                    ) : (
-                                        <Button systemImage="message" onPress={() => openMessageForPatient(item.numbers)}>
-                                            Message
+                    renderItem={({ item, index, section }) => {
+                        const chartNumber = item.chart_number;
+                        const hasChartNumber = chartNumber !== null && chartNumber !== undefined && (typeof chartNumber === "number" || (typeof chartNumber === "string" && chartNumber.trim() !== ""));
+                        console.log(`Patient ${item.id} - chart_number:`, chartNumber, "hasChartNumber:", hasChartNumber);
+                        return (
+                            <Host matchContents>
+                                <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
+                                    <ContextMenu.Items>
+                                        {hasChartNumber && (
+                                            <Button systemImage="number" disabled>
+                                                {String(chartNumber)}
+                                            </Button>
+                                        )}
+                                        <Button
+                                            systemImage="creditcard"
+                                            onPress={() => {
+                                                router.push({
+                                                    pathname: `/patients/${item.id}` as any,
+                                                    params: { action: "addId" },
+                                                });
+                                            }}
+                                        >
+                                            Add ID
                                         </Button>
-                                    )}
-                                    {item.numbers && item.numbers.length > 0 ? (
-                                        <Submenu button={<Button systemImage="phone">Call</Button>}>
-                                            {item.numbers.map((number: any, index: number) => {
-                                                const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
-                                                const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-                                                return (
-                                                    <Button key={`call-${index}-${phoneNumber}`} systemImage="phone" onPress={() => openCallForPatient([phoneNumber])}>
-                                                        {phoneType}: {phoneNumber}
-                                                    </Button>
-                                                );
-                                            })}
-                                        </Submenu>
-                                    ) : (
-                                        <Button systemImage="phone" onPress={() => openCallForPatient(item.numbers)}>
-                                            Call
+                                        <Button
+                                            systemImage="camera"
+                                            onPress={() => {
+                                                router.push({
+                                                    pathname: `/patients/${item.id}` as any,
+                                                    params: { action: "takePhoto" },
+                                                });
+                                            }}
+                                        >
+                                            Take Photo
                                         </Button>
-                                    )}
-                                </ContextMenu.Items>
-                                <ContextMenu.Trigger>
-                                    <TouchableOpacity
-                                        onPress={() => router.push(`/patients/${item.id}`)}
-                                        key={`${section.title}-${index}`}
-                                        style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
-                                        className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
-                                    >
-                                        <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
-                                        <BaseText type="Callout" weight={500} color="labels.primary">
-                                            {item.full_name}
-                                        </BaseText>
-                                    </TouchableOpacity>
-                                </ContextMenu.Trigger>
-                            </ContextMenu>
-                        </Host>
-                    )}
+                                        <Button
+                                            systemImage="text.document"
+                                            onPress={() => {
+                                                router.push({
+                                                    pathname: `/patients/${item.id}` as any,
+                                                    params: { action: "fillConsent" },
+                                                });
+                                            }}
+                                        >
+                                            Fill Consent
+                                        </Button>
+                                        {item.numbers && item.numbers.length > 0 && (
+                                            <Submenu button={<Button systemImage="message">Message</Button>}>
+                                                {item.numbers.map((number: any, index: number) => {
+                                                    const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                                    return (
+                                                        <Button
+                                                            key={`message-${index}-${phoneNumber}`}
+                                                            systemImage="message"
+                                                            onPress={() => {
+                                                                router.push({
+                                                                    pathname: `/patients/${item.id}` as any,
+                                                                    params: { action: "message", phoneIndex: index.toString() },
+                                                                });
+                                                            }}
+                                                        >
+                                                            {phoneType}: {phoneNumber}
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </Submenu>
+                                        )}
+                                        {item.numbers && item.numbers.length > 0 && (
+                                            <Submenu button={<Button systemImage="phone">Call</Button>}>
+                                                {item.numbers.map((number: any, index: number) => {
+                                                    const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                                    return (
+                                                        <Button
+                                                            key={`call-${index}-${phoneNumber}`}
+                                                            systemImage="phone"
+                                                            onPress={() => {
+                                                                router.push({
+                                                                    pathname: `/patients/${item.id}` as any,
+                                                                    params: { action: "call", phoneIndex: index.toString() },
+                                                                });
+                                                            }}
+                                                        >
+                                                            {phoneType}: {phoneNumber}
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </Submenu>
+                                        )}
+                                    </ContextMenu.Items>
+                                    <ContextMenu.Trigger>
+                                        <TouchableOpacity
+                                            onPress={() => router.push(`/patients/${item.id}`)}
+                                            key={`${section.title}-${index}`}
+                                            style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
+                                            className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
+                                        >
+                                            <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
+                                            <BaseText type="Callout" weight={500} color="labels.primary">
+                                                {item.full_name}
+                                            </BaseText>
+                                        </TouchableOpacity>
+                                    </ContextMenu.Trigger>
+                                </ContextMenu>
+                            </Host>
+                        );
+                    }}
                     renderSectionHeader={({ section: { title } }) => (
                         <View style={styles.sectionHeader} className="px-4">
                             <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>

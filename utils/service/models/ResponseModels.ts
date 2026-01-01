@@ -317,7 +317,7 @@ export interface PatientContact {
 
 export interface Patient {
     id: number;
-    chart_number: string;
+    chart_number: string | number | null;
     first_name: string;
     last_name: string;
     full_name: string;

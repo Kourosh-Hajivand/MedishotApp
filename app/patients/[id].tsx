@@ -20,13 +20,10 @@ import { blurValue } from "./_layout";
 type RowKind = "header" | "tabs" | "content";
 
 export default function PatientDetailsScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, action, phoneIndex } = useLocalSearchParams<{ id: string; action?: string; phoneIndex?: string }>();
     const navigation = useNavigation();
     const { data: patient, isLoading } = useGetPatientById(id);
     const { data: patientMediaData, isLoading: isLoadingMedia } = useGetPatientMedia(id, !!id);
-    console.log("====================================");
-    console.log(patient?.data);
-    console.log("====================================");
     const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
 
@@ -51,9 +48,14 @@ export default function PatientDetailsScreen() {
         Animated.spring(translateX, { toValue: index * tabWidth, useNativeDriver: true, speed: 20 }).start();
     };
 
-    const handleCall = async () => {
-        const phoneNumber = patient?.data?.numbers?.[0]?.value;
+    const handleCall = async (index?: number) => {
+        const numbers = patient?.data?.numbers;
+        if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
+        
+        const phoneIndex = index !== undefined ? index : 0;
+        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value || numbers[phoneIndex]?.number;
         if (!phoneNumber) return Alert.alert("Error", "No phone number found");
+        
         const url = `tel:${phoneNumber}`;
         try {
             (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot make phone call");
@@ -62,9 +64,14 @@ export default function PatientDetailsScreen() {
         }
     };
 
-    const handleMessage = async () => {
-        const phoneNumber = patient?.data?.numbers?.[0]?.value;
+    const handleMessage = async (index?: number) => {
+        const numbers = patient?.data?.numbers;
+        if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
+        
+        const phoneIndex = index !== undefined ? index : 0;
+        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value || numbers[phoneIndex]?.number;
         if (!phoneNumber) return Alert.alert("Error", "No phone number found");
+        
         const url = `sms:${phoneNumber}`;
         try {
             (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot send message");
@@ -72,6 +79,48 @@ export default function PatientDetailsScreen() {
             Alert.alert("Error", "Error sending message");
         }
     };
+
+    // Handle action parameter
+    useEffect(() => {
+        if (!action || !patient?.data || !id) return;
+
+        switch (action) {
+            case "call": {
+                const callIndex = phoneIndex ? parseInt(phoneIndex) : undefined;
+                handleCall(callIndex);
+                break;
+            }
+            case "message": {
+                const messageIndex = phoneIndex ? parseInt(phoneIndex) : undefined;
+                handleMessage(messageIndex);
+                break;
+            }
+            case "addId":
+                scanDocument();
+                break;
+            case "takePhoto":
+                router.push({
+                    pathname: "/camera" as any,
+                    params: {
+                        patientId: id,
+                        patientName: `${patient.data.first_name} ${patient.data.last_name}`,
+                        patientAvatar: patient.data.profile_image?.url || "",
+                        doctorName: `Dr. ${patient.data.doctor?.first_name || ""} ${patient.data.doctor?.last_name || ""}`,
+                        doctorColor: patient.data.doctor?.color || "",
+                    },
+                });
+                break;
+            case "fillConsent":
+                router.push({
+                    pathname: "/(modals)/select-contract" as any,
+                    params: {
+                        patientId: id,
+                    },
+                });
+                break;
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [action, phoneIndex, patient?.data, id]);
 
     const scanDocument = async () => {
         try {
