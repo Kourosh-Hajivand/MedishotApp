@@ -1,10 +1,9 @@
 import axios from "axios";
+import { router } from "expo-router";
+import { routes } from "../routes/routes";
 import { storeFailedRequest } from "./helper/failedRequestStorage";
 import { getTokens, removeTokens } from "./helper/tokenStorage";
 import { AuthService } from "./service/AuthService";
-
-import { router } from "expo-router";
-import { routes } from "../routes/routes";
 
 const axiosInstance = axios.create({
     baseURL: routes.baseUrl,
@@ -23,7 +22,7 @@ axiosInstance.interceptors.request.use(async (config) => {
     // Log request URL and body
     const method = config.method?.toUpperCase() || "GET";
     const fullUrl = config.baseURL && config.url ? `${config.baseURL}${config.url}` : config.url || "Unknown";
-    
+
     // Extract request body
     let requestBody = null;
     if (config.data) {
@@ -46,7 +45,7 @@ axiosInstance.interceptors.request.use(async (config) => {
     // Log request details
     console.log(`📤 [${method}] ${fullUrl}`);
     if (requestBody && requestBody !== "[FormData]") {
-        console.log("📤 Request Body:", JSON.stringify(requestBody, null, 2));
+        console.log("📤 Request Body:", requestBody);
     } else if (requestBody === "[FormData]") {
         console.log("📤 Request Body: [FormData - Multipart]");
     }
@@ -58,6 +57,17 @@ axiosInstance.interceptors.response.use(
     (response) => {
         // Reset redirect flag on successful response
         isRedirectingToError = false;
+
+        // Log response details
+        const method = response.config?.method?.toUpperCase() || "GET";
+        const fullUrl = response.config?.baseURL && response.config?.url ? `${response.config.baseURL}${response.config.url}` : response.config?.url || "Unknown";
+        const status = response.status;
+
+        console.log(`📥 [${method}] ${fullUrl} - Status: ${status}`);
+        if (response.data) {
+            console.log(`📥 Response Body [${method} ${fullUrl}]:`, response.data);
+        }
+
         return response;
     },
     async (error) => {
