@@ -167,7 +167,7 @@ export default function PrintInformationScreen() {
             {/* A4 Preview Section */}
             <View className="px-5" style={styles.previewSection}>
                 <BaseText type="Caption2" color="labels.secondary" style={styles.previewLabel}>
-                    A4 Preview:
+                    Preview:
                 </BaseText>
                 <View style={styles.previewCard}>
                     {/* Header */}
@@ -239,7 +239,7 @@ export default function PrintInformationScreen() {
                         <Switch label="Practice Phone" variant="switch" value={settings.practicePhone} onValueChange={isPending ? undefined : (value) => handleToggle("practicePhone", value)} />
                         <Switch label="Practice URL" variant="switch" value={settings.practiceURL} onValueChange={isPending ? undefined : (value) => handleToggle("practiceURL", value)} />
                         <Switch label="Practice Email" variant="switch" value={settings.practiceEmail} onValueChange={isPending ? undefined : (value) => handleToggle("practiceEmail", value)} />
-                        <Switch label="Practice Social Media" variant="switch" value={settings.practiceSocialMedia} onValueChange={isPending ? undefined : (value) => handleToggle("practiceSocialMedia", value)} />
+                        {/* <Switch label="Practice Social Media" variant="switch" value={settings.practiceSocialMedia} onValueChange={isPending ? undefined : (value) => handleToggle("practiceSocialMedia", value)} /> */}
                     </VStack>
                 </Host>
             </View>

@@ -3,14 +3,15 @@ import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, Keyboa
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
+import { routes } from "@/routes/routes";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook";
 import { People } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Control, FieldErrors, useForm, UseFormHandleSubmit } from "react-hook-form";
-import { ActivityIndicator, Image, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 
@@ -74,6 +75,37 @@ const urlConfig: DynamicInputConfig = {
     placeholder: "Enter URL",
 };
 
+const API_BASE_URL = routes.baseUrl.replace(/\/+$/, "");
+const STORAGE_BASE_URL = API_BASE_URL.replace(/\/api\/v1$/, "");
+
+const formatImageUri = (uri: string | null): string | null => {
+    if (!uri) return null;
+
+    const trimmed = uri.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    if (trimmed.startsWith("file://") || trimmed.startsWith("content://")) {
+        return trimmed;
+    }
+
+    let normalized = trimmed;
+
+    if (!/^https?:\/\//i.test(normalized)) {
+        const base = STORAGE_BASE_URL || API_BASE_URL;
+        normalized = `${base}${normalized.startsWith("/") ? "" : "/"}${normalized}`;
+    }
+
+    const parts = normalized.split("://");
+    if (parts.length === 2) {
+        const [protocol, rest] = parts;
+        normalized = `${protocol}://${rest.replace(/\/{2,}/g, "/")}`;
+    }
+
+    return normalized;
+};
+
 export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialData, title, subtitle, onFormReady }) => {
     const insets = useSafeAreaInsets();
     const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
@@ -131,7 +163,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 // Keep gender in lowercase for form (backend format)
                 gender: initialData.gender ? initialData.gender.toLowerCase() : "",
             });
-            // Set existing image URL if available
+            // Set existing image URL if available (only if no local image selected)
             if (initialData.profile_photo_url && !localImageUri) {
                 console.log("🖼️ [INIT] Setting existing profile image:", initialData.profile_photo_url);
                 setUploadedFilename(initialData.profile_photo_url);
@@ -139,7 +171,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             }
             // TODO: Set dynamic fields from initialData if available
         }
-    }, [initialData, mode, reset, localImageUri]);
+    }, [initialData, mode, reset]);
 
     // Expose form methods to parent
     useEffect(() => {
@@ -195,48 +227,54 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const displayTitle = title || (mode === "create" ? "Complete Your Profile" : "Edit Profile");
     const displaySubtitle = subtitle || (mode === "create" ? "Start by completing your profile." : "Update your profile information.");
 
+    // Use local URI for preview (new images) or formatted URI for existing images from server
+    // Don't show preview while uploading - show loading instead
+    const displaySelectedImage = useMemo(() => {
+        // If uploading, don't show preview (will show loading)
+        if (isUploading) {
+            return null;
+        }
+        // If we have local URI (new image), show it
+        if (localImageUri) {
+            return localImageUri;
+        }
+        // Existing image from server: format the URI (either from uploadedFilename or initialData)
+        const imageToFormat = uploadedFilename || initialData?.profile_photo_url || null;
+        return formatImageUri(imageToFormat);
+    }, [localImageUri, uploadedFilename, initialData?.profile_photo_url, isUploading]);
+
     return (
-        <KeyboardAwareScrollView
-            style={styles.scrollView}
-            contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}
-        >
+        <KeyboardAwareScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}>
             <View style={styles.avatarContainer}>
                 <ImagePickerWrapper onImageSelected={handleImageSelected}>
                     <View style={styles.avatarWrapper}>
                         {isUploading ? (
                             // Show loading indicator while uploading
                             <ActivityIndicator size="small" color={colors.system.gray6} />
-                        ) : localImageUri ? (
-                            // Show preview after upload is complete (new image)
+                        ) : displaySelectedImage ? (
+                            // Show preview after upload is complete
                             <Image
-                                source={{ uri: localImageUri }}
+                                source={{ uri: displaySelectedImage }}
                                 style={styles.avatarImage}
                                 onError={(error) => {
-                                    console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", localImageUri);
+                                    console.error("❌ [Image] Error loading image:", error.nativeEvent.error);
+                                    console.error("❌ [Image] Failed URI:", displaySelectedImage);
                                 }}
                                 onLoad={() => {
-                                    console.log("✅ [Image] Local image loaded successfully:", localImageUri);
-                                }}
-                            />
-                        ) : initialData?.profile_photo_url ? (
-                            // Show existing image from server
-                            <Image
-                                source={{ uri: initialData.profile_photo_url }}
-                                style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", initialData.profile_photo_url);
-                                }}
-                                onLoad={() => {
-                                    console.log("✅ [Image] Existing image loaded successfully:", initialData.profile_photo_url);
+                                    console.log("✅ [Image] Image loaded successfully:", displaySelectedImage);
                                 }}
                             />
                         ) : (
                             // Show default avatar when no image
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
                         )}
-                        <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
+                        {isUploading ? (
+                            <View style={styles.plusButton}>
+                                <PlusIcon width={14} height={14} strokeWidth={0} />
+                            </View>
+                        ) : (
+                            <View></View>
+                        )}
                     </View>
                 </ImagePickerWrapper>
                 <View style={styles.titleContainer}>

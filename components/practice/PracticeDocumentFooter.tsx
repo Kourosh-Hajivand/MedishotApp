@@ -32,64 +32,36 @@ interface PracticeDocumentFooterProps {
     showIcons?: boolean;
 }
 
-export const PracticeDocumentFooter: React.FC<PracticeDocumentFooterProps> = ({
-    metadata,
-    printSettings,
-    variant = "document",
-    footerStyle,
-    showIcons = false,
-}) => {
+export const PracticeDocumentFooter: React.FC<PracticeDocumentFooterProps> = ({ metadata, printSettings, variant = "document", footerStyle, showIcons = false }) => {
     const hasContent = (printSettings.address && metadata?.address) || (printSettings.practicePhone && metadata?.phone) || (printSettings.practiceEmail && metadata?.email);
 
     if (!hasContent) {
         return null;
     }
 
-    if (variant === "preview") {
-        return (
-            <View style={[styles.previewFooter, footerStyle]}>
-                {printSettings.address && metadata?.address && (
-                    <View style={styles.previewFooterItem}>
-                        {showIcons && <IconSymbol name="paperplane.fill" size={10} color={colors.system.gray2} />}
-                        <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                            {metadata.address}
-                        </BaseText>
-                    </View>
-                )}
-                {printSettings.practiceEmail && metadata?.email && (
-                    <View style={styles.previewFooterItem}>
-                        {showIcons && <IconSymbol name="envelope.fill" size={10} color={colors.system.gray2} />}
-                        <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                            {metadata.email}
-                        </BaseText>
-                    </View>
-                )}
-                {printSettings.practicePhone && metadata?.phone && (
-                    <View style={styles.previewFooterItem}>
-                        {showIcons && <IconSymbol name="phone.fill" size={10} color={colors.system.gray2} />}
-                        <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                            {metadata.phone}
-                        </BaseText>
-                    </View>
-                )}
-            </View>
-        );
-    }
-
-    // Document variant
     return (
-        <View style={[styles.documentFooter, footerStyle]}>
+        <View style={[styles.previewFooter, footerStyle]}>
             {printSettings.address && metadata?.address && (
-                <View style={styles.documentFooterItemLeft}>
-                    <BaseText type="Caption2" color="labels.primary" style={styles.documentFooterText}>
+                <View style={styles.previewFooterItem}>
+                    {showIcons && <IconSymbol name="paperplane.fill" size={10} color={colors.system.gray2} />}
+                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
                         {metadata.address}
                     </BaseText>
                 </View>
             )}
+            {printSettings.practiceEmail && metadata?.email && (
+                <View style={styles.previewFooterItem}>
+                    {showIcons && <IconSymbol name="envelope.fill" size={10} color={colors.system.gray2} />}
+                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
+                        {metadata.email}
+                    </BaseText>
+                </View>
+            )}
             {printSettings.practicePhone && metadata?.phone && (
-                <View style={styles.documentFooterItemRight}>
-                    <BaseText type="Caption2" color="labels.primary" style={styles.documentFooterText}>
-                        Phone: {metadata.phone}
+                <View style={styles.previewFooterItem}>
+                    {showIcons && <IconSymbol name="phone.fill" size={10} color={colors.system.gray2} />}
+                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
+                        {metadata.phone}
                     </BaseText>
                 </View>
             )}
@@ -106,11 +78,12 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: colors.system.gray6,
         alignItems: "center",
-        justifyContent: "flex-start",
+        justifyContent: "space-between",
     },
     previewFooterItem: {
         flexDirection: "row",
         alignItems: "center",
+        justifyContent: "flex-end",
         gap: 4,
         flexShrink: 1,
     },
@@ -142,4 +115,3 @@ const styles = StyleSheet.create({
         lineHeight: 14,
     },
 });
-
