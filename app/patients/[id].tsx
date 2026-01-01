@@ -30,6 +30,23 @@ export default function PatientDetailsScreen() {
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
 
+    // Calculate age from birth_date
+    const patientAge = useMemo(() => {
+        if (!patient?.data?.birth_date) return null;
+        try {
+            const birthDate = new Date(patient.data.birth_date);
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const monthDiff = today.getMonth() - birthDate.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age;
+        } catch {
+            return null;
+        }
+    }, [patient?.data?.birth_date]);
+
     // Extract image URLs from patient media
     const patientImages = useMemo(() => {
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) {
@@ -226,9 +243,6 @@ export default function PatientDetailsScreen() {
 
     // ترتیب آیتم‌ها: Header → Tabs(sticky) → Content
     const DATA: { key: RowKind }[] = [{ key: "header" }, { key: "tabs" }, { key: "content" }];
-    console.log("==patient?.data==== patient?.data=================== patient?.data===========");
-    console.log(patient?.data);
-    console.log("====================================");
     const renderRow = ({ item }: { item: { key: RowKind } }) => {
         if (item.key === "header") {
             return (
@@ -241,6 +255,12 @@ export default function PatientDetailsScreen() {
                         <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
                             <BaseText type="Title1" weight={600} color="labels.primary">
                                 {patient?.data?.first_name} {patient?.data?.last_name}
+                                {patientAge !== null && (
+                                    <BaseText type="Body" weight={600} color="labels.primary">
+                                        {" "}
+                                        ({patientAge}y)
+                                    </BaseText>
+                                )}
                             </BaseText>
                             <BaseText type="Callout" weight={400} color="labels.secondary">
                                 last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}

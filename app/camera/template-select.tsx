@@ -67,11 +67,12 @@ type TemplateType = {
 
 export default function TemplateSelectScreen() {
     const insets = useSafeAreaInsets();
-    const { patientId, patientName, patientAvatar, doctorName, newTemplate } = useLocalSearchParams<{
+    const { patientId, patientName, patientAvatar, doctorName, doctorColor, newTemplate } = useLocalSearchParams<{
         patientId: string;
         patientName: string;
         patientAvatar?: string;
         doctorName: string;
+        doctorColor?: string;
         newTemplate?: string;
     }>();
 
@@ -273,7 +274,7 @@ export default function TemplateSelectScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
             pathname: "/camera/create-template" as any,
-            params: { patientId, patientName, patientAvatar, doctorName },
+            params: { patientId, patientName, patientAvatar, doctorName, doctorColor },
         });
     };
 
@@ -300,6 +301,7 @@ export default function TemplateSelectScreen() {
                     patientName,
                     patientAvatar,
                     doctorName,
+                    doctorColor,
                     templateId,
                     ghostItems: JSON.stringify(template.ghostItems),
                     layoutPattern: template.layoutPattern || "left-right",
@@ -318,7 +320,7 @@ export default function TemplateSelectScreen() {
         const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
 
         return (
-            <Animated.View entering={FadeInDown.delay(index * 50).springify()} layout={Layout.springify()}>
+            <Animated.View key={item.id} entering={FadeInDown.delay(index * 50).springify()} layout={Layout.springify()}>
                 <TouchableOpacity style={[styles.templateCard, isSelected && styles.templateCardSelected]} onPress={() => handleTemplateSelect(item.id)} activeOpacity={0.8}>
                     <View style={[styles.templateImageContainer, isSelected && styles.templateImageContainerSelected]}>
                         {/* Preview of ghost items inside template - using actual ghost images with layout pattern */}
@@ -398,7 +400,9 @@ export default function TemplateSelectScreen() {
                                 }, [])
                                 .map((row, rowIndex) => (
                                     <View key={`custom-row-${rowIndex}`} style={styles.templateRow}>
-                                        {row.map((item, itemIndex) => renderTemplateItem({ item, index: rowIndex * 2 + itemIndex }))}
+                                        {row.map((item, itemIndex) => (
+                                            <React.Fragment key={item.id}>{renderTemplateItem({ item, index: rowIndex * 2 + itemIndex })}</React.Fragment>
+                                        ))}
                                         {row.length === 1 && <View style={styles.templateCard} />}
                                     </View>
                                 ))}
@@ -426,7 +430,9 @@ export default function TemplateSelectScreen() {
                                 }, [])
                                 .map((row, rowIndex) => (
                                     <View key={`global-row-${rowIndex}`} style={styles.templateRow}>
-                                        {row.map((item, itemIndex) => renderTemplateItem({ item, index: allCustomTemplates.length + rowIndex * 2 + itemIndex }))}
+                                        {row.map((item, itemIndex) => (
+                                            <React.Fragment key={item.id}>{renderTemplateItem({ item, index: allCustomTemplates.length + rowIndex * 2 + itemIndex })}</React.Fragment>
+                                        ))}
                                         {row.length === 1 && <View style={styles.templateCard} />}
                                     </View>
                                 ))}

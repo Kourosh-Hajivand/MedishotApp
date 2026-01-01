@@ -1,6 +1,6 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
-import { BaseText } from "@/components";
+import { BaseButton, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -11,7 +11,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
@@ -100,8 +100,14 @@ export default function CameraScreen() {
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
     const [currentGhostIndex, setCurrentGhostIndex] = useState(0);
+    const currentGhostIndexRef = useRef(currentGhostIndex);
     const [showGuideModal, setShowGuideModal] = useState(false);
     const [showSampleModal, setShowSampleModal] = useState(false);
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        currentGhostIndexRef.current = currentGhostIndex;
+    }, [currentGhostIndex]);
 
     // Show guide modal when ghost items are available
     useEffect(() => {
@@ -111,7 +117,6 @@ export default function CameraScreen() {
     }, [hasGhostItems]);
 
     // Animation values
-    const shutterScale = useSharedValue(1);
     const flashAnim = useSharedValue(0);
     const checkmarkScale = useSharedValue(0);
 
@@ -177,7 +182,7 @@ export default function CameraScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
             pathname: "/camera/template-select" as any,
-            params: { patientId, patientName, patientAvatar, doctorName },
+            params: { patientId, patientName, patientAvatar, doctorName, doctorColor },
         });
     };
 
@@ -188,7 +193,6 @@ export default function CameraScreen() {
         setIsCapturing(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-        shutterScale.value = withSequence(withTiming(0.9, { duration: 100 }), withSpring(1, { damping: 10 }));
         flashAnim.value = withSequence(withTiming(1, { duration: 50 }), withTiming(0, { duration: 150 }));
 
         try {
@@ -221,20 +225,27 @@ export default function CameraScreen() {
                 });
 
                 if (hasGhostItems) {
-                    // Show checkmark animation only when using templates
-                    checkmarkScale.value = withSequence(withSpring(1.2, { damping: 8 }), withSpring(1, { damping: 10 }));
+                    // Show checkmark animation only when using templates - smoother, less bounce
+                    checkmarkScale.value = withSequence(
+                        withTiming(1, { duration: 200 }), // Fade in smoothly
+                        withTiming(0, { duration: 300 }), // Fade out smoothly
+                    );
 
                     setTimeout(() => {
-                        checkmarkScale.value = withTiming(0, { duration: 200 });
+                        setCapturedPhotos((prevPhotos) => {
+                            const updatedPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
 
-                        if (!isLastGhost) {
-                            // Move to next ghost
-                            setCurrentGhostIndex((prev) => prev + 1);
-                        } else {
-                            // All ghosts captured, go to review
-                            handleGoToReview([...capturedPhotos, newPhoto]);
-                        }
-                    }, 800);
+                            if (currentGhostIndexRef.current < ghostItemsData.length - 1) {
+                                // Move to next ghost
+                                setCurrentGhostIndex((prev) => prev + 1);
+                            } else {
+                                // All ghosts captured, go to review
+                                handleGoToReview(updatedPhotos);
+                            }
+
+                            return prevPhotos;
+                        });
+                    }, 500); // Reduced timeout since animation is faster
                 } else {
                     // No template - go to review directly without checkmark
                     handleGoToReview([newPhoto]);
@@ -272,17 +283,13 @@ export default function CameraScreen() {
     };
 
     // Animated styles
-    const shutterAnimStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: shutterScale.value }],
-    }));
-
     const flashOverlayStyle = useAnimatedStyle(() => ({
         opacity: flashAnim.value,
     }));
 
     const checkmarkAnimStyle = useAnimatedStyle(() => ({
         transform: [{ scale: checkmarkScale.value }],
-        opacity: checkmarkScale.value,
+        opacity: checkmarkScale.value > 0 ? 1 : 0, // Show/hide based on scale
     }));
 
     // Permission handling
@@ -317,9 +324,19 @@ export default function CameraScreen() {
         <View style={styles.container}>
             {/* Camera View */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0}>
-                {/* Grid Overlay */}
+                {/* Grid Overlay - Only in camera viewport, not in header/bottom areas */}
                 {cameraState.isGridEnabled && (
-                    <View style={styles.gridContainer}>
+                    <View
+                        style={[
+                            styles.gridContainer,
+                            {
+                                top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+                                left: 0,
+                                right: 0,
+                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 16 (paddingTop) + 64 (thumbnails: 48 + 16 marginBottom) + 76 (shutter) + 16 (paddingBottom) = 172, without = 16 + 76 + 16 = 108
+                            },
+                        ]}
+                    >
                         <View style={[styles.gridLine, styles.gridVertical, { left: "33.33%" }]} />
                         <View style={[styles.gridLine, styles.gridVertical, { left: "66.66%" }]} />
                         <View style={[styles.gridLine, styles.gridHorizontal, { top: "33.33%" }]} />
@@ -327,12 +344,36 @@ export default function CameraScreen() {
                     </View>
                 )}
 
-                {/* Ghost Overlay */}
+                {/* Ghost Overlay - Only in camera viewport, not in header/bottom areas */}
                 {currentGhostImage && (
-                    <View style={styles.ghostOverlay}>
+                    <View
+                        style={[
+                            styles.ghostOverlay,
+                            {
+                                top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+                                left: 0,
+                                right: 0,
+                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 172, without = 108
+                            },
+                        ]}
+                    >
                         <View style={styles.ghostFrame}>
                             <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
                         </View>
+                    </View>
+                )}
+
+                {/* Sample Button - Absolute positioned above thumbnails - Only show when current ghost photo not taken */}
+                {hasGhostItems && !capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) && (
+                    // <View style={{ position: "absolute", bottom: 180 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
+                    //     <Host matchContents>
+                    //         <Button variant="glass" onPress={handleShowSample}>
+                    //             Sample
+                    //         </Button>
+                    //     </Host>
+                    // </View>
+                    <View style={{ position: "absolute", bottom: 180 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
+                        <BaseButton ButtonStyle="Tinted" onPress={handleShowSample} label="Sample" />
                     </View>
                 )}
 
@@ -400,19 +441,10 @@ export default function CameraScreen() {
                     </View>
                 </Animated.View>
 
-                {/* Bottom Controls - با یک backdrop مشترک */}
                 <View style={[styles.bottomControlsWrapper, { paddingBottom: insets.bottom + 16 }]}>
                     {/* Ghost item thumbnails - only show when has ghost items */}
                     {hasGhostItems && (
                         <View style={styles.thumbnailsContainer}>
-                            {/* Sample Button */}
-                            <TouchableOpacity style={styles.sampleButton} onPress={handleShowSample} activeOpacity={0.8}>
-                                <IconSymbol name="photo.fill" size={18} color={colors.system.white} />
-                                <BaseText type="Caption1" weight={600} color="system.white" style={{ marginLeft: 6 }}>
-                                    Sample
-                                </BaseText>
-                            </TouchableOpacity>
-
                             <FlatList
                                 data={ghostItemsData}
                                 horizontal
@@ -470,13 +502,11 @@ export default function CameraScreen() {
                         </TouchableOpacity>
 
                         {/* Shutter Button */}
-                        <Animated.View style={shutterAnimStyle}>
-                            <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
-                                <View style={styles.shutterOuter}>
-                                    <View style={styles.shutterInner}>{isCapturing && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
-                                </View>
-                            </TouchableOpacity>
-                        </Animated.View>
+                        <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
+                            <View style={styles.shutterOuter}>
+                                <View style={styles.shutterInner}>{isCapturing && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
+                            </View>
+                        </TouchableOpacity>
 
                         {/* Switch Camera */}
                         <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCamera} activeOpacity={0.7}>
@@ -565,7 +595,7 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         paddingHorizontal: 20,
         paddingBottom: 12,
-        backgroundColor: "rgba(0,0,0,0.3)",
+        backgroundColor: colors.system.black,
     },
     headerRight: {
         flexDirection: "row",
@@ -621,7 +651,7 @@ const styles = StyleSheet.create({
     },
     templateButtonContainer: {
         position: "absolute",
-        bottom: 180,
+        bottom: 160,
         left: 0,
         right: 0,
         alignItems: "center",
@@ -638,7 +668,9 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     ghostOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        position: "absolute",
+        left: 0,
+        right: 0,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -658,7 +690,7 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
+        backgroundColor: colors.system.black,
         paddingTop: 16,
     },
     thumbnailsContainer: {
@@ -677,8 +709,22 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         marginRight: 8,
     },
+    sampleButtonAbsolute: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        alignSelf: "center",
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0,199,190,0.8)",
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
+        zIndex: 10,
+    },
     thumbnailsList: {
-        gap: 10,
+        gap: 4,
     },
     thumbnail: {
         width: THUMBNAIL_SIZE,
@@ -790,8 +836,22 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    cameraViewportDebug: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        borderWidth: 4,
+        borderColor: "rgba(255,255,0,0.8)", // Yellow border for debugging
+        backgroundColor: "rgba(255,255,0,0.1)", // Light yellow background
+    },
     gridContainer: {
-        ...StyleSheet.absoluteFillObject,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
     },
     gridLine: {
         position: "absolute",
@@ -822,7 +882,7 @@ const styles = StyleSheet.create({
     },
     guideImage: {
         width: "100%",
-        height: width * 0.9,
+        height: width * 1.085,
     },
     closeGuideButton: {
         marginTop: 20,
