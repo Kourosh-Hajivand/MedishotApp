@@ -30,24 +30,11 @@ export default function AddPatientRedirect() {
         return practiceMembers.data.find((member) => member.email === profile.email) || null;
     }, [practiceMembers?.data, profile?.email]);
 
-    // Count available doctors (including owner if they are the only option)
+    // Get available doctors (members with role "doctor" or "owner")
     const availableDoctors = useMemo(() => {
-        const doctorMembers = practiceMembers?.data?.filter((member) => member.role === "doctor") ?? [];
-        
-        // If current user is owner, add them to the list
-        if (currentUserRole === "owner" && currentUserMember) {
-            const ownerAsDoctor = {
-                ...currentUserMember,
-                role: "doctor" as const,
-            };
-            const ownerExists = doctorMembers.some((doc) => doc.id === currentUserMember.id);
-            if (!ownerExists) {
-                return [ownerAsDoctor, ...doctorMembers];
-            }
-        }
-        
-        return doctorMembers;
-    }, [practiceMembers?.data, currentUserRole, currentUserMember]);
+        if (!practiceMembers?.data) return [];
+        return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
+    }, [practiceMembers?.data]);
 
     useFocusEffect(
         useCallback(() => {
@@ -55,18 +42,15 @@ export default function AddPatientRedirect() {
             if (currentUserRole === "doctor") {
                 router.push("/(modals)/add-patient/photo");
             } else if (currentUserRole === "admin" || currentUserRole === "owner") {
-                // If user is owner and only one doctor option exists (themselves), skip selection
-                if (currentUserRole === "owner" && availableDoctors.length === 1 && currentUserMember) {
-                    const ownerAsDoctor = {
-                        ...currentUserMember,
-                        role: "doctor" as const,
-                    };
-                    // Navigate directly to form with owner as doctor
+                // If there's only one doctor, go directly to photo with that doctor
+                if (availableDoctors.length === 1) {
+                    const singleDoctor = availableDoctors[0];
+                    const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
                     router.push({
-                        pathname: "/(modals)/add-patient/form",
+                        pathname: "/(modals)/add-patient/photo",
                         params: {
-                            doctor_id: typeof currentUserMember.id === "number" ? String(currentUserMember.id) : (typeof currentUserMember.id === "string" && currentUserMember.id.includes(":") ? currentUserMember.id.split(":")[1] : String(currentUserMember.id)),
-                            doctor: JSON.stringify(ownerAsDoctor),
+                            doctor_id: doctorIdParam,
+                            doctor: JSON.stringify(singleDoctor),
                         },
                     });
                 } else {
@@ -74,10 +58,10 @@ export default function AddPatientRedirect() {
                     router.push("/(modals)/add-patient/select-doctor");
                 }
             } else {
-                // Otherwise, go directly to add patient form
+                // Otherwise, go directly to add patient photo
                 router.push("/(modals)/add-patient/photo");
             }
-        }, [currentUserRole, availableDoctors.length, currentUserMember]),
+        }, [currentUserRole, availableDoctors]),
     );
 
     return <View style={{ flex: 1, backgroundColor: "white" }} />;

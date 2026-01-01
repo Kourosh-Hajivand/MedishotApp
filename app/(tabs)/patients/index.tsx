@@ -41,6 +41,12 @@ export default function PatientsScreen() {
         return currentMember?.role || selectedPractice.role;
     }, [selectedPractice, practiceMembers?.data, profile?.email]);
 
+    // Get available doctors (members with role "doctor" or "owner")
+    const availableDoctors = useMemo(() => {
+        if (!practiceMembers?.data) return [];
+        return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
+    }, [practiceMembers?.data]);
+
     // Determine doctor_id based on user role
     const doctorId = useMemo(() => {
         // If role is "owner" or "admin" (staff), don't pass doctor_id
@@ -358,12 +364,26 @@ export default function PatientsScreen() {
                                         size="Medium"
                                         rounded={true}
                                         onPress={() => {
-                                            // If user is staff (admin) or owner, show doctor selection modal first
+                                            // If user is staff (admin) or owner, check if there's only one doctor
                                             if (currentUserRole === "admin" || currentUserRole === "owner") {
-                                                router.push("/(modals)/add-patient/select-doctor");
+                                                // If there's only one doctor, go directly to add patient with that doctor
+                                                if (availableDoctors.length === 1) {
+                                                    const singleDoctor = availableDoctors[0];
+                                                    const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
+                                                    router.push({
+                                                        pathname: "/(modals)/add-patient/form",
+                                                        params: {
+                                                            doctor_id: doctorIdParam,
+                                                            doctor: JSON.stringify(singleDoctor),
+                                                        },
+                                                    });
+                                                } else {
+                                                    // Multiple doctors, show selection modal
+                                                    router.push("/(modals)/add-patient/select-doctor");
+                                                }
                                             } else {
                                                 // Otherwise, go directly to add patient
-                                                router.push("/(modals)/add-patient/photo");
+                                                router.push("/(modals)/add-patient/form");
                                             }
                                         }}
                                         leftIcon={<IconSymbol name="plus.circle.fill" size={20} color={colors.system.blue} />}

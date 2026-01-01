@@ -171,7 +171,7 @@ const PracticeDetails = ({ practice }: { practice?: Practice | null }) => {
 
     // Build compact address from address parts
     const fullAddress = React.useMemo(() => {
-        const parts = [metadata?.address, metadata?.city, metadata?.country, metadata?.zipcode].filter(Boolean);
+        const parts = [metadata?.street, metadata?.address, metadata?.city, metadata?.country, metadata?.zipcode].filter(Boolean);
         return parts.length > 0 ? parts.join(", ") : null;
     }, [metadata]);
 

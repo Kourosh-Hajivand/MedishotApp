@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, KeyboardTypeOptions, Platform, StyleSheet, TouchableWithoutFeedback, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
@@ -30,6 +30,7 @@ const schema = z.object({
             message: "Phone number must be 10 digits",
         }),
     specialty: z.string().min(1, "Required"),
+    street: z.string().optional(),
     address: z.string().min(1, "Address is required"),
     zipCode: z.string().min(1, "Zip Code is required"),
 });
@@ -60,6 +61,7 @@ export const CreatePracticeScreen: React.FC = () => {
             website: "",
             phoneNumber: "",
             specialty: practiceType?.title || "",
+            street: "",
             address: "",
             zipCode: "",
         },
@@ -139,6 +141,7 @@ export const CreatePracticeScreen: React.FC = () => {
             metadata: JSON.stringify({
                 website: normalizeWebsiteUrl(data.website),
                 phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
+                street: data.street || "",
                 address: data.address,
                 zipcode: Number(data.zipCode),
                 print_settings: {
@@ -175,54 +178,51 @@ export const CreatePracticeScreen: React.FC = () => {
         });
     }, [navigation, handleSubmit, onSubmit, isPending]);
     return (
-        <KeyboardAwareScrollView
-            style={styles.scrollView}
-            backgroundColor={colors.background}
-            contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }}
-        >
-                <View style={styles.avatarContainer}>
-                    <ImagePickerWrapper onImageSelected={handleImageSelected}>
-                        <View style={styles.avatarWrapper}>
-                            {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
-                            <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
-                        </View>
-                    </ImagePickerWrapper>
-                    <View style={styles.titleContainer}>
-                        <BaseText type="Title1" weight="700" color="system.black">
-                            Create New Practice
-                        </BaseText>
-                        <BaseText type="Body" color="labels.secondary" align="center">
-                            Start by creating your practice.
-                        </BaseText>
+        <KeyboardAwareScrollView style={styles.scrollView} backgroundColor={colors.background} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }}>
+            <View style={styles.avatarContainer}>
+                <ImagePickerWrapper onImageSelected={handleImageSelected}>
+                    <View style={styles.avatarWrapper}>
+                        {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
+                        <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
                     </View>
+                </ImagePickerWrapper>
+                <View style={styles.titleContainer}>
+                    <BaseText type="Title1" weight="700" color="system.black">
+                        Create New Practice
+                    </BaseText>
+                    <BaseText type="Body" color="labels.secondary" align="center">
+                        Start by creating your practice.
+                    </BaseText>
                 </View>
+            </View>
 
-                {/* Form */}
-                <View style={styles.formContainer}>
-                    {[
-                        { name: "practiceName", label: "Practice Name" },
-                        { name: "website", label: "Website", optional: true },
-                        { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
-                        { name: "specialty", label: "Specialty", disabled: true },
-                        { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad" },
-                        { name: "address", label: "Address" },
-                    ].map((f, i) => (
-                        <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
-                            <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
-                                {f.label}
-                            </BaseText>
-                            <View style={styles.inputWrapper}>
-                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} disabled={f.disabled} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
-                            </View>
-                        </View>
-                    ))}
-
-                    {error?.message && (
-                        <BaseText color="system.red" type="Caption2" className="mt-2">
-                            {error?.message}
+            {/* Form */}
+            <View style={styles.formContainer}>
+                {[
+                    { name: "practiceName", label: "Practice Name" },
+                    { name: "website", label: "Website", optional: true },
+                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
+                    { name: "specialty", label: "Specialty", disabled: true },
+                    { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad" },
+                    { name: "street", label: "Street" },
+                    { name: "address", label: "City, State" },
+                ].map((f, i) => (
+                    <View key={f.name} style={[styles.formRow, i === 6 ? { borderBottomWidth: 0 } : {}]}>
+                        <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
+                            {f.label}
                         </BaseText>
-                    )}
-                </View>
+                        <View style={styles.inputWrapper}>
+                            <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} disabled={f.disabled} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                        </View>
+                    </View>
+                ))}
+
+                {error?.message && (
+                    <BaseText color="system.red" type="Caption2" className="mt-2">
+                        {error?.message}
+                    </BaseText>
+                )}
+            </View>
         </KeyboardAwareScrollView>
     );
 };
