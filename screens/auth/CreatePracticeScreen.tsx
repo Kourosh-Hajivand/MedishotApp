@@ -88,10 +88,9 @@ export const CreatePracticeScreen: React.FC = () => {
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
             setUploadedFilename(response.filename ?? null);
-            console.log("Image uploaded successfully:", response.filename);
         },
         (error) => {
-            console.error("Error uploading image:", error.message);
+            // Error handled silently
         },
     );
 
@@ -112,7 +111,7 @@ export const CreatePracticeScreen: React.FC = () => {
 
             uploadImage(file);
         } catch (error) {
-            console.error("Error preparing image for upload:", error);
+            // Error handled silently
         }
     };
 
@@ -132,11 +131,7 @@ export const CreatePracticeScreen: React.FC = () => {
     });
 
     const onSubmit = (data: FormData) => {
-        console.log("====================================");
-        console.log(data);
-        324;
-        console.log("====================================");
-        createPractice({
+        const createData = {
             name: data.practiceName,
             metadata: JSON.stringify({
                 website: normalizeWebsiteUrl(data.website),
@@ -164,7 +159,12 @@ export const CreatePracticeScreen: React.FC = () => {
             }),
             type: practiceType.id,
             ...(uploadedFilename ? { image: uploadedFilename } : {}),
-        });
+        };
+
+        // Log request body being sent to backend
+        console.log("📤 Request Body:", JSON.stringify(createData, null, 2));
+
+        createPractice(createData);
     };
     useLayoutEffect(() => {
         navigation.setOptions({

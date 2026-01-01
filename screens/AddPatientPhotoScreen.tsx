@@ -129,13 +129,18 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
     const uploadedFilenameRef = useRef<string | null>(null); // Ref to always have latest value
     const [hasUploadedScannedImage, setHasUploadedScannedImage] = useState(false);
+    const [hasAppliedScannedData, setHasAppliedScannedData] = useState(false); // Track if scanned data has been applied
     const [idCardImage, setIdCardImage] = useState<string | null>(null);
     const [idCardFilename, setIdCardFilename] = useState<string | null>(null);
     // States for dynamic inputs
     const [phones, setPhones] = useState<any[]>([]);
+    const phonesRef = useRef<any[]>([]);
     const [emails, setEmails] = useState<any[]>([]);
+    const emailsRef = useRef<any[]>([]);
     const [addresses, setAddresses] = useState<any[]>([]);
+    const addressesRef = useRef<any[]>([]);
     const [urls, setUrls] = useState<any[]>([]);
+    const urlsRef = useRef<any[]>([]);
 
     const {
         control,
@@ -237,20 +242,14 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            console.log("✅ [uploadImage] Success callback triggered");
-            console.log("✅ [uploadImage] Response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("✅ [uploadImage] Filename:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
-            console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
         (error) => {
-            console.error("❌ [uploadImage] Error callback triggered");
-            console.error("❌ [uploadImage] Error uploading image:", error);
-            console.error("❌ [uploadImage] Error message:", error.message);
+            // Error handled silently
         },
     );
 
@@ -260,18 +259,18 @@ export const AddPatientPhotoScreen: React.FC = () => {
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
             setIdCardFilename(filename);
-            console.log("✅ [uploadIdCardImage] ID Card image uploaded successfully:", filename);
         },
         (error) => {
-            console.error("❌ [uploadIdCardImage] Error uploading ID card image:", error.message);
+            // Error handled silently
         },
     );
 
     const displayIdCardImage = useMemo(() => formatImageUri(idCardImage), [idCardImage]);
 
-    // Auto-fill form with parsed ID card data
+    // Auto-fill form with parsed ID card data (only once when scanned data is first available)
     useEffect(() => {
-        if (!isEditMode && params.firstName) {
+        // Only apply scanned data once, and only if we haven't applied it yet
+        if (!isEditMode && params.firstName && !hasAppliedScannedData) {
             // Auto-fill from scanned ID card data
             if (params.firstName) {
                 setValue("first_name", params.firstName);
@@ -307,19 +306,21 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     uploadIdCardImage(file);
                     setHasUploadedScannedImage(true);
                 } catch (err) {
-                    console.log("Error preparing scanned ID card image:", err);
+                    // Error handled silently
                 }
             }
 
             // Set phone number if available
             if (params.phone) {
-                setPhones([
+                const phoneData = [
                     {
                         id: "phone-0",
                         label: "Mobile",
                         value: params.phone,
                     },
-                ]);
+                ];
+                setPhones(phoneData);
+                phonesRef.current = phoneData;
             }
 
             // Set email if available
@@ -343,15 +344,15 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     },
                 ]);
             }
+
+            // Mark that scanned data has been applied
+            setHasAppliedScannedData(true);
         }
-    }, [params, isEditMode, setValue, uploadIdCardImage, hasUploadedScannedImage]);
+    }, [params.firstName, params.lastName, params.birthDate, params.gender, params.phone, params.email, params.address, params.scannedImageUri, isEditMode, setValue, uploadIdCardImage, hasUploadedScannedImage, hasAppliedScannedData]);
 
     useEffect(() => {
         if (patient?.data && isEditMode) {
             const patientData = patient.data;
-            console.log("====================================");
-            console.log(patientData?.addresses);
-            console.log("====================================");
             setValue("first_name", patientData.first_name || "");
             setValue("last_name", patientData.last_name || "");
             setValue("birth_date", patientData.birth_date || "");
@@ -376,6 +377,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     value: phone.value,
                 }));
                 setPhones(phoneData);
+                phonesRef.current = phoneData;
             }
 
             if (patientData?.email) {
@@ -431,21 +433,28 @@ export const AddPatientPhotoScreen: React.FC = () => {
     }, [patient, isEditMode, setValue]);
 
     const onSubmit = (data: FormData) => {
-        const phoneNumbers = phones
-            .filter((phone) => phone.value && phone.value.trim() !== "")
+        // Use ref to always get the latest phones value (avoid closure issues)
+        const currentPhones = phonesRef.current;
+
+        const phoneNumbers = currentPhones
+            .filter((phone) => {
+                if (!phone || !phone.value) return false;
+                const valueStr = String(phone.value);
+                return valueStr.trim() !== "";
+            })
             .map((phone) => ({
-                type: phone.label,
-                value: phone.value,
+                type: phone.label || "Mobile",
+                value: String(phone.value).trim(),
             }));
 
-        const emailAddresses = emails
+        const emailAddresses = emailsRef.current
             .filter((email) => email.value && email.value.trim() !== "")
             .map((email) => ({
                 type: email.label,
                 value: email.value,
             }));
 
-        const addressList = addresses
+        const addressList = addressesRef.current
             .filter((address) => address.value && (typeof address.value === "object" ? Object.values(address.value).some((val) => val && typeof val === "string" && val.trim() !== "") : typeof address.value === "string" && address.value.trim() !== ""))
             .map((address) => ({
                 type: address.label,
@@ -462,7 +471,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                           },
             }));
 
-        const urlLinks = urls
+        const urlLinks = urlsRef.current
             .filter((url) => url.value && url.value.trim() !== "")
             .map((url) => ({
                 type: url.label,
@@ -508,89 +517,45 @@ export const AddPatientPhotoScreen: React.FC = () => {
             patientData.links = urlLinks;
         }
 
-        // Only submit filename from server, not local URI
-        // Use ref to always get the latest value (avoid closure issues)
+        // Only submit image if user has changed/selected a new image
+        // Check if localImageUri exists (means user selected a new image)
+        // Or if it's create mode and we have an uploaded filename
         const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
-        console.log("🔍 [onSubmit] Checking uploadedFilename (state):", uploadedFilename);
-        console.log("🔍 [onSubmit] Checking uploadedFilename (ref):", uploadedFilenameRef.current);
-        console.log("🔍 [onSubmit] Using filename:", currentUploadedFilename);
 
-        if (currentUploadedFilename) {
-            console.log("📤 [onSubmit] Submitting image filename:", currentUploadedFilename);
+        // Only include image if:
+        // 1. In create mode and we have an uploaded filename (new image selected)
+        // 2. In edit mode and localImageUri exists (image was changed)
+        if (!isEditMode && currentUploadedFilename) {
+            // Create mode: include image if we have one
             patientData.image = currentUploadedFilename;
-        } else {
-            console.log("⚠️ [onSubmit] No image filename to submit");
-            console.log("⚠️ [onSubmit] uploadedFilename (state):", uploadedFilename);
-            console.log("⚠️ [onSubmit] uploadedFilename (ref):", uploadedFilenameRef.current);
+        } else if (isEditMode && localImageUri) {
+            // Edit mode: only include image if user selected a new one
+            if (currentUploadedFilename) {
+                patientData.image = currentUploadedFilename;
+            }
         }
 
         if (idCardFilename) {
-            console.log("📤 [onSubmit] Submitting ID card filename:", idCardFilename);
             patientData.id_card = idCardFilename;
         }
 
-        // Log all data being sent to backend
-        console.log("═══════════════════════════════════════════════════════════");
-        console.log("📤 [onSubmit] DATA BEING SENT TO BACKEND:");
-        console.log("═══════════════════════════════════════════════════════════");
-        console.log("🏥 Practice ID:", selectedPractice?.id);
-        console.log("📋 Patient Data (JSON):", JSON.stringify(patientData, null, 2));
-        console.log("📋 Patient Data (Object):", patientData);
-        console.log("───────────────────────────────────────────────────────────");
-        console.log("📝 Form Data:", {
-            first_name: data.first_name,
-            last_name: data.last_name,
-            birth_date: data.birth_date,
-            gender: data.gender,
-        });
-        console.log("📞 Phone Numbers:", phoneNumbers);
-        console.log("📧 Email Addresses:", emailAddresses);
-        console.log("📍 Addresses:", addressList);
-        console.log("🔗 URL Links:", urlLinks);
-        console.log("🖼️ Image Filename (state):", uploadedFilename);
-        console.log("🖼️ Image Filename (ref):", uploadedFilenameRef.current);
-        console.log("🖼️ Image Filename (using):", currentUploadedFilename);
-        console.log("🪪 ID Card Filename:", idCardFilename);
-        console.log("═══════════════════════════════════════════════════════════");
+        // Log request body being sent to backend
+        console.log("📤 Request Body:", JSON.stringify(patientData, null, 2));
 
         if (isEditMode && params.id) {
-            console.log("🔄 [onSubmit] MODE: UPDATE PATIENT");
-            console.log("🔄 [onSubmit] Patient ID:", params.id);
-            console.log("🔄 [onSubmit] Update Payload:", {
-                patientId: params.id,
-                data: patientData,
-            });
-            console.log("🔄 [onSubmit] Calling updatePatient mutation...");
-
             updatePatient(
                 { patientId: params.id, data: patientData },
                 {
-                    onSuccess: (response) => {
-                        console.log("✅ [updatePatient] Success Response:", response);
+                    onSuccess: () => {
                         router.push(`/patients/${params.id}`);
-                    },
-                    onError: (error) => {
-                        console.error("❌ [updatePatient] Error:", error);
-                        console.error("❌ [updatePatient] Error Details:", JSON.stringify(error, null, 2));
                     },
                 },
             );
         } else {
-            console.log("➕ [onSubmit] MODE: CREATE NEW PATIENT");
-            console.log("➕ [onSubmit] Practice ID:", selectedPractice?.id);
-            console.log("➕ [onSubmit] Create Payload:", patientData);
-            console.log("➕ [onSubmit] Calling createPatient mutation...");
-
             createPatient(patientData, {
-                onSuccess: (response) => {
-                    console.log("✅ [createPatient] Success Response:", response);
-                    console.log("✅ [createPatient] Response Data:", JSON.stringify(response, null, 2));
+                onSuccess: () => {
                     router.push("/(tabs)/patients");
                     router.back();
-                },
-                onError: (error) => {
-                    console.error("❌ [createPatient] Error:", error);
-                    console.error("❌ [createPatient] Error Details:", JSON.stringify(error, null, 2));
                 },
             });
         }
@@ -598,7 +563,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     const handleNext = () => {
         if (!isFormValid) {
-            console.log("Form is not valid. Please fill required fields.");
             return;
         }
         handleSubmit(onSubmit)();
@@ -659,14 +623,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
     }, [navigation, params.id]);
 
     const handleSelectFromGallery = async () => {
-        console.log("📸 [handleSelectFromGallery] Starting gallery selection...");
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-            console.log("❌ [handleSelectFromGallery] Permission denied");
             alert("Permission to access gallery is required!");
             return;
         }
-        console.log("✅ [handleSelectFromGallery] Permission granted");
 
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -675,15 +636,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
             base64: false,
         });
 
-        console.log("📸 [handleSelectFromGallery] Image picker result:", {
-            canceled: result.canceled,
-            assetsCount: result.assets?.length || 0,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
             const uri = result.assets[0].uri;
-            console.log("✅ [handleSelectFromGallery] Image selected:", uri);
-            console.log("📸 [handleSelectFromGallery] Setting localImageUri to:", uri);
             setLocalImageUri(uri); // Save local URI for preview
 
             try {
@@ -697,30 +651,19 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     name: filename,
                 } as any;
 
-                console.log("📤 [handleSelectFromGallery] Preparing to upload file:", {
-                    uri: file.uri,
-                    type: file.type,
-                    name: file.name,
-                });
-                console.log("📤 [handleSelectFromGallery] Calling uploadImage...");
                 uploadImage(file);
             } catch (err) {
-                console.error("❌ [handleSelectFromGallery] Upload error:", err);
+                // Error handled silently
             }
-        } else {
-            console.log("⚠️ [handleSelectFromGallery] Image selection was canceled or no assets");
         }
     };
 
     const handleTakePhoto = async () => {
-        console.log("📷 [handleTakePhoto] Starting camera...");
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-            console.log("❌ [handleTakePhoto] Permission denied");
             alert("Permission to access camera is required!");
             return;
         }
-        console.log("✅ [handleTakePhoto] Permission granted");
 
         const result = await ImagePicker.launchCameraAsync({
             allowsEditing: true,
@@ -728,15 +671,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
             base64: false,
         });
 
-        console.log("📷 [handleTakePhoto] Camera result:", {
-            canceled: result.canceled,
-            assetsCount: result.assets?.length || 0,
-        });
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
             const uri = result.assets[0].uri;
-            console.log("✅ [handleTakePhoto] Photo taken:", uri);
-            console.log("📸 [handleTakePhoto] Setting localImageUri to:", uri);
             setLocalImageUri(uri); // Save local URI for preview
 
             try {
@@ -750,29 +686,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     name: filename,
                 } as any;
 
-                console.log("📤 [handleTakePhoto] Preparing to upload file:", {
-                    uri: file.uri,
-                    type: file.type,
-                    name: file.name,
-                });
-                console.log("📤 [handleTakePhoto] Calling uploadImage...");
                 uploadImage(file);
             } catch (err) {
-                console.error("❌ [handleTakePhoto] Upload error:", err);
+                // Error handled silently
             }
-        } else {
-            console.log("⚠️ [handleTakePhoto] Photo capture was canceled or no assets");
         }
     };
-    console.log("===============displayIdCardImage=====================");
-    console.log(displayIdCardImage);
-    console.log("====================================");
-
-    // Debug logs for image state
-    console.log("🖼️ [RENDER] localImageUri:", localImageUri);
-    console.log("🖼️ [RENDER] uploadedFilename:", uploadedFilename);
-    console.log("🖼️ [RENDER] isUploading:", isUploading);
-    console.log("🖼️ [RENDER] isPending:", isPending);
 
     // Use local URI for preview (new images) or formatted URI for existing images from server
     // Don't show preview while uploading - show loading instead
@@ -788,7 +707,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
         // Existing image from server: format the URI
         return formatImageUri(uploadedFilename);
     }, [localImageUri, uploadedFilename, isUploading]);
-    console.log("🖼️ [RENDER] displaySelectedImage:", displaySelectedImage);
 
     return (
         <KeyboardAwareScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
@@ -801,17 +719,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                                 <ActivityIndicator size="small" color={colors.system.gray6} />
                             ) : displaySelectedImage ? (
                                 // Show preview after upload is complete
-                                <Image
-                                    source={{ uri: displaySelectedImage }}
-                                    className="w-full h-full rounded-full"
-                                    onError={(error) => {
-                                        console.error("❌ [Image] Error loading image:", error.nativeEvent.error);
-                                        console.error("❌ [Image] Failed URI:", displaySelectedImage);
-                                    }}
-                                    onLoad={() => {
-                                        console.log("✅ [Image] Image loaded successfully:", displaySelectedImage);
-                                    }}
-                                />
+                                <Image source={{ uri: displaySelectedImage }} className="w-full h-full rounded-full" />
                             ) : (
                                 // Show default avatar when no image
                                 <AvatarIcon width={50} height={50} strokeWidth={0} />
@@ -887,10 +795,42 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             </View>
                         </View>
                     )}
-                    <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
-                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
-                    <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
-                    <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
+                    <DynamicInputList
+                        config={phoneConfig}
+                        paramKey="phone"
+                        onChange={(items) => {
+                            setPhones(items);
+                            phonesRef.current = items;
+                        }}
+                        initialItems={phones}
+                    />
+                    <DynamicInputList
+                        config={emailConfig}
+                        paramKey="email"
+                        onChange={(items) => {
+                            setEmails(items);
+                            emailsRef.current = items;
+                        }}
+                        initialItems={emails}
+                    />
+                    <DynamicInputList
+                        config={addressConfig}
+                        paramKey="address"
+                        onChange={(items) => {
+                            setAddresses(items);
+                            addressesRef.current = items;
+                        }}
+                        initialItems={addresses}
+                    />
+                    <DynamicInputList
+                        config={urlConfig}
+                        paramKey="url"
+                        onChange={(items) => {
+                            setUrls(items);
+                            urlsRef.current = items;
+                        }}
+                        initialItems={urls}
+                    />
                 </View>
             </View>
         </KeyboardAwareScrollView>

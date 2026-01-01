@@ -28,6 +28,7 @@ const schema = z.object({
         }),
     address: z.string().optional(),
     zipCode: z.string().optional(),
+    street: z.string().optional(),
     email: z.string().email().optional().or(z.literal("")),
 });
 
@@ -82,6 +83,7 @@ export default function EditPracticeScreen() {
             phoneNumber: metadata?.phone?.replace(/-/g, "") || "",
             address: metadata?.address || "",
             zipCode: metadata?.zipcode?.toString() || "",
+            street: metadata?.street || "",
             email: metadata?.email || "",
         },
     });
@@ -112,6 +114,7 @@ export default function EditPracticeScreen() {
             setValue("phoneNumber", metadata?.phone?.replace(/-/g, "") || "");
             setValue("address", metadata?.address || "");
             setValue("zipCode", metadata?.zipcode?.toString() || "");
+            setValue("street", metadata?.street || "");
             setValue("email", metadata?.email || "");
         }
     }, [metadata, practice, setValue]);
@@ -119,7 +122,6 @@ export default function EditPracticeScreen() {
     // Initialize uploadedFilename with existing image URL if in edit mode
     useEffect(() => {
         if (practice?.image?.url && !localImageUri) {
-            console.log("🖼️ [INIT] Setting existing practice image:", practice.image.url);
             setUploadedFilename(practice.image.url);
             uploadedFilenameRef.current = practice.image.url;
         }
@@ -127,25 +129,18 @@ export default function EditPracticeScreen() {
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            console.log("✅ [uploadImage] Success callback triggered");
-            console.log("✅ [uploadImage] Response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("✅ [uploadImage] Filename:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
-            console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
         (error) => {
-            console.error("❌ [uploadImage] Error callback triggered");
-            console.error("❌ [uploadImage] Error uploading image:", error);
-            console.error("❌ [uploadImage] Error message:", error.message);
+            // Error handled silently
         },
     );
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
-        console.log("📸 [handleImageSelected] Image selected:", result.uri);
         setLocalImageUri(result.uri); // Save local URI for preview
 
         try {
@@ -159,15 +154,9 @@ export default function EditPracticeScreen() {
                 name: filename,
             } as any;
 
-            console.log("📤 [handleImageSelected] Preparing to upload file:", {
-                uri: file.uri,
-                type: file.type,
-                name: file.name,
-            });
-            console.log("📤 [handleImageSelected] Calling uploadImage...");
             uploadImage(file);
         } catch (error) {
-            console.error("❌ [handleImageSelected] Error preparing image for upload:", error);
+            // Error handled silently
         }
     };
 
@@ -183,22 +172,19 @@ export default function EditPracticeScreen() {
     const onSubmit = useCallback(
         (data: FormData) => {
             if (!practice?.id) {
-                console.error("❌ [onSubmit] Practice ID is missing!");
                 return;
             }
 
             // Only submit filename from server, not local URI
             // Use ref to always get the latest value (avoid closure issues)
             const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
-            console.log("🔍 [onSubmit] Checking uploadedFilename (state):", uploadedFilename);
-            console.log("🔍 [onSubmit] Checking uploadedFilename (ref):", uploadedFilenameRef.current);
-            console.log("🔍 [onSubmit] Using filename:", currentUploadedFilename);
 
             const updateData: any = {
                 name: data.practiceName,
                 metadata: JSON.stringify({
                     website: normalizeWebsiteUrl(data.website),
                     phone: data.phoneNumber ? normalizeUSPhoneToDashedFormat(data.phoneNumber) : "",
+                    street: data.street || "",
                     address: data.address || "",
                     zipcode: data.zipCode ? Number(data.zipCode) : undefined,
                     email: data.email || "",
@@ -208,41 +194,14 @@ export default function EditPracticeScreen() {
                 }),
             };
 
-            console.log("====================================");
-            console.log("updateData:", updateData);
-            console.log("====================================");
-            if (currentUploadedFilename) {
-                console.log("📤 [onSubmit] Submitting image filename:", currentUploadedFilename);
+            // Only include image if user has changed/selected a new image
+            if (localImageUri && currentUploadedFilename) {
                 updateData.image = currentUploadedFilename;
-            } else {
-                console.log("⚠️ [onSubmit] No image filename to submit");
-                console.log("⚠️ [onSubmit] uploadedFilename (state):", uploadedFilename);
-                console.log("⚠️ [onSubmit] uploadedFilename (ref):", uploadedFilenameRef.current);
             }
 
-            // Log all data being sent to backend
-            console.log("═══════════════════════════════════════════════════════════");
-            console.log("📤 [onSubmit] DATA BEING SENT TO BACKEND:");
-            console.log("═══════════════════════════════════════════════════════════");
-            console.log("🏥 Practice ID:", practice.id);
-            console.log("📋 Update Data (JSON):", JSON.stringify(updateData, null, 2));
-            console.log("📋 Update Data (Object):", updateData);
-            console.log("───────────────────────────────────────────────────────────");
-            console.log("📝 Form Data:", {
-                practiceName: data.practiceName,
-                website: data.website,
-                phoneNumber: data.phoneNumber,
-                address: data.address,
-                zipCode: data.zipCode,
-                email: data.email,
-            });
-            console.log("🖼️ Image Filename (state):", uploadedFilename);
-            console.log("🖼️ Image Filename (ref):", uploadedFilenameRef.current);
-            console.log("🖼️ Image Filename (using):", currentUploadedFilename);
-            console.log("🖼️ Local Image URI:", localImageUri);
-            console.log("═══════════════════════════════════════════════════════════");
+            // Log request body being sent to backend
+            console.log("📤 Request Body:", JSON.stringify(updateData, null, 2));
 
-            console.log("🔄 [onSubmit] Calling updatePractice mutation...");
             updatePractice({
                 id: practice.id,
                 data: updateData,
@@ -264,16 +223,6 @@ export default function EditPracticeScreen() {
         });
     }, [navigation, handleSubmit, onSubmit, isPending]);
 
-    // Debug logs for image state
-    console.log("🖼️ [RENDER] localImageUri:", localImageUri);
-    console.log("🖼️ [RENDER] uploadedFilename:", uploadedFilename);
-    console.log("🖼️ [RENDER] uploadedFilenameRef.current:", uploadedFilenameRef.current);
-    console.log("🖼️ [RENDER] isUploading:", isUploading);
-    console.log("🖼️ [RENDER] isPending:", isPending);
-    console.log("🖼️ [RENDER] practice?.image?.url:", practice?.image?.url);
-
-    console.log("🖼️ practice:", practice);
-
     return (
         <KeyboardAwareScrollView
             style={styles.scrollView}
@@ -291,30 +240,10 @@ export default function EditPracticeScreen() {
                             <ActivityIndicator size="small" color={colors.system.gray6} />
                         ) : localImageUri ? (
                             // Show preview after upload is complete (new image)
-                            <Image
-                                source={{ uri: localImageUri }}
-                                style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", localImageUri);
-                                }}
-                                onLoad={() => {
-                                    console.log("✅ [Image] Local image loaded successfully:", localImageUri);
-                                }}
-                            />
+                            <Image source={{ uri: localImageUri }} style={styles.avatarImage} />
                         ) : practice?.image?.url ? (
                             // Show existing image from server
-                            <Image
-                                source={{ uri: practice.image.url }}
-                                style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", practice.image?.url);
-                                }}
-                                onLoad={() => {
-                                    console.log("✅ [Image] Existing image loaded successfully:", practice.image?.url);
-                                }}
-                            />
+                            <Image source={{ uri: practice.image.url }} style={styles.avatarImage} />
                         ) : (
                             // Show default avatar when no image
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
@@ -323,7 +252,6 @@ export default function EditPracticeScreen() {
                             <View></View>
                         ) : (
                             <View style={styles.plusButton}>
-                                {" "}
                                 <PlusIcon width={14} height={14} strokeWidth={0} />
                             </View>
                         )}
@@ -347,9 +275,10 @@ export default function EditPracticeScreen() {
                     { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true },
                     { name: "email", label: "Email", keyboardType: "email-address", optional: true },
                     { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", optional: true },
+                    { name: "street", label: "Street", optional: true },
                     { name: "address", label: "Address", optional: true },
                 ].map((f, i) => (
-                    <View key={f.name} style={[styles.formRow, i === 5 ? { borderBottomWidth: 0 } : {}]}>
+                    <View key={f.name} style={[styles.formRow, i === 6 ? { borderBottomWidth: 0 } : {}]}>
                         <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                             {f.label}
                         </BaseText>

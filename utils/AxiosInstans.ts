@@ -16,10 +16,41 @@ let isRedirectingToError = false;
 
 axiosInstance.interceptors.request.use(async (config) => {
     const tokens = await getTokens();
-    console.log("tokens", tokens);
     if (tokens.accessToken) {
         config.headers.Authorization = `Bearer ${tokens.accessToken}`;
     }
+
+    // Log request URL and body
+    const method = config.method?.toUpperCase() || "GET";
+    const fullUrl = config.baseURL && config.url ? `${config.baseURL}${config.url}` : config.url || "Unknown";
+    
+    // Extract request body
+    let requestBody = null;
+    if (config.data) {
+        // Handle FormData
+        if (config.data instanceof FormData) {
+            // For FormData, we can't easily serialize it, so just log that it's FormData
+            requestBody = "[FormData]";
+        } else if (typeof config.data === "string") {
+            // Try to parse if it's a JSON string
+            try {
+                requestBody = JSON.parse(config.data);
+            } catch {
+                requestBody = config.data;
+            }
+        } else {
+            requestBody = config.data;
+        }
+    }
+
+    // Log request details
+    console.log(`📤 [${method}] ${fullUrl}`);
+    if (requestBody && requestBody !== "[FormData]") {
+        console.log("📤 Request Body:", JSON.stringify(requestBody, null, 2));
+    } else if (requestBody === "[FormData]") {
+        console.log("📤 Request Body: [FormData - Multipart]");
+    }
+
     return config;
 });
 
