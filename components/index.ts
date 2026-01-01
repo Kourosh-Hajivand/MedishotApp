@@ -14,3 +14,5 @@ export type { SignatureCanvasRef } from "./SignatureCanvas";
 export { AnimatedSplashScreen } from "./SplashScreen";
 export { TabletWrapper } from "./tablet-wrapper";
 export { BaseText } from "./text/BaseText";
+export { PracticeDocumentHeader, PracticeDocumentFooter } from "./practice";
+export type { PracticeSettings } from "./practice";
