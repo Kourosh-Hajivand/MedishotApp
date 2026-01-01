@@ -1,27 +1,68 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useGetPracticeTemplates } from "@/utils/hook/usePractice";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { PracticeTemplate, Template } from "@/utils/service/models/ResponseModels";
 import { Button, Host } from "@expo/ui/swift-ui";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutPattern } from "./create-template/types";
 import { getItemLayoutStyle } from "./create-template/utils";
-import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
 
 const { width } = Dimensions.get("window");
 const TEMPLATE_SIZE = (width - 60) / 2;
 
+// Helper function to select layout pattern based on item count if not provided
+const getDefaultLayoutPattern = (itemCount: number): LayoutPattern => {
+    switch (itemCount) {
+        case 1:
+            return "left-right"; // Single item can use any layout
+        case 2:
+            return "left-right";
+        case 3:
+            return "left-tall";
+        case 4:
+            return "grid-2x2";
+        case 5:
+            return "grid-2x3";
+        case 6:
+            return "grid-3x2";
+        case 7:
+            return "grid-3x3";
+        case 8:
+            return "grid-4x2";
+        case 9:
+            return "grid-3x3-full";
+        default:
+            // For more than 9 items, use grid-3x3-full
+            if (itemCount > 9) return "grid-3x3-full";
+            return "left-right";
+    }
+};
+
+type GhostItemInfo = {
+    gostId: string;
+    imageUrl?: string | null; // gost_image.url - for overlay center
+    sampleImageUrl?: string | null; // image.url - for sample modal
+    iconUrl?: string | null; // icon.url - for thumbnails
+    name?: string;
+    description?: string | null;
+};
+
 type TemplateType = {
     id: string;
     name: string;
-    ghostItems: string[];
+    ghostItems: GhostItemInfo[];
     previewCount: number;
     layoutPattern: LayoutPattern;
+    isCustom?: boolean;
+    templateData?: Template | PracticeTemplate;
 };
 
 export default function TemplateSelectScreen() {
@@ -34,18 +75,174 @@ export default function TemplateSelectScreen() {
         newTemplate?: string;
     }>();
 
+    const { selectedPractice } = useProfileStore();
     const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
     const [customTemplates, setCustomTemplates] = useState<TemplateType[]>([]);
+
+    // Fetch global templates (Ready Templates) - using practice templates endpoint which returns both global and practice templates
+    // We need to fetch from a practice to get global templates (practise_id = null)
+    const { data: globalTemplatesData, isLoading: isLoadingGlobalTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+
+    // Fetch practice templates (Custom Templates)
+    const { data: practiceTemplatesData, isLoading: isLoadingPracticeTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+
+    // Convert API templates to TemplateType
+    const globalTemplates: TemplateType[] = useMemo(() => {
+        if (!globalTemplatesData?.data) return [];
+
+        // Handle both array and paginated response
+        let templates: any[] = [];
+        if (Array.isArray(globalTemplatesData.data)) {
+            templates = globalTemplatesData.data;
+        } else if (globalTemplatesData.data && typeof globalTemplatesData.data === "object" && "data" in globalTemplatesData.data) {
+            templates = (globalTemplatesData.data as any).data || [];
+        }
+
+        // Filter only global templates (practise_id === null) that have items and convert
+        return templates
+            .filter((template: any) => {
+                // Only show templates that have items (cells or gosts)
+                const hasCells = template.cells && Array.isArray(template.cells) && template.cells.length > 0;
+                const hasGosts = template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0;
+                return template.practise_id === null && (hasCells || hasGosts);
+            })
+            .map((template: any) => {
+                // Extract ghost items with image URLs - prefer cells, fallback to gosts
+                const ghostItems: GhostItemInfo[] = [];
+
+                if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
+                    // Sort by row_index and column_index to maintain order
+                    const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                        if (a.row_index !== b.row_index) return a.row_index - b.row_index;
+                        return a.column_index - b.column_index;
+                    });
+                    ghostItems.push(
+                        ...sortedCells.map((cell: any) => ({
+                            gostId: String(cell.gost.id),
+                            // gost_image.url for overlay center
+                            imageUrl: cell.gost.gost_image?.url || null,
+                            // image.url for sample modal
+                            sampleImageUrl: cell.gost.image?.url || null,
+                            // icon.url for thumbnails
+                            iconUrl: cell.gost.icon?.url || null,
+                            name: cell.gost.name,
+                            description: cell.gost.description || null,
+                        })),
+                    );
+                } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
+                    // Use gosts array if cells are empty
+                    ghostItems.push(
+                        ...template.gosts.map((gost: any) => ({
+                            gostId: String(gost.id),
+                            // gost_image.url for overlay center
+                            imageUrl: gost.gost_image?.url || null,
+                            // image.url for sample modal
+                            sampleImageUrl: gost.image?.url || null,
+                            // icon.url for thumbnails
+                            iconUrl: gost.icon?.url || null,
+                            name: gost.name,
+                            description: gost.description || null,
+                        })),
+                    );
+                }
+
+                const itemCount = ghostItems.length;
+                const layoutPattern = template.layout_pattern ? (template.layout_pattern as LayoutPattern) : getDefaultLayoutPattern(itemCount);
+
+                return {
+                    id: `global-${template.id}`,
+                    name: template.name,
+                    ghostItems,
+                    previewCount: itemCount,
+                    layoutPattern,
+                    isCustom: false,
+                    templateData: template,
+                };
+            });
+    }, [globalTemplatesData]);
+
+    const practiceTemplates: TemplateType[] = useMemo(() => {
+        if (!practiceTemplatesData?.data) return [];
+
+        // Filter only practice templates (practise_id !== null, matches selected practice, and has items)
+        return practiceTemplatesData.data
+            .filter((template: any) => {
+                // Only show templates that belong to selected practice and have items
+                const hasCells = template.cells && Array.isArray(template.cells) && template.cells.length > 0;
+                const hasGosts = template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0;
+                return template.practise_id !== null && template.practise_id === selectedPractice?.id && (hasCells || hasGosts);
+            })
+            .map((template: any) => {
+                // Extract ghost items with image URLs - prefer cells, fallback to gosts
+                const ghostItems: GhostItemInfo[] = [];
+
+                if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
+                    // Sort by row_index and column_index to maintain order
+                    const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                        if (a.row_index !== b.row_index) return a.row_index - b.row_index;
+                        return a.column_index - b.column_index;
+                    });
+                    ghostItems.push(
+                        ...sortedCells.map((cell: any) => ({
+                            gostId: String(cell.gost.id),
+                            // gost_image.url for overlay center
+                            imageUrl: cell.gost.gost_image?.url || null,
+                            // image.url for sample modal
+                            sampleImageUrl: cell.gost.image?.url || null,
+                            // icon.url for thumbnails
+                            iconUrl: cell.gost.icon?.url || null,
+                            name: cell.gost.name,
+                            description: cell.gost.description || null,
+                        })),
+                    );
+                } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
+                    // Use gosts array if cells are empty
+                    ghostItems.push(
+                        ...template.gosts.map((gost: any) => ({
+                            gostId: String(gost.id),
+                            // gost_image.url for overlay center
+                            imageUrl: gost.gost_image?.url || null,
+                            // image.url for sample modal
+                            sampleImageUrl: gost.image?.url || null,
+                            // icon.url for thumbnails
+                            iconUrl: gost.icon?.url || null,
+                            name: gost.name,
+                            description: gost.description || null,
+                        })),
+                    );
+                }
+
+                const itemCount = ghostItems.length;
+                const layoutPattern = template.layout_pattern ? (template.layout_pattern as LayoutPattern) : getDefaultLayoutPattern(itemCount);
+
+                return {
+                    id: `practice-${template.id}`,
+                    name: template.name,
+                    ghostItems,
+                    previewCount: itemCount,
+                    layoutPattern,
+                    isCustom: true,
+                    templateData: template,
+                };
+            });
+    }, [practiceTemplatesData, selectedPractice?.id]);
 
     // Add new template when coming back from create-template
     React.useEffect(() => {
         if (newTemplate) {
             try {
                 const template = JSON.parse(newTemplate);
-                // Add previewCount based on ghostItems length
-                const templateWithPreview = {
+                // Convert old format (string[]) to new format (GhostItemInfo[])
+                const ghostItemsFormatted: GhostItemInfo[] = Array.isArray(template.ghostItems) ? template.ghostItems.map((item: string | GhostItemInfo) => (typeof item === "string" ? { gostId: item, imageUrl: null, sampleImageUrl: null, iconUrl: null, name: undefined, description: undefined } : item)) : [];
+                const itemCount = ghostItemsFormatted.length || 1;
+                const layoutPattern = template.layout_pattern ? (template.layout_pattern as LayoutPattern) : getDefaultLayoutPattern(itemCount);
+
+                const templateWithPreview: TemplateType = {
                     ...template,
-                    previewCount: template.ghostItems?.length || 1,
+                    ghostItems: ghostItemsFormatted,
+                    previewCount: itemCount,
+                    layoutPattern,
+                    isCustom: true,
                 };
                 setCustomTemplates((prev) => [templateWithPreview, ...prev]); // Add to beginning of list
             } catch (error) {
@@ -54,51 +251,10 @@ export default function TemplateSelectScreen() {
         }
     }, [newTemplate]);
 
-    // Static templates with ghost items inside
-    const STATIC_TEMPLATES: TemplateType[] = [
-        {
-            id: "template-face-complete",
-            name: "Face Complete",
-            ghostItems: ["face", "faceRightSide", "faceLeftSide"],
-            previewCount: 3,
-            layoutPattern: "left-tall",
-        },
-        {
-            id: "template-face-angles",
-            name: "Face Angles",
-            ghostItems: ["face", "faceTurnRight", "faceTurnLeft"],
-            previewCount: 3,
-            layoutPattern: "grid-2x2",
-        },
-        {
-            id: "template-all-teeth-front",
-            name: "All Teeth Front",
-            ghostItems: ["allTeethFrontOpen", "allTeethFrontClosed"],
-            previewCount: 2,
-            layoutPattern: "left-right",
-        },
-        {
-            id: "template-all-teeth-sides",
-            name: "All Teeth Sides",
-            ghostItems: ["allTeethOpenRightSide", "allTeethOpenLeftSide"],
-            previewCount: 2,
-            layoutPattern: "left-right",
-        },
-        {
-            id: "template-upper-teeth",
-            name: "Upper Teeth",
-            ghostItems: ["upperTeethFront", "upperTeethRightSide", "upperTeethLeftSide"],
-            previewCount: 3,
-            layoutPattern: "left-tall",
-        },
-        {
-            id: "template-jaw-views",
-            name: "Jaw Views",
-            ghostItems: ["upperJawDownView", "lowerJawUpView"],
-            previewCount: 2,
-            layoutPattern: "left-right",
-        },
-    ];
+    // Merge practice templates with newly created custom templates
+    const allCustomTemplates = useMemo(() => {
+        return [...practiceTemplates, ...customTemplates];
+    }, [practiceTemplates, customTemplates]);
 
     const handleTemplateSelect = (templateId: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -123,14 +279,17 @@ export default function TemplateSelectScreen() {
 
     const handleContinue = () => {
         if (!selectedTemplate) return;
-        // Check both static and custom templates
-        const template = STATIC_TEMPLATES.find((t) => t.id === selectedTemplate) || customTemplates.find((t) => t.id === selectedTemplate);
+        // Check global, practice, and custom templates
+        const template = globalTemplates.find((t) => t.id === selectedTemplate) || allCustomTemplates.find((t) => t.id === selectedTemplate);
         if (!template) return;
 
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         // Close this modal and go back to camera with ghost items
         router.dismiss();
+
+        // Extract template ID from the combined ID (remove prefix)
+        const templateId = selectedTemplate.replace(/^(global|practice)-/, "");
 
         // Navigate to camera with template params
         setTimeout(() => {
@@ -141,7 +300,7 @@ export default function TemplateSelectScreen() {
                     patientName,
                     patientAvatar,
                     doctorName,
-                    templateId: selectedTemplate,
+                    templateId,
                     ghostItems: JSON.stringify(template.ghostItems),
                     layoutPattern: template.layoutPattern || "left-right",
                 },
@@ -154,7 +313,7 @@ export default function TemplateSelectScreen() {
         router.back();
     };
 
-    const renderTemplateItem = ({ item, index }: { item: (typeof STATIC_TEMPLATES)[0] | (typeof customTemplates)[0]; index: number }) => {
+    const renderTemplateItem = ({ item, index }: { item: TemplateType; index: number }) => {
         const isSelected = isTemplateSelected(item.id);
         const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
 
@@ -164,18 +323,25 @@ export default function TemplateSelectScreen() {
                     <View style={[styles.templateImageContainer, isSelected && styles.templateImageContainerSelected]}>
                         {/* Preview of ghost items inside template - using actual ghost images with layout pattern */}
                         <View style={styles.templatePreview}>
-                            {item.ghostItems.map((ghostId: string, idx: number) => {
-                                const layoutStyle = getItemLayoutStyle(idx, item.ghostItems.length, layoutPattern, TEMPLATE_SIZE);
-                                return (
-                                    <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
-                                        {GHOST_ASSETS[ghostId as keyof typeof GHOST_ASSETS] ? (
-                                            <Image source={GHOST_ASSETS[ghostId as keyof typeof GHOST_ASSETS]} style={styles.templatePreviewImage} contentFit="contain" />
-                                        ) : (
-                                            <IconSymbol name="photo" size={32} color={colors.labels.secondary} />
-                                        )}
-                                    </Animated.View>
-                                );
-                            })}
+                            {item.ghostItems.length > 0
+                                ? // Show actual ghost items if available
+                                  item.ghostItems.map((ghostItem: GhostItemInfo, idx: number) => {
+                                      const layoutStyle = getItemLayoutStyle(idx, item.ghostItems.length, layoutPattern, TEMPLATE_SIZE);
+                                      return (
+                                          <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
+                                              {ghostItem.imageUrl ? <Image source={{ uri: ghostItem.imageUrl }} style={styles.templatePreviewImage} contentFit="contain" /> : <IconSymbol name="photo" size={32} color={colors.labels.secondary} />}
+                                          </Animated.View>
+                                      );
+                                  })
+                                : // Show placeholder images for practice templates that don't have ghostItems in list response
+                                  Array.from({ length: item.previewCount }).map((_, idx: number) => {
+                                      const layoutStyle = getItemLayoutStyle(idx, item.previewCount, layoutPattern, TEMPLATE_SIZE);
+                                      return (
+                                          <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
+                                              <IconSymbol name="photo" size={32} color={colors.labels.secondary} />
+                                          </Animated.View>
+                                      );
+                                  })}
                         </View>
                     </View>
                 </TouchableOpacity>
@@ -202,8 +368,18 @@ export default function TemplateSelectScreen() {
 
             {/* Templates Grid */}
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Loading State */}
+                {(isLoadingGlobalTemplates || isLoadingPracticeTemplates) && (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={MINT_COLOR} />
+                        <BaseText type="Body" style={{ marginTop: 12 }} color="labels.secondary">
+                            Loading templates...
+                        </BaseText>
+                    </View>
+                )}
+
                 {/* Custom Templates Section */}
-                {customTemplates.length > 0 && (
+                {!isLoadingPracticeTemplates && allCustomTemplates.length > 0 && (
                     <>
                         <View style={styles.sectionHeaderFirst}>
                             <BaseText type="Headline" weight={600} color="labels.primary">
@@ -211,7 +387,7 @@ export default function TemplateSelectScreen() {
                             </BaseText>
                         </View>
                         <View style={styles.templatesGrid}>
-                            {customTemplates
+                            {allCustomTemplates
                                 .reduce((rows: TemplateType[][], item, index) => {
                                     if (index % 2 === 0) {
                                         rows.push([item]);
@@ -231,26 +407,42 @@ export default function TemplateSelectScreen() {
                 )}
 
                 {/* Ready Templates Section */}
-                <View style={styles.sectionHeader}>
-                    <BaseText type="Headline" weight={600} color="labels.primary">
-                        Ready Templates
-                    </BaseText>
-                </View>
-                <View style={styles.templatesGrid}>
-                    {STATIC_TEMPLATES.reduce((rows: TemplateType[][], item, index) => {
-                        if (index % 2 === 0) {
-                            rows.push([item]);
-                        } else {
-                            rows[rows.length - 1].push(item);
-                        }
-                        return rows;
-                    }, []).map((row, rowIndex) => (
-                        <View key={`static-row-${rowIndex}`} style={styles.templateRow}>
-                            {row.map((item, itemIndex) => renderTemplateItem({ item, index: customTemplates.length + rowIndex * 2 + itemIndex }))}
-                            {row.length === 1 && <View style={styles.templateCard} />}
+                {!isLoadingGlobalTemplates && globalTemplates.length > 0 && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <BaseText type="Headline" weight={600} color="labels.primary">
+                                Ready Templates
+                            </BaseText>
                         </View>
-                    ))}
-                </View>
+                        <View style={styles.templatesGrid}>
+                            {globalTemplates
+                                .reduce((rows: TemplateType[][], item, index) => {
+                                    if (index % 2 === 0) {
+                                        rows.push([item]);
+                                    } else {
+                                        rows[rows.length - 1].push(item);
+                                    }
+                                    return rows;
+                                }, [])
+                                .map((row, rowIndex) => (
+                                    <View key={`global-row-${rowIndex}`} style={styles.templateRow}>
+                                        {row.map((item, itemIndex) => renderTemplateItem({ item, index: allCustomTemplates.length + rowIndex * 2 + itemIndex }))}
+                                        {row.length === 1 && <View style={styles.templateCard} />}
+                                    </View>
+                                ))}
+                        </View>
+                    </>
+                )}
+
+                {/* Empty State */}
+                {!isLoadingGlobalTemplates && !isLoadingPracticeTemplates && globalTemplates.length === 0 && allCustomTemplates.length === 0 && (
+                    <View style={styles.emptyContainer}>
+                        <IconSymbol name="photo" size={48} color={colors.labels.secondary} />
+                        <BaseText type="Body" style={{ marginTop: 12 }} color="labels.secondary">
+                            No templates available
+                        </BaseText>
+                    </View>
+                )}
             </ScrollView>
 
             {/* Continue Button */}
@@ -374,5 +566,17 @@ const styles = StyleSheet.create({
     },
     continueButtonDisabled: {
         backgroundColor: colors.system.gray3,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 60,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingVertical: 60,
     },
 });

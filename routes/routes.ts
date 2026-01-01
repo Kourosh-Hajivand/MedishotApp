@@ -143,7 +143,6 @@ export const routes = {
     },
 
     templates: {
-        list: () => "templates",
         getById: (id: string | number) => `templates/${id}`,
     },
 };

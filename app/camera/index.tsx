@@ -41,20 +41,54 @@ export default function CameraScreen() {
         doctorColor?: string;
     }>();
 
-    // Parse ghost items from params
+    // Parse ghost items from params - can be array of strings (old format) or array of objects (new format with gost data)
     const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
 
-    const ghostItemIds: GhostItemId[] = React.useMemo(() => {
+    type GhostItemData = {
+        gostId: string;
+        imageUrl?: string | null; // gost_image.url - for overlay center
+        sampleImageUrl?: string | null; // image.url - for sample modal
+        iconUrl?: string | null; // icon.url - for thumbnails
+        name?: string;
+        description?: string | null;
+    };
+
+    const ghostItemsData: GhostItemData[] = React.useMemo(() => {
         if (!ghostItems) return [];
         try {
             const parsed = JSON.parse(ghostItems);
             if (!Array.isArray(parsed)) return [];
-            return parsed.filter(isGhostItemId);
+            // Handle both old format (string[]) and new format (GhostItemData[])
+            const items: GhostItemData[] = [];
+            for (const item of parsed) {
+                if (typeof item === "string") {
+                    // Old format: just gostId string
+                    items.push({ gostId: item, name: undefined, description: undefined, imageUrl: null, sampleImageUrl: null, iconUrl: null });
+                } else if (item && typeof item === "object" && item.gostId) {
+                    // New format: object with gostId, name, description, imageUrl, sampleImageUrl, iconUrl
+                    items.push({
+                        gostId: String(item.gostId),
+                        name: item.name,
+                        description: item.description || null,
+                        imageUrl: item.imageUrl || null,
+                        sampleImageUrl: item.sampleImageUrl || null,
+                        iconUrl: item.iconUrl || null,
+                    });
+                }
+            }
+            return items;
         } catch {
             return [];
         }
     }, [ghostItems]);
-    const hasGhostItems = ghostItemIds.length > 0;
+
+    // Extract just IDs for backward compatibility (only for local assets)
+    const ghostItemIds: GhostItemId[] = React.useMemo(() => {
+        return ghostItemsData.map((item) => item.gostId).filter(isGhostItemId);
+    }, [ghostItemsData]);
+
+    // Use ghostItemsData for all items (both local and API)
+    const hasGhostItems = ghostItemsData.length > 0;
 
     const [cameraState, setCameraState] = useState<CameraState>({
         flashMode: "auto",
@@ -81,19 +115,23 @@ export default function CameraScreen() {
     const flashAnim = useSharedValue(0);
     const checkmarkScale = useSharedValue(0);
 
-    // Current ghost item
-    const currentGhostItem = hasGhostItems ? ghostItemIds[currentGhostIndex] : null;
-    const currentGhostImage = currentGhostItem ? GHOST_ITEMS_MAP[currentGhostItem] : null;
-    const isLastGhost = currentGhostIndex === ghostItemIds.length - 1;
-    const allPhotosCaptures = capturedPhotos.length === ghostItemIds.length && hasGhostItems;
+    // Current ghost item - use ghostItemsData for all items
+    const currentGhostData = hasGhostItems ? ghostItemsData[currentGhostIndex] : null;
+    const currentGhostItem = currentGhostData ? (isGhostItemId(currentGhostData.gostId) ? currentGhostData.gostId : null) : null;
+    // Use imageUrl from API if available, otherwise fallback to local assets
+    const currentGhostImage = currentGhostData?.imageUrl ? { uri: currentGhostData.imageUrl } : currentGhostItem ? GHOST_ITEMS_MAP[currentGhostItem] : null;
+    const isLastGhost = currentGhostIndex === ghostItemsData.length - 1;
+    const allPhotosCaptures = capturedPhotos.length === ghostItemsData.length && hasGhostItems;
 
-    // Get template metadata
+    // Get template metadata - use data from gost object if available, fallback to metadata
     const getTemplateName = () => {
+        if (currentGhostData?.name) return currentGhostData.name;
         if (!currentGhostItem) return "Template";
         return getGhostName(currentGhostItem);
     };
 
     const getTemplateDescription = () => {
+        if (currentGhostData?.description) return currentGhostData.description;
         if (!currentGhostItem) return "Follow the guide lines to position correctly.";
         return getGhostDescription(currentGhostItem);
     };
@@ -160,18 +198,20 @@ export default function CameraScreen() {
             });
 
             if (photo) {
+                const ghostId = currentGhostData?.gostId || currentGhostItem || "no-template";
+                const ghostName = currentGhostData?.name || currentGhostItem || "Quick Photo";
                 const newPhoto: CapturedPhoto = {
                     id: `photo-${Date.now()}`,
                     uri: photo.uri,
-                    templateId: currentGhostItem || "no-template",
-                    templateName: currentGhostItem || "Quick Photo",
+                    templateId: ghostId,
+                    templateName: ghostName,
                     timestamp: Date.now(),
                     isCompleted: true,
                 };
 
                 setCapturedPhotos((prev) => {
-                    // Replace if exists for this ghost item
-                    const existing = prev.findIndex((p) => p.templateId === currentGhostItem);
+                    // Replace if exists for this ghost item (using gostId)
+                    const existing = prev.findIndex((p) => p.templateId === ghostId);
                     if (existing !== -1) {
                         const updated = [...prev];
                         updated[existing] = newPhoto;
@@ -334,7 +374,7 @@ export default function CameraScreen() {
                 {/* {hasGhostItems && (
                     <View style={styles.templateBadge}>
                         <BaseText type="Caption1" weight={600} color="system.white">
-                            {currentGhostItem} ({currentGhostIndex + 1}/{ghostItemIds.length})
+                            {currentGhostData?.name || currentGhostItem || "Template"} ({currentGhostIndex + 1}/{ghostItemsData.length})
                         </BaseText>
                     </View>
                 )} */}
@@ -374,22 +414,18 @@ export default function CameraScreen() {
                             </TouchableOpacity>
 
                             <FlatList
-                                data={ghostItemIds}
+                                data={ghostItemsData}
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
                                 contentContainerStyle={styles.thumbnailsList}
-                                keyExtractor={(item) => item}
-                                renderItem={({ item, index }) => {
-                                    const photo = capturedPhotos.find((p) => p.templateId === item);
+                                keyExtractor={(item, index) => item.gostId || String(index)}
+                                renderItem={({ item: ghostItem, index }) => {
+                                    const ghostId = ghostItem.gostId;
+                                    const photo = capturedPhotos.find((p) => p.templateId === ghostId);
                                     const isActive = index === currentGhostIndex;
                                     const isCompleted = !!photo;
-                                    const iconSource = getGhostIcon(item);
-
-                                    // Debug
-                                    if (index === 0 && !photo) {
-                                        console.log("🔍 Icon debug:", { item, iconSource, hasIcon: !!iconSource });
-                                    }
-
+                                    // Use iconUrl (icon.url) for thumbnails, fallback to local icon
+                                    const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
                                     return (
                                         <TouchableOpacity
                                             onPress={() => {
@@ -410,7 +446,7 @@ export default function CameraScreen() {
                                                     style={styles.thumbnailIcon}
                                                     contentFit="contain"
                                                     onError={(error) => {
-                                                        console.log("Icon load error for:", item, error);
+                                                        console.log("Icon load error for:", ghostId, error);
                                                     }}
                                                 />
                                             ) : (
@@ -474,9 +510,15 @@ export default function CameraScreen() {
             <Modal visible={showSampleModal} transparent animationType="fade" onRequestClose={handleCloseSample}>
                 <View style={styles.guideModalContainer}>
                     <View style={[styles.guideModalContent, { paddingBottom: insets.bottom }]}>
-                        {currentGhostItem && (
+                        {currentGhostData && (
                             <>
-                                <Image source={getGhostSample(currentGhostItem)} style={styles.guideImage} contentFit="contain" />
+                                {currentGhostData.sampleImageUrl ? (
+                                    <Image source={{ uri: currentGhostData.sampleImageUrl }} style={styles.guideImage} contentFit="contain" />
+                                ) : currentGhostData.imageUrl ? (
+                                    <Image source={{ uri: currentGhostData.imageUrl }} style={styles.guideImage} contentFit="contain" />
+                                ) : currentGhostItem ? (
+                                    <Image source={getGhostSample(currentGhostItem)} style={styles.guideImage} contentFit="contain" />
+                                ) : null}
                                 <BaseText type="Title1" weight={600} color="labels.primary" align="center" className="mt-4 text-center">
                                     {getTemplateName()}
                                 </BaseText>
@@ -601,8 +643,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     ghostFrame: {
-        width: width * 0.85,
-        height: width * 0.85,
+        width: width * 1,
+        height: width * 1,
         justifyContent: "center",
         alignItems: "center",
     },

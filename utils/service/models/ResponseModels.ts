@@ -266,9 +266,10 @@ export interface PracticeTemplate {
         | "grid-3x3-full-alt"
         | "grid-3x3-full-horizontal"
         | null;
-    is_active: boolean;
+    is_active: boolean | null;
     image?: string | null; // URL to template's main image
     cells_count?: number; // Number of cells in this template (included in list view)
+    cells?: TemplateCell[]; // Cells array with gosts (included in list response)
     created_at: string;
     updated_at: string;
     // Legacy field - kept for backward compatibility
