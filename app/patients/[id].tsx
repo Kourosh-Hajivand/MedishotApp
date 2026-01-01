@@ -51,11 +51,11 @@ export default function PatientDetailsScreen() {
     const handleCall = async (index?: number) => {
         const numbers = patient?.data?.numbers;
         if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
-        
+
         const phoneIndex = index !== undefined ? index : 0;
-        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value || numbers[phoneIndex]?.number;
+        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
         if (!phoneNumber) return Alert.alert("Error", "No phone number found");
-        
+
         const url = `tel:${phoneNumber}`;
         try {
             (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot make phone call");
@@ -67,11 +67,11 @@ export default function PatientDetailsScreen() {
     const handleMessage = async (index?: number) => {
         const numbers = patient?.data?.numbers;
         if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
-        
+
         const phoneIndex = index !== undefined ? index : 0;
-        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value || numbers[phoneIndex]?.number;
+        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
         if (!phoneNumber) return Alert.alert("Error", "No phone number found");
-        
+
         const url = `sms:${phoneNumber}`;
         try {
             (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot send message");
@@ -306,8 +306,8 @@ export default function PatientDetailsScreen() {
                                         </BaseText>
                                     </View>
                                     <View className="flex-row gap-3">
-                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleMessage} />
-                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={handleCall} />
+                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleMessage()} />
+                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleCall()} />
                                     </View>
                                 </View>
                             )}
