@@ -67,12 +67,8 @@ type TemplateType = {
 
 export default function TemplateSelectScreen() {
     const insets = useSafeAreaInsets();
-    const { patientId, patientName, patientAvatar, doctorName, doctorColor, newTemplate } = useLocalSearchParams<{
+    const { patientId, newTemplate } = useLocalSearchParams<{
         patientId: string;
-        patientName: string;
-        patientAvatar?: string;
-        doctorName: string;
-        doctorColor?: string;
         newTemplate?: string;
     }>();
 
@@ -274,7 +270,7 @@ export default function TemplateSelectScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
             pathname: "/camera/create-template" as any,
-            params: { patientId, patientName, patientAvatar, doctorName, doctorColor },
+            params: { patientId },
         });
     };
 
@@ -292,19 +288,13 @@ export default function TemplateSelectScreen() {
         // Extract template ID from the combined ID (remove prefix)
         const templateId = selectedTemplate.replace(/^(global|practice)-/, "");
 
-        // Navigate to camera with template params
+        // Navigate to camera with templateId (template will be fetched from API)
         setTimeout(() => {
             router.replace({
                 pathname: "/camera" as any,
                 params: {
                     patientId,
-                    patientName,
-                    patientAvatar,
-                    doctorName,
-                    doctorColor,
                     templateId,
-                    ghostItems: JSON.stringify(template.ghostItems),
-                    layoutPattern: template.layoutPattern || "left-right",
                 },
             });
         }, 100);

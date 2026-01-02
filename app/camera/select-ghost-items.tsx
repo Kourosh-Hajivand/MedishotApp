@@ -15,11 +15,8 @@ const MINT_COLOR = "#00c7be";
 
 export default function SelectGhostItemsScreen() {
     const insets = useSafeAreaInsets();
-    const { patientId, patientName, patientAvatar, doctorName, templateId } = useLocalSearchParams<{
+    const { patientId, templateId } = useLocalSearchParams<{
         patientId: string;
-        patientName: string;
-        patientAvatar?: string;
-        doctorName: string;
         templateId: string;
     }>();
 
@@ -43,17 +40,13 @@ export default function SelectGhostItemsScreen() {
         // Close this modal and go back to camera with ghost items
         router.dismiss();
 
-        // Navigate to camera with ghost items params
+        // Navigate to camera with templateId (template will be fetched from API)
         setTimeout(() => {
             router.replace({
                 pathname: "/camera" as any,
                 params: {
                     patientId,
-                    patientName,
-                    patientAvatar,
-                    doctorName,
                     templateId,
-                    ghostItems: JSON.stringify(selectedItems),
                 },
             });
         }, 100);

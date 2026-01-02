@@ -2,12 +2,13 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useGetPatientById } from "@/utils/hook/usePatient";
 import { CapturedPhoto } from "@/utils/types/camera.types";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,13 +19,29 @@ export default function ReviewScreen() {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
 
-    const { patientId, patientName, patientAvatar, doctorName, photos } = useLocalSearchParams<{
+    const { patientId, photos, templateId } = useLocalSearchParams<{
         patientId: string;
-        patientName: string;
-        patientAvatar?: string;
-        doctorName: string;
         photos: string;
+        templateId?: string;
     }>();
+
+    // Get patient data from API
+    const { data: patientData, isLoading: isPatientLoading } = useGetPatientById(patientId || "");
+
+    // Extract patient info
+    const patientName = useMemo(() => {
+        if (!patientData?.data) return "Patient";
+        return `${patientData.data.first_name} ${patientData.data.last_name}`;
+    }, [patientData]);
+
+    const patientAvatar = useMemo(() => {
+        return patientData?.data?.profile_image?.url || undefined;
+    }, [patientData]);
+
+    const doctorName = useMemo(() => {
+        if (!patientData?.data?.doctor) return "Dr. Name";
+        return `Dr. ${patientData.data.doctor.first_name || ""} ${patientData.data.doctor.last_name || ""}`;
+    }, [patientData]);
 
     const capturedPhotos: CapturedPhoto[] = photos ? JSON.parse(photos) : [];
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,10 +79,7 @@ export default function ReviewScreen() {
             pathname: "/camera" as any,
             params: {
                 patientId,
-                patientName,
-                patientAvatar,
-                doctorName,
-                ghostItems: JSON.stringify(allGhostItems),
+                ...(templateId && { templateId }),
             },
         });
     };
@@ -131,6 +145,15 @@ export default function ReviewScreen() {
             </View>
         );
     };
+
+    // Loading state
+    if (isPatientLoading) {
+        return (
+            <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+                <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { paddingTop: insets.top }]}>

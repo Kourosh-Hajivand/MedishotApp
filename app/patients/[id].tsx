@@ -120,10 +120,6 @@ export default function PatientDetailsScreen() {
                     pathname: "/camera" as any,
                     params: {
                         patientId: id,
-                        patientName: `${patient.data.first_name} ${patient.data.last_name}`,
-                        patientAvatar: patient.data.profile_image?.url || "",
-                        doctorName: `Dr. ${patient.data.doctor?.first_name || ""} ${patient.data.doctor?.last_name || ""}`,
-                        doctorColor: patient.data.doctor?.color || "",
                     },
                 });
                 break;

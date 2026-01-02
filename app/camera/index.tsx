@@ -4,12 +4,14 @@ import { BaseButton, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useGetPatientById } from "@/utils/hook/usePatient";
+import { useGetTemplateById } from "@/utils/hook/useTemplate";
 import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -31,18 +33,76 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
 
-    const { patientId, patientName, patientAvatar, doctorName, ghostItems, templateId, doctorColor } = useLocalSearchParams<{
+    const { patientId, templateId } = useLocalSearchParams<{
         patientId: string;
-        patientName: string;
-        patientAvatar?: string;
-        doctorName: string;
-        ghostItems?: string;
         templateId?: string;
-        doctorColor?: string;
     }>();
 
-    // Parse ghost items from params - can be array of strings (old format) or array of objects (new format with gost data)
-    const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
+    // Get patient data from API
+    const { data: patientData, isLoading: isPatientLoading } = useGetPatientById(patientId || "");
+
+    // Get template data from API
+    const { data: templateData, isLoading: isTemplateLoading } = useGetTemplateById(templateId || "", !!templateId);
+
+    // Extract patient info
+    const patientName = useMemo(() => {
+        if (!patientData?.data) return "Patient";
+        return `${patientData.data.first_name} ${patientData.data.last_name}`;
+    }, [patientData]);
+
+    const patientAvatar = useMemo(() => {
+        return patientData?.data?.profile_image?.url || undefined;
+    }, [patientData]);
+
+    const doctorName = useMemo(() => {
+        if (!patientData?.data?.doctor) return "Dr. Name";
+        return `Dr. ${patientData.data.doctor.first_name || ""} ${patientData.data.doctor.last_name || ""}`;
+    }, [patientData]);
+
+    const doctorColor = useMemo(() => {
+        return patientData?.data?.doctor?.color || undefined;
+    }, [patientData]);
+
+    // Extract ghost items from template
+    const ghostItemsData: GhostItemData[] = useMemo(() => {
+        if (!templateData?.data) return [];
+
+        const template = templateData.data as any; // Use any to access both cells and gosts
+        const items: GhostItemData[] = [];
+
+        // Prefer cells over gosts (new format)
+        if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
+            // Sort by row_index and column_index to maintain order
+            const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                if (a.row_index !== b.row_index) return a.row_index - b.row_index;
+                return a.column_index - b.column_index;
+            });
+            items.push(
+                ...sortedCells.map((cell: any) => ({
+                    gostId: String(cell.gost.id),
+                    imageUrl: cell.gost.gost_image?.url || null,
+                    sampleImageUrl: cell.gost.image?.url || null,
+                    iconUrl: cell.gost.icon?.url || null,
+                    name: cell.gost.name,
+                    description: cell.gost.description || null,
+                })),
+            );
+        } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
+            // Fallback to gosts array (backward compatibility)
+            items.push(
+                ...template.gosts.map((gost: any) => ({
+                    gostId: String(gost.id),
+                    imageUrl: gost.gost_image?.url || null,
+                    sampleImageUrl: gost.image?.url || null,
+                    iconUrl: gost.icon?.url || null,
+                    name: gost.name,
+                    description: gost.description || null,
+                })),
+            );
+        }
+
+        return items;
+    }, [templateData]);
 
     type GhostItemData = {
         gostId: string;
@@ -53,34 +113,7 @@ export default function CameraScreen() {
         description?: string | null;
     };
 
-    const ghostItemsData: GhostItemData[] = React.useMemo(() => {
-        if (!ghostItems) return [];
-        try {
-            const parsed = JSON.parse(ghostItems);
-            if (!Array.isArray(parsed)) return [];
-            // Handle both old format (string[]) and new format (GhostItemData[])
-            const items: GhostItemData[] = [];
-            for (const item of parsed) {
-                if (typeof item === "string") {
-                    // Old format: just gostId string
-                    items.push({ gostId: item, name: undefined, description: undefined, imageUrl: null, sampleImageUrl: null, iconUrl: null });
-                } else if (item && typeof item === "object" && item.gostId) {
-                    // New format: object with gostId, name, description, imageUrl, sampleImageUrl, iconUrl
-                    items.push({
-                        gostId: String(item.gostId),
-                        name: item.name,
-                        description: item.description || null,
-                        imageUrl: item.imageUrl || null,
-                        sampleImageUrl: item.sampleImageUrl || null,
-                        iconUrl: item.iconUrl || null,
-                    });
-                }
-            }
-            return items;
-        } catch {
-            return [];
-        }
-    }, [ghostItems]);
+    const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
 
     // Extract just IDs for backward compatibility (only for local assets)
     const ghostItemIds: GhostItemId[] = React.useMemo(() => {
@@ -182,7 +215,7 @@ export default function CameraScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
             pathname: "/camera/template-select" as any,
-            params: { patientId, patientName, patientAvatar, doctorName, doctorColor },
+            params: { patientId },
         });
     };
 
@@ -264,9 +297,6 @@ export default function CameraScreen() {
             pathname: "/camera/review" as any,
             params: {
                 patientId,
-                patientName,
-                patientAvatar,
-                doctorName,
                 photos: JSON.stringify(photos),
             },
         });
@@ -291,6 +321,27 @@ export default function CameraScreen() {
         transform: [{ scale: checkmarkScale.value }],
         opacity: checkmarkScale.value > 0 ? 1 : 0, // Show/hide based on scale
     }));
+
+    // Loading state - wait for patient and template data
+    if (isPatientLoading || (templateId && isTemplateLoading)) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.system.black, justifyContent: "center", alignItems: "center" }]}>
+                <ActivityIndicator size="large" color={colors.system.white} />
+            </View>
+        );
+    }
+
+    // Error state - if patient not found
+    if (!patientData?.data) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.system.black, justifyContent: "center", alignItems: "center" }]}>
+                <BaseText color="labels.primary">Patient not found</BaseText>
+                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, padding: 12, backgroundColor: colors.system.blue, borderRadius: 8 }}>
+                    <BaseText color="system.white">Go Back</BaseText>
+                </TouchableOpacity>
+            </View>
+        );
+    }
 
     // Permission handling
     if (!permission) {

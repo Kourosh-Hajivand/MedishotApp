@@ -20,11 +20,8 @@ import { LayoutPattern, TemplateItem } from "./_components/create-template/types
 
 export default function CreateTemplateScreen() {
     const insets = useSafeAreaInsets();
-    const { patientId, patientName, patientAvatar, doctorName } = useLocalSearchParams<{
+    const { patientId } = useLocalSearchParams<{
         patientId: string;
-        patientName: string;
-        patientAvatar?: string;
-        doctorName: string;
     }>();
 
     const { selectedPractice } = useProfileStore();
