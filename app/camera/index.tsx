@@ -435,83 +435,17 @@ export default function CameraScreen() {
                         withTiming(0, { duration: 300 }), // Fade out smoothly
                     );
 
-                    // Wait for animation to complete, then move to next or go to review
+                    // Wait for animation to complete, then move to next ghost (don't auto-navigate to review)
                     setTimeout(() => {
                         const currentIndex = currentGhostIndexRef.current;
                         if (currentIndex < ghostItemsData.length - 1) {
                             // Move to next ghost
                             setCurrentGhostIndex((prev) => prev + 1);
-                        } else {
-                            // All ghosts captured, wait for all temp uploads to complete, then go to review
-                            const checkAndGoToReview = (attempt: number = 0) => {
-                                if (attempt > 10) {
-                                    // After 3 seconds (10 * 300ms), go to review anyway
-                                    console.warn("⚠️ [handleTakePhoto] Timeout waiting for temp uploads, going to review anyway");
-                                    setCapturedPhotos((prevPhotos) => {
-                                        const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
-
-                                        // Merge tempFilename from ref into photos
-                                        const finalPhotosWithFilename = finalPhotos.map((p) => {
-                                            const tempFilename = tempFilenameMapRef.current.get(p.id);
-                                            if (tempFilename && !p.tempFilename) {
-                                                return { ...p, tempFilename, uploadStatus: "success" as const };
-                                            }
-                                            return p;
-                                        });
-
-                                        handleGoToReview(finalPhotosWithFilename);
-                                        return finalPhotos;
-                                    });
-                                    return;
-                                }
-
-                                setCapturedPhotos((prevPhotos) => {
-                                    const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
-
-                                    // Merge tempFilename from ref into photos (check ref first, then state)
-                                    const finalPhotosWithFilename = finalPhotos.map((p) => {
-                                        const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
-                                        if (tempFilenameFromRef && !p.tempFilename) {
-                                            return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
-                                        }
-                                        return p;
-                                    });
-
-                                    // Check if all photos have tempFilename (from ref or state)
-                                    const allHaveFilename = finalPhotosWithFilename.every((p) => p.tempFilename);
-
-                                    if (allHaveFilename) {
-                                        console.log("✅ [handleTakePhoto] All photos have tempFilename, going to review");
-                                        handleGoToReview(finalPhotosWithFilename);
-                                    } else {
-                                        const missing = finalPhotosWithFilename.filter((p) => !p.tempFilename);
-                                        console.log(
-                                            `⏳ [handleTakePhoto] Waiting for temp uploads to complete... (attempt ${attempt + 1}/10)`,
-                                            missing.map((p) => ({ id: p.id, uploadStatus: p.uploadStatus, hasInRef: tempFilenameMapRef.current.has(p.id) })),
-                                        );
-                                        // Wait a bit more and check again
-                                        setTimeout(() => checkAndGoToReview(attempt + 1), 300);
-                                    }
-
-                                    return finalPhotos;
-                                });
-                            };
-
-                            // Start checking after a short delay
-                            setTimeout(() => checkAndGoToReview(0), 500);
                         }
+                        // Don't auto-navigate to review - user must click Save button
                     }, 500);
-                } else {
-                    // No template - wait a bit for temp upload to complete, then go to review
-                    // Give temp upload time to complete (usually very fast)
-                    setTimeout(() => {
-                        setCapturedPhotos((prevPhotos) => {
-                            const updatedPhoto = prevPhotos.find((p) => p.id === newPhoto.id);
-                            handleGoToReview(updatedPhoto ? [updatedPhoto] : [newPhoto]);
-                            return prevPhotos;
-                        });
-                    }, 800); // Wait 800ms for temp upload to complete
                 }
+                // No template - don't auto-navigate, user must click Save button
             }
         } catch (error) {
             console.error("Error taking photo:", error);
@@ -653,10 +587,32 @@ export default function CameraScreen() {
                     </>
                 )}
 
-                {/* Sample/Retake Button - Absolute positioned above thumbnails */}
+                {/* Sample/Retake Button and Camera Controls - Absolute positioned above thumbnails */}
                 {hasGhostItems && (
                     <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
-                        {capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) ? <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" /> : <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />}
+                        {/* If photo is captured, only show Retake button */}
+                        {hasCurrentPhoto ? (
+                            <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" />
+                        ) : (
+                            <View style={styles.bottomControlsRow}>
+                                {/* Grid Control */}
+                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
+                                    <View style={styles.bottomControlButtonBg}>
+                                        <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* Sample Button */}
+                                <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />
+
+                                {/* Flash Control */}
+                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
+                                    <View style={styles.bottomControlButtonBg}>
+                                        <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -681,16 +637,55 @@ export default function CameraScreen() {
                     </View>
 
                     <View style={styles.headerRight}>
-                        <TouchableOpacity style={styles.headerControlButton} onPress={toggleFlash} activeOpacity={0.7}>
-                            <View style={styles.headerControlButtonBg}>
-                                <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
-                            </View>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.headerControlButton} onPress={toggleGrid} activeOpacity={0.7}>
-                            <View style={styles.headerControlButtonBg}>
-                                <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
-                            </View>
-                        </TouchableOpacity>
+                        {/* Save Button - Only enable when conditions are met */}
+                        {(() => {
+                            // Check if save button should be enabled
+                            let canSave = false;
+
+                            if (!hasGhostItems) {
+                                // No template: need at least one photo uploaded
+                                const noTemplatePhotos = capturedPhotos.filter((p) => p.templateId === "no-template");
+                                canSave =
+                                    noTemplatePhotos.length > 0 &&
+                                    noTemplatePhotos.every((p) => {
+                                        // Check state first, then ref
+                                        return p.tempFilename || tempFilenameMapRef.current.has(p.id);
+                                    });
+                            } else {
+                                // With template: need all photos captured and uploaded
+                                const allCaptured = capturedPhotos.length === ghostItemsData.length;
+                                const allUploaded = capturedPhotos.every((p) => {
+                                    // Check state first, then ref
+                                    return p.tempFilename || tempFilenameMapRef.current.has(p.id);
+                                });
+                                canSave = allCaptured && allUploaded;
+                            }
+
+                            return (
+                                <TouchableOpacity
+                                    style={[styles.saveButtonHeader, !canSave && styles.saveButtonHeaderDisabled]}
+                                    onPress={() => {
+                                        if (canSave) {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            // Merge tempFilename from ref into photos before going to review
+                                            const finalPhotos = capturedPhotos.map((p) => {
+                                                const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                                if (tempFilenameFromRef && !p.tempFilename) {
+                                                    return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                                }
+                                                return p;
+                                            });
+                                            handleGoToReview(finalPhotos);
+                                        }
+                                    }}
+                                    disabled={!canSave}
+                                >
+                                    <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
+                                        Save
+                                    </BaseText>
+                                </TouchableOpacity>
+                            );
+                        })()}
                     </View>
                 </View>
 
@@ -703,14 +698,43 @@ export default function CameraScreen() {
                     </View>
                 )} */}
 
-                {/* Template Select Button - Only show when no ghost items selected */}
+                {/* Template Select Button and Camera Controls - Only show when no ghost items selected */}
                 {!hasGhostItems && (
                     <View style={styles.templateButtonContainer}>
-                        <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
-                            <BaseText type="Body" weight={600} color="system.white">
-                                Select a template
-                            </BaseText>
-                        </TouchableOpacity>
+                        {/* If photo is captured, only show Retake button */}
+                        {hasCurrentPhoto ? (
+                            <BaseButton
+                                ButtonStyle="Gray"
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+                                }}
+                                label="Retake"
+                            />
+                        ) : (
+                            <View style={styles.bottomControlsRow}>
+                                {/* Grid Control */}
+                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
+                                    <View style={styles.bottomControlButtonBg}>
+                                        <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {/* Template Select Button */}
+                                <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
+                                    <BaseText type="Body" weight={600} color="system.white">
+                                        Select a template
+                                    </BaseText>
+                                </TouchableOpacity>
+
+                                {/* Flash Control */}
+                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
+                                    <View style={styles.bottomControlButtonBg}>
+                                        <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 )}
 
@@ -941,14 +965,47 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingHorizontal: 20,
     },
+    bottomControlsRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "transparent",
+        justifyContent: "space-between",
+        width: "100%",
+        paddingHorizontal: 20,
+    },
+    bottomControlButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        overflow: "hidden",
+    },
+    bottomControlButtonBg: {
+        width: "100%",
+        height: "100%",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.5)",
+        borderRadius: 22,
+    },
     templateButton: {
         backgroundColor: MINT_COLOR,
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 999,
-
         alignItems: "center",
         justifyContent: "center",
+    },
+    saveButtonHeader: {
+        backgroundColor: MINT_COLOR,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        minWidth: 60,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    saveButtonHeaderDisabled: {
+        backgroundColor: "rgba(255,255,255,0.2)",
     },
     ghostOverlay: {
         position: "absolute",
