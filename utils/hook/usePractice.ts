@@ -146,6 +146,10 @@ export const useAddMember = (onSuccess?: (data: ApiResponse<any>) => void, onErr
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeMembers", variables.practiceId],
             });
+            // Invalidate subscription status to update limits
+            queryClient.invalidateQueries({
+                queryKey: ["GetSubscriptionStatus", variables.practiceId],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -163,6 +167,10 @@ export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeMembers", variables.practiceId],
             });
+            // Invalidate subscription status to update limits (role change might affect doctor/staff counts)
+            queryClient.invalidateQueries({
+                queryKey: ["GetSubscriptionStatus", variables.practiceId],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -170,6 +178,8 @@ export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void
         },
     });
 };
+<｜tool▁call▁begin｜>
+read_lints
 
 export const useRemoveMember = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; memberId: string | number }> => {
     const queryClient = useQueryClient();
@@ -179,6 +189,10 @@ export const useRemoveMember = (onSuccess?: (data: ApiResponse<string>) => void,
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeMembers", variables.practiceId],
+            });
+            // Invalidate subscription status to update limits
+            queryClient.invalidateQueries({
+                queryKey: ["GetSubscriptionStatus", variables.practiceId],
             });
             onSuccess?.(data);
         },

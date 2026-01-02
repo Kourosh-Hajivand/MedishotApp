@@ -3,13 +3,13 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import themeColors from "@/theme/colors";
-import { useGetPracticeList, useGetPracticeMembers, useRemoveMember, useTransferOwnership } from "@/utils/hook";
+import { useGetPracticeList, useGetPracticeMembers, useGetSubscriptionStatus, useRemoveMember, useTransferOwnership } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { TransferOwnershipDto } from "@/utils/service/models/RequestModels";
 import { Button, ContextMenu, Host, Switch } from "@expo/ui/swift-ui";
 import { router, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect } from "react";
+import React, { useMemo, useEffect, useLayoutEffect } from "react";
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,6 +19,7 @@ export default function PracticeTeamScreen() {
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: subscriptionData } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const navigation = useNavigation();
     console.log("practiceMembers?.data====================================");
     console.log(practiceMembers?.data);
@@ -30,6 +31,15 @@ export default function PracticeTeamScreen() {
             setSelectedPractice(practiceList.data[0]);
         }
     }, [selectedPractice, practiceList?.data, setSelectedPractice]);
+
+    // Get subscription limits
+    const limits = subscriptionData?.data?.limits;
+    const doctorLimit = limits?.doctor_limit ?? null;
+    const staffLimit = limits?.staff_limit ?? null;
+    const remainingDoctorSlots = limits?.remaining_doctor_slots ?? null;
+    const remainingStaffSlots = limits?.remaining_staff_slots ?? null;
+    const currentDoctorCount = limits?.current_doctor_count ?? 0;
+    const currentStaffCount = limits?.current_staff_count ?? 0;
     const { mutate: transferOwnership } = useTransferOwnership(
         () => {},
         (error: Error) => {
@@ -42,25 +52,48 @@ export default function PracticeTeamScreen() {
             Alert.alert("Error", error?.message || "An error occurred while removing the member.");
         },
     );
+    const handleAddMember = () => {
+        // Check if user can add more members
+        // If limits exist, check remaining slots; if null, assume unlimited
+        const canAddDoctor = doctorLimit === null || (remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+        const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
+
+        // If both doctor and staff slots are full, show upgrade alert
+        if (doctorLimit !== null && staffLimit !== null && !canAddDoctor && !canAddStaff) {
+            Alert.alert(
+                "Plan Limit Reached",
+                "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.",
+                [
+                    {
+                        text: "Cancel",
+                        style: "cancel",
+                    },
+                    {
+                        text: "Upgrade Plan",
+                        onPress: () => router.push("/(profile)/subscription"),
+                    },
+                ]
+            );
+            return;
+        }
+
+        router.push({
+            pathname: "/(modals)/add-practice-member",
+            params: { practiceId: selectedPractice?.id },
+        });
+    };
+
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
                 <Host style={{ width: 105, height: 35 }}>
-                    <Button
-                        systemImage="plus"
-                        onPress={() =>
-                            router.push({
-                                pathname: "/(modals)/add-practice-member",
-                                params: { practiceId: selectedPractice?.id },
-                            })
-                        }
-                    >
+                    <Button systemImage="plus" onPress={handleAddMember}>
                         Member
                     </Button>
                 </Host>
             ),
         });
-    }, [navigation, selectedPractice?.id]);
+    }, [navigation, selectedPractice?.id, doctorLimit, staffLimit, remainingDoctorSlots, remainingStaffSlots]);
     const handleRemoveMember = (practiceId: number, memberId: string | number) => {
         Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practise.", [
             {
@@ -133,6 +166,34 @@ export default function PracticeTeamScreen() {
                     </ContextMenu.Trigger>
                 </ContextMenu>
             </Host>
+            {/* Subscription Limits Info */}
+            {(doctorLimit !== null || staffLimit !== null) && (
+                <View className="bg-system-blue/10 rounded-xl p-3 mb-2">
+                    <BaseText type="Subhead" weight="600" color="system.blue" style={{ marginBottom: 4 }}>
+                        Plan Limits
+                    </BaseText>
+                    {doctorLimit !== null && (
+                        <BaseText type="Caption1" weight="400" color="labels.secondary">
+                            Doctors: {currentDoctorCount} / {doctorLimit} {remainingDoctorSlots !== null && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
+                        </BaseText>
+                    )}
+                    {staffLimit !== null && (
+                        <BaseText type="Caption1" weight="400" color="labels.secondary" style={{ marginTop: 2 }}>
+                            Staff: {currentStaffCount} / {staffLimit} {remainingStaffSlots !== null && remainingStaffSlots > 0 && `(${remainingStaffSlots} remaining)`}
+                        </BaseText>
+                    )}
+                    {((doctorLimit !== null && remainingDoctorSlots === 0) || (staffLimit !== null && remainingStaffSlots === 0)) && (
+                        <TouchableOpacity
+                            onPress={() => router.push("/(profile)/subscription")}
+                            className="mt-2 bg-system-blue rounded-lg py-2 px-3"
+                        >
+                            <BaseText type="Subhead" weight="600" color="system.white" style={{ textAlign: "center" }}>
+                                Upgrade Plan
+                            </BaseText>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            )}
             <View className="pt-0 border-t border-system-gray5">
                 {practiceMembers?.data?.map((member, index) => (
                     <Host key={`member-${member.id}`} style={{ width: "100%", height: 68 }}>
