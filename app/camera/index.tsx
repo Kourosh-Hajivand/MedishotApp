@@ -161,6 +161,20 @@ export default function CameraScreen() {
     const isLastGhost = currentGhostIndex === ghostItemsData.length - 1;
     const allPhotosCaptures = capturedPhotos.length === ghostItemsData.length && hasGhostItems;
 
+    // Check if current ghost has a captured photo
+    // IMPORTANT: Use the EXACT same logic as when taking photo to find the photo
+    // When taking photo: templateId = currentGhostData?.gostId || currentGhostItem || "no-template"
+    const currentGhostIdForPhoto = currentGhostData?.gostId || currentGhostItem || "no-template";
+    const currentGhostPhoto = useMemo(() => {
+        // Find photo using the same templateId logic used when taking the photo
+        const photo = capturedPhotos.find((p) => {
+            // Match by templateId (which was set to ghostId when photo was taken)
+            return p.templateId === currentGhostIdForPhoto;
+        });
+        return photo || null;
+    }, [currentGhostIdForPhoto, capturedPhotos]);
+    const hasCurrentPhoto = !!currentGhostPhoto;
+
     // Get template metadata - use data from gost object if available, fallback to metadata
     const getTemplateName = () => {
         if (currentGhostData?.name) return currentGhostData.name;
@@ -219,6 +233,33 @@ export default function CameraScreen() {
         });
     };
 
+    const handleGoToReview = useCallback(
+        (photos: CapturedPhoto[]) => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            router.push({
+                pathname: "/camera/review" as any,
+                params: {
+                    patientId,
+                    photos: JSON.stringify(photos),
+                },
+            });
+        },
+        [patientId],
+    );
+
+    // Handle retake - remove photo for current ghost and allow retaking
+    const handleRetake = useCallback(() => {
+        if (!currentGhostData) return;
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        // Use the same logic as when taking photo to find and remove the photo
+        const ghostId = currentGhostData?.gostId || currentGhostItem || "no-template";
+
+        setCapturedPhotos((prev) => {
+            return prev.filter((p) => p.templateId !== ghostId);
+        });
+    }, [currentGhostData, currentGhostItem]);
+
     // Take photo
     const handleTakePhoto = useCallback(async () => {
         if (!cameraRef.current || isCapturing) return;
@@ -264,21 +305,21 @@ export default function CameraScreen() {
                         withTiming(0, { duration: 300 }), // Fade out smoothly
                     );
 
+                    // Wait for animation to complete, then move to next or go to review
                     setTimeout(() => {
-                        setCapturedPhotos((prevPhotos) => {
-                            const updatedPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
-
-                            if (currentGhostIndexRef.current < ghostItemsData.length - 1) {
-                                // Move to next ghost
-                                setCurrentGhostIndex((prev) => prev + 1);
-                            } else {
-                                // All ghosts captured, go to review
-                                handleGoToReview(updatedPhotos);
-                            }
-
-                            return prevPhotos;
-                        });
-                    }, 500); // Reduced timeout since animation is faster
+                        const currentIndex = currentGhostIndexRef.current;
+                        if (currentIndex < ghostItemsData.length - 1) {
+                            // Move to next ghost
+                            setCurrentGhostIndex((prev) => prev + 1);
+                        } else {
+                            // All ghosts captured, go to review
+                            setCapturedPhotos((prevPhotos) => {
+                                const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
+                                handleGoToReview(finalPhotos);
+                                return finalPhotos;
+                            });
+                        }
+                    }, 500);
                 } else {
                     // No template - go to review directly without checkmark
                     handleGoToReview([newPhoto]);
@@ -289,18 +330,7 @@ export default function CameraScreen() {
         } finally {
             setIsCapturing(false);
         }
-    }, [isCapturing, currentGhostItem, hasGhostItems, isLastGhost, capturedPhotos]);
-
-    const handleGoToReview = (photos: CapturedPhoto[]) => {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.push({
-            pathname: "/camera/review" as any,
-            params: {
-                patientId,
-                photos: JSON.stringify(photos),
-            },
-        });
-    };
+    }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, handleGoToReview]);
 
     const handleClose = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -375,56 +405,70 @@ export default function CameraScreen() {
         <View style={styles.container}>
             {/* Camera View */}
             <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0}>
-                {/* Grid Overlay - Only in camera viewport, not in header/bottom areas */}
-                {cameraState.isGridEnabled && (
+                {/* Show captured photo if exists, otherwise show grid and ghost overlay */}
+                {hasCurrentPhoto && currentGhostPhoto ? (
+                    /* Captured Photo Overlay - Show the taken photo instead of camera view */
                     <View
                         style={[
-                            styles.gridContainer,
+                            styles.capturedPhotoOverlay,
                             {
-                                top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+                                top: insets.top + 64,
                                 left: 0,
                                 right: 0,
-                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 16 (paddingTop) + 64 (thumbnails: 48 + 16 marginBottom) + 76 (shutter) + 16 (paddingBottom) = 172, without = 16 + 76 + 16 = 108
+                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom,
+                                backgroundColor: colors.system.black,
                             },
                         ]}
                     >
-                        <View style={[styles.gridLine, styles.gridVertical, { left: "33.33%" }]} />
-                        <View style={[styles.gridLine, styles.gridVertical, { left: "66.66%" }]} />
-                        <View style={[styles.gridLine, styles.gridHorizontal, { top: "33.33%" }]} />
-                        <View style={[styles.gridLine, styles.gridHorizontal, { top: "66.66%" }]} />
+                        <Image source={{ uri: currentGhostPhoto.uri }} style={styles.capturedPhotoImage} contentFit="contain" />
                     </View>
+                ) : (
+                    <>
+                        {/* Grid Overlay - Only in camera viewport, not in header/bottom areas */}
+                        {cameraState.isGridEnabled && (
+                            <View
+                                style={[
+                                    styles.gridContainer,
+                                    {
+                                        top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+                                        left: 0,
+                                        right: 0,
+                                        bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 16 (paddingTop) + 64 (thumbnails: 48 + 16 marginBottom) + 76 (shutter) + 16 (paddingBottom) = 172, without = 16 + 76 + 16 = 108
+                                    },
+                                ]}
+                            >
+                                <View style={[styles.gridLine, styles.gridVertical, { left: "33.33%" }]} />
+                                <View style={[styles.gridLine, styles.gridVertical, { left: "66.66%" }]} />
+                                <View style={[styles.gridLine, styles.gridHorizontal, { top: "33.33%" }]} />
+                                <View style={[styles.gridLine, styles.gridHorizontal, { top: "66.66%" }]} />
+                            </View>
+                        )}
+
+                        {/* Ghost Overlay - Only in camera viewport, not in header/bottom areas */}
+                        {currentGhostImage && (
+                            <View
+                                style={[
+                                    styles.ghostOverlay,
+                                    {
+                                        top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+                                        left: 0,
+                                        right: 0,
+                                        bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 172, without = 108
+                                    },
+                                ]}
+                            >
+                                <View style={styles.ghostFrame}>
+                                    <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
+                                </View>
+                            </View>
+                        )}
+                    </>
                 )}
 
-                {/* Ghost Overlay - Only in camera viewport, not in header/bottom areas */}
-                {currentGhostImage && (
-                    <View
-                        style={[
-                            styles.ghostOverlay,
-                            {
-                                top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
-                                left: 0,
-                                right: 0,
-                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 172, without = 108
-                            },
-                        ]}
-                    >
-                        <View style={styles.ghostFrame}>
-                            <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
-                        </View>
-                    </View>
-                )}
-
-                {/* Sample Button - Absolute positioned above thumbnails - Only show when current ghost photo not taken */}
-                {hasGhostItems && !capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) && (
-                    // <View style={{ position: "absolute", bottom: 180 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
-                    //     <Host matchContents>
-                    //         <Button variant="glass" onPress={handleShowSample}>
-                    //             Sample
-                    //         </Button>
-                    //     </Host>
-                    // </View>
+                {/* Sample/Retake Button - Absolute positioned above thumbnails */}
+                {hasGhostItems && (
                     <View style={{ position: "absolute", bottom: 180 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
-                        <BaseButton ButtonStyle="Tinted" onPress={handleShowSample} label="Sample" />
+                        {capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) ? <BaseButton ButtonStyle="Tinted" onPress={handleRetake} label="Retake" /> : <BaseButton ButtonStyle="Tinted" onPress={handleShowSample} label="Sample" />}
                     </View>
                 )}
 
@@ -735,6 +779,18 @@ const styles = StyleSheet.create({
         width: "100%",
         height: "100%",
         opacity: 0.5,
+    },
+    capturedPhotoOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    capturedPhotoImage: {
+        width: "100%",
+        height: "100%",
+        opacity: 1,
     },
     bottomControlsWrapper: {
         position: "absolute",

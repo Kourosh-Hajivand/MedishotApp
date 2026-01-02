@@ -164,7 +164,7 @@ export default function ReviewScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.patientInfo}>
-                    <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} />
+                    <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={patientData?.data?.doctor?.color || undefined} />
                     <View>
                         <BaseText type="Subhead" weight={600} color="labels.primary">
                             {patientName}
@@ -220,13 +220,6 @@ export default function ReviewScreen() {
                         </BaseText>
                     </TouchableOpacity>
                 </View>
-
-                {/* Page indicator */}
-                <View style={styles.pageIndicator}>
-                    <BaseText type="Caption1" color="labels.secondary">
-                        {currentIndex + 1} / {capturedPhotos.length}
-                    </BaseText>
-                </View>
             </View>
 
             {/* Thumbnails */}
@@ -257,12 +250,6 @@ export default function ReviewScreen() {
 
             {/* Footer */}
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <View style={styles.footerInfo}>
-                    <BaseText type="Caption1" color="labels.secondary">
-                        {selectedPhotos.size} of {capturedPhotos.length} photos selected
-                    </BaseText>
-                </View>
-
                 <TouchableOpacity style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={handleSave} activeOpacity={0.8} disabled={isSaving || selectedPhotos.size === 0}>
                     {isSaving ? (
                         <BaseText type="Body" weight={600} color="system.white">
