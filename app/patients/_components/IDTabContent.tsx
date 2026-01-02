@@ -1,10 +1,14 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { PatientDocument } from "@/utils/service/models/ResponseModels";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { PatientDocument } from "@/utils/service/models/ResponseModels";
 import React from "react";
-import { ActivityIndicator, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const { width: screenWidth } = Dimensions.get("window");
 
 interface IDTabContentProps {
     documents: PatientDocument[];
@@ -13,40 +17,34 @@ interface IDTabContentProps {
 }
 
 export const IDTabContent: React.FC<IDTabContentProps> = ({ documents, isLoading, onDocumentPress }) => {
+    const insets = useSafeAreaInsets();
+
     const renderDocumentItem = ({ item }: { item: PatientDocument }) => {
+        // Handle both string URL and Media object
+        const imageUrl = typeof item.image === "string" ? item.image : item.image?.url;
+
         return (
-            <TouchableOpacity
-                style={styles.documentItem}
-                onPress={() => onDocumentPress?.(item)}
-                activeOpacity={0.7}
-            >
-                <View style={styles.documentImageContainer}>
-                    {item.image?.url ? (
-                        <Image
-                            source={{ uri: item.image.url }}
-                            style={styles.documentImage}
-                            resizeMode="cover"
-                        />
+            <TouchableOpacity style={styles.documentCard} onPress={() => onDocumentPress?.(item)} activeOpacity={0.8}>
+                <View style={styles.cardContent}>
+                    {/* Left side - Image */}
+                    {imageUrl ? (
+                        <Image source={{ uri: imageUrl }} style={styles.cardImage} resizeMode="cover" />
                     ) : (
-                        <View style={styles.documentImagePlaceholder}>
-                            <IconSymbol name="doc.text" color={colors.labels.tertiary} size={32} />
+                        <View style={styles.cardImagePlaceholder}>
+                            <IconSymbol name="person.text.rectangle" color={colors.labels.tertiary} size={48} />
                         </View>
                     )}
                 </View>
-                <View style={styles.documentInfo}>
-                    <BaseText type="Body" weight="600" color="labels.primary" style={styles.documentType}>
+
+                {/* Footer - Type and Date */}
+                <View style={styles.cardFooter}>
+                    <BaseText type="Subhead" weight="600" color="labels.primary" style={styles.cardType}>
                         {item.type || "ID Document"}
                     </BaseText>
-                    {item.description && (
-                        <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.documentDescription} numberOfLines={2}>
-                            {item.description}
-                        </BaseText>
-                    )}
-                    <BaseText type="Caption1" weight="400" color="labels.tertiary" style={styles.documentDate}>
+                    <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.cardDate}>
                         {getRelativeTime(item.created_at)}
                     </BaseText>
                 </View>
-                <IconSymbol name="chevron.right" color={colors.labels.tertiary} size={16} />
             </TouchableOpacity>
         );
     };
@@ -67,21 +65,15 @@ export const IDTabContent: React.FC<IDTabContentProps> = ({ documents, isLoading
                     No ID Documents
                 </BaseText>
                 <BaseText type="Body" color="labels.tertiary" style={styles.emptyDescription}>
-                    This patient doesn't have any ID documents yet. Tap "Add ID" to scan and upload a document.
+                    Tap "Add ID" to scan and upload a document
                 </BaseText>
             </View>
         );
     }
 
-    return (
-        <FlatList
-            data={documents}
-            renderItem={renderDocumentItem}
-            keyExtractor={(item) => item.id.toString()}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-        />
-    );
+    const paddingBottom = insets.bottom;
+
+    return <FlatList data={documents} renderItem={renderDocumentItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={styles.listContent} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} numColumns={1} ListFooterComponent={<View style={{ height: paddingBottom }} />} />;
 };
 
 const styles = StyleSheet.create({
@@ -106,55 +98,61 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     listContent: {
-        paddingVertical: 8,
+        paddingHorizontal: spacing["4"], // 16px
+        paddingTop: spacing["4"], // 16px
+        gap: spacing["2"], // 8px gap between cards
     },
-    documentItem: {
-        backgroundColor: colors.system.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        flexDirection: "row",
-        alignItems: "center",
-    },
-    documentImageContainer: {
-        width: 60,
-        height: 60,
-        borderRadius: 8,
+    documentCard: {
         overflow: "hidden",
-        marginRight: 12,
-        backgroundColor: colors.system.gray6,
     },
-    documentImage: {
+    cardContent: {
+        flexDirection: "row",
+        padding: spacing["4"], // 16px
+        gap: spacing["0"], // 16px
+        minHeight: 250,
+        borderRadius: 20,
+    },
+
+    cardImage: {
         width: "100%",
+        backgroundColor: colors.system.gray5,
         height: "100%",
+        borderRadius: 20,
     },
-    documentImagePlaceholder: {
+    cardImagePlaceholder: {
         width: "100%",
         height: "100%",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: colors.system.gray6,
+        backgroundColor: colors.system.gray5,
     },
-    documentInfo: {
+    cardInfoContainer: {
         flex: 1,
+        justifyContent: "center",
+        gap: spacing["2"], // 8px
+        paddingLeft: spacing["2"], // 8px
     },
-    documentType: {
+    infoLine: {
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: colors.system.gray5,
+        width: "100%",
+    },
+    infoLineShort: {
+        width: "60%",
+    },
+    cardFooter: {
+        paddingHorizontal: spacing["5"], // 16px
+    },
+    cardType: {
         fontSize: 15,
         lineHeight: 20,
         letterSpacing: -0.24,
         marginBottom: 4,
     },
-    documentDescription: {
+    cardDate: {
         fontSize: 13,
         lineHeight: 18,
         letterSpacing: -0.08,
-        marginBottom: 4,
-    },
-    documentDate: {
-        fontSize: 12,
-        lineHeight: 16,
-        letterSpacing: -0.08,
     },
 });
-

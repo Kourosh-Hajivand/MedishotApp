@@ -771,14 +771,14 @@ export interface PatientDocument {
     patient_id: number;
     type: string;
     description?: string | null;
-    image: Media;
+    image: Media | string; // Can be Media object or string URL
     created_at: string;
     updated_at: string;
 }
 
 export interface PatientDocumentListResponse {
-    success: true;
-    message: string;
+    success?: true;
+    message?: string;
     data: PatientDocument[];
 }
 

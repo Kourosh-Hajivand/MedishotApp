@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { CreatePatientDocumentRequest, UpdatePatientDocumentRequest } from "./models/RequestModels";
-import { ApiResponse, PatientDocumentDetailResponse, PatientDocumentListResponse } from "./models/ResponseModels";
+import { ApiResponse, PatientDocument, PatientDocumentDetailResponse, PatientDocumentListResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -15,7 +15,19 @@ export const PatientDocumentService = {
     // Get all documents for a patient
     getPatientDocuments: async (practiseId: string | number, patientId: string | number): Promise<PatientDocumentListResponse> => {
         try {
-            const response: AxiosResponse<PatientDocumentListResponse> = await axiosInstance.get(baseUrl + getDocuments(practiseId, patientId));
+            const response: AxiosResponse<PatientDocumentListResponse | PatientDocument[]> = await axiosInstance.get(baseUrl + getDocuments(practiseId, patientId));
+            
+            // Handle both response formats: {success, message, data} or direct array
+            if (Array.isArray(response.data)) {
+                // If response is direct array, wrap it in the expected format
+                return {
+                    success: true,
+                    message: "Patient documents retrieved successfully",
+                    data: response.data,
+                };
+            }
+            
+            // If response is already in expected format
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
