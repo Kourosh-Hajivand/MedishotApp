@@ -29,9 +29,11 @@ export default function SubscriptionScreen() {
     // Calculate days remaining
     const daysRemaining = useMemo(() => {
         const endsAt = subscriptionDataObj.ends_at || currentSubscription?.ends_at;
-        if (!endsAt) return null;
+        if (!endsAt) return null; // null means unlimited
         const endDate = new Date(endsAt);
         const today = new Date();
+        today.setHours(0, 0, 0, 0); // Reset time to start of day
+        endDate.setHours(0, 0, 0, 0); // Reset time to start of day
         const diffTime = endDate.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         return diffDays > 0 ? diffDays : 0;
@@ -155,12 +157,11 @@ export default function SubscriptionScreen() {
                     >
                         {currentPlan?.name || "No Plan"}
                     </BaseText>
-                    {daysRemaining !== null && daysRemaining > 0 && (
+                    {/* {daysRemaining !== null && daysRemaining > 0 && (
                         <BaseText type="Body" weight="400" color="labels.secondary" style={styles.daysRemaining}>
                             {daysRemaining} Days Remaining
                         </BaseText>
-                    )}
-                    <View style={styles.spacer} />
+                    )} */}
                 </View>
 
                 {/* Current Plan Card */}
@@ -199,7 +200,7 @@ export default function SubscriptionScreen() {
                         })();
 
                         return (
-                            <View style={styles.planCard}>
+                            <View style={styles.planCard} className="mb-6">
                                 <View style={styles.planCardInner}>
                                     {/* Plan Header */}
                                     <View style={styles.planHeaderWrapper}>
@@ -208,20 +209,7 @@ export default function SubscriptionScreen() {
                                                 <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
                                                     {currentPlan.name}
                                                 </BaseText>
-                                                <BaseText type="Title3" weight="600" style={{ color: planColor }}>
-                                                    {formatPrice(planPrice, currentPlan.currency || "usd", planBillingInterval)}
-                                                </BaseText>
                                             </LinearGradient>
-                                            {annualPrice !== null && (
-                                                <View style={styles.annualBadge}>
-                                                    <BaseText type="Footnote" weight="400" color="labels.primary">
-                                                        Annual:
-                                                    </BaseText>
-                                                    <BaseText type="Callout" weight="400" color="labels.primary">
-                                                        {formatPrice(annualPrice, currentPlan.currency || "usd", "yearly")}
-                                                    </BaseText>
-                                                </View>
-                                            )}
                                         </View>
                                     </View>
 
@@ -240,7 +228,14 @@ export default function SubscriptionScreen() {
 
                                 {/* Footer with Status */}
                                 <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton label={`Current Plan - ${statusText}`} onPress={() => {}} disabled={true} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} />
+                                    <View style={styles.timeLeftContainer}>
+                                        <BaseText type="Body" weight="400" color="labels.secondary">
+                                            Time left:
+                                        </BaseText>
+                                        <BaseText type="Body" weight="600" color="labels.primary" style={styles.timeLeftValue}>
+                                            {daysRemaining !== null ? `${daysRemaining} ${daysRemaining === 1 ? "Day" : "Days"}` : "Unlimited"}
+                                        </BaseText>
+                                    </View>
                                 </LinearGradient>
                             </View>
                         );
@@ -462,6 +457,17 @@ const styles = StyleSheet.create({
     },
     planFooter: {
         padding: spacing["4"], // 16px
+    },
+    timeLeftContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: spacing["2"], // 8px
+    },
+    timeLeftValue: {
+        fontSize: 17,
+        lineHeight: 22,
+        letterSpacing: -0.43,
     },
     purchaseButton: {
         width: "100%",
