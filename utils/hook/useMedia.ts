@@ -143,6 +143,9 @@ export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMedi
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMedia", variables.patientId],
             });
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientMediaAlbums", variables.patientId],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {

@@ -2,6 +2,7 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useUploadPatientMedia, useUploadPatientMediaWithTemplate } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
 import { CapturedPhoto } from "@/utils/types/camera.types";
 import * as Haptics from "expo-haptics";
@@ -44,10 +45,57 @@ export default function ReviewScreen() {
     }, [patientData]);
 
     const capturedPhotos: CapturedPhoto[] = photos ? JSON.parse(photos) : [];
+
+    // Log captured photos to debug tempFilename issue
+    React.useEffect(() => {
+        console.log(
+            "📋 [review] Captured photos received:",
+            capturedPhotos.map((p) => ({
+                id: p.id,
+                tempFilename: p.tempFilename,
+                uploadStatus: p.uploadStatus,
+                templateId: p.templateId,
+            })),
+        );
+    }, [capturedPhotos]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set(capturedPhotos.map((p) => p.id)));
     const [isSaving, setIsSaving] = useState(false);
     const [isScrolling, setIsScrolling] = useState(false);
+
+    // Ref to track upload progress for photos without template
+    const uploadProgressRef = useRef({ count: 0, total: 0 });
+
+    // Hooks for saving photos
+    const { mutate: uploadMediaWithTemplate } = useUploadPatientMediaWithTemplate(
+        () => {
+            // Success - go back to patient details
+            setIsSaving(false);
+            router.replace(`/patients/${patientId}` as any);
+        },
+        (error) => {
+            console.error("Error uploading with template:", error);
+            Alert.alert("Error", "Failed to save photos. Please try again.");
+            setIsSaving(false);
+        },
+    );
+
+    const { mutate: uploadMedia } = useUploadPatientMedia(
+        () => {
+            // Increment upload count
+            uploadProgressRef.current.count++;
+            // Check if all uploads are complete
+            if (uploadProgressRef.current.count >= uploadProgressRef.current.total) {
+                setIsSaving(false);
+                router.replace(`/patients/${patientId}` as any);
+            }
+        },
+        (error) => {
+            console.error("Error uploading media:", error);
+            Alert.alert("Error", "Failed to save photos. Please try again.");
+            setIsSaving(false);
+        },
+    );
 
     const currentPhoto = capturedPhotos[currentIndex];
 
@@ -119,21 +167,140 @@ export default function ReviewScreen() {
             return;
         }
 
+        // Check if all photos have tempFilename
+        const photosWithoutFilename = photosToSave.filter((p) => !p.tempFilename);
+        if (photosWithoutFilename.length > 0) {
+            console.log(
+                "⚠️ [handleSave] Photos without tempFilename:",
+                photosWithoutFilename.map((p) => ({ id: p.id, uploadStatus: p.uploadStatus })),
+            );
+            console.log(
+                "⚠️ [handleSave] All capturedPhotos:",
+                capturedPhotos.map((p) => ({ id: p.id, tempFilename: p.tempFilename, uploadStatus: p.uploadStatus })),
+            );
+            Alert.alert("Uploading...", "Some photos are still uploading. Please wait a moment and try again.");
+            return;
+        }
+
         setIsSaving(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         try {
-            // TODO: Implement actual save logic here
-            // This would typically upload photos to your backend
+            // Check if photos were taken with template
+            const hasTemplate = templateId && photosToSave.some((p) => p.templateId !== "no-template");
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500));
+            if (hasTemplate && templateId) {
+                // Upload with template: /patients/media/{patient}/with-template
+                const templateIdNum = parseInt(templateId, 10);
+                if (isNaN(templateIdNum)) {
+                    throw new Error("Invalid template ID");
+                }
 
-            // Success - go back to patient details
-            router.dismissAll();
+                // Prepare images array - use tempFilename instead of file object
+                const images = photosToSave
+                    .filter((p) => p.templateId !== "no-template")
+                    .map((photo) => {
+                        const gostId = parseInt(photo.templateId, 10);
+                        if (isNaN(gostId)) {
+                            throw new Error(`Invalid gost ID: ${photo.templateId}`);
+                        }
+
+                        // Use tempFilename from temp-upload, fallback to error if not available
+                        if (!photo.tempFilename) {
+                            throw new Error(`Photo ${photo.id} does not have tempFilename. Please wait for upload to complete.`);
+                        }
+
+                        return {
+                            gost_id: gostId,
+                            media: photo.tempFilename, // Send only filename string, not file object
+                            notes: photo.templateName || undefined,
+                        };
+                    });
+
+                // Prepare request data
+                const requestData: any = {
+                    template_id: templateIdNum,
+                    type: "image",
+                    data: JSON.stringify({}),
+                    images: images,
+                };
+
+                // Log the data model before sending
+                console.log("📤 [handleSave] ========== UPLOAD WITH TEMPLATE ==========");
+                console.log("📤 [handleSave] Patient ID:", patientId);
+                console.log("📤 [handleSave] Template ID:", templateIdNum);
+                console.log("📤 [handleSave] Images count:", images.length);
+                console.log("📤 [handleSave] Full Request Data:", JSON.stringify(requestData, null, 2));
+                console.log(
+                    "📤 [handleSave] Images array details:",
+                    images.map((img, idx) => ({
+                        index: idx + 1,
+                        gost_id: img.gost_id,
+                        notes: img.notes,
+                        media: img.media, // This is now a string (filename)
+                    })),
+                );
+                console.log("📤 [handleSave] ===========================================");
+
+                // Call API
+                uploadMediaWithTemplate({
+                    patientId,
+                    data: requestData,
+                });
+            } else {
+                // Upload without template: /patients/media/{patient}/albums
+                // Upload each photo individually
+                const photosWithoutTemplate = photosToSave.filter((p) => p.templateId === "no-template");
+
+                if (photosWithoutTemplate.length === 0) {
+                    Alert.alert("Error", "No photos to upload.");
+                    setIsSaving(false);
+                    return;
+                }
+
+                // Reset upload progress
+                uploadProgressRef.current.count = 0;
+                uploadProgressRef.current.total = photosWithoutTemplate.length;
+
+                console.log("📤 [handleSave] ========== UPLOAD WITHOUT TEMPLATE ==========");
+                console.log("📤 [handleSave] Patient ID:", patientId);
+                console.log("📤 [handleSave] Total photos to upload:", photosWithoutTemplate.length);
+
+                photosWithoutTemplate.forEach((photo, index) => {
+                    // Use tempFilename from temp-upload, fallback to error if not available
+                    if (!photo.tempFilename) {
+                        console.error(`📤 [handleSave] Photo ${index + 1} does not have tempFilename. Please wait for upload to complete.`);
+                        Alert.alert("Error", `Photo ${index + 1} is still uploading. Please wait.`);
+                        setIsSaving(false);
+                        return;
+                    }
+
+                    const requestData = {
+                        media: photo.tempFilename, // Send only filename string, not file object
+                        type: "image",
+                        data: {},
+                    };
+
+                    // Log the data model before sending
+                    console.log(`📤 [handleSave] Photo ${index + 1}/${photosWithoutTemplate.length}:`);
+                    console.log("📤 [handleSave]   - Photo URI:", photo.uri);
+                    console.log("📤 [handleSave]   - Photo ID:", photo.id);
+                    console.log("📤 [handleSave]   - Photo Timestamp:", photo.timestamp);
+                    console.log("📤 [handleSave]   - Temp Filename:", photo.tempFilename);
+                    console.log("📤 [handleSave]   - Request Data:", JSON.stringify(requestData, null, 2));
+
+                    // Call API
+                    uploadMedia({
+                        patientId,
+                        data: requestData,
+                    });
+                });
+
+                console.log("📤 [handleSave] ===========================================");
+            }
         } catch (error) {
+            console.error("Error saving photos:", error);
             Alert.alert("Error", "Failed to save photos. Please try again.");
-        } finally {
             setIsSaving(false);
         }
     };

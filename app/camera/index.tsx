@@ -4,6 +4,7 @@ import { BaseButton, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useTempUpload } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
 import { useGetTemplateById } from "@/utils/hook/useTemplate";
 import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
@@ -154,6 +155,60 @@ export default function CameraScreen() {
     const [showGuideModal, setShowGuideModal] = useState(false);
     const [showSampleModal, setShowSampleModal] = useState(false);
 
+    // Ref to track which photo is being uploaded (photoId -> upload promise)
+    const uploadingPhotoIdRef = useRef<string | null>(null);
+    // Ref to track tempFilename synchronously (photoId -> tempFilename)
+    const tempFilenameMapRef = useRef<Map<string, string>>(new Map());
+
+    // Hook for immediate temp upload (for all photos)
+    const { mutate: uploadToTemp } = useTempUpload(
+        (response) => {
+            // Response structure: {success: true, data: {filename: '...'}}
+            const responseAny = response as any;
+            const tempFilename = responseAny?.data?.filename || responseAny?.filename || responseAny?.id?.toString();
+
+            console.log("📥 [tempUpload] Response received:", response);
+            console.log("📥 [tempUpload] Extracted filename:", tempFilename);
+
+            if (tempFilename && uploadingPhotoIdRef.current) {
+                const photoId = uploadingPhotoIdRef.current;
+
+                // Update ref immediately (synchronous)
+                tempFilenameMapRef.current.set(photoId, tempFilename);
+                console.log(`✅ [tempUpload] Updated photo ${photoId} with filename: ${tempFilename} (ref updated)`);
+
+                // Update state (async)
+                setCapturedPhotos((prev) => {
+                    return prev.map((p) => {
+                        if (p.id === photoId && !p.tempFilename) {
+                            return { ...p, tempFilename, uploadStatus: "success" as const };
+                        }
+                        return p;
+                    });
+                });
+                uploadingPhotoIdRef.current = null; // Reset
+            } else {
+                console.warn("⚠️ [tempUpload] No tempFilename or photoId found", { tempFilename, photoId: uploadingPhotoIdRef.current });
+            }
+        },
+        (error) => {
+            console.error("❌ [tempUpload] Error uploading photo to temp:", error);
+            // Update upload status to error
+            if (uploadingPhotoIdRef.current) {
+                const photoId = uploadingPhotoIdRef.current;
+                setCapturedPhotos((prev) => {
+                    return prev.map((p) => {
+                        if (p.id === photoId && p.uploadStatus === "uploading") {
+                            return { ...p, uploadStatus: "error" as const };
+                        }
+                        return p;
+                    });
+                });
+                uploadingPhotoIdRef.current = null; // Reset
+            }
+        },
+    );
+
     // Keep ref in sync with state
     useEffect(() => {
         currentGhostIndexRef.current = currentGhostIndex;
@@ -270,6 +325,17 @@ export default function CameraScreen() {
 
     const handleGoToReview = useCallback(
         (photos: CapturedPhoto[]) => {
+            // Log photos before sending to review
+            console.log(
+                "📤 [handleGoToReview] Sending photos to review:",
+                photos.map((p) => ({
+                    id: p.id,
+                    tempFilename: p.tempFilename,
+                    uploadStatus: p.uploadStatus,
+                    templateId: p.templateId,
+                })),
+            );
+
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.push({
                 pathname: "/camera/review" as any,
@@ -314,13 +380,15 @@ export default function CameraScreen() {
             if (photo) {
                 const ghostId = currentGhostData?.gostId || currentGhostItem || "no-template";
                 const ghostName = currentGhostData?.name || currentGhostItem || "Quick Photo";
+                const photoTimestamp = Date.now();
                 const newPhoto: CapturedPhoto = {
-                    id: `photo-${Date.now()}`,
+                    id: `photo-${photoTimestamp}`,
                     uri: photo.uri,
                     templateId: ghostId,
                     templateName: ghostName,
-                    timestamp: Date.now(),
+                    timestamp: photoTimestamp,
                     isCompleted: true,
+                    uploadStatus: "pending",
                 };
 
                 setCapturedPhotos((prev) => {
@@ -333,6 +401,32 @@ export default function CameraScreen() {
                     }
                     return [...prev, newPhoto];
                 });
+
+                // Immediately upload ALL photos to temp-upload service
+                try {
+                    const filename = photo.uri.split("/").pop() || "image.jpg";
+                    const match = /\.(\w+)$/.exec(filename);
+                    const type = match ? `image/${match[1]}` : "image/jpeg";
+
+                    const file = {
+                        uri: photo.uri,
+                        type: type,
+                        name: filename,
+                    } as any;
+
+                    // Update status to uploading and set ref to track this photo
+                    uploadingPhotoIdRef.current = newPhoto.id;
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "uploading" } : p)));
+
+                    console.log(`📤 [tempUpload] Uploading photo ${newPhoto.id} to temp-upload...`);
+
+                    // Upload immediately to temp-upload
+                    uploadToTemp(file);
+                } catch (error) {
+                    console.error("Error preparing photo for temp upload:", error);
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "error" } : p)));
+                    uploadingPhotoIdRef.current = null; // Reset on error
+                }
 
                 if (hasGhostItems) {
                     // Show checkmark animation only when using templates - smoother, less bounce
@@ -348,17 +442,75 @@ export default function CameraScreen() {
                             // Move to next ghost
                             setCurrentGhostIndex((prev) => prev + 1);
                         } else {
-                            // All ghosts captured, go to review
-                            setCapturedPhotos((prevPhotos) => {
-                                const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
-                                handleGoToReview(finalPhotos);
-                                return finalPhotos;
-                            });
+                            // All ghosts captured, wait for all temp uploads to complete, then go to review
+                            const checkAndGoToReview = (attempt: number = 0) => {
+                                if (attempt > 10) {
+                                    // After 3 seconds (10 * 300ms), go to review anyway
+                                    console.warn("⚠️ [handleTakePhoto] Timeout waiting for temp uploads, going to review anyway");
+                                    setCapturedPhotos((prevPhotos) => {
+                                        const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
+
+                                        // Merge tempFilename from ref into photos
+                                        const finalPhotosWithFilename = finalPhotos.map((p) => {
+                                            const tempFilename = tempFilenameMapRef.current.get(p.id);
+                                            if (tempFilename && !p.tempFilename) {
+                                                return { ...p, tempFilename, uploadStatus: "success" as const };
+                                            }
+                                            return p;
+                                        });
+
+                                        handleGoToReview(finalPhotosWithFilename);
+                                        return finalPhotos;
+                                    });
+                                    return;
+                                }
+
+                                setCapturedPhotos((prevPhotos) => {
+                                    const finalPhotos = prevPhotos.find((p) => p.templateId === ghostId) ? prevPhotos.map((p) => (p.templateId === ghostId ? newPhoto : p)) : [...prevPhotos, newPhoto];
+
+                                    // Merge tempFilename from ref into photos (check ref first, then state)
+                                    const finalPhotosWithFilename = finalPhotos.map((p) => {
+                                        const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                        if (tempFilenameFromRef && !p.tempFilename) {
+                                            return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                        }
+                                        return p;
+                                    });
+
+                                    // Check if all photos have tempFilename (from ref or state)
+                                    const allHaveFilename = finalPhotosWithFilename.every((p) => p.tempFilename);
+
+                                    if (allHaveFilename) {
+                                        console.log("✅ [handleTakePhoto] All photos have tempFilename, going to review");
+                                        handleGoToReview(finalPhotosWithFilename);
+                                    } else {
+                                        const missing = finalPhotosWithFilename.filter((p) => !p.tempFilename);
+                                        console.log(
+                                            `⏳ [handleTakePhoto] Waiting for temp uploads to complete... (attempt ${attempt + 1}/10)`,
+                                            missing.map((p) => ({ id: p.id, uploadStatus: p.uploadStatus, hasInRef: tempFilenameMapRef.current.has(p.id) })),
+                                        );
+                                        // Wait a bit more and check again
+                                        setTimeout(() => checkAndGoToReview(attempt + 1), 300);
+                                    }
+
+                                    return finalPhotos;
+                                });
+                            };
+
+                            // Start checking after a short delay
+                            setTimeout(() => checkAndGoToReview(0), 500);
                         }
                     }, 500);
                 } else {
-                    // No template - go to review directly without checkmark
-                    handleGoToReview([newPhoto]);
+                    // No template - wait a bit for temp upload to complete, then go to review
+                    // Give temp upload time to complete (usually very fast)
+                    setTimeout(() => {
+                        setCapturedPhotos((prevPhotos) => {
+                            const updatedPhoto = prevPhotos.find((p) => p.id === newPhoto.id);
+                            handleGoToReview(updatedPhoto ? [updatedPhoto] : [newPhoto]);
+                            return prevPhotos;
+                        });
+                    }, 800); // Wait 800ms for temp upload to complete
                 }
             }
         } catch (error) {

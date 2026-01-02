@@ -16,6 +16,9 @@ export interface CapturedPhoto {
     templateName: string;
     timestamp: number;
     isCompleted: boolean;
+    mediaId?: number | string; // ID from backend after upload
+    uploadStatus?: "pending" | "uploading" | "success" | "error"; // Upload status
+    tempFilename?: string; // Filename from temp-upload service
 }
 
 export interface PatientInfo {
