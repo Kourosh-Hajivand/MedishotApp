@@ -45,6 +45,7 @@ export const useGetPracticeById = (practiceId: number, enabled: boolean = true):
 
             if (hasChanged) {
                 // Update store directly without triggering another API call
+                // اما doctor را reset نکن چون practice عوض نشده (همان practice است)
                 useProfileStore.setState({ selectedPractice: fetchedPractice });
                 // Persist the updated selection
                 persistProfileSelection();

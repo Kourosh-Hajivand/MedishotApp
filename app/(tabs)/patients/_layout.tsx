@@ -6,7 +6,7 @@ import { loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileSt
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
-import { router, Stack } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import React, { useEffect, useMemo } from "react";
 import { Animated, TouchableOpacity, View } from "react-native";
 
@@ -15,9 +15,23 @@ const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 export const blurValue = new Animated.Value(0);
 
 export default function PatientsLayout() {
-    const { logout: handleLogout, isAuthenticated } = useAuth();
-    const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
+    const { logout: handleLogout, isAuthenticated, profile } = useAuth();
+    const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
+    const segments = useSegments();
+    
+    // اگر کاربر لاگین کرده اما practice list خالی است، به select-role redirect کن
+    // اما فقط اگر در فلوی ثبت‌نام نیست (یعنی در tabs است)
+    useEffect(() => {
+        // چک کن که آیا در فلوی ثبت‌نام هستیم یا نه
+        const isInAuthFlow = segments.some((segment) => segment === "(auth)");
+        
+        if (isAuthenticated === true && profile && !isPracticeListLoading && !isInAuthFlow) {
+            if (!practiceList?.data || practiceList.data.length === 0) {
+                router.replace("/(auth)/select-role");
+            }
+        }
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, segments]);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
 
     console.log("====================================");

@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { QueryKeys } from "../../models/enums";
 import { getTokens, removeTokens } from "../helper/tokenStorage";
 import { useGetMe } from "./useAuthService";
+import { useProfileStore } from "./useProfileStore";
 
 export const useAuth = () => {
     const queryClient = useQueryClient();
@@ -40,11 +41,20 @@ export const useAuth = () => {
         }
     }, [hasToken, meError, isMeLoading, queryClient]);
 
-    const logout = () => {
+    const logout = async () => {
+        // Reset profile store (practice, doctor, viewMode)
+        await useProfileStore.getState().resetSelection();
+        
+        // Remove tokens
         removeTokens();
+        
+        // Invalidate all queries
         queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
         queryClient.invalidateQueries({ queryKey: ["GetMe"] });
+        queryClient.clear(); // Clear all cached queries
+        
+        // Navigate to welcome
         router.replace("/welcome");
     };
 

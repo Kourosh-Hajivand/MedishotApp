@@ -102,8 +102,6 @@ const DescriptionItem: React.FC<SpecialtyItemProps> = ({ item, index, scrollX })
 
 export const SelectRoleScreen: React.FC = () => {
     const router = useRouter();
-    const params = useLocalSearchParams<{ token?: string }>();
-    const token = params.token as string;
     const [currentIndex, setCurrentIndex] = useState(0);
     const navigation = useNavigation();
     /**
@@ -140,8 +138,9 @@ export const SelectRoleScreen: React.FC = () => {
      * Navigate forward
      */
     const handleContinue = useCallback(() => {
-        router.push({ pathname: "/(auth)/create-practice", params: { token, practiceType: JSON.stringify(SPECIALTIES[currentIndex]) } });
-    }, [currentIndex, router, token]);
+        // Token دیگر لازم نیست چون از store خوانده می‌شود
+        router.push({ pathname: "/(auth)/create-practice", params: { practiceType: JSON.stringify(SPECIALTIES[currentIndex]) } });
+    }, [currentIndex, router]);
 
     useLayoutEffect(() => {
         navigation.setOptions({

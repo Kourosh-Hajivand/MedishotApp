@@ -62,6 +62,7 @@ async function initializeDefaultSelection(practiceList?: Practice[]) {
     useProfileStore.setState({
         selectedPractice: defaultPractice,
         viewMode: defaultViewMode,
+        selectedDoctor: null, // Reset doctor to "all" when initializing
         isLoaded: true,
         isLoading: false,
     });
@@ -87,13 +88,16 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     isLoading: false,
 
     setSelectedPractice: async (practice) => {
-        // Reset selectedDoctor to "all" if user role is owner or admin
-        const shouldResetDoctor = practice.role === "owner" || practice.role === "admin";
+        // همیشه وقتی practice عوض می‌شود، doctor را reset کن (null = all)
+        // چون هر practice دکترهای خودش را دارد و نباید تداخل داشته باشند
+        const previousPracticeId = get().selectedPractice?.id;
+        const isPracticeChanged = previousPracticeId !== practice.id;
 
         // Set practice immediately for UI responsiveness
         set({
             selectedPractice: practice,
-            selectedDoctor: shouldResetDoctor ? null : get().selectedDoctor,
+            // اگر practice عوض شده، doctor را reset کن
+            selectedDoctor: isPracticeChanged ? null : get().selectedDoctor,
         });
 
         await persistProfileSelection();
@@ -105,6 +109,8 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
             if (fullPracticeData?.data) {
                 set({
                     selectedPractice: fullPracticeData.data,
+                    // مطمئن شو که doctor reset شده است
+                    selectedDoctor: isPracticeChanged ? null : get().selectedDoctor,
                 });
                 await persistProfileSelection();
             }
@@ -159,10 +165,13 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
     }
 
     // اگر قبلاً لود شده و selectedPractice وجود دارد، بررسی کن که آیا هنوز معتبر است
+    // اما اگر practice در store وجود دارد و معتبر است، آن را نگه دار (کاربر قبلاً انتخاب کرده)
     if (currentState.isLoaded && currentState.selectedPractice) {
         const isValidPractice = practiceList.some((p) => p.id === currentState.selectedPractice?.id);
         if (isValidPractice) {
-            console.log("Already loaded with valid practice, skipping...");
+            console.log("Already loaded with valid practice, keeping it...");
+            // Practice معتبر است، آن را نگه دار
+            // Doctor را reset نکن چون practice عوض نشده است
             return;
         } else {
             console.log("Stored practice is no longer valid, reloading...");
@@ -204,18 +213,23 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                         viewMode = determineDefaultViewMode(selectedPractice);
                         needsPersistence = true;
                     }
+                    // اگر پرکتیس معتبر است و در store وجود دارد، آن را نگه دار (کاربر قبلاً انتخاب کرده)
+                    // دیگر اولین آیتم را ست نکن
+                } else {
+                    // فقط اگر هیچ پرکتیسی در store نبود (کاربر تازه وارد شده)، اولین پرکتیس را انتخاب کن
+                    if (practiceList && practiceList.length > 0) {
+                        console.log("No stored practice found, selecting first practice");
+                        selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
+                        viewMode = determineDefaultViewMode(selectedPractice);
+                        needsPersistence = true;
+                    }
                 }
 
-                // اگر هیچ پرکتیسی انتخاب نشده بود، اولین پرکتیس را انتخاب کن
-                if (!selectedPractice && practiceList && practiceList.length > 0) {
-                    selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
-                    viewMode = determineDefaultViewMode(selectedPractice);
-                    needsPersistence = true;
-                }
-
+                // Reset selectedDoctor to "all" (null) when loading practice
                 useProfileStore.setState({
                     selectedPractice,
                     viewMode,
+                    selectedDoctor: null, // Reset doctor to "all"
                     isLoaded: true,
                     isLoading: false,
                 });
@@ -231,6 +245,7 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 }
             }
         } else {
+            // اگر هیچ داده‌ای در store نبود، اولین پرکتیس را انتخاب کن
             await initializeDefaultSelection(practiceList);
         }
     } catch (error) {
@@ -242,6 +257,7 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
             useProfileStore.setState({
                 selectedPractice: defaultPractice,
                 viewMode: defaultViewMode,
+                selectedDoctor: null, // Reset doctor to "all"
                 isLoaded: true,
                 isLoading: false,
             });

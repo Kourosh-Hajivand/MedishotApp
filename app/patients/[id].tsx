@@ -14,7 +14,7 @@ import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpaci
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
-import { ConsentTabContent } from "./ConsentTabContent";
+import { ConsentTabContent } from "./_components/ConsentTabContent";
 import { blurValue } from "./_layout";
 
 type RowKind = "header" | "tabs" | "content";

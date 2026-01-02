@@ -12,8 +12,8 @@ import React, { useMemo, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LayoutPattern } from "./create-template/types";
-import { getItemLayoutStyle } from "./create-template/utils";
+import { LayoutPattern } from "./_components/create-template/types";
+import { getItemLayoutStyle } from "./_components/create-template/utils";
 
 const { width } = Dimensions.get("window");
 const TEMPLATE_SIZE = (width - 60) / 2;

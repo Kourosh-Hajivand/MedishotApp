@@ -15,7 +15,7 @@ import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
 import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "../../utils/helper/HelperFunction";
-import { storeTokens } from "../../utils/helper/tokenStorage";
+import { getTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
 import { useTempUpload } from "../../utils/hook/useMedia";
@@ -42,7 +42,6 @@ export const CreatePracticeScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
     const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
-    const token = params.token as string;
     const practiceType = params.practiceType ? JSON.parse(params.practiceType as string) : undefined;
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -128,14 +127,22 @@ export const CreatePracticeScreen: React.FC = () => {
         mutate: createPractice,
         isPending,
         error,
-    } = useCreatePractice((data) => {
-        // Switch to the newly created practice
+    } = useCreatePractice(async (data) => {
+        // Switch to the newly created practice - این practice جدید است که تازه ساخته شده
         if (data?.data) {
-            setSelectedPractice(data.data);
+            // Set the newly created practice as selected immediately
+            await setSelectedPractice(data.data);
         }
+        
+        // Invalidate and refetch practice list to refresh it
+        queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+        queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+        
+        // Wait for practice list to refetch
+        await queryClient.refetchQueries({ queryKey: ["GetPracticeList"] });
+        
+        // Navigate to patients tab
         router.replace("/(tabs)/patients");
-        storeTokens(token);
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
     });
 
     const onSubmit = (data: FormData) => {

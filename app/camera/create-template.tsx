@@ -12,11 +12,11 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR } from "./create-template/constants";
-import { LayoutPatternSelector } from "./create-template/LayoutPatternSelector";
-import { PreviewCanvas } from "./create-template/PreviewCanvas";
-import { TemplateItemList } from "./create-template/TemplateItemList";
-import { LayoutPattern, TemplateItem } from "./create-template/types";
+import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR } from "./_components/create-template/constants";
+import { LayoutPatternSelector } from "./_components/create-template/LayoutPatternSelector";
+import { PreviewCanvas } from "./_components/create-template/PreviewCanvas";
+import { TemplateItemList } from "./_components/create-template/TemplateItemList";
+import { LayoutPattern, TemplateItem } from "./_components/create-template/types";
 
 export default function CreateTemplateScreen() {
     const insets = useSafeAreaInsets();

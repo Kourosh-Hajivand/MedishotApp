@@ -15,20 +15,21 @@ export default function AuthLayout() {
                     headerTitle: "",
                     headerShadowVisible: true,
                     headerTransparent: true,
-
+                    gestureEnabled: false, // غیرفعال کردن gesture برای کل فلوی ثبت‌نام
+                    fullScreenGestureEnabled: false,
                     headerStyle: {
                         backgroundColor: "transparent",
                     },
                 }}
             >
                 <Stack.Screen name="login" />
-                <Stack.Screen name="signup" />
-                <Stack.Screen name="select-role" />
-                <Stack.Screen name="create-practice" />
+                <Stack.Screen name="signup" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+                <Stack.Screen name="select-role" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
+                <Stack.Screen name="create-practice" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
                 <Stack.Screen name="reset-password" />
-                <Stack.Screen name="otp" />
+                <Stack.Screen name="otp" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
                 <Stack.Screen name="new-password" />
-                <Stack.Screen name="complete-profile" />
+                <Stack.Screen name="complete-profile" options={{ gestureEnabled: false, fullScreenGestureEnabled: false }} />
             </Stack>
         </BottomSheetModalProvider>
     );
