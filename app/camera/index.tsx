@@ -161,11 +161,18 @@ export default function CameraScreen() {
 
     // Navigate to specific ghost item when retaking a photo
     // Note: The photo is already removed in review.tsx before navigation, so we just need to navigate
+    // Also handle case when retaking a photo without template (no-template)
     useEffect(() => {
-        if (retakeTemplateId && ghostItemsData.length > 0) {
-            const retakeIndex = ghostItemsData.findIndex((item) => item.gostId === retakeTemplateId);
-            if (retakeIndex !== -1) {
-                setCurrentGhostIndex(retakeIndex);
+        if (retakeTemplateId) {
+            // If retaking a photo without template, remove it from capturedPhotos
+            if (retakeTemplateId === "no-template") {
+                setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+            } else if (ghostItemsData.length > 0) {
+                // If retaking a photo with template, navigate to that ghost item
+                const retakeIndex = ghostItemsData.findIndex((item) => item.gostId === retakeTemplateId);
+                if (retakeIndex !== -1) {
+                    setCurrentGhostIndex(retakeIndex);
+                }
             }
         }
     }, [retakeTemplateId, ghostItemsData]);
@@ -496,8 +503,8 @@ export default function CameraScreen() {
 
                 {/* Sample/Retake Button - Absolute positioned above thumbnails */}
                 {hasGhostItems && (
-                    <View style={{ position: "absolute", bottom: 180 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
-                        {capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) ? <BaseButton ButtonStyle="Tinted" onPress={handleRetake} label="Retake" /> : <BaseButton ButtonStyle="Tinted" onPress={handleShowSample} label="Sample" />}
+                    <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
+                        {capturedPhotos.find((p) => p.templateId === (currentGhostData?.gostId || currentGhostItem)) ? <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" /> : <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />}
                     </View>
                 )}
 

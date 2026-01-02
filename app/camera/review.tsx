@@ -86,9 +86,16 @@ export default function ReviewScreen() {
         // The camera will navigate to the specific ghost item that needs to be retaken
         const retakeTemplateId = currentPhoto?.templateId;
 
+        // Check if this is a photo without template (no-template)
+        const isNoTemplate = retakeTemplateId === "no-template" || !templateId;
+
         // Get templateId from params or try to extract from photos
         // If we have multiple photos, they should all have the same templateId (from the same template)
-        const templateIdToUse = templateId || (capturedPhotos.length > 0 ? capturedPhotos[0].templateId : undefined);
+        // But if it's "no-template", don't pass templateId
+        let templateIdToUse: string | undefined = undefined;
+        if (!isNoTemplate) {
+            templateIdToUse = templateId || (capturedPhotos.length > 0 && capturedPhotos[0].templateId !== "no-template" ? capturedPhotos[0].templateId : undefined);
+        }
 
         // Pass all captured photos except the one being retaken
         const photosToKeep = capturedPhotos.filter((p) => p.templateId !== retakeTemplateId);
@@ -97,9 +104,9 @@ export default function ReviewScreen() {
             pathname: "/camera" as any,
             params: {
                 patientId,
-                templateId: templateIdToUse,
-                retakeTemplateId: retakeTemplateId || undefined,
-                capturedPhotos: JSON.stringify(photosToKeep), // Pass remaining photos
+                ...(templateIdToUse && { templateId: templateIdToUse }),
+                ...(retakeTemplateId && retakeTemplateId !== "no-template" && { retakeTemplateId }),
+                ...(photosToKeep.length > 0 && { capturedPhotos: JSON.stringify(photosToKeep) }), // Pass remaining photos if any
             },
         });
     };
