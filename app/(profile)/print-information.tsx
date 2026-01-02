@@ -60,7 +60,7 @@ export default function PrintInformationScreen() {
 
     // Local state for settings
     const [settings, setSettings] = useState<PracticeSettings>(printSettings);
-    const [isPreviewExpanded, setIsPreviewExpanded] = useState(true);
+    const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
     const rotationAnim = React.useRef(new Animated.Value(isPreviewExpanded ? 1 : 0)).current;
     const expandAnim = React.useRef(new Animated.Value(isPreviewExpanded ? 1 : 0)).current;
 

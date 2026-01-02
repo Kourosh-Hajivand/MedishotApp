@@ -6,8 +6,8 @@ import colors from "@/theme/colors";
 import { useGetPlans, useGetSubscriptionStatus } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, View } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SubscriptionScreen() {
@@ -136,6 +136,42 @@ export default function SubscriptionScreen() {
     const currentPlanBillingInterval = currentPlan?.billing_interval || "monthly";
     const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
 
+    // Collapse/Expand state for current plan card
+    const [isCurrentPlanExpanded, setIsCurrentPlanExpanded] = useState(false);
+    const rotationAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
+    const expandAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
+
+    // Animate chevron rotation and card expand/collapse
+    React.useEffect(() => {
+        Animated.parallel([
+            Animated.timing(expandAnim, {
+                toValue: isCurrentPlanExpanded ? 1 : 0,
+                duration: 300,
+                useNativeDriver: false,
+            }),
+            Animated.timing(rotationAnim, {
+                toValue: isCurrentPlanExpanded ? 1 : 0,
+                duration: 300,
+                useNativeDriver: false,
+            }),
+        ]).start();
+    }, [isCurrentPlanExpanded, rotationAnim, expandAnim]);
+
+    const rotateInterpolate = rotationAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0deg", "180deg"],
+    });
+
+    const heightInterpolate = expandAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 500], // Approximate height of the card
+    });
+
+    const opacityInterpolate = expandAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
+
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + 40 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             {/* Current Subscription Section */}
@@ -157,11 +193,11 @@ export default function SubscriptionScreen() {
                     >
                         {currentPlan?.name || "No Plan"}
                     </BaseText>
-                    {/* {daysRemaining !== null && daysRemaining > 0 && (
+                    {daysRemaining !== null && daysRemaining > 0 && (
                         <BaseText type="Body" weight="400" color="labels.secondary" style={styles.daysRemaining}>
                             {daysRemaining} Days Remaining
                         </BaseText>
-                    )} */}
+                    )}
                 </View>
 
                 {/* Current Plan Card */}
@@ -200,7 +236,16 @@ export default function SubscriptionScreen() {
                         })();
 
                         return (
-                            <View style={styles.planCard} className="mb-6">
+                            <Animated.View
+                                style={[
+                                    styles.planCard,
+                                    {
+                                        maxHeight: heightInterpolate,
+                                        opacity: opacityInterpolate,
+                                        overflow: "hidden",
+                                    },
+                                ]}
+                            >
                                 <View style={styles.planCardInner}>
                                     {/* Plan Header */}
                                     <View style={styles.planHeaderWrapper}>
@@ -237,15 +282,29 @@ export default function SubscriptionScreen() {
                                         </BaseText>
                                     </View>
                                 </LinearGradient>
-                            </View>
+                            </Animated.View>
                         );
                     })()}
 
+                {/* Expandable Separator Line */}
+                {/* {currentPlan && (
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => setIsCurrentPlanExpanded(!isCurrentPlanExpanded)} style={styles.expandableSeparator}>
+                        <View style={styles.separatorLine} />
+                        <View style={styles.chevronButton}>
+                            <Animated.View style={{ transform: [{ rotate: rotateInterpolate }] }}>
+                                <IconSymbol name="chevron.up" size={15} color={colors.system.black} />
+                            </Animated.View>
+                        </View>
+                    </TouchableOpacity>
+                )} */}
+
                 {/* Chevron Circle */}
                 <View style={styles.chevronContainer}>
-                    <View style={styles.chevronCircle}>
-                        <IconSymbol name="chevron.down" size={16} color={colors.system.black} />
-                    </View>
+                    <TouchableOpacity activeOpacity={0.7} onPress={() => setIsCurrentPlanExpanded(!isCurrentPlanExpanded)}>
+                        <View style={styles.chevronCircle}>
+                            <IconSymbol name="chevron.down" size={16} color={colors.system.black} />
+                        </View>
+                    </TouchableOpacity>
                 </View>
             </View>
 
@@ -388,6 +447,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         bottom: -16.5,
         left: "50%",
+        right: "50%",
         marginLeft: -16.5,
         alignItems: "center",
         justifyContent: "center",
@@ -471,5 +531,24 @@ const styles = StyleSheet.create({
     },
     purchaseButton: {
         width: "100%",
+    },
+
+    separatorLine: {
+        position: "absolute",
+        width: "100%",
+        height: 3,
+        backgroundColor: colors.system.gray5,
+        top: "50%",
+    },
+    chevronButton: {
+        backgroundColor: colors.system.white,
+        borderWidth: 3,
+        borderColor: "#ebebeb",
+        borderRadius: 9999,
+        width: 33,
+        height: 33,
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1,
     },
 });
