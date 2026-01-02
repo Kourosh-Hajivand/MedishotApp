@@ -23,6 +23,10 @@ interface ImageSection {
     data: string[];
 }
 
+interface ImageRow {
+    items: string[];
+}
+
 interface GalleryWithMenuProps {
     images?: string[]; // For backward compatibility
     sections?: ImageSection[]; // New grouped format
@@ -52,6 +56,22 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         }
         return [];
     }, [images, sections]);
+
+    // Transform sections data into rows for multi-column layout
+    const sectionsWithRows = useMemo(() => {
+        return imageSections.map((section) => {
+            const rows: ImageRow[] = [];
+            for (let i = 0; i < section.data.length; i += numColumns) {
+                rows.push({
+                    items: section.data.slice(i, i + numColumns),
+                });
+            }
+            return {
+                title: section.title,
+                data: rows,
+            };
+        });
+    }, [imageSections, numColumns]);
 
     // Flatten all images for the viewer modal
     const allImages = useMemo(() => {
@@ -83,19 +103,17 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         }
     };
 
-    const renderItem = ({ item, index, section }: { item: string; index: number; section: ImageSection }) => {
-        // Calculate row and column for proper layout
-        const row = Math.floor(index / numColumns);
-        const col = index % numColumns;
-        const isLastInRow = col === numColumns - 1;
-        const isFirstInRow = col === 0;
+    const renderImageItem = (uri: string, index: number) => {
+        const gap = 0.5;
+        const totalGap = (numColumns - 1) * gap;
+        const itemWidth = (width - totalGap) / numColumns;
 
         return (
-            <Host style={{ flex: 1 }}>
+            <Host key={`${uri}-${index}`} style={{ flex: 1 }}>
                 <ContextMenu activationMethod="longPress">
                     <ContextMenu.Items>
                         {menuItems.map((menu, menuIndex) => (
-                            <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(item)}>
+                            <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
                                 {menu.label}
                             </Button>
                         ))}
@@ -104,18 +122,15 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                     <ContextMenu.Trigger>
                         <TouchableOpacity
                             activeOpacity={0.9}
-                            onPress={() => handleImagePress(item)}
+                            onPress={() => handleImagePress(uri)}
                             style={{
-                                width: width / numColumns,
-                                height: width / numColumns,
-                                paddingRight: isLastInRow ? 0 : 2,
-                                paddingLeft: isFirstInRow ? 0 : 2,
-                                paddingTop: row === 0 ? 0 : 2,
-                                paddingBottom: 2,
+                                width: itemWidth,
+                                height: itemWidth,
+                                marginRight: index < numColumns - 1 ? gap : 0,
                             }}
                         >
                             <Image
-                                source={{ uri: item }}
+                                source={{ uri }}
                                 style={{
                                     width: "100%",
                                     height: "100%",
@@ -129,7 +144,15 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         );
     };
 
-    const renderSectionHeader = ({ section }: { section: ImageSection }) => {
+    const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
+        return (
+            <View style={styles.rowContainer}>
+                {item.items.map((uri, itemIndex) => renderImageItem(uri, itemIndex))}
+            </View>
+        );
+    };
+
+    const renderSectionHeader = ({ section }: { section: { title: string; data: ImageRow[] } }) => {
         if (!section.title) return null;
         return (
             <View style={styles.sectionHeader}>
@@ -160,12 +183,11 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
                     <SectionList
-                        sections={imageSections}
+                        sections={sectionsWithRows}
                         key={numColumns}
-                        numColumns={numColumns}
                         renderItem={renderItem}
                         renderSectionHeader={renderSectionHeader}
-                        keyExtractor={(item, index) => `${item}-${index}`}
+                        keyExtractor={(item, index) => `row-${index}`}
                         stickySectionHeadersEnabled={false}
                         contentContainerStyle={styles.sectionListContent}
                     />
@@ -205,5 +227,9 @@ const styles = StyleSheet.create({
     },
     sectionListContent: {
         paddingBottom: 16,
+    },
+    rowContainer: {
+        flexDirection: "row",
+        marginBottom: 0.5,
     },
 });
