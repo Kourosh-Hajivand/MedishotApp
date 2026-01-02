@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     },
     templateImageContainerSelected: {
         borderColor: MINT_COLOR,
-        borderWidth: 2,
+        borderWidth: 1,
         backgroundColor: colors.system.white,
         margin: -1, // جبران کردن فضای border اضافی برای جلوگیری از پرش
     },

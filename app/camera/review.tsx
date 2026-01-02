@@ -9,7 +9,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
@@ -47,13 +47,23 @@ export default function ReviewScreen() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set(capturedPhotos.map((p) => p.id)));
     const [isSaving, setIsSaving] = useState(false);
+    const [isScrolling, setIsScrolling] = useState(false);
 
     const currentPhoto = capturedPhotos[currentIndex];
 
     const handleThumbnailPress = (index: number) => {
+        if (index === currentIndex) return; // Don't do anything if already on this index
+
         Haptics.selectionAsync();
+        setIsScrolling(true);
         setCurrentIndex(index);
-        flatListRef.current?.scrollToIndex({ index, animated: true });
+        // Use scrollToOffset for smoother scrolling without jump
+        flatListRef.current?.scrollToOffset({ offset: index * width, animated: true });
+
+        // Reset scrolling flag after animation completes
+        setTimeout(() => {
+            setIsScrolling(false);
+        }, 300);
     };
 
     const handleToggleSelect = (photoId: string) => {
@@ -72,14 +82,24 @@ export default function ReviewScreen() {
     const handleRetake = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-        // Go back to camera with ghost items to retake
-        const allGhostItems = capturedPhotos.map((p) => p.templateId);
+        // Go back to camera with templateId and retakeTemplateId to retake the current photo
+        // The camera will navigate to the specific ghost item that needs to be retaken
+        const retakeTemplateId = currentPhoto?.templateId;
+
+        // Get templateId from params or try to extract from photos
+        // If we have multiple photos, they should all have the same templateId (from the same template)
+        const templateIdToUse = templateId || (capturedPhotos.length > 0 ? capturedPhotos[0].templateId : undefined);
+
+        // Pass all captured photos except the one being retaken
+        const photosToKeep = capturedPhotos.filter((p) => p.templateId !== retakeTemplateId);
 
         router.replace({
             pathname: "/camera" as any,
             params: {
                 patientId,
-                ...(templateId && { templateId }),
+                templateId: templateIdToUse,
+                retakeTemplateId: retakeTemplateId || undefined,
+                capturedPhotos: JSON.stringify(photosToKeep), // Pass remaining photos
             },
         });
     };
@@ -118,12 +138,18 @@ export default function ReviewScreen() {
             {
                 text: "Discard",
                 style: "destructive",
-                onPress: () => router.dismissAll(),
+                onPress: () => {
+                    // Navigate back to patient detail page
+                    router.replace(`/patients/${patientId}` as any);
+                },
             },
         ]);
     };
 
     const handleScroll = (event: any) => {
+        // Don't update index if we're programmatically scrolling
+        if (isScrolling) return;
+
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / width);
         if (index !== currentIndex && index >= 0 && index < capturedPhotos.length) {
@@ -228,20 +254,33 @@ export default function ReviewScreen() {
                     {capturedPhotos.map((photo, index) => {
                         const isActive = index === currentIndex;
                         const isSelected = selectedPhotos.has(photo.id);
+                        const borderRadius = useSharedValue(0);
+
+                        React.useEffect(() => {
+                            borderRadius.value = withTiming(10, { duration: 300 });
+                        }, []);
+
+                        const animatedStyle = useAnimatedStyle(() => {
+                            return {
+                                borderRadius: borderRadius.value,
+                            };
+                        });
 
                         return (
                             <Animated.View key={photo.id} entering={FadeInDown.delay(index * 50).springify()}>
-                                <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive, !isSelected && styles.thumbnailDeselected]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
-                                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                                <Animated.View style={animatedStyle}>
+                                    <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive, !isSelected && styles.thumbnailDeselected]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
+                                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
 
-                                    {isSelected && (
-                                        <View style={styles.thumbnailCheck}>
-                                            <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
-                                        </View>
-                                    )}
+                                        {isSelected && (
+                                            <View style={styles.thumbnailCheck}>
+                                                <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
+                                            </View>
+                                        )}
 
-                                    {!isSelected && <View style={styles.thumbnailDeselectedOverlay} />}
-                                </TouchableOpacity>
+                                        {!isSelected && <View style={styles.thumbnailDeselectedOverlay} />}
+                                    </TouchableOpacity>
+                                </Animated.View>
                             </Animated.View>
                         );
                     })}
@@ -366,6 +405,10 @@ const styles = StyleSheet.create({
     thumbnailsScroll: {
         paddingHorizontal: 16,
         gap: 12,
+    },
+    thumbnailContainer: {
+        borderRadius: 0, // Will be animated
+        overflow: "hidden",
     },
     thumbnail: {
         width: 64,

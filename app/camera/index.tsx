@@ -33,9 +33,16 @@ export default function CameraScreen() {
     const cameraRef = useRef<CameraView>(null);
     const [permission, requestPermission] = useCameraPermissions();
 
-    const { patientId, templateId } = useLocalSearchParams<{
+    const {
+        patientId,
+        templateId,
+        retakeTemplateId,
+        capturedPhotos: capturedPhotosParam,
+    } = useLocalSearchParams<{
         patientId: string;
         templateId?: string;
+        retakeTemplateId?: string;
+        capturedPhotos?: string;
     }>();
 
     // Get patient data from API
@@ -131,7 +138,17 @@ export default function CameraScreen() {
     });
 
     const [isCapturing, setIsCapturing] = useState(false);
-    const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>([]);
+    // Initialize capturedPhotos from params if coming from retake, otherwise empty
+    const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>(() => {
+        if (capturedPhotosParam) {
+            try {
+                return JSON.parse(capturedPhotosParam);
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    });
     const [currentGhostIndex, setCurrentGhostIndex] = useState(0);
     const currentGhostIndexRef = useRef(currentGhostIndex);
     const [showGuideModal, setShowGuideModal] = useState(false);
@@ -141,6 +158,17 @@ export default function CameraScreen() {
     useEffect(() => {
         currentGhostIndexRef.current = currentGhostIndex;
     }, [currentGhostIndex]);
+
+    // Navigate to specific ghost item when retaking a photo
+    // Note: The photo is already removed in review.tsx before navigation, so we just need to navigate
+    useEffect(() => {
+        if (retakeTemplateId && ghostItemsData.length > 0) {
+            const retakeIndex = ghostItemsData.findIndex((item) => item.gostId === retakeTemplateId);
+            if (retakeIndex !== -1) {
+                setCurrentGhostIndex(retakeIndex);
+            }
+        }
+    }, [retakeTemplateId, ghostItemsData]);
 
     // Show guide modal when ghost items are available
     useEffect(() => {
@@ -241,10 +269,11 @@ export default function CameraScreen() {
                 params: {
                     patientId,
                     photos: JSON.stringify(photos),
+                    ...(templateId && { templateId }),
                 },
             });
         },
-        [patientId],
+        [patientId, templateId],
     );
 
     // Handle retake - remove photo for current ghost and allow retaking
