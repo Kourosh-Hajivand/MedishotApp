@@ -1,6 +1,6 @@
 import PatientService, { GetPatientsParams } from "@/utils/service/PatientService";
 import { CreatePatientRequest, UpdatePatientRequest } from "@/utils/service/models/RequestModels";
-import { ApiResponse, DoctorPatientsResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, DoctorPatientsResponse, PatientActivitiesResponse, PatientDetailResponse, PatientListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -30,6 +30,15 @@ export const useGetPatientById = (patientId: number | string): UseQueryResult<Pa
         queryKey: ["GetPatientById", patientId],
         queryFn: () => PatientService.getPatientById(patientId),
         enabled: isAuthenticated === true && !!patientId,
+    });
+};
+
+export const useGetPatientActivities = (practiseId: number | string | undefined, patientId: number | string, enabled: boolean = true): UseQueryResult<PatientActivitiesResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetPatientActivities", practiseId, patientId],
+        queryFn: () => PatientService.getPatientActivities(practiseId!, patientId),
+        enabled: isAuthenticated === true && enabled && !!practiseId && !!patientId,
     });
 };
 

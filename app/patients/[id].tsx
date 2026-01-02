@@ -5,8 +5,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
-import { useGetPatientById } from "@/utils/hook";
+import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
 import { useGetPatientMedia } from "@/utils/hook/useMedia";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -14,7 +15,9 @@ import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpaci
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
+import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
 import { ConsentTabContent } from "./_components/ConsentTabContent";
+import { IDTabContent } from "./_components/IDTabContent";
 import { blurValue } from "./_layout";
 
 type RowKind = "header" | "tabs" | "content";
@@ -22,10 +25,50 @@ type RowKind = "header" | "tabs" | "content";
 export default function PatientDetailsScreen() {
     const { id, action, phoneIndex } = useLocalSearchParams<{ id: string; action?: string; phoneIndex?: string }>();
     const navigation = useNavigation();
+    const { selectedPractice } = useProfileStore();
     const { data: patient, isLoading } = useGetPatientById(id);
     const { data: patientMediaData, isLoading: isLoadingMedia } = useGetPatientMedia(id, !!id);
+    const { data: activitiesData, isLoading: isLoadingActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
+    const { data: documentsData, isLoading: isLoadingDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
+
+    // Temp upload for scanned documents
+    const { mutate: uploadScannedImage, isPending: isUploadingScannedImage } = useTempUpload(
+        (response) => {
+            const responseAny = response as any;
+            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            if (filename) {
+                console.log("📸 [scanDocument] Image uploaded, filename:", filename);
+                // Create document with the filename
+                createDocument({
+                    type: "id_card",
+                    description: "Scanned ID Document",
+                    image: filename, // Send filename string, not File
+                });
+            } else {
+                Alert.alert("Error", "Failed to upload scanned image");
+            }
+        },
+        (error) => {
+            console.error("❌ [scanDocument] Upload error:", error);
+            Alert.alert("Error", "Failed to upload scanned image");
+        },
+    );
+
+    // Create document mutation
+    const { mutate: createDocument } = useCreatePatientDocument(
+        selectedPractice?.id,
+        id,
+        (data) => {
+            console.log("✅ [scanDocument] Document created successfully:", data);
+            Alert.alert("Success", "ID document uploaded successfully!");
+        },
+        (error) => {
+            console.error("❌ [scanDocument] Create document error:", error);
+            Alert.alert("Error", "Failed to create document");
+        },
+    );
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
@@ -47,12 +90,63 @@ export default function PatientDetailsScreen() {
         }
     }, [patient?.data?.birth_date]);
 
-    // Extract image URLs from patient media
-    const patientImages = useMemo(() => {
+    // Extract and group images by date from patient media
+    const groupedPatientImages = useMemo(() => {
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) {
             return [];
         }
-        return patientMediaData.data.map((media) => media.media?.url).filter((url): url is string => !!url);
+
+        // Map to store images grouped by date
+        const imagesByDate = new Map<string, string[]>();
+
+        patientMediaData.data.forEach((media: any) => {
+            // Get the date from created_at
+            const createdAt = media.created_at;
+            if (!createdAt) return;
+
+            // Format date as "MMMM D, YYYY" (e.g., "January 2, 2026")
+            const date = new Date(createdAt);
+            const dateKey = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+            // Initialize array for this date if it doesn't exist
+            if (!imagesByDate.has(dateKey)) {
+                imagesByDate.set(dateKey, []);
+            }
+
+            const dateImages = imagesByDate.get(dateKey)!;
+
+            // If media has a template, extract images from template.images array
+            if (media.template && media.images && Array.isArray(media.images)) {
+                media.images.forEach((img: any) => {
+                    if (img.image?.url) {
+                        dateImages.push(img.image.url);
+                    }
+                });
+            }
+            // If media doesn't have a template, use original_media
+            else if (media.original_media?.url) {
+                dateImages.push(media.original_media.url);
+            }
+            // Fallback: check if media.media exists (old structure)
+            else if (media.media?.url) {
+                dateImages.push(media.media.url);
+            }
+        });
+
+        // Convert Map to array of sections, sorted by date (newest first)
+        const sections = Array.from(imagesByDate.entries())
+            .map(([date, images]) => ({
+                title: date,
+                data: images,
+            }))
+            .sort((a, b) => {
+                // Sort by date (newest first)
+                const dateA = new Date(a.title);
+                const dateB = new Date(b.title);
+                return dateB.getTime() - dateA.getTime();
+            });
+
+        return sections;
     }, [patientMediaData?.data]);
 
     const screenWidth = Dimensions.get("window").width;
@@ -143,20 +237,44 @@ export default function PatientDetailsScreen() {
 
             if (scannedImages && scannedImages.length > 0) {
                 const imagePath = scannedImages[0];
+                console.log("📸 [scanDocument] Image scanned:", imagePath);
 
-                const path = imagePath.replace("file://", "");
+                // Upload scanned image to temp-upload
+                try {
+                    const path = imagePath.replace("file://", "");
+                    const filename = path.split("/").pop() || "scanned-document.jpg";
+                    const match = /\.(\w+)$/.exec(filename);
+                    const type = match ? `image/${match[1]}` : "image/jpeg";
 
-                const lines = await TextRecognition.recognize(path);
-                const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
-                console.log("OCR:", fullText);
-                // Parse the extracted data
-                const parsed = parseUSIDCardData(fullText, imagePath);
-                console.log("Parsed ID Card Data:", parsed);
-                // TODO: Save parsed data to patient record
-                Alert.alert("Success", "ID card scanned successfully!");
+                    const file = {
+                        uri: imagePath,
+                        type,
+                        name: filename,
+                    } as any;
+
+                    console.log("📤 [scanDocument] Uploading to temp-upload...");
+                    uploadScannedImage(file);
+                } catch (uploadError) {
+                    console.error("❌ [scanDocument] Upload error:", uploadError);
+                    Alert.alert("Error", "Failed to upload scanned image");
+                }
+
+                // Optional: OCR processing (can be done in background)
+                try {
+                    const path = imagePath.replace("file://", "");
+                    const lines = await TextRecognition.recognize(path);
+                    const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
+                    console.log("📝 [scanDocument] OCR Text:", fullText);
+                    // Parse the extracted data (optional, for future use)
+                    const parsed = parseUSIDCardData(fullText, imagePath);
+                    console.log("📋 [scanDocument] Parsed ID Card Data:", parsed);
+                } catch (ocrError) {
+                    console.warn("⚠️ [scanDocument] OCR failed (non-critical):", ocrError);
+                    // OCR failure is not critical, continue with upload
+                }
             }
         } catch (error) {
-            console.error("Document scan or OCR failed:", error);
+            console.error("❌ [scanDocument] Scan failed:", error);
             Alert.alert("Error", "Failed to scan document. Please try again.");
         }
     };
@@ -421,20 +539,12 @@ export default function PatientDetailsScreen() {
                             },
                         ]}
                         patientData={patient?.data}
-                        images={patientImages}
+                        sections={groupedPatientImages}
                     />
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                {activeTab === 2 && (
-                    <View style={{ flex: 1, minHeight: screenHeight }}>
-                        <BaseText className="p-5">🪪 ID info...</BaseText>
-                    </View>
-                )}
-                {activeTab === 3 && (
-                    <View style={{ flex: 1, minHeight: screenHeight }}>
-                        <BaseText className="p-5">📊 Activity log...</BaseText>
-                    </View>
-                )}
+                {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} />}
+                {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} />}
             </View>
         );
     };

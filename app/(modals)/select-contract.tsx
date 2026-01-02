@@ -16,8 +16,8 @@ export default function SelectContractScreen() {
     const { patientId } = useLocalSearchParams<{ patientId: string }>();
     const headerHeight = useHeaderHeight();
     const insets = useSafeAreaInsets();
-    const { data: contractsData, isLoading } = useGetContractTemplates(patientId ? Number(patientId) : undefined);
-    // const { data: contractsData, isLoading } = useGetContractTemplates();
+    // const { data: contractsData, isLoading } = useGetContractTemplates(patientId ? Number(patientId) : undefined);
+    const { data: contractsData, isLoading } = useGetContractTemplates();
 
     const handleSelectContract = (templateId: number) => {
         // Dismiss the modal first

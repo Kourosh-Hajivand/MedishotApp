@@ -1,4 +1,4 @@
-import { BaseButton, BaseText } from "@/components";
+import { BaseButton, BaseText, PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
@@ -1034,30 +1034,7 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
     return (
         <View style={{ flex: 1, backgroundColor: "white" }}>
             {/* Header */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                    {printSettings.avatar === "logo" && practice.image?.url ? (
-                        <Image source={{ uri: practice.image.url }} style={{ width: 50, height: 50, borderRadius: 25 }} />
-                    ) : printSettings.avatar === "profile_picture" && me?.profile_photo_url ? (
-                        <Avatar name={`${me?.first_name} ${me?.last_name}`} size={50} imageUrl={me?.profile_photo_url || undefined} />
-                    ) : null}
-                    <View>
-                        {printSettings.practiceName && (
-                            <BaseText type="Subhead" weight={600} color="labels.primary" style={{ fontSize: 14 }}>
-                                {practice.name}
-                            </BaseText>
-                        )}
-                        {printSettings.doctorName && patient.doctor && (
-                            <BaseText type="Caption2" color="labels.secondary" style={{ fontSize: 11 }}>
-                                Dr. {patient.doctor.first_name} {patient.doctor.last_name}
-                            </BaseText>
-                        )}
-                    </View>
-                </View>
-                <BaseText type="Caption1" color="system.blue" style={{ fontSize: 10 }}>
-                    Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                </BaseText>
-            </View>
+            <PracticeDocumentHeader practice={practice} printSettings={printSettings} doctor={patient.doctor || null} me={me || undefined} variant="document" />
 
             {/* Contract Title */}
             <BaseText type="Body" weight={600} color="labels.primary" style={{ marginBottom: 36, marginTop: 16, fontSize: 16, textAlign: "center" }}>
@@ -1214,23 +1191,8 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
                 </View>
             </View>
 
-            {/* Footer with Address and Phone - Fixed at bottom */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingTop: 15, paddingBottom: 15 }}>
-                {metadata?.address && printSettings.address && (
-                    <View style={{ flex: 1, marginRight: 20 }}>
-                        <BaseText type="Caption2" color="labels.primary" style={{ fontSize: 9, lineHeight: 14 }}>
-                            {metadata.address}
-                        </BaseText>
-                    </View>
-                )}
-                {metadata?.phone && printSettings.practicePhone && (
-                    <View style={{ flex: 1, marginLeft: 20, alignItems: "flex-end" }}>
-                        <BaseText type="Caption2" color="labels.primary" style={{ fontSize: 9, lineHeight: 14 }}>
-                            Phone: {metadata.phone}
-                        </BaseText>
-                    </View>
-                )}
-            </View>
+            {/* Footer */}
+            <PracticeDocumentFooter metadata={metadata} printSettings={printSettings} variant="document" />
         </View>
     );
 });

@@ -245,10 +245,13 @@ export const AddPatientPhotoScreen: React.FC = () => {
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            console.log("📸 [uploadImage] Success - Filename received:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
+            console.log("📸 [uploadImage] State updated - uploadedFilename:", filename, "ref:", uploadedFilenameRef.current);
         },
         (error) => {
+            console.error("❌ [uploadImage] Error:", error);
             // Error handled silently
         },
     );
@@ -521,18 +524,40 @@ export const AddPatientPhotoScreen: React.FC = () => {
         // Check if localImageUri exists (means user selected a new image)
         // Or if it's create mode and we have an uploaded filename
         const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
+        const originalImageUrl = patient?.data?.profile_image?.url || null;
+
+        // Debug logging
+        console.log("📸 [onSubmit] Image Debug:", {
+            isEditMode,
+            localImageUri: !!localImageUri,
+            uploadedFilename,
+            uploadedFilenameRef: uploadedFilenameRef.current,
+            currentUploadedFilename,
+            originalImageUrl,
+        });
 
         // Only include image if:
         // 1. In create mode and we have an uploaded filename (new image selected)
-        // 2. In edit mode and localImageUri exists (image was changed)
+        // 2. In edit mode: if we have a new uploaded filename that's different from original, or if localImageUri exists (user selected new image)
         if (!isEditMode && currentUploadedFilename) {
             // Create mode: include image if we have one
             patientData.image = currentUploadedFilename;
-        } else if (isEditMode && localImageUri) {
-            // Edit mode: only include image if user selected a new one
-            if (currentUploadedFilename) {
+            console.log("✅ [onSubmit] Image added to patientData (create mode):", currentUploadedFilename);
+        } else if (isEditMode) {
+            // Edit mode: include image if:
+            // - User selected a new image (localImageUri exists) AND we have uploadedFilename
+            // - OR we have a new uploadedFilename that's different from the original
+            const hasNewImage = localImageUri && currentUploadedFilename;
+            const hasDifferentUploadedImage = currentUploadedFilename && currentUploadedFilename !== originalImageUrl;
+
+            if (hasNewImage || hasDifferentUploadedImage) {
                 patientData.image = currentUploadedFilename;
+                console.log("✅ [onSubmit] Image added to patientData (edit mode):", currentUploadedFilename);
+            } else {
+                console.log("⚠️ [onSubmit] Edit mode - no new image to upload");
             }
+        } else {
+            console.log("⚠️ [onSubmit] Image not added - conditions not met");
         }
 
         if (idCardFilename) {

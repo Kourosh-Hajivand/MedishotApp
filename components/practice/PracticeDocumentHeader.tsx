@@ -1,7 +1,7 @@
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import colors from "@/theme/colors";
-import { Practice, People } from "@/utils/service/models/ResponseModels";
+import { People, Practice } from "@/utils/service/models/ResponseModels";
 import React from "react";
 import { Image, StyleSheet, View, ViewStyle } from "react-native";
 
@@ -25,14 +25,7 @@ interface PracticeDocumentHeaderProps {
     headerStyle?: ViewStyle;
 }
 
-export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({
-    practice,
-    printSettings,
-    doctor,
-    me,
-    variant = "document",
-    headerStyle,
-}) => {
+export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({ practice, printSettings, doctor, me, variant = "document", headerStyle }) => {
     const avatarSize = variant === "preview" ? 33 : 50;
     const showDate = true;
 
@@ -43,31 +36,21 @@ export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({
         <View style={[variant === "preview" ? styles.previewHeader : styles.documentHeader, headerStyle]}>
             <View style={variant === "preview" ? styles.previewHeaderLeft : styles.documentHeaderLeft}>
                 {printSettings.avatar === "logo" && practice.image?.url ? (
-                    <Image
-                        source={{ uri: practice.image.url }}
-                        style={[
-                            variant === "preview" ? styles.previewAvatar : styles.documentAvatar,
-                            { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 },
-                        ]}
-                    />
+                    <Image source={{ uri: practice.image.url }} style={[variant === "preview" ? styles.previewAvatar : styles.documentAvatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]} />
                 ) : printSettings.avatar === "profile_picture" && me?.profile_photo_url ? (
                     <Avatar name={`${me?.first_name} ${me?.last_name}`} size={avatarSize} imageUrl={me?.profile_photo_url || undefined} />
                 ) : null}
                 <View style={variant === "preview" ? styles.previewHeaderText : styles.documentHeaderText}>
                     {printSettings.practiceName && practice.name && (
-                        <BaseText
-                            type="Subhead"
-                            weight={variant === "preview" ? "600" : 600}
-                            color="labels.primary"
-                            style={variant === "preview" ? styles.previewPracticeName : styles.documentPracticeName}
-                        >
+                        <BaseText type="Subhead" weight={variant === "preview" ? "600" : 600} color="labels.primary" style={variant === "preview" ? styles.previewPracticeName : styles.documentPracticeName}>
                             {practice.name}
                         </BaseText>
                     )}
                     {printSettings.doctorName && displayDoctor && (
                         <BaseText
-                            type="Caption2"
-                            color="labels.secondary"
+                            type={printSettings.practiceName && practice.name ? "Caption2" : "Subhead"}
+                            weight={printSettings.practiceName && practice.name ? "400" : "600"}
+                            color={printSettings.practiceName && practice.name ? "labels.secondary" : "labels.primary"}
                             style={variant === "preview" ? styles.previewDoctorName : styles.documentDoctorName}
                         >
                             Dr. {displayDoctor.first_name} {displayDoctor.last_name}
@@ -77,11 +60,7 @@ export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({
             </View>
             {showDate && (
                 <View style={variant === "preview" ? styles.previewDateContainer : styles.documentDateContainer}>
-                    <BaseText
-                        type={variant === "preview" ? "Caption2" : "Caption1"}
-                        color={variant === "preview" ? "labels.primary" : "system.blue"}
-                        style={variant === "preview" ? styles.previewDate : styles.documentDate}
-                    >
+                    <BaseText type={variant === "preview" ? "Caption2" : "Caption1"} color={variant === "preview" ? "labels.primary" : "system.blue"} style={variant === "preview" ? styles.previewDate : styles.documentDate}>
                         Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                     </BaseText>
                 </View>
@@ -164,4 +143,3 @@ const styles = StyleSheet.create({
         fontSize: 10,
     },
 });
-

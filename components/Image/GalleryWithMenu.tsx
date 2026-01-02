@@ -5,8 +5,8 @@ import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useState } from "react";
-import { Dimensions, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
 import { ImageViewerModal } from "./ImageViewerModal";
@@ -17,8 +17,15 @@ interface MenuItem {
     onPress?: (uri: string) => void;
     role?: ButtonRole;
 }
+
+interface ImageSection {
+    title: string;
+    data: string[];
+}
+
 interface GalleryWithMenuProps {
-    images: string[];
+    images?: string[]; // For backward compatibility
+    sections?: ImageSection[]; // New grouped format
     initialColumns?: number;
     minColumns?: number;
     maxColumns?: number;
@@ -29,11 +36,27 @@ interface GalleryWithMenuProps {
 
 const { width } = Dimensions.get("window");
 
-export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData, menuItems }) => {
+export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData, menuItems }) => {
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const scale = useSharedValue(1);
+
+    // Convert images array to sections format if sections not provided (backward compatibility)
+    const imageSections = useMemo(() => {
+        if (sections && sections.length > 0) {
+            return sections;
+        }
+        if (images && images.length > 0) {
+            return [{ title: "", data: images }];
+        }
+        return [];
+    }, [images, sections]);
+
+    // Flatten all images for the viewer modal
+    const allImages = useMemo(() => {
+        return imageSections.flatMap((section) => section.data);
+    }, [imageSections]);
 
     const pinchGesture = Gesture.Pinch()
         .onUpdate((e) => {
@@ -51,41 +74,74 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initia
             scale.value = 1;
         });
 
-    const handleImagePress = (uri: string, index: number) => {
+    const handleImagePress = (uri: string) => {
         if (onImagePress) onImagePress(uri);
-        setSelectedIndex(index);
-        setViewerVisible(true);
+        const index = allImages.indexOf(uri);
+        if (index !== -1) {
+            setSelectedIndex(index);
+            setViewerVisible(true);
+        }
     };
 
-    const renderItem = ({ item, index }: { item: string; index: number }) => (
-        <Host style={{ flex: 1 }}>
-            <ContextMenu activationMethod="longPress">
-                <ContextMenu.Items>
-                    {menuItems.map((menu, index) => (
-                        <Button key={`${menu.icon}-${index}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(item)}>
-                            {menu.label}
-                        </Button>
-                    ))}
-                </ContextMenu.Items>
+    const renderItem = ({ item, index, section }: { item: string; index: number; section: ImageSection }) => {
+        // Calculate row and column for proper layout
+        const row = Math.floor(index / numColumns);
+        const col = index % numColumns;
+        const isLastInRow = col === numColumns - 1;
+        const isFirstInRow = col === 0;
 
-                <ContextMenu.Trigger>
-                    <TouchableOpacity activeOpacity={0.9} onPress={() => handleImagePress(item, index)}>
-                        <Image
-                            source={{ uri: item }}
+        return (
+            <Host style={{ flex: 1 }}>
+                <ContextMenu activationMethod="longPress">
+                    <ContextMenu.Items>
+                        {menuItems.map((menu, menuIndex) => (
+                            <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(item)}>
+                                {menu.label}
+                            </Button>
+                        ))}
+                    </ContextMenu.Items>
+
+                    <ContextMenu.Trigger>
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => handleImagePress(item)}
                             style={{
                                 width: width / numColumns,
                                 height: width / numColumns,
+                                paddingRight: isLastInRow ? 0 : 2,
+                                paddingLeft: isFirstInRow ? 0 : 2,
+                                paddingTop: row === 0 ? 0 : 2,
+                                paddingBottom: 2,
                             }}
-                            contentFit="cover"
-                        />
-                    </TouchableOpacity>
-                </ContextMenu.Trigger>
-            </ContextMenu>
-        </Host>
-    );
+                        >
+                            <Image
+                                source={{ uri: item }}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                }}
+                                contentFit="cover"
+                            />
+                        </TouchableOpacity>
+                    </ContextMenu.Trigger>
+                </ContextMenu>
+            </Host>
+        );
+    };
+
+    const renderSectionHeader = ({ section }: { section: ImageSection }) => {
+        if (!section.title) return null;
+        return (
+            <View style={styles.sectionHeader}>
+                <BaseText type="Subhead" weight="600" color="labels.primary" style={styles.sectionHeaderText}>
+                    {section.title}
+                </BaseText>
+            </View>
+        );
+    };
 
     // Show empty state if no images
-    if (!images || images.length === 0) {
+    if (!imageSections || imageSections.length === 0 || allImages.length === 0) {
         return (
             <View style={styles.emptyContainer}>
                 <IconSymbol name="photo" color={colors.labels.tertiary} size={64} />
@@ -103,11 +159,20 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, initia
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
-                    <FlatList data={images} key={numColumns} numColumns={numColumns} renderItem={renderItem} keyExtractor={(_, i) => i.toString()} />
+                    <SectionList
+                        sections={imageSections}
+                        key={numColumns}
+                        numColumns={numColumns}
+                        renderItem={renderItem}
+                        renderSectionHeader={renderSectionHeader}
+                        keyExtractor={(item, index) => `${item}-${index}`}
+                        stickySectionHeadersEnabled={false}
+                        contentContainerStyle={styles.sectionListContent}
+                    />
                 </Animated.View>
             </GestureDetector>
 
-            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={images} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} />
+            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={allImages} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} />
         </GestureHandlerRootView>
     );
 };
@@ -126,5 +191,19 @@ const styles = StyleSheet.create({
     },
     emptyDescription: {
         textAlign: "center",
+    },
+    sectionHeader: {
+        backgroundColor: colors.system.white,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    sectionHeaderText: {
+        fontSize: 15,
+        letterSpacing: -0.24,
+    },
+    sectionListContent: {
+        paddingBottom: 16,
     },
 });

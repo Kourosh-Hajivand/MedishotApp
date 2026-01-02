@@ -121,8 +121,17 @@ const PatientService = {
 
             // OpenAPI expects `profile` - keep backward compatibility with `image`
             const profile = payload.profile ?? payload.image;
+            console.log("📤 [CreatePatient] Profile/Image check:", {
+                hasProfile: !!payload.profile,
+                hasImage: !!payload.image,
+                profileValue: profile,
+                profileType: typeof profile,
+            });
             if (profile) {
                 formData.append("profile", profile);
+                console.log("✅ [CreatePatient] Profile added to formData:", profile);
+            } else {
+                console.log("⚠️ [CreatePatient] No profile/image to add");
             }
 
             if (payload.id_card) {

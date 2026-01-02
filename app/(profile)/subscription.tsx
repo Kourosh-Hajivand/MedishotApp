@@ -123,20 +123,7 @@ export default function SubscriptionScreen() {
         console.log("Purchase plan:", planId);
     };
 
-    if (isLoadingPlans || isLoadingSubscription) {
-        return (
-            <View style={[styles.container, { paddingTop: insets.top + headerHeight, justifyContent: "center", alignItems: "center" }]}>
-                <ActivityIndicator size="large" color={colors.system.blue} />
-            </View>
-        );
-    }
-
-    // Get current plan price - use exactly as received from API
-    const currentPlanPrice = currentPlan?.price || 0;
-    const currentPlanBillingInterval = currentPlan?.billing_interval || "monthly";
-    const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
-
-    // Collapse/Expand state for current plan card
+    // Collapse/Expand state for current plan card - MUST be before any conditional returns
     const [isCurrentPlanExpanded, setIsCurrentPlanExpanded] = useState(false);
     const rotationAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
     const expandAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
@@ -171,6 +158,19 @@ export default function SubscriptionScreen() {
         inputRange: [0, 1],
         outputRange: [0, 1],
     });
+
+    if (isLoadingPlans || isLoadingSubscription) {
+        return (
+            <View style={[styles.container, { paddingTop: insets.top + headerHeight, justifyContent: "center", alignItems: "center" }]}>
+                <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
+
+    // Get current plan price - use exactly as received from API
+    const currentPlanPrice = currentPlan?.price || 0;
+    const currentPlanBillingInterval = currentPlan?.billing_interval || "monthly";
+    const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
 
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + 40 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
@@ -318,67 +318,68 @@ export default function SubscriptionScreen() {
                 </BaseText>
 
                 {/* Plan Cards */}
-                {plansData?.data?.map((plan) => {
-                    const planColor = getPlanColor(plan.name);
-                    const isCurrentPlan = currentPlan?.id === plan.id;
-                    const features = getPlanFeatures(plan);
-                    const planPrice = plan.price; // Use price exactly as received from API
-                    const planBillingInterval = plan.billing_interval || "monthly";
-                    const annualPrice = getAnnualPrice(plan, plansData?.data || []);
+                {plansData?.data
+                    ?.filter((plan) => plan.id !== currentPlan?.id) // Filter out current plan
+                    .map((plan) => {
+                        const planColor = getPlanColor(plan.name);
+                        const features = getPlanFeatures(plan);
+                        const planPrice = plan.price; // Use price exactly as received from API
+                        const planBillingInterval = plan.billing_interval || "monthly";
+                        const annualPrice = getAnnualPrice(plan, plansData?.data || []);
 
-                    // Create gradient background for plan header
-                    const gradientColors: [string, string, string, string, string] =
-                        planColor === colors.system.blue
-                            ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
-                            : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
+                        // Create gradient background for plan header
+                        const gradientColors: [string, string, string, string, string] =
+                            planColor === colors.system.blue
+                                ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
+                                : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
 
-                    return (
-                        <View key={plan.id} style={styles.planCard}>
-                            <View style={styles.planCardInner}>
-                                {/* Plan Header */}
-                                <View style={styles.planHeaderWrapper}>
-                                    <View style={styles.planHeaderContent}>
-                                        <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
-                                            <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
-                                                {plan.name}
-                                            </BaseText>
-                                            <BaseText type="Title3" weight="600" style={{ color: planColor }}>
-                                                {formatPrice(planPrice, plan.currency, planBillingInterval)}
-                                            </BaseText>
-                                        </LinearGradient>
-                                        {annualPrice !== null && (
-                                            <View style={styles.annualBadge}>
-                                                <BaseText type="Footnote" weight="400" color="labels.primary">
-                                                    Annual:
+                        return (
+                            <View key={plan.id} style={styles.planCard}>
+                                <View style={styles.planCardInner}>
+                                    {/* Plan Header */}
+                                    <View style={styles.planHeaderWrapper}>
+                                        <View style={styles.planHeaderContent}>
+                                            <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
+                                                <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
+                                                    {plan.name}
                                                 </BaseText>
-                                                <BaseText type="Callout" weight="400" color="labels.primary">
-                                                    {formatPrice(annualPrice, plan.currency, "yearly")}
+                                                <BaseText type="Title3" weight="600" style={{ color: planColor }}>
+                                                    {formatPrice(planPrice, plan.currency, planBillingInterval)}
+                                                </BaseText>
+                                            </LinearGradient>
+                                            {annualPrice !== null && (
+                                                <View style={styles.annualBadge}>
+                                                    <BaseText type="Footnote" weight="400" color="labels.primary">
+                                                        Annual:
+                                                    </BaseText>
+                                                    <BaseText type="Callout" weight="400" color="labels.primary">
+                                                        {formatPrice(annualPrice, plan.currency, "yearly")}
+                                                    </BaseText>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+
+                                    {/* Plan Features */}
+                                    <View style={styles.planFeatures}>
+                                        {features.map((feature, index) => (
+                                            <View key={index} style={styles.featureItemContainer}>
+                                                <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
+                                                <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                    {" " + feature}
                                                 </BaseText>
                                             </View>
-                                        )}
+                                        ))}
                                     </View>
                                 </View>
 
-                                {/* Plan Features */}
-                                <View style={styles.planFeatures}>
-                                    {features.map((feature, index) => (
-                                        <View key={index} style={styles.featureItemContainer}>
-                                            <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
-                                            <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
-                                                {" " + feature}
-                                            </BaseText>
-                                        </View>
-                                    ))}
-                                </View>
+                                {/* Purchase Button */}
+                                <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
+                                    <BaseButton label="Purchase Now" onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} />
+                                </LinearGradient>
                             </View>
-
-                            {/* Purchase Button */}
-                            <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                <BaseButton label={isCurrentPlan ? "Current Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} disabled={isCurrentPlan} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} />
-                            </LinearGradient>
-                        </View>
-                    );
-                })}
+                        );
+                    })}
             </View>
         </ScrollView>
     );

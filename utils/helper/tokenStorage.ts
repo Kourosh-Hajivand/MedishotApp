@@ -2,6 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { StorageKeys } from "../../models/enums";
 
+// Flag to log tokens only once
+let hasLoggedTokens = false;
+
 const setItemWithFallback = async (key: string, value: string) => {
     const isSecureStoreAvailable = await SecureStore.isAvailableAsync();
 
@@ -69,6 +72,17 @@ const removeItemWithFallback = async (key: string) => {
  */
 export const storeTokens = async (accessToken: string, refreshToken?: string): Promise<void> => {
     try {
+        // Log tokens only once
+        if (!hasLoggedTokens) {
+            console.log("💾 [storeTokens] Storing Access Token:", accessToken ? `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}` : "null");
+            console.log("💾 [storeTokens] Full Access Token:", accessToken);
+            if (refreshToken) {
+                console.log("💾 [storeTokens] Storing Refresh Token:", refreshToken ? `${refreshToken.substring(0, 20)}...${refreshToken.substring(refreshToken.length - 10)}` : "null");
+                console.log("💾 [storeTokens] Full Refresh Token:", refreshToken);
+            }
+            hasLoggedTokens = true;
+        }
+        
         await setItemWithFallback(StorageKeys.token, accessToken);
         if (refreshToken) {
             await setItemWithFallback(StorageKeys.refreshToken, refreshToken);
@@ -89,6 +103,16 @@ export const getTokens = async (): Promise<{
     try {
         const accessToken = await getItemWithFallback(StorageKeys.token);
         const refreshToken = await getItemWithFallback(StorageKeys.refreshToken);
+        
+        // Log tokens only once
+        if (!hasLoggedTokens) {
+            console.log("🔑 [getTokens] Access Token:", accessToken ? `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}` : "null");
+            console.log("🔑 [getTokens] Refresh Token:", refreshToken ? `${refreshToken.substring(0, 20)}...${refreshToken.substring(refreshToken.length - 10)}` : "null");
+            console.log("🔑 [getTokens] Full Access Token:", accessToken);
+            console.log("🔑 [getTokens] Full Refresh Token:", refreshToken);
+            hasLoggedTokens = true;
+        }
+        
         return {
             accessToken,
             refreshToken,
