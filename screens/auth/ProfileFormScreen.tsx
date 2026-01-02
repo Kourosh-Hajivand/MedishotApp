@@ -9,9 +9,9 @@ import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook";
 import { People } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Control, FieldErrors, useForm, UseFormHandleSubmit } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 
@@ -111,6 +111,10 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
     const uploadedFilenameRef = React.useRef<string | null>(null); // Ref to always have latest value
+
+    // Refs برای فیلدهای متنی
+    const firstNameRef = useRef<TextInput>(null);
+    const lastNameRef = useRef<TextInput>(null);
 
     // States for dynamic inputs
     const [phones, setPhones] = useState<DynamicFieldItem[]>([]);
@@ -269,11 +273,11 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
                         )}
                         {isUploading ? (
+                            <View></View>
+                        ) : (
                             <View style={styles.plusButton}>
                                 <PlusIcon width={14} height={14} strokeWidth={0} />
                             </View>
-                        ) : (
-                            <View></View>
                         )}
                     </View>
                 </ImagePickerWrapper>
@@ -290,10 +294,10 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             <View className="gap-4">
                 <View className="bg-white rounded-2xl px-4">
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} />
+                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => lastNameRef.current?.focus()} ref={firstNameRef} />
                     </View>
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} />
+                        <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} returnKeyType="done" blurOnSubmit={true} onSubmitEditing={() => Keyboard.dismiss()} ref={lastNameRef} />
                     </View>
 
                     <View className="border-b border-border">

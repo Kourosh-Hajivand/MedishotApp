@@ -75,7 +75,7 @@ export default function CompleteProfile() {
             headerRight: () => (
                 <Host style={{ width: 65, height: 35 }}>
                     <Button onPress={handleNext} disabled={isUpdating}>
-                        {isUpdating ? "..." : "Next"}
+                        {isUpdating ? "Next" : "Next"}
                     </Button>
                 </Host>
             ),

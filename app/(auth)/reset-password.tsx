@@ -1,10 +1,10 @@
-import { BaseButton, BaseText, ControlledInput, KeyboardAwareScrollView } from "@/components";
+import { BaseButton, BaseText, ControlledInput } from "@/components";
 import { useForgetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Platform, View } from "react-native";
+import { Animated, Keyboard, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z.object({
@@ -32,15 +32,43 @@ export default function ResetPassword() {
             params: { email, forgetPassword: "true" },
         });
     });
+
+    // انیمیشن برای دکمه Reset Password
+    const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const keyboardWillShow = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (event) => {
+            const keyboardHeight = event.endCoordinates.height;
+
+            const offset = Math.min(keyboardHeight * 0.7, 280) + 40;
+
+            Animated.timing(bottomSectionTranslateY, {
+                toValue: -offset,
+                duration: Platform.OS === "ios" ? event.duration || 300 : 300,
+                useNativeDriver: true,
+            }).start();
+        });
+
+        const keyboardWillHide = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", (event) => {
+            Animated.timing(bottomSectionTranslateY, {
+                toValue: 0,
+                duration: Platform.OS === "ios" ? event.duration || 300 : 300,
+                useNativeDriver: true,
+            }).start();
+        });
+
+        return () => {
+            keyboardWillShow.remove();
+            keyboardWillHide.remove();
+        };
+    }, [bottomSectionTranslateY]);
+
     const onSubmit = (data: ResetPasswordFormData) => {
         resetPassword(data);
     };
     return (
-        <>
-            <KeyboardAwareScrollView
-                backgroundColor="white"
-                contentContainerStyle={{ flexGrow: 1 }}
-            >
+        <View style={{ flex: 1, backgroundColor: "white" }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, backgroundColor: "white" }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
                 <View className="flex-1 px-10" style={{ paddingTop: insets.top + 40 }}>
                     <View className="gap-10" style={{ gap: 71 }}>
                         <View className="gap-2">
@@ -54,14 +82,21 @@ export default function ResetPassword() {
                             </View>
                         </View>
                         <View className="">
-                            <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} />
+                            <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} returnKeyType="done" blurOnSubmit={true} onSubmitEditing={handleSubmit(onSubmit)} />
                         </View>
                     </View>
                 </View>
-            </KeyboardAwareScrollView>
-            <View style={{ paddingBottom: insets.bottom + 40 || 40, paddingHorizontal: 40, backgroundColor: "white" }}>
+            </ScrollView>
+            <Animated.View
+                style={{
+                    paddingBottom: insets.bottom + 40 || 40,
+                    paddingHorizontal: 40,
+                    backgroundColor: "white",
+                    transform: [{ translateY: bottomSectionTranslateY }],
+                }}
+            >
                 <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
-            </View>
-        </>
+            </Animated.View>
+        </View>
     );
 }

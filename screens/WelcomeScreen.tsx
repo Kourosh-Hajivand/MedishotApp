@@ -1,8 +1,8 @@
 import { BottomSheetBackdrop, BottomSheetModal } from "@gorhom/bottom-sheet";
 import { ResizeMode, Video } from "expo-av";
 import { useRouter } from "expo-router";
-import React, { useCallback, useRef } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef } from "react";
+import { BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BaseButton, BaseText } from "../components";
 import { spacing } from "../styles/spaces";
@@ -16,6 +16,14 @@ export const WelcomeScreen: React.FC = () => {
         router.push("/(auth)/login");
     };
     const renderBackdrop = useCallback((props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
+
+    useEffect(() => {
+        const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {
+            return true;
+        });
+
+        return () => backHandler.remove();
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>

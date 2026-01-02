@@ -1,6 +1,6 @@
 import { formatNumber, formatUSPhoneWithDashes } from "@/utils/helper/HelperFunction";
 import classNames from "classnames";
-import React, { useRef, useState } from "react";
+import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { Controller, FieldValues } from "react-hook-form";
 import { StyleSheet, TextInput, TextInputProps, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
@@ -10,10 +10,13 @@ import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors";
 import { BaseText } from "../text/BaseText";
 
-export default function ControlledInput<T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps) {
+const ControlledInputComponent = <T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps, ref: React.Ref<TextInput>) => {
     const [showPassword, setShowPassword] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<TextInput>(null);
+
+    // Expose inputRef methods to parent via ref
+    useImperativeHandle(ref, () => inputRef.current!);
 
     const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
     const focusInput = () => !disabled && inputRef.current?.focus();
@@ -185,7 +188,13 @@ export default function ControlledInput<T extends FieldValues>({ control, name, 
             />
         </View>
     );
-}
+};
+
+const ControlledInput = forwardRef(ControlledInputComponent) as <T extends FieldValues>(
+    props: InputProps<T> & TextInputProps & { ref?: React.Ref<TextInput> }
+) => React.ReactElement;
+
+export default ControlledInput;
 
 const styles = StyleSheet.create({
     container: {

@@ -15,7 +15,7 @@ export default function AuthLayout() {
                     headerTitle: "",
                     headerShadowVisible: true,
                     headerTransparent: true,
-                    // presentation: "transparentModal",
+
                     headerStyle: {
                         backgroundColor: "transparent",
                     },

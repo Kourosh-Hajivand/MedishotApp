@@ -4,9 +4,9 @@ import { Button, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
@@ -47,6 +47,14 @@ export const CreatePracticeScreen: React.FC = () => {
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+
+    // Refs برای فیلدها
+    const practiceNameRef = useRef<TextInput>(null);
+    const websiteRef = useRef<TextInput>(null);
+    const phoneNumberRef = useRef<TextInput>(null);
+    const zipCodeRef = useRef<TextInput>(null);
+    const streetRef = useRef<TextInput>(null);
+    const addressRef = useRef<TextInput>(null);
 
     const {
         control,
@@ -199,20 +207,33 @@ export const CreatePracticeScreen: React.FC = () => {
             {/* Form */}
             <View style={styles.formContainer}>
                 {[
-                    { name: "practiceName", label: "Practice Name" },
-                    { name: "website", label: "Website", optional: true },
-                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad" },
+                    { name: "practiceName", label: "Practice Name", ref: practiceNameRef, returnKeyType: "next" as const, onSubmitEditing: () => websiteRef.current?.focus() },
+                    { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => phoneNumberRef.current?.focus() },
+                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
                     { name: "specialty", label: "Specialty", disabled: true },
-                    { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad" },
-                    { name: "street", label: "Street" },
-                    { name: "address", label: "City, State" },
+                    { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", ref: zipCodeRef, returnKeyType: "next" as const, onSubmitEditing: () => streetRef.current?.focus() },
+                    { name: "street", label: "Street", ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
+                    { name: "address", label: "City, State", ref: addressRef, returnKeyType: "done" as const, onSubmitEditing: () => Keyboard.dismiss() },
                 ].map((f, i) => (
                     <View key={f.name} style={[styles.formRow, i === 6 ? { borderBottomWidth: 0 } : {}]}>
                         <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                             {f.label}
                         </BaseText>
                         <View style={styles.inputWrapper}>
-                            <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} disabled={f.disabled} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                            <ControlledInput
+                                control={control}
+                                name={f.name as keyof FormData}
+                                label={f.label}
+                                optional={f.optional}
+                                disabled={f.disabled}
+                                keyboardType={f.keyboardType as KeyboardTypeOptions}
+                                haveBorder={false}
+                                error={errors?.[f.name as keyof FormData]?.message as string}
+                                returnKeyType={f.returnKeyType}
+                                blurOnSubmit={f.returnKeyType === "done" ? true : false}
+                                onSubmitEditing={f.onSubmitEditing}
+                                ref={f.ref}
+                            />
                         </View>
                     </View>
                 ))}

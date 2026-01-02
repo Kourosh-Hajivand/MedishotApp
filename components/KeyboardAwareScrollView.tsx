@@ -17,7 +17,7 @@ export const KeyboardAwareScrollView: React.FC<KeyboardAwareScrollViewProps> = (
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
     // Default keyboard padding values
-    const defaultKeyboardPadding = Platform.OS === "ios" ? 300 : 200;
+    const defaultKeyboardPadding = Platform.OS === "ios" ? 500 : 400;
     const iosPadding = keyboardPaddingBottom ?? defaultKeyboardPadding;
     const androidPadding = keyboardPaddingBottomAndroid ?? defaultKeyboardPadding;
 
