@@ -300,7 +300,7 @@ export default function PatientDetailsScreen() {
 
                 // Upload scanned image to temp-upload
                 try {
-                    const path = imagePath.replace("file://", "");
+                const path = imagePath.replace("file://", "");
                     const filename = path.split("/").pop() || "scanned-document.jpg";
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : "image/jpeg";
@@ -321,11 +321,11 @@ export default function PatientDetailsScreen() {
                 // Optional: OCR processing (can be done in background)
                 try {
                     const path = imagePath.replace("file://", "");
-                    const lines = await TextRecognition.recognize(path);
-                    const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
+                const lines = await TextRecognition.recognize(path);
+                const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                     console.log("📝 [scanDocument] OCR Text:", fullText);
                     // Parse the extracted data (optional, for future use)
-                    const parsed = parseUSIDCardData(fullText, imagePath);
+                const parsed = parseUSIDCardData(fullText, imagePath);
                     console.log("📋 [scanDocument] Parsed ID Card Data:", parsed);
                 } catch (ocrError) {
                     console.warn("⚠️ [scanDocument] OCR failed (non-critical):", ocrError);

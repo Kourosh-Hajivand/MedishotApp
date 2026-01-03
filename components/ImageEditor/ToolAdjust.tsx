@@ -6,11 +6,58 @@ import React, { useState } from "react";
 import { Dimensions, LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Svg, { Circle } from "react-native-svg";
 import { AdjustChange, ImageEditorToolProps } from "./types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const MINT_COLOR = "#00c7be";
 const YELLOW_COLOR = "#fc0";
+
+// Progress Circle Component (like iOS)
+interface ProgressCircleProps {
+    value: number; // -100 to 100
+}
+
+const ProgressCircle: React.FC<ProgressCircleProps> = ({ value }) => {
+    const size = 52;
+    const strokeWidth = 2;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+
+    // Calculate progress: -100 to 100 -> 0 to 1
+    const progress = Math.abs(value) / 100;
+    const strokeDashoffset = circumference * (1 - progress);
+
+    // For iOS-like behavior:
+    // Positive values: clockwise from top (normal direction)
+    // Negative values: counter-clockwise from top (flip horizontally)
+    const isNegative = value < 0;
+
+    return (
+        <View style={styles.progressCircleContainer}>
+            {/* Background circle - always normal */}
+            <Svg width={size} height={size} style={styles.progressSvg}>
+                <Circle cx={size / 2} cy={size / 2} r={radius} stroke={colors.labels.quaternary} strokeWidth={strokeWidth} fill="transparent" />
+            </Svg>
+            {/* Progress circle - can be flipped for counter-clockwise */}
+            <Svg width={size} height={size} style={[styles.progressSvg, { transform: isNegative ? [{ scaleX: -1 }] : [] }]}>
+                <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke={YELLOW_COLOR}
+                    strokeWidth={strokeWidth}
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    // Start from top (12 o'clock) by rotating -90 degrees
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                />
+            </Svg>
+        </View>
+    );
+};
 
 interface AdjustmentOption {
     id: string;
@@ -43,6 +90,10 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
     });
     const [sliderWidth, setSliderWidth] = useState(0);
     const sliderX = useSharedValue(0);
+    const scrollViewRef = React.useRef<ScrollView>(null);
+    const buttonLayouts = React.useRef<Record<string, { x: number; width: number }>>({});
+    const scrollX = useSharedValue(0);
+    const isScrolling = React.useRef(false);
 
     const currentAdjustment = ADJUSTMENT_OPTIONS.find((opt) => opt.id === selectedAdjustment);
     const currentValue = adjustmentValues[selectedAdjustment] || 0;
@@ -59,6 +110,83 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
     const handleAdjustmentSelect = (id: string) => {
         Haptics.selectionAsync();
         setSelectedAdjustment(id);
+
+        // Scroll to center the selected item
+        const layout = buttonLayouts.current[id];
+        if (layout && scrollViewRef.current) {
+            const screenWidth = Dimensions.get("window").width;
+            // Add offset to shift item left for better centering
+            const scrollToX = layout.x - screenWidth / 2 + layout.width / 2 - 20;
+            isScrolling.current = true;
+            scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: true });
+            setTimeout(() => {
+                isScrolling.current = false;
+            }, 300);
+        }
+    };
+
+    const handleScroll = (event: any) => {
+        const offsetX = event.nativeEvent.contentOffset.x;
+        scrollX.value = offsetX;
+
+        if (isScrolling.current) return;
+
+        const screenWidth = Dimensions.get("window").width;
+        // Shift center point slightly left for better alignment
+        const centerX = offsetX + screenWidth / 2 - 12;
+
+        // Find the item closest to center
+        let closestId: string | null = null;
+        let minDistance = Infinity;
+
+        ADJUSTMENT_OPTIONS.forEach((option) => {
+            const layout = buttonLayouts.current[option.id];
+            if (layout) {
+                const itemCenterX = layout.x + layout.width / 2;
+                const distance = Math.abs(centerX - itemCenterX);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestId = option.id;
+                }
+            }
+        });
+
+        if (closestId && closestId !== selectedAdjustment) {
+            setSelectedAdjustment(closestId);
+        }
+    };
+
+    const handleMomentumScrollEnd = (event: any) => {
+        // Snap to center when scroll ends
+        const screenWidth = Dimensions.get("window").width;
+        const currentScrollX = event.nativeEvent.contentOffset.x;
+        const centerX = currentScrollX + screenWidth / 2 - 12;
+
+        let closestId: string | null = null;
+        let minDistance = Infinity;
+        let closestX = 0;
+        let closestWidth = 0;
+
+        ADJUSTMENT_OPTIONS.forEach((option) => {
+            const layout = buttonLayouts.current[option.id];
+            if (layout) {
+                const itemCenterX = layout.x + layout.width / 2;
+                const distance = Math.abs(centerX - itemCenterX);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestId = option.id;
+                    closestX = layout.x;
+                    closestWidth = layout.width;
+                }
+            }
+        });
+
+        if (closestId && scrollViewRef.current) {
+            setSelectedAdjustment(closestId);
+            // Add offset to shift item left for better centering
+            const scrollToX = closestX - screenWidth / 2 + closestWidth / 2 - 20;
+            scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: true });
+        }
     };
 
     const handleValueChange = (value: number) => {
@@ -190,14 +318,21 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         <View style={styles.container}>
             {/* Adjustment Buttons Row */}
             <View style={styles.buttonsContainer}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.buttonsScrollContent} style={styles.buttonsScroll}>
+                <ScrollView ref={scrollViewRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.buttonsScrollContent} style={styles.buttonsScroll} onScroll={handleScroll} scrollEventThrottle={16} onMomentumScrollEnd={handleMomentumScrollEnd} decelerationRate="fast">
                     {ADJUSTMENT_OPTIONS.map((option) => {
                         const isSelected = selectedAdjustment === option.id;
                         const value = adjustmentValues[option.id] || 0;
                         const hasValue = value !== 0;
 
                         return (
-                            <View key={option.id} style={styles.buttonWrapper}>
+                            <View
+                                key={option.id}
+                                style={styles.buttonWrapper}
+                                onLayout={(event) => {
+                                    const { x, width } = event.nativeEvent.layout;
+                                    buttonLayouts.current[option.id] = { x, width };
+                                }}
+                            >
                                 <TouchableOpacity onPress={() => handleAdjustmentSelect(option.id)} style={[styles.adjustmentButton, isSelected && hasValue && styles.adjustmentButtonActive, isSelected && !hasValue && styles.adjustmentButtonSelected]} activeOpacity={0.8}>
                                     {hasValue && isSelected ? (
                                         <BaseText type="Callout" weight={400} style={[styles.buttonValueText, { color: isSelected && hasValue ? YELLOW_COLOR : colors.labels.primary }]}>
@@ -209,7 +344,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
                                 </TouchableOpacity>
                                 {isSelected && hasValue && (
                                     <View style={styles.activeIndicator}>
-                                        <View style={styles.activeIndicatorDot} />
+                                        <ProgressCircle value={value} />
                                     </View>
                                 )}
                             </View>
@@ -288,9 +423,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     buttonsScrollContent: {
-        paddingHorizontal: 20,
-        gap: 20,
-        alignItems: "center",
+        paddingHorizontal: Dimensions.get("window").width / 2 - 26, // Center first item (half screen - half button width)
+        gap: 0, // Gap handled by marginHorizontal in buttonWrapper
+        alignItems: "flex-start",
     },
     buttonWrapper: {
         width: 52,
@@ -298,6 +433,7 @@ const styles = StyleSheet.create({
         position: "relative",
         alignItems: "center",
         justifyContent: "center",
+        marginHorizontal: 10, // Space between buttons
     },
     adjustmentButton: {
         width: 52,
@@ -329,13 +465,17 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         pointerEvents: "none",
     },
-    activeIndicatorDot: {
+    progressCircleContainer: {
         width: 52,
         height: 52,
-        borderRadius: 26,
-        borderWidth: 2,
-        borderColor: YELLOW_COLOR,
-        backgroundColor: "transparent",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+    },
+    progressSvg: {
+        position: "absolute",
+        top: 0,
+        left: 0,
     },
     sliderSectionContainer: {
         gap: 8,

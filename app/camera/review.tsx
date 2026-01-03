@@ -424,8 +424,8 @@ export default function ReviewScreen() {
                             <Animated.View key={photo.id} entering={FadeInDown.delay(index * 50).springify()}>
                                 <Animated.View style={animatedStyle}>
                                     <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
-                                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                                    </TouchableOpacity>
+                                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                                </TouchableOpacity>
                                 </Animated.View>
                             </Animated.View>
                         );

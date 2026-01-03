@@ -83,27 +83,27 @@ export const SignUpScreen: React.FC = () => {
     return (
         <View style={styles.container}>
             <ScrollView style={styles.scrollView} contentContainerStyle={{ flexGrow: 1, backgroundColor: colors.background }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
-                <View style={styles.content} className="flex-1  px-10 ">
+            <View style={styles.content} className="flex-1  px-10 ">
                     <View className="flex-1 items-center  justify-between gap-5">
-                        <View style={{ paddingTop: insets.top + 40 }} className="w-full items-center justify-start  flex-1 ">
-                            <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
-                                Let's Get Started
-                            </BaseText>
+                    <View style={{ paddingTop: insets.top + 40 }} className="w-full items-center justify-start  flex-1 ">
+                        <BaseText type="Title1" weight={"700"} color="system.black" className="mb-8">
+                            Let's Get Started
+                        </BaseText>
 
-                            <View style={styles.formContainer} className="w-full mt-[40px]">
-                                <View style={styles.inputContainer}>
+                        <View style={styles.formContainer} className="w-full mt-[40px]">
+                            <View style={styles.inputContainer}>
                                     <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => passwordRef.current?.focus()} ref={emailRef} />
                                     <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="new-password" error={errors.password?.message} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => confirmPasswordRef.current?.focus()} ref={passwordRef} />
                                     <ControlledInput control={control} type="password" name="confirmPassword" label="Confirm Password" secureTextEntry autoComplete="new-password" error={errors.confirmPassword?.message} returnKeyType="done" blurOnSubmit={true} onSubmitEditing={handleSubmit(onSubmit)} ref={confirmPasswordRef} />
-                                </View>
-                                {initiateRegistrationError?.message && (
-                                    <BaseText color="system.red" type="Caption2" className="mt-2">
-                                        {initiateRegistrationError?.message}
-                                    </BaseText>
-                                )}
                             </View>
+                            {initiateRegistrationError?.message && (
+                                <BaseText color="system.red" type="Caption2" className="mt-2">
+                                    {initiateRegistrationError?.message}
+                                </BaseText>
+                            )}
                         </View>
-                        <View className="w-full flex-1 b items-center justify-center gap-10">
+                    </View>
+                    <View className="w-full flex-1 b items-center justify-center gap-10">
                             <View style={{ width: "100%" }}>
                                 <Animated.View
                                     style={{
@@ -111,27 +111,27 @@ export const SignUpScreen: React.FC = () => {
                                         transform: [{ translateY: bottomSectionTranslateY }],
                                     }}
                                 >
-                                    <BaseButton onPress={handleSubmit(onSubmit)} disabled={isInitiateRegistrationPending} size="Large" ButtonStyle="Filled" className=" w-full" label={isInitiateRegistrationPending ? "Creating Account..." : "Create Account"} />
+                        <BaseButton onPress={handleSubmit(onSubmit)} disabled={isInitiateRegistrationPending} size="Large" ButtonStyle="Filled" className=" w-full" label={isInitiateRegistrationPending ? "Creating Account..." : "Create Account"} />
                                 </Animated.View>
                             </View>
-                            <View className="gap-10 w-full items-center justify-center">
-                                <View style={styles.socialContainer} className="w-full gap-4">
-                                    <AuthWithSocial isLogin={false} />
-                                </View>
-                                <View style={styles.loginContainer} className="flex-row items-center gap-1">
-                                    <BaseText type="Callout" color="labels.secondary">
-                                        Already have an account?
+                        <View className="gap-10 w-full items-center justify-center">
+                            <View style={styles.socialContainer} className="w-full gap-4">
+                                <AuthWithSocial isLogin={false} />
+                            </View>
+                            <View style={styles.loginContainer} className="flex-row items-center gap-1">
+                                <BaseText type="Callout" color="labels.secondary">
+                                    Already have an account?
+                                </BaseText>
+                                <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
+                                    <BaseText type="Callout" color="system.blue">
+                                        Log in
                                     </BaseText>
-                                    <TouchableOpacity onPress={() => router.push("/(auth)/login")}>
-                                        <BaseText type="Callout" color="system.blue">
-                                            Log in
-                                        </BaseText>
-                                    </TouchableOpacity>
-                                </View>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </View>
                 </View>
+            </View>
             </ScrollView>
         </View>
     );
