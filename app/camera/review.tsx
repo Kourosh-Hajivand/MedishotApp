@@ -59,7 +59,6 @@ export default function ReviewScreen() {
         );
     }, [capturedPhotos]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [selectedPhotos, setSelectedPhotos] = useState<Set<string>>(new Set(capturedPhotos.map((p) => p.id)));
     const [isSaving, setIsSaving] = useState(false);
     const [isScrolling, setIsScrolling] = useState(false);
 
@@ -114,19 +113,6 @@ export default function ReviewScreen() {
         }, 300);
     };
 
-    const handleToggleSelect = (photoId: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setSelectedPhotos((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(photoId)) {
-                newSet.delete(photoId);
-            } else {
-                newSet.add(photoId);
-            }
-            return newSet;
-        });
-    };
-
     const handleRetake = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -160,10 +146,10 @@ export default function ReviewScreen() {
     };
 
     const handleSave = async () => {
-        const photosToSave = capturedPhotos.filter((p) => selectedPhotos.has(p.id));
+        const photosToSave = capturedPhotos;
 
         if (photosToSave.length === 0) {
-            Alert.alert("No Photos Selected", "Please select at least one photo to save.");
+            Alert.alert("No Photos", "No photos to save.");
             return;
         }
 
@@ -332,16 +318,9 @@ export default function ReviewScreen() {
     };
 
     const renderMainImage = ({ item, index }: { item: CapturedPhoto; index: number }) => {
-        const isSelected = selectedPhotos.has(item.id);
-
         return (
             <View style={styles.mainImageContainer}>
                 <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />
-
-                {/* Selection overlay */}
-                <TouchableOpacity style={[styles.selectionOverlay, !isSelected && styles.deselectedOverlay]} onPress={() => handleToggleSelect(item.id)} activeOpacity={0.9}>
-                    <View style={[styles.selectionCircle, isSelected && styles.selectionCircleActive]}>{isSelected && <IconSymbol name="checkmark" size={16} color={colors.system.white} />}</View>
-                </TouchableOpacity>
             </View>
         );
     };
@@ -427,7 +406,6 @@ export default function ReviewScreen() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailsScroll}>
                     {capturedPhotos.map((photo, index) => {
                         const isActive = index === currentIndex;
-                        const isSelected = selectedPhotos.has(photo.id);
                         const borderRadius = useSharedValue(0);
 
                         React.useEffect(() => {
@@ -443,16 +421,8 @@ export default function ReviewScreen() {
                         return (
                             <Animated.View key={photo.id} entering={FadeInDown.delay(index * 50).springify()}>
                                 <Animated.View style={animatedStyle}>
-                                    <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive, !isSelected && styles.thumbnailDeselected]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
+                                    <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
                                         <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-
-                                        {isSelected && (
-                                            <View style={styles.thumbnailCheck}>
-                                                <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
-                                            </View>
-                                        )}
-
-                                        {!isSelected && <View style={styles.thumbnailDeselectedOverlay} />}
                                     </TouchableOpacity>
                                 </Animated.View>
                             </Animated.View>
@@ -463,7 +433,7 @@ export default function ReviewScreen() {
 
             {/* Footer */}
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={handleSave} activeOpacity={0.8} disabled={isSaving || selectedPhotos.size === 0}>
+                <TouchableOpacity style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={handleSave} activeOpacity={0.8} disabled={isSaving || capturedPhotos.length === 0}>
                     {isSaving ? (
                         <BaseText type="Body" weight={600} color="system.white">
                             Saving...
@@ -525,26 +495,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-    selectionOverlay: {
-        position: "absolute",
-        top: 30,
-        right: 30,
-    },
-    deselectedOverlay: {},
-    selectionCircle: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        borderWidth: 2,
-        borderColor: colors.system.white,
-        backgroundColor: "rgba(0,0,0,0.3)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    selectionCircleActive: {
-        backgroundColor: MINT_COLOR,
-        borderColor: MINT_COLOR,
-    },
     retakeContainer: {
         position: "absolute",
         bottom: 20,
@@ -595,23 +545,9 @@ const styles = StyleSheet.create({
     thumbnailActive: {
         borderColor: MINT_COLOR,
     },
-    thumbnailDeselected: {
-        opacity: 0.5,
-    },
     thumbnailImage: {
         width: "100%",
         height: "100%",
-    },
-    thumbnailCheck: {
-        position: "absolute",
-        bottom: 2,
-        right: 2,
-        backgroundColor: colors.system.white,
-        borderRadius: 8,
-    },
-    thumbnailDeselectedOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(255,255,255,0.4)",
     },
     footer: {
         backgroundColor: colors.system.white,

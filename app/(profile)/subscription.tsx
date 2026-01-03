@@ -3,17 +3,16 @@ import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { useCheckoutCancel, useCheckoutSuccess, useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSubscribe, useSwapSubscription } from "@/utils/hook";
+import { useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSwapSubscription } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { router } from "expo-router";
+import React, { useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SubscriptionScreen() {
     const insets = useSafeAreaInsets();
-    const params = useLocalSearchParams<{ session_id?: string; practice_id?: string; plan_id?: string }>();
     const { selectedPractice } = useProfileStore();
     const { data: plansData, isLoading: isLoadingPlans } = useGetPlans(!!selectedPractice?.id);
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
@@ -120,14 +119,25 @@ export default function SubscriptionScreen() {
         return features;
     };
 
+    // Store plan_id for checkout navigation
+    const createCheckoutPlanIdRef = useRef<number | null>(null);
+
     const { mutate: createCheckout, isPending: isCreatingCheckout } = useCreateCheckout(
         (data) => {
-            // Open checkout URL in browser
-            if (data?.data?.checkout_url) {
-                Linking.openURL(data.data.checkout_url).catch((err) => {
-                    console.error("Failed to open checkout URL:", err);
-                    Alert.alert("Error", "Failed to open checkout page. Please try again.");
-                });
+            // Navigate to checkout WebView screen
+            if (data?.data?.checkout_url && selectedPractice?.id) {
+                // Get plan_id from the ref
+                const currentPlanId = createCheckoutPlanIdRef.current;
+                if (currentPlanId) {
+                    router.push({
+                        pathname: "/checkout" as any,
+                        params: {
+                            checkout_url: data.data.checkout_url,
+                            practice_id: selectedPractice.id.toString(),
+                            plan_id: currentPlanId.toString(),
+                        },
+                    });
+                }
             }
         },
         (error) => {
@@ -135,59 +145,7 @@ export default function SubscriptionScreen() {
         },
     );
 
-    const { mutate: subscribe, isPending: isSubscribing } = useSubscribe(
-        () => {
-            Alert.alert("Success", "Your subscription has been activated successfully!", [
-                {
-                    text: "OK",
-                    onPress: () => {
-                        // Refresh subscription status - query will auto-refresh
-                        router.replace("/(profile)/subscription");
-                    },
-                },
-            ]);
-        },
-        (error) => {
-            Alert.alert("Error", error?.message || "Failed to subscribe. Please try again.");
-        },
-    );
-
-    const { mutate: checkoutSuccess, isPending: isProcessingSuccess } = useCheckoutSuccess(
-        (data) => {
-            // After successful checkout, call subscribe with plan_id
-            // Backend should extract payment_method_id from the checkout session using session_id
-            if (params.plan_id && selectedPractice?.id && params.session_id) {
-                const planId = parseInt(params.plan_id);
-                if (planId) {
-                    // Call subscribe - backend will use payment_method_id from checkout session
-                    // We pass session_id as payment_method_id (backend should handle this)
-                    // Or backend should extract payment_method_id from session_id
-                    subscribe({
-                        practiceId: selectedPractice.id,
-                        data: {
-                            plan_id: planId,
-                            payment_method_id: params.session_id, // Backend should extract payment_method from this session_id
-                        },
-                    });
-                }
-            }
-        },
-        (error) => {
-            Alert.alert("Error", error?.message || "Failed to process checkout. Please contact support.");
-        },
-    );
-
-    const { mutate: checkoutCancel } = useCheckoutCancel(
-        () => {
-            // User cancelled, just refresh to show current state
-            router.replace("/(profile)/subscription");
-        },
-        (error) => {
-            console.error("Checkout cancel error:", error);
-            // Even if cancel fails, just refresh
-            router.replace("/(profile)/subscription");
-        },
-    );
+    // Note: subscribe, checkoutSuccess, and checkoutCancel are now handled in checkout.tsx
 
     const { mutate: swapSubscription, isPending: isSwapping } = useSwapSubscription(
         () => {
@@ -205,35 +163,7 @@ export default function SubscriptionScreen() {
         },
     );
 
-    // Handle deep link callbacks from checkout
-    useEffect(() => {
-        // Check for success callback with session_id
-        if (params.session_id && params.practice_id && params.plan_id) {
-            const practiceId = parseInt(params.practice_id);
-            const planId = parseInt(params.plan_id);
-            if (practiceId && planId && selectedPractice?.id === practiceId && !isProcessingSuccess && !isSubscribing) {
-                // First call checkoutSuccess to verify the session
-                checkoutSuccess({
-                    practiceId: practiceId,
-                    sessionId: params.session_id,
-                });
-                // Note: subscribe will be called in checkoutSuccess callback
-            }
-        }
-        // Check for cancel callback (when plan_id exists but no session_id)
-        else if (params.plan_id && params.practice_id && !params.session_id) {
-            const practiceId = parseInt(params.practice_id);
-            const planId = parseInt(params.plan_id);
-            if (practiceId && selectedPractice?.id === practiceId) {
-                checkoutCancel({
-                    practiceId: practiceId,
-                    planId: planId,
-                });
-                // Clear params
-                router.setParams({ session_id: undefined, practice_id: undefined, plan_id: undefined });
-            }
-        }
-    }, [params.session_id, params.practice_id, params.plan_id, selectedPractice?.id, checkoutSuccess, checkoutCancel, isProcessingSuccess, isSubscribing]);
+    // Note: Deep link handling is now done in checkout.tsx WebView
 
     const handlePurchase = (planId: number) => {
         if (!selectedPractice?.id) {
@@ -263,10 +193,14 @@ export default function SubscriptionScreen() {
         } else {
             // User doesn't have active subscription
             // First create checkout session to get payment method
-            // Build success and cancel URLs - Stripe will append session_id to success_url
-            const baseUrl = "medishots://subscription"; // Deep link scheme
+            // Build success and cancel URLs - use valid HTTP URLs that will be intercepted by WebView
+            // These URLs will be detected in the WebView's onNavigationStateChange handler
+            const baseUrl = "https://medishots.com/checkout"; // Valid HTTP URL
             const successUrl = `${baseUrl}/success?practice_id=${selectedPractice.id}&plan_id=${planId}`;
             const cancelUrl = `${baseUrl}/cancel?practice_id=${selectedPractice.id}&plan_id=${planId}`;
+
+            // Store plan_id for use in createCheckout callback
+            createCheckoutPlanIdRef.current = planId;
 
             createCheckout({
                 practiceId: selectedPractice.id,
@@ -531,15 +465,7 @@ export default function SubscriptionScreen() {
 
                                 {/* Purchase Button */}
                                 <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton
-                                        label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"}
-                                        onPress={() => handlePurchase(plan.id)}
-                                        ButtonStyle="Filled"
-                                        size="Medium"
-                                        rounded
-                                        style={styles.purchaseButton}
-                                        disabled={isCreatingCheckout || isSwapping || isProcessingSuccess || isSubscribing}
-                                    />
+                                    <BaseButton label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
                                 </LinearGradient>
                             </View>
                         );
@@ -622,7 +548,8 @@ const styles = StyleSheet.create({
         width: 33,
         height: 33,
         borderRadius: 9999,
-        backgroundColor: "#ffffff",
+        backgroundColor: "white",
+
         borderWidth: 3,
         borderColor: "#d8d8d8",
         alignItems: "center",
