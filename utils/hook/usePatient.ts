@@ -51,6 +51,10 @@ export const useCreatePatient = (practiseId: string | number, onSuccess?: (data:
         mutationFn: (data: CreatePatientRequest) => PatientService.createPatient(practiseId, data),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
+            // Invalidate patient activities for the newly created patient
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -69,6 +73,10 @@ export const useUpdatePatient = (onSuccess?: (data: PatientDetailResponse) => vo
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientById", variables.patientId],
+            });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
             });
             onSuccess?.(data);
         },

@@ -98,8 +98,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         if (onImagePress) onImagePress(uri);
         const index = allImages.indexOf(uri);
         if (index !== -1) {
-            setSelectedIndex(index);
-            setViewerVisible(true);
+        setSelectedIndex(index);
+        setViewerVisible(true);
         }
     };
 
@@ -110,16 +110,16 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
 
         return (
             <Host key={`${uri}-${index}`} style={{ flex: 1 }}>
-                <ContextMenu activationMethod="longPress">
-                    <ContextMenu.Items>
+            <ContextMenu activationMethod="longPress">
+                <ContextMenu.Items>
                         {menuItems.map((menu, menuIndex) => (
                             <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
-                                {menu.label}
-                            </Button>
-                        ))}
-                    </ContextMenu.Items>
+                            {menu.label}
+                        </Button>
+                    ))}
+                </ContextMenu.Items>
 
-                    <ContextMenu.Trigger>
+                <ContextMenu.Trigger>
                         <TouchableOpacity
                             activeOpacity={0.9}
                             onPress={() => handleImagePress(uri)}
@@ -134,14 +134,14 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                                }}
-                                contentFit="cover"
-                            />
-                        </TouchableOpacity>
-                    </ContextMenu.Trigger>
-                </ContextMenu>
-            </Host>
-        );
+                            }}
+                            contentFit="cover"
+                        />
+                    </TouchableOpacity>
+                </ContextMenu.Trigger>
+            </ContextMenu>
+        </Host>
+    );
     };
 
     const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {

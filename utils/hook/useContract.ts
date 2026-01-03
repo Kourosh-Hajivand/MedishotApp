@@ -53,6 +53,10 @@ export const useCreateContract = (onSuccess?: (data: CreateContractResponse) => 
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientContracts", variables.patientId],
             });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {

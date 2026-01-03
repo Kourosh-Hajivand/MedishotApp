@@ -5,7 +5,7 @@ import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import { Dimensions, LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { AdjustChange, ImageEditorToolProps } from "./types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -90,12 +90,23 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
 
+    const lastHapticValue = React.useRef<number | null>(null);
+
     const updateValueFromPosition = (x: number) => {
         if (!currentAdjustment || sliderWidth === 0) return;
         const percentage = Math.max(0, Math.min(1, x / sliderWidth));
         const range = currentAdjustment.max - currentAdjustment.min;
         const newValue = Math.round(currentAdjustment.min + percentage * range);
+
+        // Haptic feedback when value changes (like Apple's slider)
         if (newValue !== currentValue) {
+            // Haptic feedback on every value change (like Apple's native slider)
+            // Only trigger if value actually changed from last haptic
+            if (lastHapticValue.current === null || newValue !== lastHapticValue.current) {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                lastHapticValue.current = newValue;
+            }
+
             handleValueChange(newValue);
         }
     };
@@ -105,6 +116,8 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         .onStart((e) => {
             panStartX.value = sliderX.value;
             runOnJS(triggerHaptic)();
+            // Reset haptic tracking when starting new gesture
+            lastHapticValue.current = null;
         })
         .onUpdate((e) => {
             if (sliderWidth > 0) {
@@ -253,23 +266,9 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
                                     })}
                                 </View>
                             </View>
-
-                            {/* Slider Track */}
-                            <View style={styles.sliderTrack}>
-                                <View style={styles.sliderTrackBackground} />
-                                <Animated.View style={[styles.sliderTrackFill, sliderFillStyle]} />
-                                <Animated.View style={[styles.sliderThumb, sliderThumbStyle]} />
-                            </View>
                         </View>
                     </GestureDetector>
                 </View>
-
-                {/* Reset Button */}
-                <TouchableOpacity onPress={handleReset} style={styles.resetButton} activeOpacity={0.8}>
-                    <BaseText type="Subhead" weight="600" color="labels.primary">
-                        RESET
-                    </BaseText>
-                </TouchableOpacity>
             </View>
         </View>
     );
@@ -397,7 +396,7 @@ const styles = StyleSheet.create({
         width: 1,
         height: 25.2,
         backgroundColor: colors.labels.primary,
-        top: -0.44,
+        top: -4, // Start from rulerTrack position, then extend to align with thumb
         left: "50%",
         marginLeft: -0.5,
     },

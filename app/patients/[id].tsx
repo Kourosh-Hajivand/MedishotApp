@@ -6,12 +6,12 @@ import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
-import { useGetPatientMedia } from "@/utils/hook/useMedia";
+import { useDeletePatientMedia, useGetPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Linking, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Share, TouchableOpacity, View } from "react-native";
 import DocumentScanner from "react-native-document-scanner-plugin";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
@@ -90,6 +90,35 @@ export default function PatientDetailsScreen() {
         }
     }, [patient?.data?.birth_date]);
 
+    // Create a map from image URL to mediaId (patient_media_id)
+    const imageUrlToMediaIdMap = useMemo(() => {
+        const map = new Map<string, number>();
+        if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
+
+        patientMediaData.data.forEach((media: any) => {
+            const mediaId = media.id; // patient_media_id
+
+            // If media has a template, extract images from template.images array
+            if (media.template && media.images && Array.isArray(media.images)) {
+                media.images.forEach((img: any) => {
+                    if (img.image?.url) {
+                        map.set(img.image.url, mediaId);
+                    }
+                });
+            }
+            // If media doesn't have a template, use original_media
+            else if (media.original_media?.url) {
+                map.set(media.original_media.url, mediaId);
+            }
+            // Fallback: check if media.media exists (old structure)
+            else if (media.media?.url) {
+                map.set(media.media.url, mediaId);
+            }
+        });
+
+        return map;
+    }, [patientMediaData?.data]);
+
     // Extract and group images by date from patient media
     const groupedPatientImages = useMemo(() => {
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) {
@@ -148,6 +177,36 @@ export default function PatientDetailsScreen() {
 
         return sections;
     }, [patientMediaData?.data]);
+
+    // Archive media mutation
+    const { mutate: archiveMedia, isPending: isArchiving } = useDeletePatientMedia(
+        () => {
+            Alert.alert("Success", "Image archived successfully");
+        },
+        (error) => {
+            console.error("Error archiving media:", error);
+            Alert.alert("Error", error.message || "Failed to archive image");
+        },
+    );
+
+    const handleArchiveImage = (imageUri: string) => {
+        const mediaId = imageUrlToMediaIdMap.get(imageUri);
+        if (!mediaId) {
+            Alert.alert("Error", "Could not find media ID for this image");
+            return;
+        }
+
+        Alert.alert("Archive Image", "Are you sure you want to archive this image?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Archive",
+                style: "destructive",
+                onPress: () => {
+                    archiveMedia({ patientId: id, mediaId });
+                },
+            },
+        ]);
+    };
 
     const screenWidth = Dimensions.get("window").width;
     const screenHeight = Dimensions.get("window").height;
@@ -506,8 +565,9 @@ export default function PatientDetailsScreen() {
                     <GalleryWithMenu
                         menuItems={[
                             {
-                                icon: "slider.horizontal.3",
-                                label: "Edit Photo",
+                                icon: "sparkles",
+                                label: "Use Magic",
+
                                 onPress: (imageUri) => {
                                     router.push({
                                         pathname: "/(fullmodals)/image-editor",
@@ -516,12 +576,12 @@ export default function PatientDetailsScreen() {
                                 },
                             },
                             {
-                                icon: "sparkles",
-                                label: "Use Magic",
+                                icon: "slider.horizontal.3",
+                                label: "Adjustment",
                                 onPress: (imageUri) => {
                                     router.push({
                                         pathname: "/(fullmodals)/image-editor",
-                                        params: { uri: imageUri },
+                                        params: { uri: imageUri, initialTool: "Adjust" },
                                     });
                                 },
                             },
@@ -529,13 +589,31 @@ export default function PatientDetailsScreen() {
                                 icon: "square.and.arrow.up",
                                 label: "Share",
                                 role: "default",
-                                onPress: () => console.log("Share pressed"),
+                                onPress: async (imageUri: string) => {
+                                    try {
+                                        const patientName = `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`.trim();
+                                        const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${imageUri}`;
+
+                                        // Share with both image and message containing the link
+                                        // The message includes the link so users can copy it
+                                        await Share.share({
+                                            message: message,
+                                            url: imageUri,
+                                        });
+                                    } catch (error: any) {
+                                        console.error("Error sharing image:", error);
+                                        // If user cancels, don't show error
+                                        if (error?.message !== "User did not share") {
+                                            Alert.alert("Error", "Failed to share image");
+                                        }
+                                    }
+                                },
                             },
                             {
                                 icon: "archivebox",
                                 label: "Archive Image",
                                 role: "destructive",
-                                onPress: () => console.log("Archive Image pressed"),
+                                onPress: handleArchiveImage,
                             },
                         ]}
                         patientData={patient?.data}

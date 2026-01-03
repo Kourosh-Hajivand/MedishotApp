@@ -24,6 +24,10 @@ export const useUploadPatientMedia = (onSuccess?: (data: PatientMediaUploadRespo
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMedia", variables.patientId],
             });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -40,6 +44,10 @@ export const useDeletePatientMedia = (onSuccess?: (data: PatientMediaDeleteRespo
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMedia", variables.patientId],
+            });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
             });
             onSuccess?.(data);
         },
@@ -78,6 +86,10 @@ export const useRestoreMedia = (onSuccess?: (data: PatientMediaRestoreResponse) 
             // Invalidate all media queries to refresh the lists
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
             queryClient.invalidateQueries({ queryKey: ["GetTrashMedia"] });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -94,6 +106,10 @@ export const useEditPatientMedia = (onSuccess?: (data: PatientMediaEditResponse)
         onSuccess: (data, variables) => {
             // Invalidate all media queries to refresh the lists
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -145,6 +161,10 @@ export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMedi
             });
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMediaAlbums", variables.patientId],
+            });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
             });
             onSuccess?.(data);
         },

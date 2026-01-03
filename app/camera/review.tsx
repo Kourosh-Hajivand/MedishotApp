@@ -68,7 +68,8 @@ export default function ReviewScreen() {
     // Hooks for saving photos
     const { mutate: uploadMediaWithTemplate } = useUploadPatientMediaWithTemplate(
         () => {
-            // Success - go back to patient details
+            // Success - navigate back to patient detail
+            // Use replace to replace the camera stack in history
             setIsSaving(false);
             router.replace(`/patients/${patientId}` as any);
         },
@@ -86,6 +87,7 @@ export default function ReviewScreen() {
             // Check if all uploads are complete
             if (uploadProgressRef.current.count >= uploadProgressRef.current.total) {
                 setIsSaving(false);
+                // Navigate back to patient detail
                 router.replace(`/patients/${patientId}` as any);
             }
         },
@@ -299,7 +301,7 @@ export default function ReviewScreen() {
                 text: "Discard",
                 style: "destructive",
                 onPress: () => {
-                    // Navigate back to patient detail page
+                    // Navigate back to patient detail
                     router.replace(`/patients/${patientId}` as any);
                 },
             },

@@ -20,8 +20,8 @@ const { width, height } = Dimensions.get("window");
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
 
 export default function ImageEditorScreen() {
-    const { uri } = useLocalSearchParams<{ uri?: string }>();
-    const [activeTool, setActiveTool] = useState("Magic");
+    const { uri, initialTool } = useLocalSearchParams<{ uri?: string; initialTool?: string }>();
+    const [activeTool, setActiveTool] = useState(initialTool || "Magic");
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -210,7 +210,11 @@ export default function ImageEditorScreen() {
         setDisplayedImageUri(uri ?? null);
         setOriginalImageUri(uri ?? null);
         setAdjustmentValues(null);
-    }, [uri]);
+        // Set initial tool if provided
+        if (initialTool) {
+            setActiveTool(initialTool);
+        }
+    }, [uri, initialTool]);
 
     useEffect(() => {
         if (!magicSelection) return;
@@ -253,6 +257,13 @@ export default function ImageEditorScreen() {
     useEffect(() => {
         const processImage = async () => {
             if (!uri) return;
+            // Only process image for Magic tool - don't process if not on Magic tab
+            if (activeTool !== "Magic") {
+                // Reset loading state if not on Magic tab
+                setIsLoading(false);
+                setIsProcessing(false);
+                return;
+            }
             if (hasRequestedRef.current) return;
             hasRequestedRef.current = true;
             setIsProcessing(true);
@@ -272,7 +283,7 @@ export default function ImageEditorScreen() {
         };
 
         processImage();
-    }, [uri]);
+    }, [uri, activeTool]);
 
     const renderActiveToolPanel = () => {
         const imageUri = uri || "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900";

@@ -35,6 +35,10 @@ export const useCreatePatientDocument = (practiseId: number | string | undefined
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientDocuments", practiseId, patientId],
             });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -55,6 +59,10 @@ export const useUpdatePatientDocument = (practiseId: number | string | undefined
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientDocument", practiseId, patientId, variables.documentId],
             });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -74,6 +82,10 @@ export const useDeletePatientDocument = (practiseId: number | string | undefined
             });
             queryClient.removeQueries({
                 queryKey: ["GetPatientDocument", practiseId, patientId, documentId],
+            });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
             });
             onSuccess?.(data);
         },
