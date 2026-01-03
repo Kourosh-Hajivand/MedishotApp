@@ -129,12 +129,7 @@ export default function SignContractScreen() {
 
     const { mutate: createContract, isPending: isSubmitting } = useCreateContract(
         () => {
-            Alert.alert("Success", "Contract signed successfully!", [
-                {
-                    text: "OK",
-                    onPress: () => router.back(),
-                },
-            ]);
+            router.back();
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to sign contract");

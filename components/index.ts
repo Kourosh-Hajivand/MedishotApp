@@ -17,3 +17,4 @@ export { TabletWrapper } from "./tablet-wrapper";
 export { BaseText } from "./text/BaseText";
 export { PracticeDocumentHeader, PracticeDocumentFooter } from "./practice";
 export type { PracticeSettings } from "./practice";
+export { ActivityItem } from "./ActivityItem";

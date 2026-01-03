@@ -11,7 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Platform, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Image, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -77,14 +77,24 @@ export default function AddPracticeMemberForm() {
         return null;
     }, [isEditMode, params.member]);
 
-    const { mutate: addMember, isPending: isAddingMember } = useAddMember((data) => {
-        console.log("addMember", data);
-        router.back();
-    });
+    const { mutate: addMember, isPending: isAddingMember } = useAddMember(
+        (data) => {
+            console.log("addMember", data);
+            router.back();
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to add member. Please try again.");
+        },
+    );
 
-    const { mutate: updateMemberRole, isPending: isUpdatingRole } = useUpdateMemberRole(() => {
-        router.back();
-    });
+    const { mutate: updateMemberRole, isPending: isUpdatingRole } = useUpdateMemberRole(
+        () => {
+            router.back();
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update member role. Please try again.");
+        },
+    );
 
     const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
@@ -210,7 +220,7 @@ export default function AddPracticeMemberForm() {
                 updateMemberRole({
                     practiceId: parseInt(practiceId),
                     memberId: memberData.id,
-                    data: { role: data.role as "staff" | "doctor" },
+                    data: { role: data.role as any },
                 });
             } else {
                 // Add new member
@@ -257,7 +267,7 @@ export default function AddPracticeMemberForm() {
                         last_name: data.last_name,
                         email: data.email,
                         // Backend only accepts "staff" or "doctor" when creating a member
-                        role: data.role as "staff" | "doctor",
+                        role: data.role as any,
                         ...(data.birth_date && { birth_date: data.birth_date }),
                         // Ensure gender is lowercase for backend
                         ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
@@ -284,10 +294,7 @@ export default function AddPracticeMemberForm() {
     }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode, onSubmit]);
 
     return (
-        <KeyboardAwareScrollView
-            style={styles.scrollView}
-            contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}
-        >
+        <KeyboardAwareScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}>
             <View style={styles.avatarContainer}>
                 <ImagePickerWrapper onImageSelected={handleImageSelected} disabled={isEditMode}>
                     <View style={styles.avatarWrapper}>

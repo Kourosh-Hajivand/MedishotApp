@@ -1,7 +1,7 @@
+import { ActivityItem, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
-import { BaseText } from "@/components/text/BaseText";
-import { formatDate } from "@/utils/helper/dateUtils";
 import { useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
+import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import { Button, Host, Picker } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect, useState } from "react";
@@ -31,19 +31,7 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
                 Recent Activities
             </BaseText>
             {memberData?.activities && memberData.activities.length > 0 ? (
-                memberData.activities.slice(0, 10).map((activity, index) => (
-                    <View key={index} className="flex-row items-center gap-3 p-3 bg-system-gray6 rounded-lg">
-                        <View className="w-2 h-2 bg-system-blue rounded-full" />
-                        <View className="flex-1">
-                            <BaseText type="Body" weight={500} color="labels.primary">
-                                {activity.description}
-                            </BaseText>
-                            <BaseText type="Caption1" weight={400} color="labels.secondary">
-                                {activity.created_at ? formatDate(activity.created_at, "MMM D, YYYY") : ""}
-                            </BaseText>
-                        </View>
-                    </View>
-                ))
+                memberData.activities.slice(0, 10).map((activity, index) => <ActivityItem key={index} activity={activity as ActivityLog} showBorder={false} />)
             ) : (
                 <View className="items-center py-8">
                     <BaseText type="Body" weight={400} color="labels.secondary">

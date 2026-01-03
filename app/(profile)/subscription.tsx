@@ -3,15 +3,17 @@ import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { useGetPlans, useGetSubscriptionStatus } from "@/utils/hook";
+import { useCheckoutCancel, useCheckoutSuccess, useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSubscribe, useSwapSubscription } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SubscriptionScreen() {
     const insets = useSafeAreaInsets();
+    const params = useLocalSearchParams<{ session_id?: string; practice_id?: string; plan_id?: string }>();
     const { selectedPractice } = useProfileStore();
     const { data: plansData, isLoading: isLoadingPlans } = useGetPlans(!!selectedPractice?.id);
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
@@ -118,9 +120,163 @@ export default function SubscriptionScreen() {
         return features;
     };
 
+    const { mutate: createCheckout, isPending: isCreatingCheckout } = useCreateCheckout(
+        (data) => {
+            // Open checkout URL in browser
+            if (data?.data?.checkout_url) {
+                Linking.openURL(data.data.checkout_url).catch((err) => {
+                    console.error("Failed to open checkout URL:", err);
+                    Alert.alert("Error", "Failed to open checkout page. Please try again.");
+                });
+            }
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to create checkout session. Please try again.");
+        },
+    );
+
+    const { mutate: subscribe, isPending: isSubscribing } = useSubscribe(
+        () => {
+            Alert.alert("Success", "Your subscription has been activated successfully!", [
+                {
+                    text: "OK",
+                    onPress: () => {
+                        // Refresh subscription status - query will auto-refresh
+                        router.replace("/(profile)/subscription");
+                    },
+                },
+            ]);
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to subscribe. Please try again.");
+        },
+    );
+
+    const { mutate: checkoutSuccess, isPending: isProcessingSuccess } = useCheckoutSuccess(
+        (data) => {
+            // After successful checkout, call subscribe with plan_id
+            // Backend should extract payment_method_id from the checkout session using session_id
+            if (params.plan_id && selectedPractice?.id && params.session_id) {
+                const planId = parseInt(params.plan_id);
+                if (planId) {
+                    // Call subscribe - backend will use payment_method_id from checkout session
+                    // We pass session_id as payment_method_id (backend should handle this)
+                    // Or backend should extract payment_method_id from session_id
+                    subscribe({
+                        practiceId: selectedPractice.id,
+                        data: {
+                            plan_id: planId,
+                            payment_method_id: params.session_id, // Backend should extract payment_method from this session_id
+                        },
+                    });
+                }
+            }
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to process checkout. Please contact support.");
+        },
+    );
+
+    const { mutate: checkoutCancel } = useCheckoutCancel(
+        () => {
+            // User cancelled, just refresh to show current state
+            router.replace("/(profile)/subscription");
+        },
+        (error) => {
+            console.error("Checkout cancel error:", error);
+            // Even if cancel fails, just refresh
+            router.replace("/(profile)/subscription");
+        },
+    );
+
+    const { mutate: swapSubscription, isPending: isSwapping } = useSwapSubscription(
+        () => {
+            Alert.alert("Success", "Your subscription plan has been updated successfully.", [
+                {
+                    text: "OK",
+                    onPress: () => {
+                        // Refresh subscription status - query will auto-refresh
+                    },
+                },
+            ]);
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update subscription. Please try again.");
+        },
+    );
+
+    // Handle deep link callbacks from checkout
+    useEffect(() => {
+        // Check for success callback with session_id
+        if (params.session_id && params.practice_id && params.plan_id) {
+            const practiceId = parseInt(params.practice_id);
+            const planId = parseInt(params.plan_id);
+            if (practiceId && planId && selectedPractice?.id === practiceId && !isProcessingSuccess && !isSubscribing) {
+                // First call checkoutSuccess to verify the session
+                checkoutSuccess({
+                    practiceId: practiceId,
+                    sessionId: params.session_id,
+                });
+                // Note: subscribe will be called in checkoutSuccess callback
+            }
+        }
+        // Check for cancel callback (when plan_id exists but no session_id)
+        else if (params.plan_id && params.practice_id && !params.session_id) {
+            const practiceId = parseInt(params.practice_id);
+            const planId = parseInt(params.plan_id);
+            if (practiceId && selectedPractice?.id === practiceId) {
+                checkoutCancel({
+                    practiceId: practiceId,
+                    planId: planId,
+                });
+                // Clear params
+                router.setParams({ session_id: undefined, practice_id: undefined, plan_id: undefined });
+            }
+        }
+    }, [params.session_id, params.practice_id, params.plan_id, selectedPractice?.id, checkoutSuccess, checkoutCancel, isProcessingSuccess, isSubscribing]);
+
     const handlePurchase = (planId: number) => {
-        // TODO: Navigate to purchase screen or handle purchase
-        console.log("Purchase plan:", planId);
+        if (!selectedPractice?.id) {
+            Alert.alert("Error", "No practice selected.");
+            return;
+        }
+
+        const hasActiveSubscription = subscriptionDataObj.has_subscription && subscriptionDataObj.is_active;
+
+        if (hasActiveSubscription) {
+            // User has active subscription, use swap
+            Alert.alert("Change Subscription Plan", "Are you sure you want to change your subscription plan?", [
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
+                {
+                    text: "Change Plan",
+                    onPress: () => {
+                        swapSubscription({
+                            practiceId: selectedPractice.id,
+                            data: { plan_id: planId },
+                        });
+                    },
+                },
+            ]);
+        } else {
+            // User doesn't have active subscription
+            // First create checkout session to get payment method
+            // Build success and cancel URLs - Stripe will append session_id to success_url
+            const baseUrl = "medishots://subscription"; // Deep link scheme
+            const successUrl = `${baseUrl}/success?practice_id=${selectedPractice.id}&plan_id=${planId}`;
+            const cancelUrl = `${baseUrl}/cancel?practice_id=${selectedPractice.id}&plan_id=${planId}`;
+
+            createCheckout({
+                practiceId: selectedPractice.id,
+                data: {
+                    plan_id: planId,
+                    success_url: successUrl,
+                    cancel_url: cancelUrl,
+                },
+            });
+        }
     };
 
     // Collapse/Expand state for current plan card - MUST be before any conditional returns
@@ -375,7 +531,15 @@ export default function SubscriptionScreen() {
 
                                 {/* Purchase Button */}
                                 <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton label="Purchase Now" onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} />
+                                    <BaseButton
+                                        label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"}
+                                        onPress={() => handlePurchase(plan.id)}
+                                        ButtonStyle="Filled"
+                                        size="Medium"
+                                        rounded
+                                        style={styles.purchaseButton}
+                                        disabled={isCreatingCheckout || isSwapping || isProcessingSuccess || isSubscribing}
+                                    />
                                 </LinearGradient>
                             </View>
                         );

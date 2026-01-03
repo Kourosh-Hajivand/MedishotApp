@@ -178,8 +178,6 @@ export const useUpdateMemberRole = (onSuccess?: (data: ApiResponse<any>) => void
         },
     });
 };
-<｜tool▁call▁begin｜>
-read_lints
 
 export const useRemoveMember = (onSuccess?: (data: ApiResponse<string>) => void, onError?: (error: Error) => void): UseMutationResult<ApiResponse<string>, Error, { practiceId: number; memberId: string | number }> => {
     const queryClient = useQueryClient();
