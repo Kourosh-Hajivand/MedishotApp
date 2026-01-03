@@ -3,7 +3,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
-import { Dimensions, LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Animated, Dimensions, Easing, LayoutChangeEvent, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
@@ -89,6 +89,8 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         return initial;
     });
     const [sliderWidth, setSliderWidth] = useState(0);
+    const [isSliderActive, setIsSliderActive] = useState(false);
+    const fadeAnim = React.useRef(new Animated.Value(1)).current;
     const sliderX = useSharedValue(0);
     const scrollViewRef = React.useRef<ScrollView>(null);
     const buttonLayouts = React.useRef<Record<string, { x: number; width: number }>>({});
@@ -106,6 +108,24 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
             sliderX.value = percentage * sliderWidth;
         }
     }, [selectedAdjustment, sliderWidth, currentValue]);
+
+    // Initial scroll to center the default item (exposure)
+    React.useEffect(() => {
+        if (scrollViewRef.current) {
+            // Wait for layout to complete
+            const timer = setTimeout(() => {
+                const layout = buttonLayouts.current["exposure"];
+                if (layout && scrollViewRef.current) {
+                    const screenWidth = Dimensions.get("window").width;
+                    const itemCenterX = layout.x + layout.width / 2;
+                    // Add offset to adjust for proper centering (based on debug: +20 needed)
+                    const scrollToX = itemCenterX - screenWidth / 2 + 20;
+                    scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: false });
+                }
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     const handleAdjustmentSelect = (id: string) => {
         Haptics.selectionAsync();
@@ -271,10 +291,21 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
     };
 
     const panStartX = useSharedValue(0);
+    const setSliderActive = (active: boolean) => {
+        setIsSliderActive(active);
+        // Animate opacity smoothly to 0 when active, 1 when inactive
+        Animated.timing(fadeAnim, {
+            toValue: active ? 0 : 1,
+            duration: 600,
+            easing: Easing.bezier(0.4, 0.0, 0.2, 1), // Material design easing for smooth animation
+            useNativeDriver: true,
+        }).start();
+    };
     const panGesture = Gesture.Pan()
         .onStart((e) => {
             panStartX.value = sliderX.value;
             runOnJS(triggerHaptic)();
+            runOnJS(setSliderActive)(true);
             // Reset haptic tracking when starting new gesture
             lastHapticValue.current = null;
         })
@@ -286,6 +317,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
             }
         })
         .onEnd(() => {
+            runOnJS(setSliderActive)(false);
             // Snap to nearest value
             if (sliderWidth > 0 && currentAdjustment) {
                 const percentage = sliderX.value / sliderWidth;
@@ -355,10 +387,13 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
                         const value = adjustmentValues[option.id] || 0;
                         const hasValue = value !== 0;
 
+                        const shouldFade = isSliderActive && !isSelected;
+                        const WrapperComponent = shouldFade ? Animated.View : View;
+
                         return (
-                            <View
+                            <WrapperComponent
                                 key={option.id}
-                                style={styles.buttonWrapper}
+                                style={[styles.buttonWrapper, shouldFade ? { opacity: fadeAnim } : { opacity: 1 }]}
                                 onLayout={(event) => {
                                     const { x, width } = event.nativeEvent.layout;
                                     buttonLayouts.current[option.id] = { x, width };
@@ -378,7 +413,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
                                         <ProgressCircle value={value} />
                                     </View>
                                 )}
-                            </View>
+                            </WrapperComponent>
                         );
                     })}
                 </ScrollView>

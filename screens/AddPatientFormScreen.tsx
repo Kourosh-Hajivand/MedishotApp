@@ -25,6 +25,10 @@ export const AddPatientFormScreen: React.FC = () => {
             });
 
             if (scannedImages && scannedImages.length > 0) {
+                // Only take the first image (ensure only 1 image is used)
+                if (scannedImages.length > 1) {
+                    console.warn(`⚠️ [scanDocument] Received ${scannedImages.length} images, using only the first one`);
+                }
                 const imagePath = scannedImages[0];
                 setScannedImage(imagePath);
 
@@ -38,6 +42,8 @@ export const AddPatientFormScreen: React.FC = () => {
                 const parsed = parseUSIDCardData(fullText, imagePath);
                 setParsedData(parsed);
                 console.log("Parsed ID Card Data:", parsed);
+            } else {
+                console.warn("⚠️ [scanDocument] No images scanned");
             }
         } catch (error) {
             console.error("Document scan or OCR failed:", error);

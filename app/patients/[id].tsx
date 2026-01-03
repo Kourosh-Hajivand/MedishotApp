@@ -295,23 +295,24 @@ export default function PatientDetailsScreen() {
             });
 
             if (scannedImages && scannedImages.length > 0) {
+                // Only take the first image (ensure only 1 image)
                 const imagePath = scannedImages[0];
                 console.log("📸 [scanDocument] Image scanned:", imagePath);
 
                 // Upload scanned image to temp-upload
                 try {
-                const path = imagePath.replace("file://", "");
-                    const filename = path.split("/").pop() || "scanned-document.jpg";
+                    // Extract filename from path (same pattern as other uploads in codebase)
+                    const filename = imagePath.split("/").pop() || `scanned-document-${Date.now()}.jpg`;
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : "image/jpeg";
 
                     const file = {
-                        uri: imagePath,
-                        type,
+                        uri: imagePath, // Use imagePath directly (DocumentScanner returns proper URI format)
+                        type: type,
                         name: filename,
                     } as any;
 
-                    console.log("📤 [scanDocument] Uploading to temp-upload...");
+                    console.log("📤 [scanDocument] Uploading to temp-upload...", { uri: imagePath, type, name: filename });
                     uploadScannedImage(file);
                 } catch (uploadError) {
                     console.error("❌ [scanDocument] Upload error:", uploadError);
@@ -321,16 +322,18 @@ export default function PatientDetailsScreen() {
                 // Optional: OCR processing (can be done in background)
                 try {
                     const path = imagePath.replace("file://", "");
-                const lines = await TextRecognition.recognize(path);
-                const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
+                    const lines = await TextRecognition.recognize(path);
+                    const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                     console.log("📝 [scanDocument] OCR Text:", fullText);
                     // Parse the extracted data (optional, for future use)
-                const parsed = parseUSIDCardData(fullText, imagePath);
+                    const parsed = parseUSIDCardData(fullText, imagePath);
                     console.log("📋 [scanDocument] Parsed ID Card Data:", parsed);
                 } catch (ocrError) {
                     console.warn("⚠️ [scanDocument] OCR failed (non-critical):", ocrError);
                     // OCR failure is not critical, continue with upload
                 }
+            } else {
+                console.warn("⚠️ [scanDocument] No images scanned");
             }
         } catch (error) {
             console.error("❌ [scanDocument] Scan failed:", error);
