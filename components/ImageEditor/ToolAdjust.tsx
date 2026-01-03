@@ -115,8 +115,21 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         const layout = buttonLayouts.current[id];
         if (layout && scrollViewRef.current) {
             const screenWidth = Dimensions.get("window").width;
-            // Add offset to shift item left for better centering
-            const scrollToX = layout.x - screenWidth / 2 + layout.width / 2 - 20;
+            // Calculate scroll position to center the item
+            // layout.x is relative to content, so we center it in viewport
+            const itemCenterX = layout.x + layout.width / 2;
+            // Add offset to adjust for proper centering (based on debug: +20 needed)
+            const scrollToX = itemCenterX - screenWidth / 2 + 20;
+
+            console.log("=== Scroll Debug ===");
+            console.log("Item ID:", id);
+            console.log("layout.x:", layout.x);
+            console.log("layout.width:", layout.width);
+            console.log("screenWidth:", screenWidth);
+            console.log("itemCenterX:", itemCenterX);
+            console.log("scrollToX (calculated):", scrollToX);
+            console.log("scrollToX (final):", Math.max(0, scrollToX));
+
             isScrolling.current = true;
             scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: true });
             setTimeout(() => {
@@ -131,9 +144,25 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
 
         if (isScrolling.current) return;
 
+        // Debug log for scroll position
+        if (selectedAdjustment) {
+            const layout = buttonLayouts.current[selectedAdjustment];
+            if (layout) {
+                const screenWidth = Dimensions.get("window").width;
+                const itemCenterX = layout.x + layout.width / 2;
+                const visibleCenterX = offsetX + screenWidth / 2;
+                console.log("=== Scroll Position Debug ===");
+                console.log("Current scroll offsetX:", offsetX);
+                console.log("Screen width:", screenWidth);
+                console.log("Visible center X:", visibleCenterX);
+                console.log("Item center X:", itemCenterX);
+                console.log("Difference:", visibleCenterX - itemCenterX);
+            }
+        }
+
         const screenWidth = Dimensions.get("window").width;
         // Shift center point slightly left for better alignment
-        const centerX = offsetX + screenWidth / 2 - 12;
+        const centerX = offsetX + screenWidth / 2 - 20;
 
         // Find the item closest to center
         let closestId: string | null = null;
@@ -160,7 +189,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
         // Snap to center when scroll ends
         const screenWidth = Dimensions.get("window").width;
         const currentScrollX = event.nativeEvent.contentOffset.x;
-        const centerX = currentScrollX + screenWidth / 2 - 12;
+        const centerX = currentScrollX + screenWidth / 2 - 20;
 
         let closestId: string | null = null;
         let minDistance = Infinity;
@@ -183,8 +212,10 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
 
         if (closestId && scrollViewRef.current) {
             setSelectedAdjustment(closestId);
-            // Add offset to shift item left for better centering
-            const scrollToX = closestX - screenWidth / 2 + closestWidth / 2 - 20;
+            // Calculate scroll position to center the item
+            const itemCenterX = closestX + closestWidth / 2;
+            // Add offset to adjust for proper centering (based on debug: +20 needed)
+            const scrollToX = itemCenterX - screenWidth / 2 + 20;
             scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: true });
         }
     };
@@ -334,15 +365,15 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
                                 }}
                             >
                                 <TouchableOpacity onPress={() => handleAdjustmentSelect(option.id)} style={[styles.adjustmentButton, isSelected && hasValue && styles.adjustmentButtonActive, isSelected && !hasValue && styles.adjustmentButtonSelected]} activeOpacity={0.8}>
-                                    {hasValue && isSelected ? (
-                                        <BaseText type="Callout" weight={400} style={[styles.buttonValueText, { color: isSelected && hasValue ? YELLOW_COLOR : colors.labels.primary }]}>
+                                    {isSelected && hasValue ? (
+                                        <BaseText type="Callout" weight={400} style={[styles.buttonValueText, { color: YELLOW_COLOR }]}>
                                             {formatValue(value)}
                                         </BaseText>
                                     ) : (
                                         <IconSymbol name={option.icon as any} size={20} color={isSelected ? colors.labels.primary : colors.labels.secondary} />
                                     )}
                                 </TouchableOpacity>
-                                {isSelected && hasValue && (
+                                {hasValue && (
                                     <View style={styles.activeIndicator}>
                                         <ProgressCircle value={value} />
                                     </View>
