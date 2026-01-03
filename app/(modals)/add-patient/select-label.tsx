@@ -26,7 +26,7 @@ export default function SelectLabelModal() {
                         }}
                         activeOpacity={0.7}
                     >
-                        <BaseText type="Footnote" color={isSelected ? "system.blue" : "labels.primary"} weight={isSelected ? "500" : "400"}>
+                        <BaseText type="Body" color={isSelected ? "system.blue" : "labels.primary"} weight={isSelected ? "500" : "400"}>
                             {option}
                         </BaseText>
                     </TouchableOpacity>

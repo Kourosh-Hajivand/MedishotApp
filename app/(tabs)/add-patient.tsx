@@ -47,7 +47,7 @@ export default function AddPatientRedirect() {
                     const singleDoctor = availableDoctors[0];
                     const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
                     router.push({
-                        pathname: "/(modals)/add-patient/photo",
+                        pathname: "/(modals)/add-patient/form",
                         params: {
                             doctor_id: doctorIdParam,
                             doctor: JSON.stringify(singleDoctor),
@@ -59,7 +59,7 @@ export default function AddPatientRedirect() {
                 }
             } else {
                 // Otherwise, go directly to add patient photo
-                router.push("/(modals)/add-patient/photo");
+                router.push("/(modals)/add-patient/form");
             }
         }, [currentUserRole, availableDoctors]),
     );

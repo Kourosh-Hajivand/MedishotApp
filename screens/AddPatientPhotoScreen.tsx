@@ -16,7 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Pressable, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { BaseText, ControlledInput, DynamicInputList, KeyboardAwareScrollView } from "../components";
@@ -229,14 +229,29 @@ export const AddPatientPhotoScreen: React.FC = () => {
         return selectedDoctor.email;
     }, [selectedDoctor]);
 
-    const { mutate: createPatient, isPending: isCreating } = useCreatePatient(selectedPractice?.id ?? "", () => {
-        router.back();
-        router.back();
-        router.push("/(tabs)/patients");
-    });
-    const { mutate: updatePatient, isPending: isUpdating } = useUpdatePatient(() => {
-        router.back();
-    });
+    const { mutate: createPatient, isPending: isCreating } = useCreatePatient(
+        selectedPractice?.id ?? "",
+        (data) => {
+            // Navigate to the newly created patient's detail page
+            if (data?.data?.id) {
+                router.back();
+                router.back();
+                router.dismissAll();
+                router.push(`/patients/${data.data.id}`);
+            }
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to create patient. Please try again.");
+        },
+    );
+    const { mutate: updatePatient, isPending: isUpdating } = useUpdatePatient(
+        () => {
+            router.back();
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update patient. Please try again.");
+        },
+    );
 
     const isPending = isCreating || isUpdating;
 
@@ -578,9 +593,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
             );
         } else {
             createPatient(patientData, {
-                onSuccess: () => {
-                    router.push("/(tabs)/patients");
-                    router.back();
+                onSuccess: (data) => {
+                    // Navigate to the newly created patient's detail page
+                    if (data?.data?.id) {
+                        router.dismissAll();
+                        router.push(`/patients/${data.data.id}`);
+                    }
                 },
             });
         }
@@ -631,13 +649,17 @@ export const AddPatientPhotoScreen: React.FC = () => {
         navigation.setOptions({
             headerRight: () => (
                 <Pressable onPress={handleNext} disabled={!isFormValid || isPending} className="px-2">
-                    <BaseText type="Body" weight="600" color={isFormValid ? "system.blue" : "system.gray"}>
-                        Done
-                    </BaseText>
+                    {isPending ? (
+                        <ActivityIndicator size="small" color={colors.system.blue} />
+                    ) : (
+                        <BaseText type="Body" weight="600" color={!isFormValid || isPending ? "system.gray" : "system.blue"}>
+                            Done
+                        </BaseText>
+                    )}
                 </Pressable>
             ),
         });
-    }, [navigation, isFormValid]);
+    }, [navigation, isFormValid, isPending, handleNext]);
 
     useLayoutEffect(() => {
         if (params.id) {
