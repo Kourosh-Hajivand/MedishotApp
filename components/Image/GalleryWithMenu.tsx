@@ -140,6 +140,11 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                                 }}
                                 contentFit="cover"
                             />
+                            {imageUrlToBookmarkMap?.get(uri) && (
+                                <View style={styles.bookmarkIcon}>
+                                    <IconSymbol name="heart.fill" size={16} color={colors.system.white} />
+                                </View>
+                            )}
                         </TouchableOpacity>
                     </ContextMenu.Trigger>
                 </ContextMenu>
@@ -222,5 +227,14 @@ const styles = StyleSheet.create({
     rowContainer: {
         flexDirection: "row",
         marginBottom: 0.5,
+    },
+    bookmarkIcon: {
+        position: "absolute",
+        bottom: 8,
+        left: 8,
+        width: 24,
+        height: 24,
+        justifyContent: "center",
+        alignItems: "center",
     },
 });
