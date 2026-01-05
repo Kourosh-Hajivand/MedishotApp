@@ -560,6 +560,23 @@ export default function PatientDetailsScreen() {
                                 </View>
                             </View>
                         </View>
+
+                        <TouchableOpacity
+                            className="bg-white py-2 px-4 rounded-xl"
+                            onPress={() => {
+                                router.push({
+                                    pathname: "/(modals)/patient-details",
+                                    params: { id },
+                                });
+                            }}
+                        >
+                            <View className="flex-row items-center justify-between">
+                                <BaseText type="Body" color="labels.primary">
+                                    Patient Details
+                                </BaseText>
+                                <IconSymbol name="chevron.right" color={colors.system.gray} size={16} />
+                            </View>
+                        </TouchableOpacity>
                     </View>
                 </>
             );

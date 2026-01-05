@@ -1,4 +1,4 @@
-import { BaseText } from "@/components";
+import { BackButton, BaseText } from "@/components";
 import { router, Stack } from "expo-router";
 import React from "react";
 import { TouchableOpacity } from "react-native";
@@ -28,6 +28,7 @@ export default function ModalsLayout() {
             <Stack.Screen name="add-practice-member" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="edit-practice" options={{ headerShown: false, gestureEnabled: false }} />
             <Stack.Screen name="edit-profile" options={{ headerShown: false, gestureEnabled: false }} />
+            <Stack.Screen name="patient-details" options={{ headerShown: true, headerTitle: "Patient Details", headerTransparent: true, headerLeft: () => <BackButton onPress={() => router.back()} />, gestureEnabled: false, fullScreenGestureEnabled: false }} />
         </Stack>
     );
 }
