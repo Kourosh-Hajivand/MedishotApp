@@ -259,6 +259,15 @@ export const useGetRecentlyPhotos = (practiceId: number, enabled: boolean = true
     });
 };
 
+export const useGetPracticeAlbums = (practiceId: number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetPracticeAlbums", practiceId],
+        queryFn: () => PracticeService.getAlbums(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
+
 export const useGetPatientsCount = (practiceId: number, type: string, enabled: boolean = true): UseQueryResult<PracticeStatsResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({

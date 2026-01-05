@@ -31,6 +31,7 @@ const {
         getRecentlyPhotos,
         getPatientsCount,
         getArchivedMedia,
+        getAlbums,
         getMember,
     },
 } = routes;
@@ -239,6 +240,19 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to get archived media");
+            }
+            throw error;
+        }
+    },
+
+    // Get practice albums
+    getAlbums: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
+        try {
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getAlbums(practiseId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get practice albums");
             }
             throw error;
         }

@@ -39,7 +39,7 @@ export default function AddPatientRedirect() {
     useFocusEffect(
         useCallback(() => {
             // First navigate to patients tab
-            router.replace("/(tabs)/album");
+            router.replace("/(tabs)/patients");
 
             // // Then open modal after a short delay to ensure navigation completes
             setTimeout(() => {
