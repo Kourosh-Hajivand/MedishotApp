@@ -10,9 +10,11 @@ import { Media } from "@/utils/service/models/ResponseModels";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, { FadeIn, FadeInDown, SlideInDown } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -20,6 +22,14 @@ export const AlbumScreen: React.FC = () => {
     const { selectedPractice } = useProfileStore();
     const [selectedImage, setSelectedImage] = useState<Media | null>(null);
     const [bookmarkedImages, setBookmarkedImages] = useState<Set<number>>(new Set());
+    const [animationKey, setAnimationKey] = useState(0);
+
+    // Reset animation key when screen is focused to replay animations
+    useFocusEffect(
+        useCallback(() => {
+            setAnimationKey((prev) => prev + 1);
+        }, []),
+    );
 
     // Get albums for the practice
     const { data: albumsData, isLoading: isLoadingPhotos } = useGetPracticeAlbums(selectedPractice?.id ?? 0, !!selectedPractice?.id);
@@ -110,77 +120,139 @@ export const AlbumScreen: React.FC = () => {
             bookmarkMedia(selectedImage.id);
         }
     };
-
+    const insets = useSafeAreaInsets();
     return (
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.content, { paddingTop: 0 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             {isLoadingPhotos ? (
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color={colors.system.blue} />
                 </View>
             ) : !hasPhotos ? (
                 <>
-                    {/* Create Practice Album Card */}
-                    <LinearGradient colors={["#5856D6", "rgba(88, 86, 214, 0.00)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.createAlbumCard}>
-                        <View className="w-full   items-center gap-4 flex-row">
-                            <View style={styles.cardImagesContainer}>
-                                {/* Overlapping placeholder images - 3 items only */}
-                                {[
-                                    { image: require("@/assets/images/fakePatients/testImage.png"), index: 0 },
-                                    { image: require("@/assets/images/fakePatients/testImage.png"), index: 1 },
-                                    { image: require("@/assets/images/fakePatients/testImage.png"), index: 2 },
-                                ].map(({ image, index }) => {
-                                    const rotations = [-23.685, -5.344, 8.869];
-                                    const sizes = [46.346, 58.55, 85.326];
-                                    const leftOffsets = [-59.37, -47.81, -30.22];
-                                    const topOffsets = [-20.08, -35.78, -45.39];
-                                    return (
-                                        <View
-                                            key={index}
-                                            style={[
-                                                styles.overlappingImage,
-                                                {
-                                                    width: sizes[index],
-                                                    height: sizes[index],
-                                                    left: 64 + leftOffsets[index],
-                                                    top: 47 + topOffsets[index],
-                                                    transform: [{ rotate: `${rotations[index]}deg` }],
-                                                    zIndex: 3 + index,
-                                                },
-                                            ]}
-                                        >
-                                            <Image source={image} style={styles.overlappingImageInner} contentFit="cover" />
+                    {recentPatients.length > 0 ? (
+                        <Animated.View key={`card-${animationKey}`} entering={FadeInDown.duration(600).delay(100).springify()}>
+                            <LinearGradient colors={["#5856D6", "rgba(88, 86, 214, 0.00)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.createAlbumCard}>
+                                <View className="w-full   items-center gap-4 flex-row">
+                                    <View style={styles.cardImagesContainer}>
+                                        {/* Overlapping placeholder images - 3 items only */}
+                                        {[
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 0 },
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 1 },
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 2 },
+                                        ].map(({ image, index }) => {
+                                            const rotations = [-23.685, -5.344, 8.869];
+                                            const sizes = [46.346, 58.55, 85.326];
+                                            const leftOffsets = [-59.37, -47.81, -30.22];
+                                            const topOffsets = [-20.08, -35.78, -45.39];
+                                            return (
+                                                <Animated.View
+                                                    key={index}
+                                                    entering={FadeIn.duration(400)
+                                                        .delay(200 + index * 100)
+                                                        .springify()}
+                                                    style={[
+                                                        styles.overlappingImage,
+                                                        {
+                                                            width: sizes[index],
+                                                            height: sizes[index],
+                                                            left: 64 + leftOffsets[index],
+                                                            top: 47 + topOffsets[index],
+                                                            transform: [{ rotate: `${rotations[index]}deg` }],
+                                                            zIndex: 3 + index,
+                                                        },
+                                                    ]}
+                                                >
+                                                    <Image source={image} style={styles.overlappingImageInner} contentFit="cover" />
+                                                </Animated.View>
+                                            );
+                                        })}
+                                    </View>
+                                    <Animated.View entering={FadeIn.duration(400).delay(300)} style={styles.cardTextContainer}>
+                                        <BaseText type="Body" weight="600" color="labels.primary" style={styles.cardTitle}>
+                                            Create Practice Album.
+                                        </BaseText>
+                                        <BaseText type="Footnote" color="labels.secondary" style={styles.cardDescription}>
+                                            You can add your favorite patient result's here.
+                                        </BaseText>
+                                    </Animated.View>
+                                </View>
+                                {/* Patients List */}
+                                {recentPatients.length > 0 && (
+                                    <Animated.View entering={SlideInDown.duration(500).delay(600).springify()} style={styles.patientsListContainer}>
+                                        <BaseText type="Footnote" weight="600" color="labels.primary" style={styles.patientsListTitle}>
+                                            Start with your last patient's:
+                                        </BaseText>
+                                        <View style={styles.patientsList}>
+                                            {recentPatients.map((patient, index) => (
+                                                <Animated.View
+                                                    key={`${patient.id}-${index}`}
+                                                    entering={FadeInDown.duration(300)
+                                                        .delay(700 + index * 50)
+                                                        .springify()}
+                                                >
+                                                    <TouchableOpacity onPress={() => router.push(`/patients/${patient.id}`)} style={[styles.listItem]} className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== recentPatients.length - 1 ? "border-b border-gray-200" : ""}`}>
+                                                        <Avatar haveRing name={patient.full_name} size={36} imageUrl={patient.profile_image?.url || undefined} color={patient.doctor?.color} />
+                                                        <BaseText type="Callout" weight={500} color="labels.primary">
+                                                            {patient.full_name}
+                                                        </BaseText>
+                                                    </TouchableOpacity>
+                                                </Animated.View>
+                                            ))}
                                         </View>
-                                    );
-                                })}
-                            </View>
-                            <View style={styles.cardTextContainer}>
-                                <BaseText type="Body" weight="600" color="labels.primary" style={styles.cardTitle}>
-                                    Create Practice Album.
-                                </BaseText>
-                                <BaseText type="Footnote" color="labels.secondary" style={styles.cardDescription}>
-                                    You can add your favorite patient result's here.
-                                </BaseText>
-                            </View>
-                        </View>
-                        {/* Patients List */}
-                        {recentPatients.length > 0 && (
-                            <View style={styles.patientsListContainer}>
-                                <BaseText type="Footnote" weight="600" color="labels.primary" style={styles.patientsListTitle}>
-                                    Start with your last patient's:
-                                </BaseText>
-                                <View style={styles.patientsList}>
-                                    {recentPatients.map((patient, index) => (
-                                        <TouchableOpacity onPress={() => router.push(`/patients/${patient.id}`)} key={`${patient.id}-${index}`} style={[styles.listItem]} className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== recentPatients.length - 1 ? "border-b border-gray-200" : ""}`}>
-                                            <Avatar haveRing name={patient.full_name} size={36} imageUrl={patient.profile_image?.url || undefined} color={patient.doctor?.color} />
-                                            <BaseText type="Callout" weight={500} color="labels.primary">
-                                                {patient.full_name}
-                                            </BaseText>
-                                        </TouchableOpacity>
-                                    ))}
+                                    </Animated.View>
+                                )}
+                            </LinearGradient>
+                        </Animated.View>
+                    ) : (
+                        <View className="px-5">
+                            <View className="bg-[#5856D6] p-5 rounded-2xl ">
+                                <View className="w-full  items-center gap-4 flex-row">
+                                    <View style={styles.cardImagesContainer}>
+                                        {/* Overlapping placeholder images - 3 items only */}
+                                        {[
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 0 },
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 1 },
+                                            { image: require("@/assets/images/fakePatients/testImage.png"), index: 2 },
+                                        ].map(({ image, index }) => {
+                                            const rotations = [-23.685, -5.344, 8.869];
+                                            const sizes = [46.346, 58.55, 85.326];
+                                            const leftOffsets = [-59.37, -47.81, -30.22];
+                                            const topOffsets = [-20.08, -35.78, -45.39];
+                                            return (
+                                                <Animated.View
+                                                    key={index}
+                                                    entering={FadeIn.duration(400)
+                                                        .delay(200 + index * 100)
+                                                        .springify()}
+                                                    style={[
+                                                        styles.overlappingImage,
+                                                        {
+                                                            width: sizes[index],
+                                                            height: sizes[index],
+                                                            left: 64 + leftOffsets[index],
+                                                            top: 47 + topOffsets[index],
+                                                            transform: [{ rotate: `${rotations[index]}deg` }],
+                                                            zIndex: 3 + index,
+                                                        },
+                                                    ]}
+                                                >
+                                                    <Image source={image} style={styles.overlappingImageInner} contentFit="cover" />
+                                                </Animated.View>
+                                            );
+                                        })}
+                                    </View>
+                                    <Animated.View entering={FadeIn.duration(400).delay(300)} style={styles.cardTextContainer}>
+                                        <BaseText type="Body" weight="600" color="labels.primary" style={styles.cardTitle}>
+                                            Create Practice Album.
+                                        </BaseText>
+                                        <BaseText type="Footnote" color="labels.secondary" style={styles.cardDescription}>
+                                            You can add your favorite patient result's here.
+                                        </BaseText>
+                                    </Animated.View>
                                 </View>
                             </View>
-                        )}
-                    </LinearGradient>
+                        </View>
+                    )}
                 </>
             ) : (
                 /* Gallery View */
