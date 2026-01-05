@@ -1,5 +1,6 @@
 import { BaseButton, BaseText } from "@/components";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
+import { ImageEditorModal } from "@/components/ImageEditor";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -72,6 +73,9 @@ export default function PatientDetailsScreen() {
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
+    const [imageEditorVisible, setImageEditorVisible] = useState(false);
+    const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
+    const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
 
     // Calculate age from birth_date
     const patientAge = useMemo(() => {
@@ -113,6 +117,35 @@ export default function PatientDetailsScreen() {
             // Fallback: check if media.media exists (old structure)
             else if (media.media?.url) {
                 map.set(media.media.url, mediaId);
+            }
+        });
+
+        return map;
+    }, [patientMediaData?.data]);
+
+    // Create a map from image URL to bookmark status
+    const imageUrlToBookmarkMap = useMemo(() => {
+        const map = new Map<string, boolean>();
+        if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
+
+        patientMediaData.data.forEach((media: any) => {
+            const isBookmarked = media.is_bookmarked ?? false;
+
+            // If media has a template, extract images from template.images array
+            if (media.template && media.images && Array.isArray(media.images)) {
+                media.images.forEach((img: any) => {
+                    if (img.image?.url) {
+                        map.set(img.image.url, isBookmarked);
+                    }
+                });
+            }
+            // If media doesn't have a template, use original_media
+            else if (media.original_media?.url) {
+                map.set(media.original_media.url, isBookmarked);
+            }
+            // Fallback: check if media.media exists (old structure)
+            else if (media.media?.url) {
+                map.set(media.media.url, isBookmarked);
             }
         });
 
@@ -572,20 +605,18 @@ export default function PatientDetailsScreen() {
                                 label: "Use Magic",
 
                                 onPress: (imageUri) => {
-                                    router.push({
-                                        pathname: "/(fullmodals)/image-editor",
-                                        params: { uri: imageUri },
-                                    });
+                                    setImageEditorUri(imageUri);
+                                    setImageEditorTool("Magic");
+                                    setImageEditorVisible(true);
                                 },
                             },
                             {
                                 icon: "slider.horizontal.3",
                                 label: "Adjustment",
                                 onPress: (imageUri) => {
-                                    router.push({
-                                        pathname: "/(fullmodals)/image-editor",
-                                        params: { uri: imageUri, initialTool: "Adjust" },
-                                    });
+                                    setImageEditorUri(imageUri);
+                                    setImageEditorTool("Adjust");
+                                    setImageEditorVisible(true);
                                 },
                             },
                             {
@@ -621,6 +652,9 @@ export default function PatientDetailsScreen() {
                         ]}
                         patientData={patient?.data}
                         sections={groupedPatientImages}
+                        imageUrlToMediaIdMap={imageUrlToMediaIdMap}
+                        imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                        patientId={id}
                     />
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}
@@ -649,6 +683,7 @@ export default function PatientDetailsScreen() {
                 contentContainerStyle={{}}
                 onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
             />
+            <ImageEditorModal visible={imageEditorVisible} uri={imageEditorUri} initialTool={imageEditorTool} onClose={() => setImageEditorVisible(false)} />
         </View>
     );
 }

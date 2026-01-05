@@ -1,13 +1,14 @@
+import { ImageEditorModal } from "@/components/ImageEditor";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { useBookmarkMedia, useDeletePatientMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
 import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
-import { router } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Dimensions, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +21,9 @@ interface ImageViewerModalProps {
     initialIndex: number;
     onClose: () => void;
     patientData?: Patient;
+    imageUrlToMediaIdMap?: Map<string, number | string>;
+    imageUrlToBookmarkMap?: Map<string, boolean>;
+    patientId?: string | number;
 }
 
 interface ThumbnailItemProps {
@@ -74,7 +78,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
     );
 };
 
-export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, patientData }) => {
+export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, patientData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId }) => {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
     const thumbnailScrollRef = useRef<ScrollView>(null);
@@ -87,6 +91,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
     const [isZoomed, setIsZoomed] = useState(false);
+    const [localBookmarkMap, setLocalBookmarkMap] = useState<Map<string, boolean>>(new Map());
+    const [imageEditorVisible, setImageEditorVisible] = useState(false);
+    const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
+    const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
 
     // Shared values for zoom and pan (only for current image)
     const scale = useSharedValue(1);
@@ -353,13 +361,149 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const handleEditPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const currentImageUri = images[currentIndex];
-        onClose();
-        setTimeout(() => {
-            router.push({
-                pathname: "/(fullmodals)/image-editor",
-                params: { uri: currentImageUri },
+        setImageEditorUri(currentImageUri);
+        setImageEditorTool(undefined);
+        setImageEditorVisible(true);
+    };
+
+    // Bookmark mutations
+    const { mutate: bookmarkMedia } = useBookmarkMedia(
+        () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // Optimistically update local bookmark map
+            const currentImageUri = images[currentIndex];
+            setLocalBookmarkMap((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(currentImageUri, true);
+                return newMap;
             });
-        }, 300);
+        },
+        (error) => {
+            console.error("Error bookmarking media:", error);
+            Alert.alert("Error", error.message || "Failed to bookmark image");
+            // Revert optimistic update on error
+            const currentImageUri = images[currentIndex];
+            setLocalBookmarkMap((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(currentImageUri, imageUrlToBookmarkMap?.get(currentImageUri) ?? false);
+                return newMap;
+            });
+        },
+    );
+
+    const { mutate: unbookmarkMedia } = useUnbookmarkMedia(
+        () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // Optimistically update local bookmark map
+            const currentImageUri = images[currentIndex];
+            setLocalBookmarkMap((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(currentImageUri, false);
+                return newMap;
+            });
+        },
+        (error) => {
+            console.error("Error unbookmarking media:", error);
+            Alert.alert("Error", error.message || "Failed to unbookmark image");
+            // Revert optimistic update on error
+            const currentImageUri = images[currentIndex];
+            setLocalBookmarkMap((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(currentImageUri, imageUrlToBookmarkMap?.get(currentImageUri) ?? false);
+                return newMap;
+            });
+        },
+    );
+
+    // Archive mutation
+    const { mutate: archiveMedia } = useDeletePatientMedia(
+        () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert("Success", "Image archived successfully");
+            onClose();
+        },
+        (error) => {
+            console.error("Error archiving media:", error);
+            Alert.alert("Error", error.message || "Failed to archive image");
+        },
+    );
+
+    // Initialize local bookmark map from prop map when it changes or modal opens
+    React.useEffect(() => {
+        if (imageUrlToBookmarkMap && imageUrlToBookmarkMap.size > 0) {
+            setLocalBookmarkMap(new Map(imageUrlToBookmarkMap));
+        }
+    }, [imageUrlToBookmarkMap, visible]);
+
+    const handleBookmarkPress = () => {
+        const currentImageUri = images[currentIndex];
+        const mediaId = imageUrlToMediaIdMap?.get(currentImageUri);
+        // Use local bookmark map first, fallback to prop map
+        const isBookmarked = localBookmarkMap.get(currentImageUri) ?? imageUrlToBookmarkMap?.get(currentImageUri) ?? false;
+
+        if (!mediaId) {
+            Alert.alert("Error", "Could not find media ID for this image");
+            return;
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        if (isBookmarked) {
+            unbookmarkMedia(mediaId);
+        } else {
+            bookmarkMedia(mediaId);
+        }
+    };
+
+    const handleAdjustPress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const currentImageUri = images[currentIndex];
+        setImageEditorUri(currentImageUri);
+        setImageEditorTool("Adjust");
+        setImageEditorVisible(true);
+    };
+
+    const handleArchivePress = () => {
+        const currentImageUri = images[currentIndex];
+        const mediaId = imageUrlToMediaIdMap?.get(currentImageUri);
+
+        if (!mediaId) {
+            Alert.alert("Error", "Could not find media ID for this image");
+            return;
+        }
+
+        if (!patientId) {
+            Alert.alert("Error", "Patient ID is required");
+            return;
+        }
+
+        Alert.alert("Archive Image", "Are you sure you want to archive this image?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Archive",
+                style: "destructive",
+                onPress: () => {
+                    archiveMedia({ patientId, mediaId });
+                },
+            },
+        ]);
+    };
+
+    const handleSharePress = async () => {
+        const currentImageUri = images[currentIndex];
+        try {
+            const patientName = `${patientData?.first_name || ""} ${patientData?.last_name || ""}`.trim();
+            const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${currentImageUri}`;
+
+            await Share.share({
+                message: message,
+                url: currentImageUri,
+            });
+        } catch (error: any) {
+            console.error("Error sharing image:", error);
+            if (error?.message !== "User did not share") {
+                Alert.alert("Error", "Failed to share image");
+            }
+        }
     };
 
     const toggleControls = () => {
@@ -577,7 +721,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                         <View style={styles.actionButtonsContainer}>
                             <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                 <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
-                                    <Button systemImage="chevron.left" variant="glass" onPress={onClose} />
+                                    <HStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 40, height: 40 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                    >
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="chevron.left" variant="plain" controlSize="regular" onPress={onClose} />
+                                    </HStack>
                                     <Spacer />
                                     <VStack
                                         alignment="center"
@@ -598,7 +755,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         </Text>
                                     </VStack>
                                     <Spacer />
-                                    <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="ellipsis" variant="glass" onPress={() => {}} />
+                                    <HStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 40, height: 40 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                    >
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="ellipsis" variant="plain" controlSize="regular" onPress={() => {}} />
+                                    </HStack>
                                 </HStack>
                             </Host>
                         </View>
@@ -672,13 +842,26 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                         <View style={styles.actionButtonsContainer}>
                             <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                 <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
-                                    <Button systemImage="square.and.arrow.up" variant="glass" controlSize="regular" onPress={() => {}} />
+                                    <HStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 40, height: 40 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                    >
+                                        <Button systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} />
+                                    </HStack>
                                     <Spacer />
                                     <HStack
                                         alignment="center"
                                         modifiers={[
                                             padding({ all: 4 }),
-                                            frame({ width: 150, height: 40 }),
+                                            frame({ width: 100, height: 40 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -687,18 +870,33 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         ]}
                                         spacing={4}
                                     >
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="heart" variant="plain" controlSize="regular" onPress={handleEditPress} />
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="info.circle" variant="plain" controlSize="regular" onPress={handleEditPress} />
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleEditPress} />
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage={(localBookmarkMap.get(images[currentIndex]) ?? imageUrlToBookmarkMap?.get(images[currentIndex])) ? "heart.fill" : "heart"} variant="plain" controlSize="regular" onPress={handleBookmarkPress} />
+                                        {/* <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="info.circle" variant="plain" controlSize="regular" onPress={handleEditPress} /> */}
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleAdjustPress} />
                                     </HStack>
                                     <Spacer />
-                                    <Button systemImage="archivebox" variant="glass" controlSize="regular" onPress={handleEditPress} />
+                                    <HStack
+                                        alignment="center"
+                                        modifiers={[
+                                            padding({ all: 4 }),
+                                            frame({ width: 40, height: 40 }),
+                                            glassEffect({
+                                                glass: {
+                                                    variant: "regular",
+                                                },
+                                            }),
+                                        ]}
+                                    >
+                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="archivebox" variant="plain" role="destructive" controlSize="large" onPress={handleArchivePress} />
+                                    </HStack>
                                 </HStack>
                             </Host>
                         </View>
                     </Animated.View>
                 </View>
             </GestureHandlerRootView>
+
+            <ImageEditorModal visible={imageEditorVisible} uri={imageEditorUri} initialTool={imageEditorTool} onClose={() => setImageEditorVisible(false)} />
         </Modal>
     );
 };

@@ -36,11 +36,14 @@ interface GalleryWithMenuProps {
     onImagePress?: (uri: string) => void;
     patientData?: Patient;
     menuItems: MenuItem[];
+    imageUrlToMediaIdMap?: Map<string, number | string>;
+    imageUrlToBookmarkMap?: Map<string, boolean>;
+    patientId?: string | number;
 }
 
 const { width } = Dimensions.get("window");
 
-export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData, menuItems }) => {
+export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData, menuItems, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId }) => {
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -98,8 +101,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         if (onImagePress) onImagePress(uri);
         const index = allImages.indexOf(uri);
         if (index !== -1) {
-        setSelectedIndex(index);
-        setViewerVisible(true);
+            setSelectedIndex(index);
+            setViewerVisible(true);
         }
     };
 
@@ -110,16 +113,16 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
 
         return (
             <Host key={`${uri}-${index}`} style={{ flex: 1 }}>
-            <ContextMenu activationMethod="longPress">
-                <ContextMenu.Items>
+                <ContextMenu activationMethod="longPress">
+                    <ContextMenu.Items>
                         {menuItems.map((menu, menuIndex) => (
                             <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
-                            {menu.label}
-                        </Button>
-                    ))}
-                </ContextMenu.Items>
+                                {menu.label}
+                            </Button>
+                        ))}
+                    </ContextMenu.Items>
 
-                <ContextMenu.Trigger>
+                    <ContextMenu.Trigger>
                         <TouchableOpacity
                             activeOpacity={0.9}
                             onPress={() => handleImagePress(uri)}
@@ -134,22 +137,18 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                                 style={{
                                     width: "100%",
                                     height: "100%",
-                            }}
-                            contentFit="cover"
-                        />
-                    </TouchableOpacity>
-                </ContextMenu.Trigger>
-            </ContextMenu>
-        </Host>
-    );
+                                }}
+                                contentFit="cover"
+                            />
+                        </TouchableOpacity>
+                    </ContextMenu.Trigger>
+                </ContextMenu>
+            </Host>
+        );
     };
 
     const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
-        return (
-            <View style={styles.rowContainer}>
-                {item.items.map((uri, itemIndex) => renderImageItem(uri, itemIndex))}
-            </View>
-        );
+        return <View style={styles.rowContainer}>{item.items.map((uri, itemIndex) => renderImageItem(uri, itemIndex))}</View>;
     };
 
     const renderSectionHeader = ({ section }: { section: { title: string; data: ImageRow[] } }) => {
@@ -182,19 +181,11 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
-                    <SectionList
-                        sections={sectionsWithRows}
-                        key={numColumns}
-                        renderItem={renderItem}
-                        renderSectionHeader={renderSectionHeader}
-                        keyExtractor={(item, index) => `row-${index}`}
-                        stickySectionHeadersEnabled={false}
-                        contentContainerStyle={styles.sectionListContent}
-                    />
+                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item, index) => `row-${index}`} stickySectionHeadersEnabled={false} contentContainerStyle={styles.sectionListContent} />
                 </Animated.View>
             </GestureDetector>
 
-            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={allImages} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} />
+            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={allImages} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} imageUrlToMediaIdMap={imageUrlToMediaIdMap} imageUrlToBookmarkMap={imageUrlToBookmarkMap} patientId={patientId} />
         </GestureHandlerRootView>
     );
 };

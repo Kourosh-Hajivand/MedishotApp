@@ -112,6 +112,17 @@ export const useUpdatePractice = (onSuccess?: (data: PracticeDetailResponse) => 
             queryClient.invalidateQueries({
                 queryKey: ["GetPracticeById", variables.id],
             });
+
+            // اگر practice اپدیت شده همان selectedPractice است، استور را اپدیت کن
+            const currentState = useProfileStore.getState();
+            if (currentState.selectedPractice?.id === variables.id && data?.data) {
+                // Update store directly without triggering another API call
+                // اما doctor را reset نکن چون practice عوض نشده (همان practice است)
+                useProfileStore.setState({ selectedPractice: data.data });
+                // Persist the updated selection
+                persistProfileSelection();
+            }
+
             onSuccess?.(data);
         },
         onError: (error) => {

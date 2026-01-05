@@ -19,13 +19,13 @@ export default function PatientsLayout() {
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
     const segments = useSegments();
-    
+
     // اگر کاربر لاگین کرده اما practice list خالی است، به select-role redirect کن
     // اما فقط اگر در فلوی ثبت‌نام نیست (یعنی در tabs است)
     useEffect(() => {
         // چک کن که آیا در فلوی ثبت‌نام هستیم یا نه
         const isInAuthFlow = segments.some((segment) => segment === "(auth)");
-        
+
         if (isAuthenticated === true && profile && !isPracticeListLoading && !isInAuthFlow) {
             if (!practiceList?.data || practiceList.data.length === 0) {
                 router.replace("/(auth)/select-role");

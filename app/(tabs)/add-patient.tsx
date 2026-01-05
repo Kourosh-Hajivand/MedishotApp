@@ -38,29 +38,35 @@ export default function AddPatientRedirect() {
 
     useFocusEffect(
         useCallback(() => {
-            // If user is doctor, go directly to photo (no need to select doctor)
-            if (currentUserRole === "doctor") {
-                router.push("/(modals)/add-patient/photo");
-            } else if (currentUserRole === "admin" || currentUserRole === "owner") {
-                // If there's only one doctor, go directly to photo with that doctor
-                if (availableDoctors.length === 1) {
-                    const singleDoctor = availableDoctors[0];
-                    const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
-                    router.push({
-                        pathname: "/(modals)/add-patient/form",
-                        params: {
-                            doctor_id: doctorIdParam,
-                            doctor: JSON.stringify(singleDoctor),
-                        },
-                    });
+            // First navigate to patients tab
+            router.replace("/(tabs)/album");
+
+            // // Then open modal after a short delay to ensure navigation completes
+            setTimeout(() => {
+                // If user is doctor, go directly to photo (no need to select doctor)
+                if (currentUserRole === "doctor") {
+                    router.push("/(modals)/add-patient/form");
+                } else if (currentUserRole === "admin" || currentUserRole === "owner") {
+                    // If there's only one doctor, go directly to photo with that doctor
+                    if (availableDoctors.length === 1) {
+                        const singleDoctor = availableDoctors[0];
+                        const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
+                        router.push({
+                            pathname: "/(modals)/add-patient/form",
+                            params: {
+                                doctor_id: doctorIdParam,
+                                doctor: JSON.stringify(singleDoctor),
+                            },
+                        });
+                    } else {
+                        // If user is staff (admin) or owner with multiple doctors, show doctor selection modal
+                        router.push("/(modals)/add-patient/select-doctor");
+                    }
                 } else {
-                    // If user is staff (admin) or owner with multiple doctors, show doctor selection modal
-                    router.push("/(modals)/add-patient/select-doctor");
+                    // Otherwise, go directly to add patient photo
+                    router.push("/(modals)/add-patient/form");
                 }
-            } else {
-                // Otherwise, go directly to add patient photo
-                router.push("/(modals)/add-patient/form");
-            }
+            }, 100);
         }, [currentUserRole, availableDoctors]),
     );
 
