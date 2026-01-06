@@ -129,12 +129,7 @@ export default function SignContractScreen() {
 
     const { mutate: createContract, isPending: isSubmitting } = useCreateContract(
         () => {
-            Alert.alert("Success", "Contract signed successfully!", [
-                {
-                    text: "OK",
-                    onPress: () => router.back(),
-                },
-            ]);
+            router.back();
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to sign contract");
@@ -497,11 +492,13 @@ export default function SignContractScreen() {
                 {/* Header with Practice Info - Based on print_settings */}
                 <View className="flex-row items-center justify-between ">
                     <View className="flex-row items-center gap-2">
-                        {printSettings.avatar === "logo" && practice.image?.url ? (
-                            <Image source={{ uri: practice.image.url }} className="w-10 h-10 rounded-full" />
-                        ) : printSettings.avatar === "profile_picture" && patient.doctor?.profile_photo_url ? (
-                            <Avatar name={`${me?.first_name} ${me?.last_name}`} size={40} imageUrl={me?.profile_photo_url || undefined} />
-                        ) : null}
+                        <View className="w-10 h-10 rounded-full">
+                            {printSettings.avatar === "logo" && practice.image?.url ? (
+                                <Image source={{ uri: practice.image.url }} className="w-10 h-10 rounded-full" />
+                            ) : printSettings.avatar === "profile_picture" && patient.doctor?.profile_photo_url ? (
+                                <Avatar name={`${me?.first_name} ${me?.last_name}`} size={40} imageUrl={me?.profile_photo_url || undefined} />
+                            ) : null}
+                        </View>
                         <View className="gap-0">
                             {printSettings.practiceName && (
                                 <BaseText type="Subhead" weight={600} color="labels.primary">

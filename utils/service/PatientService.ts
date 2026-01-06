@@ -82,14 +82,18 @@ const PatientService = {
             if (payload.national_id) {
                 formData.append("national_id", payload.national_id);
             }
-            if (payload.email) {
-                formData.append("email", payload.email);
-            }
 
             if (payload.numbers) {
                 payload.numbers.forEach((number, index) => {
                     formData.append(`numbers[${index}][type]`, number.type);
                     formData.append(`numbers[${index}][value]`, number.value);
+                });
+            }
+
+            if (payload.email) {
+                payload.email.forEach((email, index) => {
+                    formData.append(`email[${index}][type]`, email.type);
+                    formData.append(`email[${index}][value]`, email.value);
                 });
             }
 
@@ -189,14 +193,18 @@ const PatientService = {
             if (payload.national_id) {
                 formData.append("national_id", payload.national_id);
             }
-            if (payload.email) {
-                formData.append("email", payload.email);
-            }
 
             if (payload.numbers) {
                 payload.numbers.forEach((number, index) => {
                     formData.append(`numbers[${index}][type]`, number.type);
                     formData.append(`numbers[${index}][value]`, number.value);
+                });
+            }
+
+            if (payload.email) {
+                payload.email.forEach((email, index) => {
+                    formData.append(`email[${index}][type]`, email.type);
+                    formData.append(`email[${index}][value]`, email.value);
                 });
             }
 

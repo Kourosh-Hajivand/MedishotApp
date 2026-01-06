@@ -9,7 +9,7 @@ export default function AlbumLayout() {
                 options={{
                     headerTitle: "Practice Album",
                     headerLargeTitle: false,
-                    headerTransparent: true,
+                    headerTransparent: false,
                     headerShadowVisible: true,
                     // headerRight: () => (
                     //     <Host style={{ width: 30, height: 50 }}>

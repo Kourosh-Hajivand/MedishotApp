@@ -33,12 +33,7 @@ export default function CreateTemplateScreen() {
         (data: PracticeTemplateResponse) => {
             console.log("✅ Template created successfully:", data);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("Success", "Template created successfully", [
-                {
-                    text: "OK",
-                    onPress: () => router.back(),
-                },
-            ]);
+            router.back();
         },
         (error: Error) => {
             console.error("❌ Error creating template:", error);

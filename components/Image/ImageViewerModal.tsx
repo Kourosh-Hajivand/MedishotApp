@@ -2,7 +2,7 @@ import { ImageEditorModal } from "@/components/ImageEditor";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useBookmarkMedia, useDeletePatientMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
-import { Patient } from "@/utils/service/models/ResponseModels";
+import { useGetPatientById } from "@/utils/hook/usePatient";
 import { Button, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
@@ -15,15 +15,17 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
 
+import { ViewerActionsConfig } from "./GalleryWithMenu";
+
 interface ImageViewerModalProps {
     visible: boolean;
     images: string[];
     initialIndex: number;
     onClose: () => void;
-    patientData?: Patient;
     imageUrlToMediaIdMap?: Map<string, number | string>;
     imageUrlToBookmarkMap?: Map<string, boolean>;
     patientId?: string | number;
+    actions?: ViewerActionsConfig;
 }
 
 interface ThumbnailItemProps {
@@ -78,7 +80,12 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
     );
 };
 
-export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, patientData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId }) => {
+export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
+
+    // Fetch patient data if patientId is provided
+    const { data: patientDataResponse } = useGetPatientById(patientId || "");
+    const patientData = patientDataResponse?.data;
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
     const thumbnailScrollRef = useRef<ScrollView>(null);
@@ -724,8 +731,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                     <HStack
                                         alignment="center"
                                         modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: 40, height: 40 }),
+                                            padding({ all: 0 }),
+                                            frame({ width: 44, height: 44 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -733,7 +740,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                             }),
                                         ]}
                                     >
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="chevron.left" variant="plain" controlSize="regular" onPress={onClose} />
+                                        <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="chevron.left" variant="plain" controlSize="regular" onPress={onClose} />
                                     </HStack>
                                     <Spacer />
                                     <VStack
@@ -758,8 +765,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                     <HStack
                                         alignment="center"
                                         modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: 40, height: 40 }),
+                                            padding({ all: 0 }),
+                                            frame({ width: 44, height: 44 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -767,7 +774,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                             }),
                                         ]}
                                     >
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="ellipsis" variant="plain" controlSize="regular" onPress={() => {}} />
+                                        <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="ellipsis" variant="plain" controlSize="regular" onPress={() => {}} />
                                     </HStack>
                                 </HStack>
                             </Host>
@@ -842,53 +849,60 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                         <View style={styles.actionButtonsContainer}>
                             <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                 <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
-                                    <HStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: 40, height: 40 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                    >
-                                        <Button systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} />
-                                    </HStack>
-                                    <Spacer />
-                                    <HStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: 100, height: 40 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                        spacing={4}
-                                    >
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage={(localBookmarkMap.get(images[currentIndex]) ?? imageUrlToBookmarkMap?.get(images[currentIndex])) ? "heart.fill" : "heart"} variant="plain" controlSize="regular" onPress={handleBookmarkPress} />
-                                        {/* <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="info.circle" variant="plain" controlSize="regular" onPress={handleEditPress} /> */}
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleAdjustPress} />
-                                    </HStack>
-                                    <Spacer />
-                                    <HStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: 40, height: 40 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                    >
-                                        <Button modifiers={[frame({ width: 36 }), padding({ all: 0 })]} systemImage="archivebox" variant="plain" role="destructive" controlSize="large" onPress={handleArchivePress} />
-                                    </HStack>
+                                    {showShare && (
+                                        <HStack
+                                            alignment="center"
+                                            modifiers={[
+                                                padding({ all: 0 }),
+                                                frame({ width: 48, height: 48 }),
+                                                glassEffect({
+                                                    glass: {
+                                                        variant: "regular",
+                                                    },
+                                                }),
+                                            ]}
+                                        >
+                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} />
+                                        </HStack>
+                                    )}
+                                    {(showBookmark || showEdit) && <Spacer />}
+                                    {(showBookmark || showEdit) && (
+                                        <HStack
+                                            alignment="center"
+                                            modifiers={[
+                                                padding({ all: 0 }),
+                                                frame({ width: showBookmark && showEdit ? 96 : 44, height: 44 }),
+                                                glassEffect({
+                                                    glass: {
+                                                        variant: "regular",
+                                                    },
+                                                }),
+                                            ]}
+                                            spacing={4}
+                                        >
+                                            {showBookmark && (
+                                                <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage={(localBookmarkMap.get(images[currentIndex]) ?? imageUrlToBookmarkMap?.get(images[currentIndex])) ? "heart.fill" : "heart"} variant="plain" controlSize="regular" onPress={handleBookmarkPress} />
+                                            )}
+                                            {showEdit && <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleAdjustPress} />}
+                                        </HStack>
+                                    )}
+                                    {showArchive && <Spacer />}
+                                    {showArchive && (
+                                        <HStack
+                                            alignment="center"
+                                            modifiers={[
+                                                padding({ all: 0 }),
+                                                frame({ width: 48, height: 48 }),
+                                                glassEffect({
+                                                    glass: {
+                                                        variant: "regular",
+                                                    },
+                                                }),
+                                            ]}
+                                        >
+                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="archivebox" variant="plain" role="destructive" controlSize="large" onPress={handleArchivePress} />
+                                        </HStack>
+                                    )}
                                 </HStack>
                             </Host>
                         </View>

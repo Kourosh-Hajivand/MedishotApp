@@ -206,7 +206,7 @@ export interface CreatePatientRequest {
     birth_date?: string;
     gender?: "male" | "female" | "other";
     national_id?: string;
-    email?: string;
+    email?: PatientContact[];
     numbers?: PatientContact[];
     addresses?: PatientAddress[];
     links?: PatientLink[];
@@ -227,7 +227,7 @@ export interface UpdatePatientRequest {
     birth_date?: string;
     gender?: "male" | "female" | "other";
     national_id?: string;
-    email?: string;
+    email?: PatientContact[];
     numbers?: PatientContact[];
     addresses?: PatientAddress[];
     links?: PatientLink[];

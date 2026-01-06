@@ -1,7 +1,6 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
-import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
@@ -27,6 +26,13 @@ interface ImageRow {
     items: string[];
 }
 
+export interface ViewerActionsConfig {
+    showBookmark?: boolean;
+    showEdit?: boolean;
+    showArchive?: boolean;
+    showShare?: boolean;
+}
+
 interface GalleryWithMenuProps {
     images?: string[]; // For backward compatibility
     sections?: ImageSection[]; // New grouped format
@@ -34,20 +40,24 @@ interface GalleryWithMenuProps {
     minColumns?: number;
     maxColumns?: number;
     onImagePress?: (uri: string) => void;
-    patientData?: Patient;
     menuItems: MenuItem[];
     imageUrlToMediaIdMap?: Map<string, number | string>;
     imageUrlToBookmarkMap?: Map<string, boolean>;
     patientId?: string | number;
+    actions?: ViewerActionsConfig;
 }
 
 const { width } = Dimensions.get("window");
 
-export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, patientData, menuItems, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId }) => {
+export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, menuItems, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const scale = useSharedValue(1);
+
+    // Fetch patient data if patientId is provided (for ImageViewerModal)
+    // Note: ImageViewerModal will fetch patient data itself using patientId
 
     // Convert images array to sections format if sections not provided (backward compatibility)
     const imageSections = useMemo(() => {
@@ -160,7 +170,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
         if (!section.title) return null;
         return (
             <View style={styles.sectionHeader}>
-                <BaseText type="Subhead" weight="600" color="labels.primary" style={styles.sectionHeaderText}>
+                <BaseText type="Footnote" weight="500" color="labels.secondary" style={styles.sectionHeaderText}>
                     {section.title}
                 </BaseText>
             </View>
@@ -190,7 +200,21 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                 </Animated.View>
             </GestureDetector>
 
-            <ImageViewerModal patientData={patientData} visible={viewerVisible} images={allImages} initialIndex={selectedIndex} onClose={() => setViewerVisible(false)} imageUrlToMediaIdMap={imageUrlToMediaIdMap} imageUrlToBookmarkMap={imageUrlToBookmarkMap} patientId={patientId} />
+            <ImageViewerModal
+                visible={viewerVisible}
+                images={allImages}
+                initialIndex={selectedIndex}
+                onClose={() => setViewerVisible(false)}
+                imageUrlToMediaIdMap={imageUrlToMediaIdMap}
+                imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                patientId={patientId}
+                actions={{
+                    showBookmark,
+                    showEdit,
+                    showArchive,
+                    showShare,
+                }}
+            />
         </GestureHandlerRootView>
     );
 };
@@ -213,7 +237,7 @@ const styles = StyleSheet.create({
     sectionHeader: {
         backgroundColor: colors.system.white,
         paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingVertical: 4,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
     },

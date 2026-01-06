@@ -1,10 +1,10 @@
-import { BaseText } from "@/components";
+import { BackButton, BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
 import { formatDate } from "@/utils/helper/dateUtils";
 import { useGetContract, useGetPatientById } from "@/utils/hook";
-import { useLocalSearchParams, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect } from "react";
 import { ActivityIndicator, Image, ScrollView, Share, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -45,8 +45,10 @@ export default function ContractDetailScreen() {
         navigation.setOptions({
             headerTitle: "",
             headerTitleAlign: "center",
+            headerTransparent: true,
+            headerLeft: () => <BackButton onPress={() => router.back()} />,
             headerRight: () => (
-                <TouchableOpacity onPress={handleShare} disabled={!contract?.contract_file?.url} className="flex-row  translate-x-1.5 items-center justify-center">
+                <TouchableOpacity onPress={handleShare} disabled={!contract?.contract_file?.url} className="flex-row  translate-x-[6.5px] items-center justify-center">
                     <IconSymbol name="square.and.arrow.up" color={contract?.contract_file?.url ? colors.system.blue : colors.labels.tertiary} size={24} />
                 </TouchableOpacity>
             ),
@@ -57,7 +59,7 @@ export default function ContractDetailScreen() {
 
     if (isLoading) {
         return (
-            <View className="flex-1 items-center justify-center">
+            <View className="flex-1 items-center justify-center bg-system-gray6">
                 <ActivityIndicator size="large" color={colors.system.blue} />
             </View>
         );
@@ -65,7 +67,7 @@ export default function ContractDetailScreen() {
 
     if (!contract) {
         return (
-            <View className="flex-1 items-center justify-center">
+            <View className="flex-1 items-center justify-center bg-system-gray6">
                 <BaseText type="Body" color="labels.secondary">
                     Contract not found
                 </BaseText>
@@ -76,8 +78,8 @@ export default function ContractDetailScreen() {
     const contractImageUrl = contract.contract_file?.url || contract.contract_template?.preview_image || contract.contract_template?.image;
 
     return (
-        <View className="flex-1 bg-white" style={{ paddingTop: headerHeight }}>
-            <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, alignItems: "center", paddingBottom: insets.bottom + 20 }}>
+        <View className="flex-1 bg-system-gray6">
+            <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1, padding: 20, alignItems: "center", justifyContent: "center", paddingBottom: insets.bottom + 60, paddingTop: headerHeight }}>
                 {contractImageUrl ? (
                     <Image source={{ uri: contractImageUrl }} style={{ width: "100%", aspectRatio: 816 / 1056 }} resizeMode="contain" />
                 ) : (

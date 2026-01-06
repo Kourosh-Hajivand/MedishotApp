@@ -37,6 +37,19 @@ export default function PatientsLayout() {
                         headerBackground: () => <AnimatedWhiteBackground />,
                     }}
                 />
+                <Stack.Screen
+                    name="[id]/archive"
+                    options={{
+                        headerShown: true,
+                        headerTitle: "Archived Photos",
+                        headerTransparent: true,
+                        headerTitleAlign: "center",
+                        headerTintColor: "#000",
+                        headerShadowVisible: false,
+                        headerLeft: () => <BackButton onPress={() => router.back()} />,
+                        headerBackground: () => <AnimatedWhiteBackground />,
+                    }}
+                />
             </Stack>
         </BottomSheetModalProvider>
     );

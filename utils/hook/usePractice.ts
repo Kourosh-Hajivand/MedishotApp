@@ -74,6 +74,27 @@ export const useGetArchivedMedia = (practiceId: number, enabled: boolean = true)
     });
 };
 
+export const useGetPatientsArchived = (practiceId: number, patientId: string | number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetArchivedMedia", practiceId, patientId],
+        queryFn: () => PracticeService.getArchivedMedia(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId && !!patientId,
+        select: (data) => {
+            // Filter archived photos for the specific patient
+            if (!data?.data) return data;
+            const filteredData = data.data.filter((media: any) => {
+                // Check if media belongs to this patient
+                return media.patient_id === Number(patientId) || media.patient_id === String(patientId);
+            });
+            return {
+                ...data,
+                data: filteredData,
+            };
+        },
+    });
+};
+
 export const useGetPracticeMember = (practiceId: number, memberId: string, enabled: boolean = true): UseQueryResult<ApiResponse<any>, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({

@@ -2,6 +2,7 @@ import MediaService from "@/utils/service/MediaService";
 import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
 import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
+import { useProfileStore } from "./useProfileStore";
 
 // ============= Query Hooks (GET) =============
 
@@ -17,6 +18,7 @@ export const useGetPatientMedia = (patientId: number | string, enabled: boolean 
 
 export const useUploadPatientMedia = (onSuccess?: (data: PatientMediaUploadResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaUploadResponse, Error, { patientId: number | string; data: UploadPatientMediaRequest }> => {
     const queryClient = useQueryClient();
+    const { selectedPractice } = useProfileStore();
 
     return useMutation({
         mutationFn: ({ patientId, data }: { patientId: number | string; data: UploadPatientMediaRequest }) => MediaService.uploadPatientMedia(patientId, data),
@@ -24,6 +26,12 @@ export const useUploadPatientMedia = (onSuccess?: (data: PatientMediaUploadRespo
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMedia", variables.patientId],
             });
+            // Invalidate practice albums to refresh album list
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({
+                    queryKey: ["GetPracticeAlbums", selectedPractice.id],
+                });
+            }
             // Invalidate patient activities to refresh activity list
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],
@@ -152,6 +160,7 @@ export const useUnbookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkRespon
 
 export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMediaWithTemplateResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaWithTemplateResponse, Error, { patientId: number | string; data: UploadMediaWithTemplateRequest }> => {
     const queryClient = useQueryClient();
+    const { selectedPractice } = useProfileStore();
 
     return useMutation({
         mutationFn: ({ patientId, data }: { patientId: number | string; data: UploadMediaWithTemplateRequest }) => MediaService.uploadPatientMediaWithTemplate(patientId, data),
@@ -162,6 +171,12 @@ export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMedi
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMediaAlbums", variables.patientId],
             });
+            // Invalidate practice albums to refresh album list
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({
+                    queryKey: ["GetPracticeAlbums", selectedPractice.id],
+                });
+            }
             // Invalidate patient activities to refresh activity list
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],

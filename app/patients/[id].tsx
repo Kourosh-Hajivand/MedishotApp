@@ -3,6 +3,7 @@ import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import { ImageEditorModal } from "@/components/ImageEditor";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
@@ -667,12 +668,44 @@ export default function PatientDetailsScreen() {
                                 onPress: handleArchiveImage,
                             },
                         ]}
-                        patientData={patient?.data}
+                        actions={{
+                            showBookmark: true,
+                            showEdit: true,
+                            showArchive: true,
+                            showShare: true,
+                        }}
                         sections={groupedPatientImages}
                         imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                         imageUrlToBookmarkMap={imageUrlToBookmarkMap}
                         patientId={id}
                     />
+                )}
+                {activeTab === 0 && (
+                    <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[8], paddingBottom: safe.bottom + spacing[4] }}>
+                        {/* <BaseButton
+                            label="Archived Photos"
+                            ButtonStyle=""
+                            leftIcon={<IconSymbol name="archivebox" color={colors.system.blue} size={18} />}
+                            onPress={() => {
+                                // TODO: Navigate to archived photos or open modal
+                                router.push("/(profile)/archive");
+                            }}
+                        /> */}
+                        <TouchableOpacity
+                            className="bg-system-gray6 py-3 px-4 rounded-xl flex-row items-center justify-between"
+                            onPress={() => {
+                                router.push(`/patients/${id}/archive`);
+                            }}
+                        >
+                            <View className="flex-row items-center gap-2">
+                                <IconSymbol name="tray" color={colors.system.gray2} size={24} />
+                                <BaseText type="Body" color="labels.primary">
+                                    Archived Photos
+                                </BaseText>
+                            </View>
+                            <IconSymbol name="chevron.right" color={colors.system.gray2} size={16} />
+                        </TouchableOpacity>
+                    </View>
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}
                 {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} />}

@@ -41,30 +41,42 @@ export const PracticeDocumentFooter: React.FC<PracticeDocumentFooterProps> = ({ 
 
     return (
         <View style={[styles.previewFooter, footerStyle]}>
-            {printSettings.address && metadata?.address && (
-                <View style={styles.previewFooterItem}>
-                    {showIcons && <IconSymbol name="paperplane.fill" size={10} color={colors.system.gray2} />}
-                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                        {metadata.address}
-                    </BaseText>
-                </View>
-            )}
-            {printSettings.practiceEmail && metadata?.email && (
-                <View style={styles.previewFooterItem}>
-                    {showIcons && <IconSymbol name="envelope.fill" size={10} color={colors.system.gray2} />}
-                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                        {metadata.email}
-                    </BaseText>
-                </View>
-            )}
-            {printSettings.practicePhone && metadata?.phone && (
-                <View style={styles.previewFooterItem}>
-                    {showIcons && <IconSymbol name="phone.fill" size={10} color={colors.system.gray2} />}
-                    <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                        {metadata.phone}
-                    </BaseText>
-                </View>
-            )}
+            <View className="flex-row gap-2 w-full justify-between">
+                {printSettings.address && metadata?.address && (
+                    <View style={styles.previewFooterItem}>
+                        {showIcons && <IconSymbol name="paperplane.fill" size={10} color={colors.system.gray2} />}
+                        <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
+                            {metadata.address}
+                        </BaseText>
+                    </View>
+                )}
+                {printSettings.practiceEmail && metadata?.email && (
+                    <View style={[styles.previewFooterItem, styles.previewFooterItemEnd]}>
+                        {showIcons && <IconSymbol name="envelope.fill" size={10} color={colors.system.gray2} />}
+                        <BaseText type="Caption2" color="labels.primary" style={[styles.previewFooterText, { flex: 0 }]} numberOfLines={1}>
+                            {metadata.email}
+                        </BaseText>
+                    </View>
+                )}
+            </View>
+            <View className="flex-row gap-2 w-full justify-between">
+                {printSettings.practicePhone && metadata?.phone && (
+                    <View style={styles.previewFooterItem}>
+                        {showIcons && <IconSymbol name="phone.fill" size={10} color={colors.system.gray2} />}
+                        <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
+                            {metadata.phone}
+                        </BaseText>
+                    </View>
+                )}
+                {printSettings.practiceURL && metadata?.website && (
+                    <View style={[styles.previewFooterItem, styles.previewFooterItemEnd]}>
+                        {showIcons && <IconSymbol name="globe" size={10} color={colors.system.gray2} />}
+                        <BaseText type="Caption2" color="labels.primary" style={[styles.previewFooterText, { flex: 0 }]} numberOfLines={1}>
+                            {metadata.website}
+                        </BaseText>
+                    </View>
+                )}
+            </View>
         </View>
     );
 };
@@ -72,26 +84,34 @@ export const PracticeDocumentFooter: React.FC<PracticeDocumentFooterProps> = ({ 
 const styles = StyleSheet.create({
     // Preview variant styles
     previewFooter: {
-        flexDirection: "row",
+        flexDirection: "column",
         gap: 12,
         padding: 12,
+        flex: 1,
         borderTopWidth: 1,
         borderTopColor: colors.system.gray6,
-        alignItems: "center",
         justifyContent: "space-between",
     },
     previewFooterItem: {
         flexDirection: "row",
         alignItems: "center",
+        gap: 4,
+        flexShrink: 1,
+        flex: 1,
+    },
+    previewFooterItemEnd: {
+        flexDirection: "row",
+        alignItems: "center",
         justifyContent: "flex-end",
         gap: 4,
         flexShrink: 1,
+        flex: 1,
     },
     previewFooterText: {
         fontSize: 8.7,
         lineHeight: 11.4,
         letterSpacing: -0.17,
-        flex: 1,
+        flexShrink: 1,
     },
     // Document variant styles
     documentFooter: {

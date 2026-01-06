@@ -114,9 +114,7 @@ export default function Index() {
         // owner and others see all items (or items without role restriction)
         return allMenuItems.filter((item) => !item.roles || item.roles.includes(userRole || ""));
     }, [currentUserRole]);
-    console.log("====================================");
-    console.log(selectedPractice);
-    console.log("====================================");
+
     const menuItems = filteredMenuItems;
 
     return (

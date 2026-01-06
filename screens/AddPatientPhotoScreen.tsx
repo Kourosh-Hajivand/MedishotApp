@@ -468,8 +468,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
         const emailAddresses = emailsRef.current
             .filter((email) => email.value && email.value.trim() !== "")
             .map((email) => ({
-                type: email.label,
-                value: email.value,
+                type: email.label || "Personal",
+                value: email.value.trim(),
             }));
 
         const addressList = addressesRef.current
@@ -521,10 +521,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
         }
 
         if (emailAddresses.length > 0) {
-            const emailValue = emailAddresses[0].value?.trim();
-            if (emailValue) {
-                patientData.email = emailValue;
-            }
+            patientData.email = emailAddresses;
         }
 
         if (addressList.length > 0) {

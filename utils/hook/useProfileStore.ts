@@ -219,9 +219,9 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                     // فقط اگر هیچ پرکتیسی در store نبود (کاربر تازه وارد شده)، اولین پرکتیس را انتخاب کن
                     if (practiceList && practiceList.length > 0) {
                         console.log("No stored practice found, selecting first practice");
-                    selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
-                    viewMode = determineDefaultViewMode(selectedPractice);
-                    needsPersistence = true;
+                        selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
+                        viewMode = determineDefaultViewMode(selectedPractice);
+                        needsPersistence = true;
                     }
                 }
 
