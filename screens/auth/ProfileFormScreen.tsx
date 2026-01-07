@@ -111,6 +111,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
     const uploadedFilenameRef = React.useRef<string | null>(null); // Ref to always have latest value
+    const [hasImageChanged, setHasImageChanged] = useState(false); // Track if image was changed/selected
 
     // Refs برای فیلدهای متنی
     const firstNameRef = useRef<TextInput>(null);
@@ -132,12 +133,14 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             console.log("✅ [uploadImage] Filename:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
+            setHasImageChanged(true); // Mark that image was changed and uploaded
             console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
         (error) => {
             console.error("❌ [uploadImage] Error callback triggered");
             console.error("❌ [uploadImage] Error uploading image:", error);
             console.error("❌ [uploadImage] Error message:", error.message);
+            setHasImageChanged(false); // Reset on error
         },
     );
 
@@ -168,10 +171,12 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 gender: initialData.gender ? initialData.gender.toLowerCase() : "",
             });
             // Set existing image URL if available (only if no local image selected)
+            // Don't set uploadedFilename for existing images - only for newly uploaded ones
+            // This way we only send profile_photo to backend if image was changed
             if (initialData.profile_photo_url && !localImageUri) {
-                console.log("🖼️ [INIT] Setting existing profile image:", initialData.profile_photo_url);
-                setUploadedFilename(initialData.profile_photo_url);
-                uploadedFilenameRef.current = initialData.profile_photo_url;
+                console.log("🖼️ [INIT] Existing profile image found:", initialData.profile_photo_url);
+                // Don't set uploadedFilename here - we only want to send it if image was changed
+                setHasImageChanged(false);
             }
             // TODO: Set dynamic fields from initialData if available
         }
@@ -187,23 +192,28 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 getFormData: () => {
                     // Use ref to always get the latest value (avoid closure issues)
                     const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
+                    // Only return uploadedFilename if image was changed and uploaded successfully
+                    // In create mode, always return it if exists
+                    // In edit mode, only return it if image was changed
+                    const shouldIncludeFilename = mode === "create" ? !!currentUploadedFilename : hasImageChanged && !!currentUploadedFilename;
                     return {
                         formData: getValues(),
                         phones,
                         emails,
                         addresses,
                         urls,
-                        uploadedFilename: currentUploadedFilename,
+                        uploadedFilename: shouldIncludeFilename ? currentUploadedFilename : null,
                     };
                 },
             });
         }
-    }, [onFormReady, handleSubmit, control, errors, phones, emails, addresses, urls, uploadedFilename, getValues]);
+    }, [onFormReady, handleSubmit, control, errors, phones, emails, addresses, urls, uploadedFilename, getValues, hasImageChanged, mode]);
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
         console.log("📸 [handleImageSelected] Image selected:", result.uri);
         Keyboard.dismiss();
         setLocalImageUri(result.uri); // Save local URI for preview
+        setHasImageChanged(true); // Mark that user selected a new image
 
         try {
             const filename = result.uri.split("/").pop() || "image.jpg";
