@@ -33,6 +33,13 @@ export interface ViewerActionsConfig {
     showShare?: boolean;
 }
 
+interface MediaItem {
+    url: string;
+    mediaId?: number | string;
+    isBookmarked?: boolean;
+    createdAt?: string;
+}
+
 interface GalleryWithMenuProps {
     images?: string[]; // For backward compatibility
     sections?: ImageSection[]; // New grouped format
@@ -41,15 +48,33 @@ interface GalleryWithMenuProps {
     maxColumns?: number;
     onImagePress?: (uri: string) => void;
     menuItems: MenuItem[];
+    // New prop: pass raw media data and component will build maps internally
+    mediaData?: MediaItem[];
+    // Legacy props (for backward compatibility)
     imageUrlToMediaIdMap?: Map<string, number | string>;
     imageUrlToBookmarkMap?: Map<string, boolean>;
+    imageUrlToCreatedAtMap?: Map<string, string>;
     patientId?: string | number;
     actions?: ViewerActionsConfig;
 }
 
 const { width } = Dimensions.get("window");
 
-export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sections, initialColumns = 2, minColumns = 2, maxColumns = 6, onImagePress, menuItems, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientId, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
+export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
+    images,
+    sections,
+    initialColumns = 2,
+    minColumns = 2,
+    maxColumns = 6,
+    onImagePress,
+    menuItems,
+    mediaData,
+    imageUrlToMediaIdMap,
+    imageUrlToBookmarkMap,
+    imageUrlToCreatedAtMap,
+    patientId,
+    actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
+}) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
@@ -205,8 +230,10 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({ images, sectio
                 images={allImages}
                 initialIndex={selectedIndex}
                 onClose={() => setViewerVisible(false)}
+                mediaData={mediaData}
                 imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                imageUrlToCreatedAtMap={imageUrlToCreatedAtMap}
                 patientId={patientId}
                 actions={{
                     showBookmark,

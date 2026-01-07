@@ -20,10 +20,7 @@ export default function PatientsLayout() {
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
     const segments = useSegments();
 
-    // اگر کاربر لاگین کرده اما practice list خالی است، به select-role redirect کن
-    // اما فقط اگر در فلوی ثبت‌نام نیست (یعنی در tabs است)
     useEffect(() => {
-        // چک کن که آیا در فلوی ثبت‌نام هستیم یا نه
         const isInAuthFlow = segments.some((segment) => segment === "(auth)");
 
         if (isAuthenticated === true && profile && !isPracticeListLoading && !isInAuthFlow) {
@@ -34,9 +31,6 @@ export default function PatientsLayout() {
     }, [isAuthenticated, profile, practiceList, isPracticeListLoading, segments]);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
 
-    console.log("====================================");
-    console.log(practiceList?.data);
-    console.log("====================================");
     // Filter doctors from members
     const doctors = useMemo(() => {
         return practiceMembers?.data?.filter((member) => member.role === "doctor") ?? [];
@@ -70,11 +64,9 @@ export default function PatientsLayout() {
     useEffect(() => {
         if (practiceList?.data && practiceList.data.length > 0 && isAuthenticated === true) {
             const currentState = useProfileStore.getState();
-            // فقط اگر هنوز لود نشده یا selectedPractice معتبر نیست، لود کن
             if (!currentState.isLoaded || !currentState.selectedPractice) {
                 loadProfileSelection(practiceList.data);
             } else {
-                // بررسی کن که selectedPractice هنوز معتبر است
                 const isValidPractice = practiceList.data.some((p) => p.id === currentState.selectedPractice?.id);
                 if (!isValidPractice) {
                     loadProfileSelection(practiceList.data);

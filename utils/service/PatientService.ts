@@ -6,7 +6,7 @@ import { ApiResponse, DoctorPatientsResponse, PatientActivitiesResponse, Patient
 
 const {
     baseUrl,
-    patients: { list, create, getById, update, delete: deleteRoute, getActivities },
+    patients: { list, create, getArchived, getById, update, delete: deleteRoute, archive, unarchive, getActivities },
     doctor: { getPatients: getDoctorPatientsRoute },
 } = routes;
 
@@ -266,6 +266,60 @@ const PatientService = {
             console.error("Error in DeletePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Delete patient failed");
+            }
+            throw error;
+        }
+    },
+
+    // Get archived patients
+    getArchivedPatients: async (practiseId: string | number, params?: GetPatientsParams): Promise<PatientListResponse> => {
+        try {
+            const queryParams = new URLSearchParams();
+            if (params?.doctor_id) {
+                queryParams.append("doctor_id", String(params.doctor_id));
+            }
+            if (params?.page) {
+                queryParams.append("page", String(params.page));
+            }
+            if (params?.per_page) {
+                queryParams.append("per_page", String(params.per_page));
+            }
+
+            const url = baseUrl + getArchived(practiseId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
+            return response.data;
+        } catch (error) {
+            console.error("Error in GetArchivedPatients:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Get archived patients failed");
+            }
+            throw error;
+        }
+    },
+
+    // Archive patient
+    archivePatient: async (patientId: string | number): Promise<PatientDetailResponse> => {
+        try {
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + archive(patientId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in ArchivePatient:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Archive patient failed");
+            }
+            throw error;
+        }
+    },
+
+    // Unarchive patient
+    unarchivePatient: async (patientId: string | number): Promise<PatientDetailResponse> => {
+        try {
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + unarchive(patientId));
+            return response.data;
+        } catch (error) {
+            console.error("Error in UnarchivePatient:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Unarchive patient failed");
             }
             throw error;
         }

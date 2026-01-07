@@ -74,7 +74,8 @@ export const useGetArchivedMedia = (practiceId: number, enabled: boolean = true)
     });
 };
 
-export const useGetPatientsArchived = (practiceId: number, patientId: string | number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
+// Hook for getting archived media for a specific patient (deprecated - use useGetPatientArchivedMedia from useMedia instead)
+export const useGetPatientArchivedMedia = (practiceId: number, patientId: string | number, enabled: boolean = true): UseQueryResult<RecentlyPhotosResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({
         queryKey: ["GetArchivedMedia", practiceId, patientId],
@@ -82,11 +83,30 @@ export const useGetPatientsArchived = (practiceId: number, patientId: string | n
         enabled: isAuthenticated === true && enabled && !!practiceId && !!patientId,
         select: (data) => {
             // Filter archived photos for the specific patient
-            if (!data?.data) return data;
+            if (!data?.data) {
+                console.log("useGetPatientArchivedMedia: No data received");
+                return data;
+            }
+
+            console.log("useGetPatientArchivedMedia: Raw data received:", data.data.length, "items");
+            console.log("useGetPatientArchivedMedia: Filtering for patientId:", patientId, "type:", typeof patientId);
+
+            const patientIdNum = Number(patientId);
+            const patientIdStr = String(patientId);
+
             const filteredData = data.data.filter((media: any) => {
-                // Check if media belongs to this patient
-                return media.patient_id === Number(patientId) || media.patient_id === String(patientId);
+                const mediaPatientId = media.patient_id;
+                const matches = mediaPatientId === patientIdNum || mediaPatientId === patientIdStr || String(mediaPatientId) === patientIdStr || Number(mediaPatientId) === patientIdNum;
+
+                if (!matches) {
+                    console.log("useGetPatientArchivedMedia: Filtered out item - media.patient_id:", mediaPatientId, "type:", typeof mediaPatientId, "target:", patientId);
+                }
+
+                return matches;
             });
+
+            console.log("useGetPatientArchivedMedia: Filtered data:", filteredData.length, "items");
+
             return {
                 ...data,
                 data: filteredData,
@@ -94,6 +114,9 @@ export const useGetPatientsArchived = (practiceId: number, patientId: string | n
         },
     });
 };
+
+// Deprecated: Use useGetPatientArchivedMedia instead
+export const useGetPatientsArchived = useGetPatientArchivedMedia;
 
 export const useGetPracticeMember = (practiceId: number, memberId: string, enabled: boolean = true): UseQueryResult<ApiResponse<any>, Error> => {
     const { isAuthenticated } = useAuth();

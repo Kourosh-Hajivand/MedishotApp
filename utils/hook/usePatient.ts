@@ -33,6 +33,15 @@ export const useGetPatientById = (patientId: number | string): UseQueryResult<Pa
     });
 };
 
+export const useGetArchivedPatients = (practiseId?: string | number, params?: GetPatientsParams): UseQueryResult<PatientListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetArchivedPatients", practiseId, params],
+        queryFn: () => PatientService.getArchivedPatients(practiseId!, params),
+        enabled: isAuthenticated === true && !!practiseId,
+    });
+};
+
 export const useGetPatientActivities = (practiseId: number | string | undefined, patientId: number | string, enabled: boolean = true): UseQueryResult<PatientActivitiesResponse, Error> => {
     const { isAuthenticated } = useAuth();
     return useQuery({
@@ -93,8 +102,43 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
         mutationFn: (patientId: number | string) => PatientService.deletePatient(patientId),
         onSuccess: (data, patientId) => {
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
             queryClient.removeQueries({ queryKey: ["GetPatientById", patientId] });
             queryClient.removeQueries({ queryKey: ["GetPatientMedia", patientId] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useArchivePatient = (onSuccess?: (data: PatientDetailResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientDetailResponse, Error, number | string> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (patientId: number | string) => PatientService.archivePatient(patientId),
+        onSuccess: (data, patientId) => {
+            queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetPatientById", patientId] });
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUnarchivePatient = (onSuccess?: (data: PatientDetailResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientDetailResponse, Error, number | string> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (patientId: number | string) => PatientService.unarchivePatient(patientId),
+        onSuccess: (data, patientId) => {
+            queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetPatientById", patientId] });
             onSuccess?.(data);
         },
         onError: (error) => {

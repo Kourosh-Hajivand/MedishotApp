@@ -14,7 +14,13 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Share, TouchableOpacity, View } from "react-native";
-import DocumentScanner from "react-native-document-scanner-plugin";
+// Conditional import for DocumentScanner (optional native module)
+let DocumentScanner: any = null;
+try {
+    DocumentScanner = require("react-native-document-scanner-plugin").default;
+} catch (error) {
+    console.warn("DocumentScanner module not available:", error);
+}
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
 import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
@@ -323,6 +329,10 @@ export default function PatientDetailsScreen() {
     }, [action, phoneIndex, patient?.data, id]);
 
     const scanDocument = async () => {
+        if (!DocumentScanner) {
+            Alert.alert("Error", "Document scanner is not available on this device");
+            return;
+        }
         try {
             const { scannedImages } = await DocumentScanner.scanDocument({
                 maxNumDocuments: 1,

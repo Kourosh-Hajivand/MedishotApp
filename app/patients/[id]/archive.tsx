@@ -1,20 +1,41 @@
 import { BaseText } from "@/components";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
-import { useGetPatientsArchived } from "@/utils/hook/usePractice";
-import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { useGetTrashMedia, useRestoreMedia } from "@/utils/hook";
+
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useLocalSearchParams } from "expo-router";
 import React, { useMemo } from "react";
 import { ActivityIndicator, Alert, Share, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    return `${month} ${day}, ${year}`;
+};
+
 export default function PatientArchiveScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
-    const { selectedPractice } = useProfileStore();
 
-    const { data: archivedData, isLoading } = useGetPatientsArchived(selectedPractice?.id || 0, id || "", !!selectedPractice?.id && !!id);
+    console.log("PatientArchiveScreen: id from params:", id, "type:", typeof id);
+
+    const { data: archivedData, isLoading, refetch } = useGetTrashMedia(id || "", !!id);
+
+    const restoreMediaMutation = useRestoreMedia(
+        () => {
+            Alert.alert("Success", "Media restored successfully");
+            refetch();
+        },
+        (error) => {
+            Alert.alert("Error", error.message || "Failed to restore media");
+        },
+    );
 
     // Extract image URLs and create sections grouped by date
     const gallerySections = useMemo(() => {
@@ -22,106 +43,135 @@ export default function PatientArchiveScreen() {
             return [];
         }
 
-        // Map to store images grouped by date
-        const imagesByDate = new Map<string, string[]>();
+        console.log("Archived data received:", archivedData.data.length, "items");
+
+        // Map to store images grouped by date with timestamp for sorting
+        const imagesByDate = new Map<string, { images: string[]; timestamp: number }>();
 
         archivedData.data.forEach((media: any) => {
-            const createdAt = media.created_at || media.updated_at;
-            if (!createdAt) return;
+            // Extract image URLs from media.images array
+            if (media.images && Array.isArray(media.images) && media.images.length > 0) {
+                media.images.forEach((imageItem: any) => {
+                    if (imageItem.image?.url) {
+                        // Use image's created_at or fallback to media's created_at
+                        const createdAt = imageItem.created_at || media.created_at || media.updated_at;
+                        if (!createdAt) return;
 
-            // Format date as "MMMM D, YYYY" (e.g., "January 2, 2026")
-            const date = new Date(createdAt);
-            const dateKey = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+                        const dateKey = formatDate(createdAt);
+                        const timestamp = new Date(createdAt).getTime();
 
-            // Initialize array for this date if it doesn't exist
-            if (!imagesByDate.has(dateKey)) {
-                imagesByDate.set(dateKey, []);
+                        // Initialize array for this date if it doesn't exist
+                        if (!imagesByDate.has(dateKey)) {
+                            imagesByDate.set(dateKey, { images: [], timestamp });
+                        }
+
+                        const dateData = imagesByDate.get(dateKey)!;
+                        dateData.images.push(imageItem.image.url);
+                    }
+                });
             }
+            // Fallback to old structure for backward compatibility
+            else {
+                const createdAt = media.created_at || media.updated_at;
+                if (!createdAt) return;
 
-            const dateImages = imagesByDate.get(dateKey)!;
+                const dateKey = formatDate(createdAt);
+                const timestamp = new Date(createdAt).getTime();
 
-            // Extract image URL from media
-            if (media.url) {
-                dateImages.push(media.url);
-            } else if (media.image?.url) {
-                dateImages.push(media.image.url);
-            } else if (media.original_media?.url) {
-                dateImages.push(media.original_media.url);
+                // Initialize array for this date if it doesn't exist
+                if (!imagesByDate.has(dateKey)) {
+                    imagesByDate.set(dateKey, { images: [], timestamp });
+                }
+
+                const dateData = imagesByDate.get(dateKey)!;
+
+                if (media.url) {
+                    dateData.images.push(media.url);
+                } else if (media.image?.url) {
+                    dateData.images.push(media.image.url);
+                } else if (media.original_media?.url) {
+                    dateData.images.push(media.original_media.url);
+                }
             }
         });
 
         // Convert Map to array of sections, sorted by date (newest first)
         const sections = Array.from(imagesByDate.entries())
-            .map(([date, images]) => ({
+            .map(([date, { images, timestamp }]) => ({
                 title: date,
                 data: images,
+                timestamp,
             }))
-            .sort((a, b) => {
-                const dateA = new Date(a.title);
-                const dateB = new Date(b.title);
-                return dateB.getTime() - dateA.getTime();
-            });
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .map(({ title, data }) => ({ title, data })); // Remove timestamp from final result
+
+        console.log(
+            "Gallery sections created:",
+            sections.length,
+            "sections with",
+            sections.reduce((sum, s) => sum + s.data.length, 0),
+            "total images",
+        );
 
         return sections;
     }, [archivedData?.data]);
 
-    // Create imageUrlToMediaIdMap
-    const imageUrlToMediaIdMap = useMemo(() => {
-        const map = new Map<string, number | string>();
-        if (!archivedData?.data || !Array.isArray(archivedData.data)) return map;
+    // Create mediaData array for ImageViewerModal (component will build maps internally)
+    const mediaData = useMemo(() => {
+        if (!archivedData?.data || !Array.isArray(archivedData.data)) return [];
+
+        const items: Array<{ url: string; mediaId?: number | string; isBookmarked?: boolean; createdAt?: string }> = [];
 
         archivedData.data.forEach((media: any) => {
-            const mediaId = media.id || media.media_id;
-            if (!mediaId) return;
-
-            // Extract image URL from media
-            let imageUrl: string | undefined;
-            if (media.url) {
-                imageUrl = media.url;
-            } else if (media.image?.url) {
-                imageUrl = media.image.url;
-            } else if (media.original_media?.url) {
-                imageUrl = media.original_media.url;
-            }
-
-            if (imageUrl) {
-                map.set(imageUrl, mediaId);
-            }
-        });
-
-        return map;
-    }, [archivedData?.data]);
-
-    // Create imageUrlToBookmarkMap
-    const imageUrlToBookmarkMap = useMemo(() => {
-        const map = new Map<string, boolean>();
-        if (!archivedData?.data || !Array.isArray(archivedData.data)) return map;
-
-        archivedData.data.forEach((media: any) => {
+            const patientMediaId = media.id; // This is the patient_media_id needed for restore
             const isBookmarked = media.is_bookmarked ?? false;
 
-            // Extract image URL from media
-            let imageUrl: string | undefined;
-            if (media.url) {
-                imageUrl = media.url;
-            } else if (media.image?.url) {
-                imageUrl = media.image.url;
-            } else if (media.original_media?.url) {
-                imageUrl = media.original_media.url;
+            // Extract image URLs from media.images array
+            if (media.images && Array.isArray(media.images)) {
+                media.images.forEach((imageItem: any) => {
+                    const imageUrl = imageItem.image?.url;
+                    if (imageUrl) {
+                        // Use image's created_at or fallback to media's created_at
+                        const createdAt = imageItem.created_at || media.created_at || media.updated_at;
+                        items.push({
+                            url: imageUrl,
+                            mediaId: patientMediaId,
+                            isBookmarked,
+                            createdAt,
+                        });
+                    }
+                });
             }
+            // Fallback to old structure for backward compatibility
+            else {
+                let imageUrl: string | undefined;
+                if (media.url) {
+                    imageUrl = media.url;
+                } else if (media.image?.url) {
+                    imageUrl = media.image.url;
+                } else if (media.original_media?.url) {
+                    imageUrl = media.original_media.url;
+                }
 
-            if (imageUrl) {
-                map.set(imageUrl, isBookmarked);
+                if (imageUrl) {
+                    const createdAt = media.created_at || media.updated_at;
+                    items.push({
+                        url: imageUrl,
+                        mediaId: patientMediaId,
+                        isBookmarked,
+                        createdAt,
+                    });
+                }
             }
         });
 
-        return map;
+        return items;
     }, [archivedData?.data]);
 
     const hasPhotos = gallerySections.length > 0 && gallerySections.some((section) => section.data.length > 0);
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top + headerHeight }]}>
+        <View style={[styles.container, { paddingTop: headerHeight }]}>
             {isLoading ? (
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
@@ -148,10 +198,36 @@ export default function PatientArchiveScreen() {
                                 }
                             },
                         },
+                        {
+                            icon: "arrow.uturn.backward",
+                            label: "Restore",
+                            role: "default",
+                            onPress: async (imageUri: string) => {
+                                const mediaItem = mediaData.find((item) => item.url === imageUri);
+                                const mediaId = mediaItem?.mediaId;
+                                if (!mediaId) {
+                                    Alert.alert("Error", "Media ID not found");
+                                    return;
+                                }
+
+                                Alert.alert("Restore Media", "Are you sure you want to restore this media?", [
+                                    {
+                                        text: "Cancel",
+                                        style: "cancel",
+                                    },
+                                    {
+                                        text: "Restore",
+                                        style: "default",
+                                        onPress: () => {
+                                            restoreMediaMutation.mutate(mediaId);
+                                        },
+                                    },
+                                ]);
+                            },
+                        },
                     ]}
                     sections={gallerySections}
-                    imageUrlToMediaIdMap={imageUrlToMediaIdMap}
-                    imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                    mediaData={mediaData}
                     patientId={id}
                     actions={{
                         showBookmark: false,

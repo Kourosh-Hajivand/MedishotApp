@@ -5,17 +5,18 @@ import BaseButton from "@/components/button/BaseButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
-import { useGetPatients, useGetPracticeMembers } from "@/utils/hook";
+import { useArchivePatient, useGetPatients, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Patient } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host, Submenu } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,6 +26,7 @@ const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export default function PatientsScreen() {
     const { selectedPractice, viewMode } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
+    const queryClient = useQueryClient();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
@@ -60,9 +62,19 @@ export default function PatientsScreen() {
         return undefined;
     }, [currentUserRole, profile?.id]);
 
-    const { data: patients, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
+    const { data: patients, isLoading: isPatientsLoading, refetch: refetchPatients } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
     const currentPatients = patients?.data;
     const isLoading = isPatientsLoading;
+
+    const archivePatientMutation = useArchivePatient(
+        () => {
+            refetchPatients();
+            queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
+        },
+        (error) => {
+            Alert.alert("Error", error.message || "Failed to archive patient");
+        },
+    );
 
     const groupedPatients =
         currentPatients?.reduce(
@@ -352,6 +364,27 @@ export default function PatientsScreen() {
                                                 })}
                                             </Submenu>
                                         )}
+                                        <Button
+                                            systemImage="archivebox"
+                                            role="destructive"
+                                            onPress={() => {
+                                                Alert.alert("Archive Patient", `Are you sure you want to archive ${item.first_name} ${item.last_name}?`, [
+                                                    {
+                                                        text: "Cancel",
+                                                        style: "cancel",
+                                                    },
+                                                    {
+                                                        text: "Archive",
+                                                        style: "destructive",
+                                                        onPress: () => {
+                                                            archivePatientMutation.mutate(item.id);
+                                                        },
+                                                    },
+                                                ]);
+                                            }}
+                                        >
+                                            Archive Patient
+                                        </Button>
                                     </ContextMenu.Items>
                                     <ContextMenu.Trigger>
                                         <TouchableOpacity

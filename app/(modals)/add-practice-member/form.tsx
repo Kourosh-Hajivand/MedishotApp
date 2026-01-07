@@ -1,17 +1,18 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
-import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
+import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { spacing } from "@/styles/spaces";
-import themeColors from "@/theme/colors";
+import themeColors, { colors } from "@/theme/colors";
 import { useAddMember, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { ActivityIndicator, Alert, Image, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -76,11 +77,11 @@ export default function AddPracticeMemberForm() {
         }
         return null;
     }, [isEditMode, params.member]);
-
+    const queryClient = useQueryClient();
     const { mutate: addMember, isPending: isAddingMember } = useAddMember(
         (data) => {
-            console.log("addMember", data);
             router.back();
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeMembers"] });
         },
         (error) => {
             Alert.alert("Error", error?.message || "Failed to add member. Please try again.");
@@ -110,21 +111,12 @@ export default function AddPracticeMemberForm() {
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            console.log("✅ [uploadImage] Success callback triggered");
-            console.log("✅ [uploadImage] Response:", response);
-            // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("✅ [uploadImage] Filename:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
-            console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
-        (error) => {
-            console.error("❌ [uploadImage] Error callback triggered");
-            console.error("❌ [uploadImage] Error uploading image:", error);
-            console.error("❌ [uploadImage] Error message:", error.message);
-        },
+        (error) => {},
     );
 
     const {
@@ -180,14 +172,12 @@ export default function AddPracticeMemberForm() {
     // Initialize uploadedFilename with existing image URL if in edit mode
     useEffect(() => {
         if (isEditMode && memberData?.image?.url && !localImageUri) {
-            console.log("🖼️ [INIT] Setting existing member image:", memberData.image.url);
             setUploadedFilename(memberData.image.url);
             uploadedFilenameRef.current = memberData.image.url;
         }
     }, [isEditMode, memberData?.image?.url, localImageUri]);
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
-        console.log("📸 [handleImageSelected] Image selected:", result.uri);
         setLocalImageUri(result.uri); // Save local URI for preview
 
         try {
@@ -201,16 +191,8 @@ export default function AddPracticeMemberForm() {
                 name: filename,
             } as any;
 
-            console.log("📤 [handleImageSelected] Preparing to upload file:", {
-                uri: file.uri,
-                type: file.type,
-                name: file.name,
-            });
-            console.log("📤 [handleImageSelected] Calling uploadImage...");
             uploadImage(file);
-        } catch (error) {
-            console.error("❌ [handleImageSelected] Error preparing image for upload:", error);
-        }
+        } catch (error) {}
     };
 
     const onSubmit = React.useCallback(
@@ -240,26 +222,7 @@ export default function AddPracticeMemberForm() {
                 // Only submit filename from server, not local URI
                 // Use ref to always get the latest value (avoid closure issues)
                 const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
-                console.log("🔍 [onSubmit] Checking uploadedFilename (state):", uploadedFilename);
-                console.log("🔍 [onSubmit] Checking uploadedFilename (ref):", uploadedFilenameRef.current);
-                console.log("🔍 [onSubmit] Using filename:", currentUploadedFilename);
 
-                console.log("===============Submited Data=====================");
-                console.log({
-                    practiceId: parseInt(practiceId),
-                    data: {
-                        first_name: data.first_name,
-                        last_name: data.last_name,
-                        email: data.email,
-                        role: data.role,
-                        ...(data.birth_date && { birth_date: data.birth_date }),
-                        // Ensure gender is lowercase for backend
-                        ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
-                        ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
-                        ...(currentUploadedFilename && { profile_photo: currentUploadedFilename }),
-                    },
-                });
-                console.log("====================================");
                 addMember({
                     practiceId: parseInt(practiceId),
                     data: {
@@ -289,7 +252,18 @@ export default function AddPracticeMemberForm() {
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerRight: () => <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} ButtonStyle="Filled" size="Medium" />,
+            headerRight: () => (
+                <Pressable onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} className="px-2">
+                    {isAddingMember || isUpdatingRole ? (
+                        <ActivityIndicator size="small" color={colors.system.blue} />
+                    ) : (
+                        <BaseText type="Body" weight="600" color={isAddingMember || isUpdatingRole ? "system.gray" : "system.blue"}>
+                            Done
+                        </BaseText>
+                    )}
+                </Pressable>
+            ),
+            // <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} ButtonStyle="Filled" size="Medium" />,
         });
     }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode, onSubmit]);
 
@@ -303,30 +277,10 @@ export default function AddPracticeMemberForm() {
                             <ActivityIndicator size="small" color={themeColors.system.gray6} />
                         ) : localImageUri ? (
                             // Show preview after upload is complete (new image)
-                            <Image
-                                source={{ uri: localImageUri }}
-                                style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading local image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", localImageUri);
-                                }}
-                                onLoad={() => {
-                                    console.log("✅ [Image] Local image loaded successfully:", localImageUri);
-                                }}
-                            />
+                            <Image source={{ uri: localImageUri }} style={styles.avatarImage} />
                         ) : memberData?.image?.url ? (
                             // Show existing image from server
-                            <Image
-                                source={{ uri: memberData.image.url }}
-                                style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading existing image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", memberData.image?.url);
-                                }}
-                                onLoad={() => {
-                                    console.log("✅ [Image] Existing image loaded successfully:", memberData.image?.url);
-                                }}
-                            />
+                            <Image source={{ uri: memberData.image.url }} style={styles.avatarImage} />
                         ) : (
                             // Show default avatar when no image
                             <AvatarIcon width={50} height={50} strokeWidth={0} />

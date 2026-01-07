@@ -72,11 +72,14 @@ export const routes = {
     patients: {
         list: (practiseId: string | number) => `${practiseId}/patients`,
         create: (practiseId: string | number) => `${practiseId}/patients`,
+        getArchived: (practiseId: string | number) => `${practiseId}/patients/archived`,
 
         getById: (patientId: string | number) => `patients/${patientId}`,
         // OpenAPI: POST /patients/{patient}/update (multipart/form-data)
         update: (patientId: string | number) => `patients/${patientId}/update`,
         delete: (patientId: string | number) => `patients/${patientId}`,
+        archive: (patientId: string | number) => `patients/${patientId}/archive`,
+        unarchive: (patientId: string | number) => `patients/${patientId}/unarchive`,
 
         // Media
         getMedia: (patientId: string | number) => `patients/media/${patientId}`,
