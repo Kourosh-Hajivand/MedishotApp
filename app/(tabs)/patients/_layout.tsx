@@ -33,12 +33,12 @@ export default function PatientsLayout() {
 
     // Filter doctors from members
     const doctors = useMemo(() => {
-        return practiceMembers?.data?.filter((member) => member.role === "doctor") ?? [];
+        return practiceMembers?.data?.filter((member) => member.role === "doctor" || member.role === "owner") ?? [];
     }, [practiceMembers?.data]);
 
-    // Check if user can see doctor filter (only owner or admin)
+    // Check if user can see doctor filter (only owner or staff)
     const canSeeDoctorFilter = useMemo(() => {
-        return selectedPractice?.role === "owner" || selectedPractice?.role === "admin";
+        return selectedPractice?.role === "owner" || selectedPractice?.role === "staff";
     }, [selectedPractice?.role]);
 
     // Calculate width based on practice name length
@@ -104,24 +104,29 @@ export default function PatientsLayout() {
                                         </Submenu>
                                         {canSeeDoctorFilter && (
                                             <Submenu button={<Button systemImage="line.3.horizontal.decrease">Doctor Filter</Button>}>
-                                                <Button
-                                                    systemImage="line.3.horizontal.decrease.circle"
-                                                    onPress={() => {
-                                                        setSelectedDoctor(null);
+                                                <Switch
+                                                    label="All"
+                                                    variant="switch"
+                                                    value={selectedDoctor === null}
+                                                    onValueChange={(value) => {
+                                                        if (value) {
+                                                            setSelectedDoctor(null);
+                                                        }
                                                     }}
-                                                >
-                                                    All
-                                                </Button>
+                                                />
                                                 {doctors.length > 0 ? (
                                                     doctors.map((doctor) => (
-                                                        <Button
+                                                        <Switch
                                                             key={String(doctor.id)}
-                                                            onPress={() => {
-                                                                setSelectedDoctor(String(doctor.id));
+                                                            label={doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
+                                                            variant="switch"
+                                                            value={selectedDoctor === String(doctor.id)}
+                                                            onValueChange={(value) => {
+                                                                if (value) {
+                                                                    setSelectedDoctor(String(doctor.id));
+                                                                }
                                                             }}
-                                                        >
-                                                            {doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
-                                                        </Button>
+                                                        />
                                                     ))
                                                 ) : (
                                                     <Button disabled>No doctors found</Button>

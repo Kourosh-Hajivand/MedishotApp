@@ -147,7 +147,7 @@ export interface Practice {
     metadata?: PracticeMetadata;
     created_by?: People;
     patients_count?: number;
-    role?: "owner" | "admin" | "member" | "viewer";
+    role?: "owner" | "doctor" | "staff";
     created_at: string;
     updated_at: string;
 }
@@ -157,7 +157,7 @@ export interface Member {
     first_name: string | null;
     last_name: string | null;
     email: string;
-    role: "owner" | "admin" | "member" | "viewer" | "doctor"; // OpenAPI: includes "doctor"
+    role: "owner" | "doctor" | "staff"; // OpenAPI: includes "doctor"
     status: "active";
     patients_count: number;
     taken_images_count: number;
@@ -182,7 +182,7 @@ export interface Invitation {
     id: number;
     type: "invitation";
     email: string;
-    role: "owner" | "admin" | "member" | "viewer" | "doctor";
+    role: "owner" | "doctor" | "staff";
     status: "pending";
     invited_at: string;
 }

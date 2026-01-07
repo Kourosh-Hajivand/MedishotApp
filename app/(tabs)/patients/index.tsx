@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 export default function PatientsScreen() {
-    const { selectedPractice, viewMode } = useProfileStore();
+    const { selectedPractice, viewMode, selectedDoctor } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
     const queryClient = useQueryClient();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
@@ -43,24 +43,38 @@ export default function PatientsScreen() {
         return currentMember?.role || selectedPractice.role;
     }, [selectedPractice, practiceMembers?.data, profile?.email]);
 
-    // Get available doctors (members with role "doctor" or "owner")
+    // Check if user can see doctor filter (only owner or admin)
+    const canSeeDoctorFilter = useMemo(() => {
+        return selectedPractice?.role === "owner" || selectedPractice?.role === "staff";
+    }, [selectedPractice?.role]);
+
     const availableDoctors = useMemo(() => {
         if (!practiceMembers?.data) return [];
         return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
     }, [practiceMembers?.data]);
 
-    // Determine doctor_id based on user role
+    // Determine doctor_id based on user role and selected doctor filter
     const doctorId = useMemo(() => {
-        // If role is "owner" or "admin" (staff), don't pass doctor_id
-        if (currentUserRole === "owner" || currentUserRole === "admin" || currentUserRole === "member") {
-            return undefined;
+        // If user is owner/admin and can see doctor filter
+        if (canSeeDoctorFilter) {
+            // If "All" is selected (selectedDoctor is null), don't pass doctor_id
+            if (selectedDoctor === null) {
+                return undefined;
+            }
+            // If a specific doctor is selected, pass that doctor's id
+            if (selectedDoctor) {
+                return parseInt(selectedDoctor);
+            }
         }
-        // If role is "doctor", pass current user's id
+
+        // If user is a doctor (not owner/admin), only show their own patients
         if (currentUserRole === "doctor" && profile?.id) {
             return profile.id;
         }
+
+        // Default: don't filter by doctor
         return undefined;
-    }, [currentUserRole, profile?.id]);
+    }, [canSeeDoctorFilter, selectedDoctor, currentUserRole, profile?.id]);
 
     const { data: patients, isLoading: isPatientsLoading, refetch: refetchPatients } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
     const currentPatients = patients?.data;
@@ -448,7 +462,7 @@ export default function PatientsScreen() {
                                         rounded={true}
                                         onPress={() => {
                                             // If user is staff (admin) or owner, check if there's only one doctor
-                                            if (currentUserRole === "admin" || currentUserRole === "owner") {
+                                            if (currentUserRole === "staff" || currentUserRole === "owner") {
                                                 // If there's only one doctor, go directly to add patient with that doctor
                                                 if (availableDoctors.length === 1) {
                                                     const singleDoctor = availableDoctors[0];

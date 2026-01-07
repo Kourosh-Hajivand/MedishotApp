@@ -96,7 +96,7 @@ export interface AddMemberDto {
     first_name: string;
     last_name: string;
     email: string;
-    role: "owner" | "admin" | "member" | "doctor"; // OpenAPI: enum values
+    role: "owner" | "doctor" | "staff"; // OpenAPI: enum values
     birth_date?: string; // YYYY-MM-DD format
     gender?: "male" | "female" | "other";
     metadata?: string; // JSON string containing phones, emails, addresses, urls
@@ -104,7 +104,7 @@ export interface AddMemberDto {
 }
 
 export interface UpdateMemberRoleDto {
-    role: "owner" | "admin" | "member" | "viewer"; // OpenAPI: update role enum
+    role: "owner" | "doctor" | "staff"; // OpenAPI: update role enum
 }
 
 export interface TransferOwnershipDto {
