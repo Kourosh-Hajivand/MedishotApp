@@ -68,10 +68,21 @@ export default function ReviewScreen() {
     // Hooks for saving photos
     const { mutate: uploadMediaWithTemplate } = useUploadPatientMediaWithTemplate(
         () => {
-            // Success - navigate back to patient detail
-            // Use replace to replace the camera stack in history
+            // Success - navigate back to patient detail and remove camera stack from history
             setIsSaving(false);
-            router.replace(`/patients/${patientId}` as any);
+            // Go back twice to remove both review and camera from history, then navigate to patient detail
+            // This ensures camera stack is removed from navigation history
+            if (router.canGoBack()) {
+                router.back(); // Go back from review to camera
+            }
+            setTimeout(() => {
+                if (router.canGoBack()) {
+                    router.back(); // Go back from camera to patient detail
+                } else {
+                    // Fallback: if can't go back, navigate directly
+                    router.replace(`/patients/${patientId}` as any);
+                }
+            }, 100);
         },
         (error) => {
             console.error("Error uploading with template:", error);
@@ -87,8 +98,19 @@ export default function ReviewScreen() {
             // Check if all uploads are complete
             if (uploadProgressRef.current.count >= uploadProgressRef.current.total) {
                 setIsSaving(false);
-                // Navigate back to patient detail
-                router.replace(`/patients/${patientId}` as any);
+                // Navigate back to patient detail and remove camera stack from history
+                // Go back twice to remove both review and camera from history
+                if (router.canGoBack()) {
+                    router.back(); // Go back from review to camera
+                }
+                setTimeout(() => {
+                    if (router.canGoBack()) {
+                        router.back(); // Go back from camera to patient detail
+                    } else {
+                        // Fallback: if can't go back, navigate directly
+                        router.replace(`/patients/${patientId}` as any);
+                    }
+                }, 100);
             }
         },
         (error) => {
@@ -213,23 +235,6 @@ export default function ReviewScreen() {
                     images: images,
                 };
 
-                // Log the data model before sending
-                console.log("📤 [handleSave] ========== UPLOAD WITH TEMPLATE ==========");
-                console.log("📤 [handleSave] Patient ID:", patientId);
-                console.log("📤 [handleSave] Template ID:", templateIdNum);
-                console.log("📤 [handleSave] Images count:", images.length);
-                console.log("📤 [handleSave] Full Request Data:", JSON.stringify(requestData, null, 2));
-                console.log(
-                    "📤 [handleSave] Images array details:",
-                    images.map((img, idx) => ({
-                        index: idx + 1,
-                        gost_id: img.gost_id,
-                        notes: img.notes,
-                        media: img.media, // This is now a string (filename)
-                    })),
-                );
-                console.log("📤 [handleSave] ===========================================");
-
                 // Call API
                 uploadMediaWithTemplate({
                     patientId,
@@ -301,8 +306,19 @@ export default function ReviewScreen() {
                 text: "Discard",
                 style: "destructive",
                 onPress: () => {
-                    // Navigate back to patient detail
-                    router.replace(`/patients/${patientId}` as any);
+                    // Navigate back to patient detail and remove camera stack from history
+                    // Go back twice to remove both review and camera from history
+                    if (router.canGoBack()) {
+                        router.back(); // Go back from review to camera
+                    }
+                    setTimeout(() => {
+                        if (router.canGoBack()) {
+                            router.back(); // Go back from camera to patient detail
+                        } else {
+                            // Fallback: if can't go back, navigate directly
+                            router.replace(`/patients/${patientId}` as any);
+                        }
+                    }, 100);
                 },
             },
         ]);
@@ -424,8 +440,8 @@ export default function ReviewScreen() {
                             <Animated.View key={photo.id} entering={FadeInDown.delay(index * 50).springify()}>
                                 <Animated.View style={animatedStyle}>
                                     <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
-                                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                                </TouchableOpacity>
+                                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                                    </TouchableOpacity>
                                 </Animated.View>
                             </Animated.View>
                         );

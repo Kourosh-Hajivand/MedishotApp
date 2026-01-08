@@ -9,6 +9,7 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import React, { useRef, useState } from "react";
 import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ActivitiesTab, OverviewTab, TeamTab } from "./_components";
 
 export default function PracticeOverviewScreen() {
     const insets = useSafeAreaInsets();
@@ -89,11 +90,11 @@ export default function PracticeOverviewScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
-            <View className="bg-white border-t  border-t-white" style={{ borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 100 }}>
-                <View className="px-5">
-                    <View className="flex-row relative">
+            <View className="bg-white" style={{ borderBottomWidth: 0.33, borderBottomColor: "rgba(84,84,86,0.34)", zIndex: 100 }}>
+                <View className="px-4">
+                    <View className="flex-row relative h-[44px]">
                         {tabs.map((tab, i) => (
-                            <TouchableOpacity key={tab} onPress={() => handleTabPress(i)} className="flex-1 items-center justify-center py-3">
+                            <TouchableOpacity key={tab} onPress={() => handleTabPress(i)} className="flex-1 items-center justify-center px-4 py-3">
                                 <BaseText type="Subhead" weight={activeTab === i ? 600 : 400} color={activeTab === i ? "system.blue" : "labels.secondary"}>
                                     {tab}
                                 </BaseText>
@@ -102,61 +103,21 @@ export default function PracticeOverviewScreen() {
                         <Animated.View
                             style={{
                                 position: "absolute",
-                                bottom: 0,
-                                height: 3,
+                                bottom: -0.33,
+                                height: 4,
                                 width: tabWidth,
                                 backgroundColor: colors.system.blue,
                                 transform: [{ translateX }],
-                                borderTopLeftRadius: 3,
-                                borderTopRightRadius: 3,
+                                borderTopLeftRadius: 6,
+                                borderTopRightRadius: 6,
                             }}
                         />
                     </View>
                 </View>
             </View>
-            <View className="gap-6 p-4">
-                <BaseText type="Title3" weight="600" color="labels.primary">
-                    Overview
-                </BaseText>
-                <View className="flex-row items-center justify-between">
-                    <View className="w-1/2">
-                        <BaseText type="Subhead" weight="400" color="labels.secondary">
-                            Total Image Taken
-                        </BaseText>
-                        <BaseText type="Title2" weight="600" color="labels.primary">
-                            100
-                        </BaseText>
-                    </View>
-                    <View className="border-l border-system-gray5 pl-4 w-1/2">
-                        <BaseText type="Subhead" weight="400" color="labels.secondary">
-                            Total Consent Signed{" "}
-                        </BaseText>
-                        <BaseText type="Title2" weight="600" color="labels.primary">
-                            30
-                        </BaseText>
-                    </View>
-                </View>
-                <View className="flex-row items-center justify-between border-t border-system-gray5 pt-4">
-                    <View className="w-1/2">
-                        <BaseText type="Subhead" weight="400" color="labels.secondary">
-                            Total Ai Enhancment
-                        </BaseText>
-                        <BaseText type="Title2" weight="600" color="labels.primary">
-                            20
-                        </BaseText>
-                    </View>
-                    <View className="border-l border-system-gray5 pl-4 w-1/2">
-                        <BaseText type="Subhead" weight="400" color="labels.secondary">
-                            Team members
-                        </BaseText>
-                        <BaseText type="Title2" weight="600" color="labels.primary">
-                            4
-                        </BaseText>
-                    </View>
-                </View>
-            </View>
-
-            {/* TODO: Add practice overview content */}
+            {activeTab === 0 && <OverviewTab />}
+            {activeTab === 1 && <TeamTab practiceId={selectedPractice?.id} />}
+            {activeTab === 2 && <ActivitiesTab practiceId={selectedPractice?.id} />}
         </ScrollView>
     );
 }
