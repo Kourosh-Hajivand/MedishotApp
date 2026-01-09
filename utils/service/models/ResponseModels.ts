@@ -137,6 +137,7 @@ export interface PracticeMetadata {
     email?: string;
     website?: string;
     logo?: string;
+    print_settings?: string; // JSON string
 }
 
 export interface Practice {
@@ -144,10 +145,12 @@ export interface Practice {
     name: string;
     type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology";
     image?: Media;
-    metadata?: PracticeMetadata;
+    metadata?: PracticeMetadata | string; // Can be object or JSON string
     created_by?: People;
     patients_count?: number;
     role?: "owner" | "doctor" | "staff";
+    subscriptions?: Subscription[];
+    current_subscription?: Subscription;
     created_at: string;
     updated_at: string;
 }
@@ -170,6 +173,7 @@ export interface Member {
     activities?: Array<{
         description: string;
         created_at: string;
+        updated_at?: string;
         subject_type: string;
         subject_id: number;
         properties?: Record<string, any>;
@@ -383,7 +387,10 @@ export interface PatientMedia {
     is_bookmarked?: boolean;
     data: Record<string, any> | null;
     taker?: People;
-    media: Media | null;
+    media?: Media | null;
+    original_media?: Media | null;
+    edited_media?: Media | null;
+    created_at?: string;
 }
 
 export interface PatientMediaListResponse {
@@ -463,17 +470,17 @@ export type PatientsCountResponse = PracticeStatsResponse;
 export interface RecentlyPhotosResponse {
     success: true;
     message: string;
-    data: Media[];
+    data: PatientMedia[];
 }
 
 // ============= Plan & Subscription Responses =============
 export interface PlanFeature {
     id: number;
     feature_key: string;
-    feature_type: "limit" | "boolean";
+    feature_type: "limit" | "boolean" | "doctor_limit" | "staff_limit" | "patient_count";
     feature_value: string;
     display_name: string;
-    description: string;
+    description: string | null;
 }
 
 export interface PlanAddon {
@@ -487,14 +494,24 @@ export interface Plan {
     name: string;
     slug: string;
     description: string;
-    price: number;
+    price: string | number; // Can be string "60.00" or number
     currency: string;
-    billing_interval: "month" | "year";
+    billing_interval: "month" | "year" | "monthly" | "yearly";
+    billing_interval_label?: string; // e.g., "Monthly"
     is_active: boolean;
     features: PlanFeature[];
-    addons: PlanAddon[];
-    created_at: string;
-    updated_at: string;
+    addons?: PlanAddon[]; // Optional as it may not be in all responses
+    metadata?: Record<string, any> | null;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Subscription {
+    plan: Plan;
+    stripe_id: string;
+    stripe_status: "active" | "canceled" | "past_due" | "unpaid" | "trialing" | string;
+    trial_ends_at: string | null;
+    ends_at: string | null;
 }
 
 export interface PlanListResponse {

@@ -8,7 +8,7 @@ import { RecentPhotosSection } from "./RecentPhotosSection";
 
 export function OverviewTab() {
     return (
-        <View className="gap-2 bg-[#F2F2F7]">
+        <View className="gap-2 bg-[#F2F2F7] ">
             <PatientsChartSection />
             <ConsentSection />
             <RecentPhotosSection />

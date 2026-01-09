@@ -1,4 +1,4 @@
-import { BaseText } from "@/components";
+import { BaseButton, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { colors } from "@/theme/colors";
@@ -9,6 +9,7 @@ import { Member } from "@/utils/service/models/ResponseModels";
 import { router } from "expo-router";
 import React from "react";
 import { TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface TeamTabProps {
     practiceId?: number;
@@ -26,14 +27,21 @@ export function TeamTab({ practiceId }: TeamTabProps) {
 
     // Get last activity description
     const getLastActivity = (member: Member): string => {
-        if (!member.activities || member.activities.length === 0) return "No activity";
+        if (!member.activities || member.activities.length === 0) {
+            // If no activities, use member's updated_at
+            if (member.updated_at) {
+                return `${getRelativeTime(member.updated_at)}`;
+            }
+            return "No activity";
+        }
         const lastActivity = member.activities[0];
-        const timeAgo = getRelativeTime(lastActivity.created_at);
-        return `${lastActivity.description} - ${timeAgo}`;
+        const timeAgo = getRelativeTime(lastActivity.updated_at || lastActivity.created_at);
+        return `${timeAgo}`;
     };
 
+    const { bottom } = useSafeAreaInsets();
     return (
-        <View className="gap-3 px-4 py-3">
+        <View style={{ paddingBottom: bottom }} className="gap-3 px-4 py-3 bg-[#F2F2F7]">
             {practiceMembers?.data?.map((member) => {
                 const enhancedCount = getEnhancedPicturesCount(member);
                 const lastActivity = getLastActivity(member);
@@ -43,11 +51,21 @@ export function TeamTab({ practiceId }: TeamTabProps) {
                 return (
                     <View key={`member-${member.id}`} className="bg-white rounded-lg overflow-hidden">
                         <View className="p-3 gap-[10px]">
-                            <View className="flex-row items-center justify-between pl-0 pr-3">
+                            <TouchableOpacity
+                                onPress={() =>
+                                    router.push({
+                                        pathname: "/(profile)/practice-member-details",
+                                        params: {
+                                            practiceId: String(practiceId ?? selectedPractice?.id ?? 0),
+                                            memberId: String(member.id),
+                                        },
+                                    })
+                                }
+                                className="flex-row items-center justify-between pl-0 pr-3"
+                            >
                                 <View className="flex-row items-center gap-[10px]">
-                                    <View className={isOwner ? "border-2 border-system-blue rounded-full p-[2px]" : ""}>
-                                        <Avatar size={52} rounded={99} name={memberName} imageUrl={member.image?.url} color={member.color} />
-                                    </View>
+                                    <Avatar size={52} rounded={99} name={memberName} imageUrl={member.image?.url} color={member.color} />
+
                                     <View>
                                         <BaseText type="Callout" weight="600" color="labels.primary">
                                             {memberName}
@@ -58,7 +76,7 @@ export function TeamTab({ practiceId }: TeamTabProps) {
                                     </View>
                                 </View>
                                 <IconSymbol name="chevron.right" size={16} color={colors.labels.tertiary} />
-                            </View>
+                            </TouchableOpacity>
                             <View className="flex-row items-center justify-between">
                                 <View className="flex-col items-start">
                                     <BaseText type="Footnote" weight="400" color="labels.secondary">
@@ -109,20 +127,18 @@ export function TeamTab({ practiceId }: TeamTabProps) {
                     </View>
                 );
             })}
-            <TouchableOpacity
+
+            <BaseButton
                 onPress={() => {
                     router.push({
                         pathname: "/(modals)/add-practice-member",
                         params: { practiceId: selectedPractice?.id },
                     });
                 }}
-                className="bg-system-blue/15 rounded-full py-1 px-4 flex-row items-center justify-center w-full"
-            >
-                <IconSymbol name="plus" size={15} color={colors.system.blue} />
-                <BaseText type="Subhead" weight="600" color="system.blue" className="ml-1">
-                    Member
-                </BaseText>
-            </TouchableOpacity>
+                label="Member"
+                ButtonStyle="Tinted"
+                leftIcon={<IconSymbol name="plus" size={15} color={colors.system.blue} />}
+            />
         </View>
     );
 }

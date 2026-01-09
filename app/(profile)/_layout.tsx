@@ -8,7 +8,7 @@ export default function layout() {
             screenOptions={{
                 headerShown: true,
                 headerLeft: () => <BackButton onPress={() => router.back()} />,
-                headerTitle: "Profile",
+                headerTitle: "Practice Overview",
                 headerShadowVisible: true,
                 headerTransparent: true,
                 headerLargeTitle: true,

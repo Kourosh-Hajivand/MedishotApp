@@ -1,15 +1,17 @@
 import { BaseText } from "@/components";
-import { useGetPracticeMembers, useGetRecentlyPhotos } from "@/utils/hook/usePractice";
 import { useGetPatients } from "@/utils/hook/usePatient";
+import { useGetPracticeMembers, useGetRecentlyPhotos } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import React, { useMemo } from "react";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function OverviewStatisticsSection() {
     const { selectedPractice } = useProfileStore();
     const { data: recentPhotos } = useGetRecentlyPhotos(selectedPractice?.id ?? 0, !!selectedPractice?.id);
-    const { data: patientsData } = useGetPatients(selectedPractice?.id, { per_page: 10 });
+    const { data: patientsData } = useGetPatients(selectedPractice?.id);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const { bottom } = useSafeAreaInsets();
 
     // Get all consents from all patients (for practice overview)
     const allConsents = useMemo(() => {
@@ -20,7 +22,7 @@ export function OverviewStatisticsSection() {
     }, [patientsData?.data]);
 
     return (
-        <View className="bg-white px-4 py-3 gap-4">
+        <View style={{ paddingBottom: bottom }} className="bg-white px-4 py-3 gap-4">
             <BaseText type="Title3" weight="600" color="labels.primary">
                 Overview
             </BaseText>
@@ -59,7 +61,7 @@ export function OverviewStatisticsSection() {
                         Team members
                     </BaseText>
                     <BaseText type="Title2" weight="700" color="labels.primary">
-                        {practiceMembers?.data?.length ?? 0}
+                        {selectedPractice?.patients_count ?? 0}
                     </BaseText>
                 </View>
             </View>

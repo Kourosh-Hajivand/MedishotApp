@@ -65,6 +65,9 @@ export const routes = {
         updateTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
         deleteTemplate: (practiseId: string | number, templateId: string | number) => `practises/${practiseId}/templates/${templateId}`,
 
+        // Contracts
+        getLatestContracts: (practiseId: string | number) => `${practiseId}/contracts/latest`,
+
         // Patients
         getPatients: (practiseId: string | number) => `${practiseId}/patients`,
     },

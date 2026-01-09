@@ -1,41 +1,37 @@
 import { BaseText } from "@/components";
-import { useGetPatients } from "@/utils/hook/usePatient";
-import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
-import { Host, Picker } from "@expo/ui/swift-ui";
-import React, { useMemo, useState } from "react";
-import { Image, ScrollView, View } from "react-native";
+import { useGetPatients } from "@/utils/hook/usePatient";
+import { useGetLatestContracts } from "@/utils/hook/usePractice";
+import { useProfileStore } from "@/utils/hook/useProfileStore";
+import React, { useMemo } from "react";
+import { ActivityIndicator, Image, ScrollView, View } from "react-native";
 
 export function ConsentSection() {
     const { selectedPractice } = useProfileStore();
-    const { data: patientsData } = useGetPatients(selectedPractice?.id, { per_page: 10 });
-    const [consentPeriod, setConsentPeriod] = useState(0);
-    const consentOptions = ["Recently", "Total"];
+    const { data: contractsData, isLoading } = useGetLatestContracts(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const { data: patientsData } = useGetPatients(selectedPractice?.id, { per_page: 100 });
 
-    // Get all consents from all patients (for practice overview)
+    // Map contracts with patient names
     const allConsents = useMemo(() => {
-        if (!patientsData?.data) return [];
-        // This would need to fetch contracts for each patient, but for now we'll use a placeholder
-        // In a real implementation, you'd need an API endpoint for practice-level consents
-        return [];
-    }, [patientsData?.data]);
+        if (!contractsData?.data || !patientsData?.data) return [];
+
+        return contractsData.data.map((contract) => {
+            const patient = patientsData.data.find((p) => p.id === contract.patient_id);
+            return {
+                ...contract,
+                patientName: patient?.full_name || `${patient?.first_name || ""} ${patient?.last_name || ""}`.trim() || "Patient",
+                imageUrl: contract.contract_file?.url || null,
+                date: contract.signed_at || contract.created_at,
+                type: contract.contract_template?.title || "Consent",
+            };
+        });
+    }, [contractsData?.data, patientsData?.data]);
 
     return (
         <View className="bg-white px-4 py-3 gap-3">
             <BaseText type="Title3" weight="600" color="labels.primary">
-                Consent
+                Recently Consent
             </BaseText>
-            <Host matchContents style={{ width: "100%" }}>
-                <Picker
-                    label="Consent Period"
-                    options={consentOptions}
-                    selectedIndex={consentPeriod}
-                    onOptionSelected={({ nativeEvent: { index } }) => {
-                        setConsentPeriod(index);
-                    }}
-                    variant="segmented"
-                />
-            </Host>
             <View className="flex-row items-end gap-1">
                 <BaseText type="Title3" weight="600" color="labels.primary">
                     {allConsents.length}
@@ -44,20 +40,32 @@ export function ConsentSection() {
                     Consents signed
                 </BaseText>
             </View>
-            {allConsents.length > 0 ? (
+            {isLoading ? (
+                <View className="items-center justify-center py-8">
+                    <ActivityIndicator size="large" color="#007AFF" />
+                </View>
+            ) : allConsents.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 16 }}>
-                    {allConsents.slice(0, 3).map((consent: any, index: number) => (
-                        <View key={index} className="gap-[10px]" style={{ width: 174 }}>
+                    {allConsents.slice(0, 3).map((consent) => (
+                        <View key={consent.id} className="gap-[10px]" style={{ width: 174 }}>
                             <View>
                                 <BaseText type="Subhead" weight="600" color="labels.primary">
-                                    {consent.patientName || "Patient"}
+                                    {consent.patientName}
                                 </BaseText>
                                 <BaseText type="Caption1" weight="400" color="labels.secondary">
-                                    {consent.type || "Consent"} - {getRelativeTime(consent.date || "")}
+                                    {consent.type} - {getRelativeTime(consent.date || "")}
                                 </BaseText>
                             </View>
-                            <View className="border border-system-gray6 rounded-md bg-system-gray5" style={{ height: 246 }}>
-                                {consent.imageUrl && <Image source={{ uri: consent.imageUrl }} className="w-full h-full rounded-md" resizeMode="cover" />}
+                            <View className="border border-system-gray6 rounded-md bg-background aspect-[816/1056]  w-full">
+                                {consent.imageUrl ? (
+                                    <Image source={{ uri: consent.imageUrl }} className="w-full h-full rounded-md" resizeMode="contain" />
+                                ) : (
+                                    <View className="w-full h-full items-center justify-center">
+                                        <BaseText type="Body" weight="400" color="labels.tertiary">
+                                            No preview
+                                        </BaseText>
+                                    </View>
+                                )}
                             </View>
                         </View>
                     ))}

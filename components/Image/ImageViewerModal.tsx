@@ -36,6 +36,10 @@ interface ImageViewerModalProps {
     imageUrlToBookmarkMap?: Map<string, boolean>;
     imageUrlToCreatedAtMap?: Map<string, string>;
     patientId?: string | number;
+    // Map imageUrl to patientId for dynamic patient switching
+    imageUrlToPatientIdMap?: Map<string, number>;
+    // Map imageUrl to taker info for displaying who took the photo
+    imageUrlToTakerMap?: Map<string, { first_name?: string | null; last_name?: string | null }>;
     actions?: ViewerActionsConfig;
 }
 
@@ -91,12 +95,8 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
     );
 };
 
-export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, mediaData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, imageUrlToCreatedAtMap, patientId, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
+export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, mediaData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, imageUrlToCreatedAtMap, patientId, imageUrlToPatientIdMap, imageUrlToTakerMap, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
-
-    // Fetch patient data if patientId is provided
-    const { data: patientDataResponse } = useGetPatientById(patientId || "");
-    const patientData = patientDataResponse?.data;
 
     // Build maps from mediaData if provided, otherwise use legacy maps
     const { imageUrlToMediaIdMapInternal, imageUrlToBookmarkMapInternal, imageUrlToCreatedAtMapInternal, imagesList } = React.useMemo(() => {
@@ -163,6 +163,28 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const savedTranslateY = useSharedValue(0);
     const scrollProgress = useSharedValue(0); // Progress of swipe: -1 to 1 (left to right)
     const currentIndexShared = useSharedValue(initialIndex); // Shared value for current index
+
+    // Get current patientId from currentIndex if imageUrlToPatientIdMap is provided
+    const currentPatientId = React.useMemo(() => {
+        if (imageUrlToPatientIdMap && imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return imageUrlToPatientIdMap.get(currentImageUrl) || patientId;
+        }
+        return patientId;
+    }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
+
+    // Get current taker info
+    const currentTaker = React.useMemo(() => {
+        if (imageUrlToTakerMap && imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return imageUrlToTakerMap.get(currentImageUrl);
+        }
+        return null;
+    }, [currentIndex, imagesList, imageUrlToTakerMap]);
+
+    // Fetch patient data if patientId is provided
+    const { data: patientDataResponse } = useGetPatientById(currentPatientId || "");
+    const patientData = patientDataResponse?.data;
 
     const scrollThumbnailToPosition = React.useCallback(
         (currentPage: number, animated: boolean = false) => {
@@ -798,7 +820,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         alignment="center"
                                         modifiers={[
                                             padding({ all: 4 }),
-                                            frame({ width: 150 }),
+                                            frame({ width: currentTaker ? 200 : 150 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -808,13 +830,19 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         spacing={4}
                                     >
                                         <Text size={14}>{patientData?.full_name ?? ""}</Text>
-                                        <Text weight="light" size={12}>
-                                            {(() => {
-                                                const currentImageUrl = imagesList[currentIndex];
-                                                const createdAt = currentImageUrl && imageUrlToCreatedAtMapInternal.get(currentImageUrl);
-                                                return createdAt ? getRelativeTime(createdAt) : "Now";
-                                            })()}
-                                        </Text>
+                                        {currentTaker ? (
+                                            <Text weight="light" size={12}>
+                                                {`taken by DR.${`${currentTaker.first_name || ""} ${currentTaker.last_name || ""}`.trim()}`}
+                                            </Text>
+                                        ) : (
+                                            <Text weight="light" size={12}>
+                                                {(() => {
+                                                    const currentImageUrl = imagesList[currentIndex];
+                                                    const createdAt = currentImageUrl && imageUrlToCreatedAtMapInternal.get(currentImageUrl);
+                                                    return createdAt ? getRelativeTime(createdAt) : "Now";
+                                                })()}
+                                            </Text>
+                                        )}
                                     </VStack>
                                     <Spacer />
                                     <HStack

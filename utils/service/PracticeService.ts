@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, Member, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
+import { ApiResponse, Member, PatientContractListResponse, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -33,6 +33,7 @@ const {
         getArchivedMedia,
         getAlbums,
         getMember,
+        getLatestContracts,
     },
 } = routes;
 
@@ -400,6 +401,21 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to delete practice template");
+            }
+            throw error;
+        }
+    },
+
+    // ============= Contracts =============
+
+    // Get latest contracts for a practice
+    getLatestContracts: async (practiceId: number): Promise<PatientContractListResponse> => {
+        try {
+            const response: AxiosResponse<PatientContractListResponse> = await axiosInstance.get(baseUrl + getLatestContracts(practiceId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get latest contracts");
             }
             throw error;
         }

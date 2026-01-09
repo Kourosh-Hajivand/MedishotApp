@@ -90,7 +90,7 @@ export default function PracticeOverviewScreen() {
                     </TouchableOpacity>
                 </View>
             </View>
-            <View className="bg-white" style={{ borderBottomWidth: 0.33, borderBottomColor: "rgba(84,84,86,0.34)", zIndex: 100 }}>
+            <View className="bg-white mt-4 border-t border-border " style={{ borderBottomWidth: 0.33, borderBottomColor: "rgba(84,84,86,0.34)", zIndex: 100 }}>
                 <View className="px-4">
                     <View className="flex-row relative h-[44px]">
                         {tabs.map((tab, i) => (
@@ -129,8 +129,6 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         // paddingHorizontal: 20,
-        gap: 16,
-        paddingBottom: 20,
     },
     description: {
         marginTop: 8,

@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, PatientContractListResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useAuth } from "./useAuth";
@@ -317,6 +317,15 @@ export const useGetPatientsCount = (practiceId: number, type: string, enabled: b
     return useQuery({
         queryKey: ["GetPatientsCount", practiceId, type],
         queryFn: () => PracticeService.getPatientsCount(practiceId, type),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
+
+export const useGetLatestContracts = (practiceId: number, enabled: boolean = true): UseQueryResult<PatientContractListResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetLatestContracts", practiceId],
+        queryFn: () => PracticeService.getLatestContracts(practiceId),
         enabled: isAuthenticated === true && enabled && !!practiceId,
     });
 };
