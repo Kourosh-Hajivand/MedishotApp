@@ -27,11 +27,13 @@ interface MemberData {
 const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
     return (
         <View className="gap-3">
-            <BaseText type="Headline" weight={600} color="labels.primary">
-                Recent Activities
-            </BaseText>
+            <View className="px-4">
+                <BaseText type="Headline" weight={600} color="labels.primary">
+                    Recent Activities
+                </BaseText>
+            </View>
             {memberData?.activities && memberData.activities.length > 0 ? (
-                memberData.activities.slice(0, 10).map((activity, index) => <ActivityItem key={index} activity={activity as ActivityLog} showBorder={false} />)
+                memberData.activities.map((activity, index) => <ActivityItem key={index} activity={activity as ActivityLog} showBorder={false} />)
             ) : (
                 <View className="items-center py-8">
                     <BaseText type="Body" weight={400} color="labels.secondary">
@@ -47,26 +49,49 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
 const MemberPatients = ({ memberData, practiceId }: { memberData?: MemberData; practiceId?: number }) => {
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(practiceId || 0, { doctor_id: memberData?.id });
 
+    // Helper function to get email as string
+    const getEmailString = (email: any): string => {
+        if (!email) return "";
+        if (typeof email === "string") return email;
+        if (Array.isArray(email) && email.length > 0) {
+            // Check if it's array of objects with value property
+            const firstItem = email[0];
+            if (typeof firstItem === "object" && firstItem?.value) {
+                return firstItem.value;
+            }
+            // If it's array of strings, return first one
+            if (typeof firstItem === "string") {
+                return firstItem;
+            }
+        }
+        return "";
+    };
+
     return (
-        <View className="gap-3">
+        <View className="gap-3 px-4">
             <BaseText type="Headline" weight={600} color="labels.primary">
                 Patients Statistics
             </BaseText>
 
             {patients?.data && patients?.data?.length > 0 ? (
-                patients.data.map((patient, index) => (
-                    <View key={index} className={`flex-row items-center gap-3 ${index !== patients.data.length - 1 ? "pb-2 border-b border-system-gray5" : ""}`}>
-                        <Avatar size={34} rounded={99} name={`${patient.first_name} ${patient.last_name}`} imageUrl={patient.profile_image?.url} />
-                        <View className="flex-row items-center">
-                            <BaseText type="Body" weight={500} color="labels.primary">
-                                {patient.first_name} {patient.last_name}
-                            </BaseText>
-                            <BaseText type="Caption1" weight={400} color="labels.secondary">
-                                {patient.email}
-                            </BaseText>
+                patients.data.map((patient, index) => {
+                    const emailString = getEmailString(patient.email);
+                    return (
+                        <View key={index} className={`flex-row items-center gap-3 ${index !== patients.data.length - 1 ? "pb-2 border-b border-system-gray5" : ""}`}>
+                            <Avatar size={34} rounded={99} name={`${patient.first_name} ${patient.last_name}`} imageUrl={patient.profile_image?.url} />
+                            <View className="flex-col">
+                                <BaseText type="Body" weight={500} color="labels.primary">
+                                    {patient.first_name} {patient.last_name}
+                                </BaseText>
+                                {emailString && (
+                                    <BaseText type="Caption1" weight={400} color="labels.secondary">
+                                        {emailString}
+                                    </BaseText>
+                                )}
+                            </View>
                         </View>
-                    </View>
-                ))
+                    );
+                })
             ) : (
                 <View className="items-center py-8">
                     <BaseText type="Body" weight={400} color="labels.secondary">
@@ -129,7 +154,7 @@ export default function PracticeMemberDetailsScreen() {
         <ScrollView style={[styles.container, { paddingTop: insets.top + 60 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             <View className="gap-3">
                 <View className="flex-row items-center gap-2 px-4 ">
-                    <Avatar size={54} rounded={99} name={memberData?.data?.first_name && memberData?.data?.last_name ? memberData.data.first_name + " " + memberData.data.last_name : memberData?.data?.email || ""} color={memberData?.data?.color} />
+                    <Avatar size={54} rounded={99} name={memberData?.data?.first_name && memberData?.data?.last_name ? memberData.data.first_name + " " + memberData.data.last_name : memberData?.data?.email || ""} imageUrl={memberData?.data?.image?.url} color={memberData?.data?.color} />
                     <View className="gap-0">
                         <BaseText type="Title3" weight={600} color="labels.primary">
                             {memberData?.data?.first_name && memberData?.data?.last_name ? `${memberData.data.first_name} ${memberData.data.last_name}` : memberData?.data?.email}
@@ -139,18 +164,20 @@ export default function PracticeMemberDetailsScreen() {
                         </BaseText>
                     </View>
                 </View>
-                <View className="pt-2 border-t border-system-gray5 px-4">
-                    <Host style={{ width: "100%", height: 38 }}>
-                        <Picker
-                            label="Picker Type"
-                            options={typeButton}
-                            selectedIndex={pickerType}
-                            onOptionSelected={({ nativeEvent: { index } }) => {
-                                setPickerType(index);
-                            }}
-                            variant="segmented"
-                        />
-                    </Host>
+                <View className="pt-2 border-t border-system-gray5 ">
+                    <View className="px-4">
+                        <Host style={{ width: "100%", height: 38 }}>
+                            <Picker
+                                label="Picker Type"
+                                options={typeButton}
+                                selectedIndex={pickerType}
+                                onOptionSelected={({ nativeEvent: { index } }) => {
+                                    setPickerType(index);
+                                }}
+                                variant="segmented"
+                            />
+                        </Host>
+                    </View>
 
                     <View className="mt-4">{pickerType === 0 ? <MemberActivities memberData={memberData?.data} /> : <MemberPatients memberData={memberData?.data} practiceId={parseInt(practiceId || "0")} />}</View>
                 </View>

@@ -1,8 +1,9 @@
 import { BaseText } from "@/components/text/BaseText";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { formatDate } from "@/utils/helper/dateUtils";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
-import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -16,6 +17,9 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         // Map event types to appropriate icons
         if (!event) return "circle.fill";
         const eventLower = event.toLowerCase();
+        if (eventLower.includes("appointment") || eventLower.includes("scheduled")) {
+            return "calendar";
+        }
         if (eventLower.includes("created") || eventLower.includes("create")) {
             return "plus.circle.fill";
         }
@@ -26,7 +30,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
             return "trash.circle.fill";
         }
         if (eventLower.includes("upload") || eventLower.includes("media")) {
-            return "photo.circle.fill";
+            return "photo.badge.plus.fill";
         }
         if (eventLower.includes("consent") || eventLower.includes("contract")) {
             return "doc.text.fill";
@@ -52,32 +56,52 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         if (eventLower.includes("consent") || eventLower.includes("contract")) {
             return colors.system.orange;
         }
+        if (eventLower.includes("appointment") || eventLower.includes("scheduled")) {
+            return "#FF3B30"; // Red color for appointment
+        }
         return colors.system.gray;
     };
 
-    const icon = getActivityIcon(activity.event);
-    const iconColor = getActivityColor(activity.event);
+    const getActivityIconBackgroundColor = (iconColor: string): string => {
+        // Light background colors matching the icon colors
+        if (iconColor === "#FF3B30") return "#FFE5E5"; // Light pink/red for appointment
+        if (iconColor === colors.system.green) return "#E5F5E5";
+        if (iconColor === colors.system.blue) return "#E5F0FF";
+        if (iconColor === colors.system.red) return "#FFE5E5";
+        if (iconColor === colors.system.purple) return "#F0E5FF";
+        if (iconColor === colors.system.orange) return "#FFF0E5";
+        return colors.system.gray6;
+    };
+
+    // Use description if event is not available
+    const activityType = activity.event || activity.description || "";
+    const icon = getActivityIcon(activityType);
+    const iconColor = getActivityColor(activityType);
+
+    const activityDate = activity.updated_at || activity.created_at;
+    const formattedDate = activityDate ? formatDate(activityDate) : "";
 
     return (
-        <View style={[styles.activityItem, !showBorder && styles.activityItemNoBorder]}>
-            <View style={styles.activityContent}>
-                <View style={styles.activityIconContainer}>
-                    <IconSymbol name={icon as any} size={20} color={iconColor} />
-                </View>
-                <View style={styles.activityTextContainer}>
-                    <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
-                        {activity.description}
+        <View>
+            {formattedDate && (
+                <LinearGradient colors={["rgba(255, 255, 255, 0.08)", "rgba(120, 120, 128, 0.08)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ paddingHorizontal: 16, paddingVertical: 4, zIndex: 0 }} className="w-full">
+                    <BaseText type="Footnote" weight="600" color="labels.tertiary">
+                        {formattedDate}
                     </BaseText>
-                    <View style={styles.activityMeta}>
+                </LinearGradient>
+            )}
+            <View style={[styles.activityItem, !showBorder && styles.activityItemNoBorder]} className="p-4">
+                <View style={styles.activityContent}>
+                    <View style={[styles.activityIconContainer, { backgroundColor: getActivityIconBackgroundColor(iconColor) }]}>
+                        <IconSymbol name={icon as any} size={24} color={iconColor} />
+                    </View>
+                    <View style={styles.activityTextContainer}>
+                        <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
+                            {activity.description}
+                        </BaseText>
                         {activity.causer && (
                             <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.activityMetaText}>
                                 by {activity.causer.name}
-                            </BaseText>
-                        )}
-                        {activity.causer && activity.created_at && <BaseText type="Caption1" color="labels.tertiary" style={styles.activityMetaSeparator}>•</BaseText>}
-                        {activity.created_at && (
-                            <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.activityMetaText}>
-                                {getRelativeTime(activity.created_at)}
                             </BaseText>
                         )}
                     </View>
@@ -90,10 +114,8 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
 const styles = StyleSheet.create({
     activityItem: {
         backgroundColor: colors.system.white,
-        borderBottomWidth: 1,
+        zIndex: 10,
         borderBottomColor: colors.border,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
     },
     activityItemNoBorder: {
         borderBottomWidth: 0,
@@ -103,14 +125,12 @@ const styles = StyleSheet.create({
         alignItems: "flex-start",
     },
     activityIconContainer: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: colors.system.gray6,
+        width: 40,
+        height: 40,
+        borderRadius: 8,
         alignItems: "center",
         justifyContent: "center",
         marginRight: 12,
-        marginTop: 2,
     },
     activityTextContainer: {
         flex: 1,
@@ -121,18 +141,9 @@ const styles = StyleSheet.create({
         letterSpacing: -0.24,
         marginBottom: 4,
     },
-    activityMeta: {
-        flexDirection: "row",
-        alignItems: "center",
-    },
     activityMetaText: {
         fontSize: 13,
         lineHeight: 18,
         letterSpacing: -0.08,
     },
-    activityMetaSeparator: {
-        marginHorizontal: 6,
-        fontSize: 13,
-    },
 });
-

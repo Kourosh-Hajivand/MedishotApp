@@ -4,6 +4,7 @@ import colors from "@/theme/colors";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import React from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ActivitiesTabContentProps {
     activities: ActivityLog[];
@@ -11,6 +12,8 @@ interface ActivitiesTabContentProps {
 }
 
 export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = ({ activities, isLoading }) => {
+    const insets = useSafeAreaInsets();
+
     const renderActivityItem = ({ item }: { item: ActivityLog }) => {
         return <ActivityItem activity={item} />;
     };
@@ -37,7 +40,7 @@ export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = ({ acti
         );
     }
 
-    return <FlatList data={activities} renderItem={renderActivityItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false} />;
+    return <FlatList data={activities} renderItem={renderActivityItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom }]} showsVerticalScrollIndicator={false} />;
 };
 
 const styles = StyleSheet.create({
