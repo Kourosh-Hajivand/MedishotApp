@@ -5,6 +5,7 @@ import BaseButton from "@/components/button/BaseButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useArchivePatient, useGetPatients, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
@@ -337,11 +338,13 @@ export default function PatientsScreen() {
                                         {item.numbers && item.numbers.length > 0 && (
                                             <Submenu button={<Button systemImage="message">Message</Button>}>
                                                 {item.numbers.map((number: any, index: number) => {
-                                                    const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
                                                     const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                                    // Display formatted phone number
+                                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
                                                     return (
                                                         <Button
-                                                            key={`message-${index}-${phoneNumber}`}
+                                                            key={`message-${index}-${phoneNumberRaw}`}
                                                             systemImage="message"
                                                             onPress={() => {
                                                                 router.push({
@@ -350,7 +353,7 @@ export default function PatientsScreen() {
                                                                 });
                                                             }}
                                                         >
-                                                            {phoneType}: {phoneNumber}
+                                                            {phoneType}: {phoneNumberDisplay}
                                                         </Button>
                                                     );
                                                 })}
@@ -359,11 +362,13 @@ export default function PatientsScreen() {
                                         {item.numbers && item.numbers.length > 0 && (
                                             <Submenu button={<Button systemImage="phone">Call</Button>}>
                                                 {item.numbers.map((number: any, index: number) => {
-                                                    const phoneNumber = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
                                                     const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                                    // Display formatted phone number
+                                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
                                                     return (
                                                         <Button
-                                                            key={`call-${index}-${phoneNumber}`}
+                                                            key={`call-${index}-${phoneNumberRaw}`}
                                                             systemImage="phone"
                                                             onPress={() => {
                                                                 router.push({
@@ -372,7 +377,7 @@ export default function PatientsScreen() {
                                                                 });
                                                             }}
                                                         >
-                                                            {phoneType}: {phoneNumber}
+                                                            {phoneType}: {phoneNumberDisplay}
                                                         </Button>
                                                     );
                                                 })}

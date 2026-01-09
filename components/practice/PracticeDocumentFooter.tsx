@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import React from "react";
 import { StyleSheet, View, ViewStyle } from "react-native";
 
@@ -64,7 +65,7 @@ export const PracticeDocumentFooter: React.FC<PracticeDocumentFooterProps> = ({ 
                     <View style={styles.previewFooterItem}>
                         {showIcons && <IconSymbol name="phone.fill" size={10} color={colors.system.gray2} />}
                         <BaseText type="Caption2" color="labels.primary" style={styles.previewFooterText} numberOfLines={1}>
-                            {metadata.phone}
+                            {e164ToDisplay(metadata.phone) || metadata.phone}
                         </BaseText>
                     </View>
                 )}

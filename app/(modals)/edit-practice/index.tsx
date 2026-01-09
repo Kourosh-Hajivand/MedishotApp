@@ -1,8 +1,10 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
+import IOSPhoneInput from "@/components/input/IOSPhoneInput";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "@/utils/helper/HelperFunction";
+import { normalizeWebsiteUrl } from "@/utils/helper/HelperFunction";
+import { toE164 } from "@/utils/helper/phoneUtils";
 import useDebounce from "@/utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "@/utils/hook/useGetMapboxSearch";
 import { useTempUpload } from "@/utils/hook/useMedia";
@@ -20,12 +22,17 @@ import { z } from "zod";
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
     website: z.string().optional(),
-    phoneNumber: z
-        .string()
-        .transform((val) => val.replace(/\D/g, ""))
-        .refine((val) => val.length === 0 || val.length === 10 || val.length === 11, {
+    phoneNumber: z.string().refine(
+        (val) => {
+            if (!val || val.length === 0) return true; // Optional field
+            // Accept E.164 format (+1XXXXXXXXXX) or validate as E.164
+            const digits = val.replace(/\D/g, "");
+            return digits.length === 10 || (val.startsWith("+1") && val.length === 12);
+        },
+        {
             message: "Phone number must be 10 digits",
-        }),
+        },
+    ),
     address: z.string().optional(),
     zipCode: z.string().optional(),
     street: z.string().optional(),
@@ -80,7 +87,7 @@ export default function EditPracticeScreen() {
         defaultValues: {
             practiceName: practice?.name || "",
             website: metadata?.website?.replace("https://", "") || "",
-            phoneNumber: metadata?.phone?.replace(/-/g, "") || "",
+            phoneNumber: metadata?.phone ? toE164(metadata.phone) || "" : "",
             address: metadata?.address || "",
             zipCode: metadata?.zipcode?.toString() || "",
             street: metadata?.street || "",
@@ -111,7 +118,7 @@ export default function EditPracticeScreen() {
         if (metadata && practice) {
             setValue("practiceName", practice.name || "");
             setValue("website", metadata?.website?.replace("https://", "") || "");
-            setValue("phoneNumber", metadata?.phone?.replace(/-/g, "") || "");
+            setValue("phoneNumber", metadata?.phone ? toE164(metadata.phone) || "" : "");
             setValue("address", metadata?.address || "");
             setValue("zipCode", metadata?.zipcode?.toString() || "");
             setValue("street", metadata?.street || "");
@@ -183,7 +190,7 @@ export default function EditPracticeScreen() {
                 name: data.practiceName,
                 metadata: JSON.stringify({
                     website: normalizeWebsiteUrl(data.website),
-                    phone: data.phoneNumber ? normalizeUSPhoneToDashedFormat(data.phoneNumber) : "",
+                    phone: data.phoneNumber || "",
                     street: data.street || "",
                     address: data.address || "",
                     zipcode: data.zipCode ? Number(data.zipCode) : undefined,
@@ -283,7 +290,11 @@ export default function EditPracticeScreen() {
                             {f.label}
                         </BaseText>
                         <View style={styles.inputWrapper}>
-                            <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                            {f.name === "phoneNumber" ? (
+                                <IOSPhoneInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                            ) : (
+                                <ControlledInput control={control} name={f.name as keyof FormData} label={f.label} optional={f.optional} keyboardType={f.keyboardType as KeyboardTypeOptions} haveBorder={false} error={errors?.[f.name as keyof FormData]?.message as string} />
+                            )}
                         </View>
                     </View>
                 ))}

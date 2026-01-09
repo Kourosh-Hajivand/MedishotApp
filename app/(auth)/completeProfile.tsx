@@ -1,5 +1,6 @@
 import { DynamicFieldItem } from "@/models";
 import { ProfileFormData, ProfileFormScreen } from "@/screens/auth/ProfileFormScreen";
+import { toE164 } from "@/utils/helper/phoneUtils";
 import { useUpdateProfileFull } from "@/utils/hook";
 import { UpdateProfileFullBody } from "@/utils/service/models/RequestModels";
 import { Button, Host } from "@expo/ui/swift-ui";
@@ -38,7 +39,20 @@ export default function CompleteProfile() {
                     const formData = formRef.current?.getFormData();
                     if (formData) {
                         // Map DynamicFieldItem arrays to the format expected by API and include in metadata
-                        const phonesData = formData.phones.length > 0 ? formData.phones.map((phone) => ({ label: phone.label, value: typeof phone.value === "string" ? phone.value : "" })) : undefined;
+                        const phonesData =
+                            formData.phones.length > 0
+                                ? formData.phones
+                                      .map((phone) => {
+                                          // Ensure phone value is in E.164 format
+                                          const phoneValue = typeof phone.value === "string" ? phone.value : "";
+                                          const e164Value = phoneValue ? toE164(phoneValue) || phoneValue : "";
+                                          return {
+                                              label: phone.label,
+                                              value: e164Value,
+                                          };
+                                      })
+                                      .filter((phone) => phone.value) // Filter out empty values
+                                : undefined;
                         const emailsData = formData.emails.length > 0 ? formData.emails.map((email) => ({ label: email.label, value: typeof email.value === "string" ? email.value : "" })) : undefined;
                         const addressesData = formData.addresses.length > 0 ? formData.addresses.map((address) => ({ label: address.label, value: address.value })) : undefined;
                         const urlsData = formData.urls.length > 0 ? formData.urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;

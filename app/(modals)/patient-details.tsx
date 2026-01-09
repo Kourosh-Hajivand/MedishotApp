@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useGetPatientById } from "@/utils/hook";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
@@ -190,9 +191,13 @@ export default function PatientDetailsScreen() {
                     <View style={styles.sectionContainer}>
                         <View style={styles.phoneNumbersContainer}>
                             {patientData.numbers.map((number, index) => {
-                                const phoneNumber = typeof number === "string" ? number : number.value;
+                                const phoneNumberRaw = typeof number === "string" ? number : number.value;
                                 const phoneType = typeof number === "object" ? number.type : "phone";
-                                if (!phoneNumber) return null;
+                                if (!phoneNumberRaw) return null;
+
+                                // Display formatted phone number, but use raw E.164 for actions (call/message)
+                                const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
+
                                 return (
                                     <View key={index} style={styles.phoneRow} className={`${index < patientData.numbers.length - 1 ? "border-b border-border" : ""}`}>
                                         <View style={styles.phoneInfo}>
@@ -200,14 +205,14 @@ export default function PatientDetailsScreen() {
                                                 {phoneType.charAt(0).toUpperCase() + phoneType.slice(1)}
                                             </BaseText>
                                             <BaseText type="Subhead" color="labels.primary">
-                                                {phoneNumber}
+                                                {phoneNumberDisplay}
                                             </BaseText>
                                         </View>
                                         <View style={styles.actionButtonsContainer}>
-                                            <TouchableOpacity onPress={() => handleCall(phoneNumber)} style={styles.actionButton}>
+                                            <TouchableOpacity onPress={() => handleCall(phoneNumberRaw)} style={styles.actionButton}>
                                                 <IconSymbol name="phone.fill" size={16} color={colors.system.blue} />
                                             </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => handleMessage(phoneNumber)} style={styles.actionButton}>
+                                            <TouchableOpacity onPress={() => handleMessage(phoneNumberRaw)} style={styles.actionButton}>
                                                 <IconSymbol name="message.fill" size={16} color={colors.system.blue} />
                                             </TouchableOpacity>
                                         </View>

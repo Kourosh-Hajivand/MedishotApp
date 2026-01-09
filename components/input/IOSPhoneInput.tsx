@@ -1,24 +1,63 @@
-import { formatNumber } from "@/utils/helper/HelperFunction";
+import { extractPhoneDigits, formatPhoneDisplay, toE164 } from "@/utils/helper/phoneUtils";
 import classNames from "classnames";
-import React, { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { Controller, FieldValues } from "react-hook-form";
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Controller, FieldValues, useWatch } from "react-hook-form";
 import { StyleSheet, TextInput, TextInputProps, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, withSpring, withTiming } from "react-native-reanimated";
-import { EyeInvisibleIcon, EyeVisibleIcon } from "../../assets/icons";
 import { InputProps } from "../../models/models";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors";
 import { BaseText } from "../text/BaseText";
 
-const ControlledInputComponent = <T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps, ref: React.Ref<TextInput>) => {
-    const [showPassword, setShowPassword] = useState(false);
+const IOSPhoneInputComponent = <T extends FieldValues>({ control, name, label, error, disabled = false, optional, info, size = "Large", haveBorder = true, ...props }: InputProps<T> & TextInputProps, ref: React.Ref<TextInput>) => {
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<TextInput>(null);
+    const isInternalChangeRef = useRef(false);
+    const lastSentValueRef = useRef<string>("");
+    const isInitializedRef = useRef(false);
 
-    // Expose inputRef methods to parent via ref
     useImperativeHandle(ref, () => inputRef.current!);
 
-    const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
+    // Watch the form value to sync display value when it changes externally
+    const formValue = useWatch({ control, name });
+
+    // Initialize localDigits from formValue - use empty string initially, will be synced in useEffect
+    const [localDigits, setLocalDigits] = useState<string>("");
+
+    useEffect(() => {
+        if (formValue !== undefined) {
+            // Initialize on first render
+            if (!isInitializedRef.current) {
+                const extracted = extractPhoneDigits(formValue || "");
+                setLocalDigits(extracted);
+                lastSentValueRef.current = formValue || "";
+                isInitializedRef.current = true;
+                return;
+            }
+
+            // Skip sync if this change was triggered by our own handleChange
+            if (isInternalChangeRef.current && formValue === lastSentValueRef.current) {
+                isInternalChangeRef.current = false;
+                return;
+            }
+
+            // External change - sync localDigits with form value
+            const extracted = extractPhoneDigits(formValue || "");
+            setLocalDigits((prev) => {
+                // Only update if different to prevent unnecessary re-renders
+                if (extracted !== prev) {
+                    return extracted;
+                }
+                return prev;
+            });
+            // Reset flag for external changes
+            isInternalChangeRef.current = false;
+        }
+    }, [formValue]);
+
+    // Format display value from local digits
+    const displayValue = formatPhoneDisplay(localDigits);
+
     const focusInput = () => !disabled && inputRef.current?.focus();
 
     const height = size === "Large" ? 50 : 44;
@@ -34,15 +73,32 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
             <Controller
                 control={control}
                 name={name}
-                render={({ field: { onChange, onBlur, value } }) => {
-                    const handleNumberChange = (text: string) => {
-                        const cleaned = text.replace(/,/g, "");
-                        onChange(cleaned);
-                    };
-
+                render={({ field: { onChange, onBlur } }) => {
                     const handleChange = (text: string) => {
-                        if (SperatedNumber) handleNumberChange(text);
-                        else onChange(text);
+                        // Extract digits from input (handle both formatted and unformatted text)
+                        const digits = text.replace(/\D/g, "");
+                        const limited = digits.slice(0, 10);
+
+                        // Update local state immediately for smooth typing
+                        setLocalDigits(limited);
+
+                        // Convert to E.164 format and notify parent
+                        let valueToSend: string;
+                        if (limited.length === 10) {
+                            // Valid complete phone number - send E.164 format
+                            valueToSend = toE164(limited);
+                        } else if (limited.length > 0) {
+                            // Partial input - send raw digits to preserve state while typing
+                            valueToSend = limited;
+                        } else {
+                            // Empty input - clear everything
+                            valueToSend = "";
+                        }
+
+                        // Mark this as an internal change and track what we're sending
+                        isInternalChangeRef.current = true;
+                        lastSentValueRef.current = valueToSend;
+                        onChange(valueToSend);
                     };
 
                     return (
@@ -77,7 +133,7 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                     ]}
                                 >
                                     {/* Placeholder */}
-                                    {!value && !!label && (
+                                    {!displayValue && !!label && (
                                         <View style={styles.placeholder}>
                                             <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
                                                 {label} {optional && `(Optional)`}
@@ -89,8 +145,9 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                     <TextInput
                                         ref={inputRef}
                                         {...props}
-                                        value={SperatedNumber && value ? formatNumber(value.toString()) : value}
+                                        value={displayValue}
                                         onChangeText={handleChange}
+                                        keyboardType="phone-pad"
                                         onBlur={(e) => {
                                             setIsFocused(false);
                                             onBlur();
@@ -103,10 +160,10 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                         editable={!disabled}
                                         placeholder=""
                                         placeholderTextColor={"rgba(60, 60, 67, 0.30)"}
-                                        secureTextEntry={type === "password" && !showPassword}
-                                        keyboardType={type === "number" ? "numeric" : "default"}
-                                        textAlign={centerText ? "center" : "left"}
-                                        returnKeyType={props.returnKeyType || (type === "password" && name === "confirmPassword" ? "done" : "next")}
+                                        textContentType="telephoneNumber"
+                                        autoComplete="tel"
+                                        textAlign="left"
+                                        returnKeyType={props.returnKeyType || "next"}
                                         onSubmitEditing={props.onSubmitEditing || undefined}
                                         blurOnSubmit={props.blurOnSubmit !== undefined ? props.blurOnSubmit : false}
                                         style={[
@@ -119,12 +176,6 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                             },
                                         ]}
                                     />
-
-                                    {type === "password" && (
-                                        <TouchableOpacity onPress={togglePasswordVisibility} disabled={disabled} style={styles.passwordToggle}>
-                                            {showPassword ? <EyeVisibleIcon width={20} height={20} strokeWidth={0} /> : <EyeInvisibleIcon width={20} height={20} strokeWidth={0} />}
-                                        </TouchableOpacity>
-                                    )}
                                 </TouchableOpacity>
                             </View>
 
@@ -150,9 +201,9 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
     );
 };
 
-const ControlledInput = forwardRef(ControlledInputComponent) as <T extends FieldValues>(props: InputProps<T> & TextInputProps & { ref?: React.Ref<TextInput> }) => React.ReactElement;
+const IOSPhoneInput = forwardRef(IOSPhoneInputComponent) as <T extends FieldValues>(props: InputProps<T> & TextInputProps & { ref?: React.Ref<TextInput> }) => React.ReactElement;
 
-export default ControlledInput;
+export default IOSPhoneInput;
 
 const styles = StyleSheet.create({
     container: {
@@ -190,9 +241,6 @@ const styles = StyleSheet.create({
         fontSize: 17,
         lineHeight: 22,
         fontWeight: "400",
-    },
-    passwordToggle: {
-        paddingLeft: spacing["2"],
     },
     errorContainer: {
         height: 20,

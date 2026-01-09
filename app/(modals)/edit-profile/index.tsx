@@ -1,5 +1,6 @@
 import { BaseText } from "@/components";
 import { ProfileFormData, ProfileFormScreen } from "@/screens/auth/ProfileFormScreen";
+import { toE164 } from "@/utils/helper/phoneUtils";
 import { useUpdateProfileFull } from "@/utils/hook";
 import { UpdateProfileFullBody } from "@/utils/service/models/RequestModels";
 import { People } from "@/utils/service/models/ResponseModels";
@@ -67,10 +68,16 @@ export default function EditProfileScreen() {
                 const metadataObject: any = {};
 
                 if (formData.phones && formData.phones.length > 0) {
-                    const phonesData = formData.phones.map((phone) => ({
-                        type: phone.label,
-                        value: phone.value,
-                    }));
+                    const phonesData = formData.phones
+                        .map((phone) => {
+                            // Ensure phone value is in E.164 format
+                            const e164Value = phone.value ? toE164(phone.value) || phone.value : "";
+                            return {
+                                type: phone.label,
+                                value: e164Value,
+                            };
+                        })
+                        .filter((phone) => phone.value); // Filter out empty values
                     if (phonesData.length > 0) metadataObject.phones = phonesData;
                 }
 
@@ -108,27 +115,6 @@ export default function EditProfileScreen() {
                     ...(formData.uploadedFilename && { profile_photo: formData.uploadedFilename }),
                 };
 
-                // Log all data being sent to backend
-                console.log("═══════════════════════════════════════════════════════════");
-                console.log("📤 [handleSave] DATA BEING SENT TO BACKEND:");
-                console.log("═══════════════════════════════════════════════════════════");
-                console.log("📋 Payload (JSON):", JSON.stringify(payload, null, 2));
-                console.log("📋 Payload (Object):", payload);
-                console.log("───────────────────────────────────────────────────────────");
-                console.log("📝 Form Data:", {
-                    first_name: data.first_name,
-                    last_name: data.last_name,
-                    birth_date: data.birth_date,
-                    gender: data.gender,
-                });
-                console.log("📞 Phone Numbers:", formData.phones);
-                console.log("📧 Email Addresses:", formData.emails);
-                console.log("📍 Addresses:", formData.addresses);
-                console.log("🔗 URL Links:", formData.urls);
-                console.log("🖼️ Profile Photo Filename:", formData.uploadedFilename);
-                console.log("═══════════════════════════════════════════════════════════");
-
-                console.log("🔄 [handleSave] Calling updateProfile mutation...");
                 updateProfile(payload, {
                     onSuccess: (response) => {
                         console.log("✅ [updateProfile] Success Response:", response);

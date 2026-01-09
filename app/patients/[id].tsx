@@ -7,6 +7,7 @@ import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
@@ -542,7 +543,7 @@ export default function PatientDetailsScreen() {
                                             Phone
                                         </BaseText>
                                         <BaseText type="Subhead" color="labels.primary">
-                                            {patient?.data?.numbers?.[0]?.value}
+                                            {e164ToDisplay(patient?.data?.numbers?.[0]?.value) || patient?.data?.numbers?.[0]?.value}
                                         </BaseText>
                                     </View>
                                     <View className="flex-row gap-3">

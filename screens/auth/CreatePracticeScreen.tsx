@@ -11,11 +11,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
 import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "../../components";
+import IOSPhoneInput from "../../components/input/IOSPhoneInput";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared";
 import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "../../utils/helper/HelperFunction";
-import { getTokens } from "../../utils/helper/tokenStorage";
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
 import { useTempUpload } from "../../utils/hook/useMedia";
@@ -23,12 +23,17 @@ import { useTempUpload } from "../../utils/hook/useMedia";
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
     website: z.string().optional(),
-    phoneNumber: z
-        .string()
-        .transform((val) => val.replace(/\D/g, ""))
-        .refine((val) => val.length === 10 || val.length === 11, {
+    phoneNumber: z.string().refine(
+        (val) => {
+            if (!val || val.length === 0) return true; // Optional field
+            // Accept E.164 format (+1XXXXXXXXXX) or validate as E.164
+            const digits = val.replace(/\D/g, "");
+            return digits.length === 10 || (val.startsWith("+1") && val.length === 12);
+        },
+        {
             message: "Phone number must be 10 digits",
-        }),
+        },
+    ),
     specialty: z.string().min(1, "Required"),
     street: z.string().optional(),
     address: z.string().min(1, "Address is required"),
@@ -133,14 +138,14 @@ export const CreatePracticeScreen: React.FC = () => {
             // Set the newly created practice as selected immediately
             await setSelectedPractice(data.data);
         }
-        
+
         // Invalidate and refetch practice list to refresh it
         queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
-        
+
         // Wait for practice list to refetch
         await queryClient.refetchQueries({ queryKey: ["GetPracticeList"] });
-        
+
         // Navigate to patients tab
         router.replace("/(tabs)/patients");
     });
@@ -227,20 +232,35 @@ export const CreatePracticeScreen: React.FC = () => {
                             {f.label}
                         </BaseText>
                         <View style={styles.inputWrapper}>
-                            <ControlledInput
-                                control={control}
-                                name={f.name as keyof FormData}
-                                label={f.label}
-                                optional={f.optional}
-                                disabled={f.disabled}
-                                keyboardType={f.keyboardType as KeyboardTypeOptions}
-                                haveBorder={false}
-                                error={errors?.[f.name as keyof FormData]?.message as string}
-                                returnKeyType={f.returnKeyType}
-                                blurOnSubmit={f.returnKeyType === "done" ? true : false}
-                                onSubmitEditing={f.onSubmitEditing}
-                                ref={f.ref}
-                            />
+                            {f.name === "phoneNumber" ? (
+                                <IOSPhoneInput
+                                    control={control}
+                                    name={f.name as keyof FormData}
+                                    label={f.label}
+                                    optional={f.optional}
+                                    haveBorder={false}
+                                    error={errors?.[f.name as keyof FormData]?.message as string}
+                                    returnKeyType={f.returnKeyType}
+                                    blurOnSubmit={f.returnKeyType === "done" ? true : false}
+                                    onSubmitEditing={f.onSubmitEditing}
+                                    ref={f.ref}
+                                />
+                            ) : (
+                                <ControlledInput
+                                    control={control}
+                                    name={f.name as keyof FormData}
+                                    label={f.label}
+                                    optional={f.optional}
+                                    disabled={f.disabled}
+                                    keyboardType={f.keyboardType as KeyboardTypeOptions}
+                                    haveBorder={false}
+                                    error={errors?.[f.name as keyof FormData]?.message as string}
+                                    returnKeyType={f.returnKeyType}
+                                    blurOnSubmit={f.returnKeyType === "done" ? true : false}
+                                    onSubmitEditing={f.onSubmitEditing}
+                                    ref={f.ref}
+                                />
+                            )}
                         </View>
                     </View>
                 ))}

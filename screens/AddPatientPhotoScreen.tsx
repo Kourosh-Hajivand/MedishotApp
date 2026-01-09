@@ -5,6 +5,7 @@ import { DynamicInputConfig } from "@/models";
 import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { routes } from "@/routes/routes";
 import colors from "@/theme/colors";
+import { toE164 } from "@/utils/helper/phoneUtils";
 import { useCreatePatient, useGetPatientById, useGetPracticeMembers, useTempUpload, useUpdatePatient } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
@@ -328,17 +329,20 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 }
             }
 
-            // Set phone number if available
+            // Set phone number if available (convert to E.164 format)
             if (params.phone) {
-                const phoneData = [
-                    {
-                        id: "phone-0",
-                        label: "Mobile",
-                        value: params.phone,
-                    },
-                ];
-                setPhones(phoneData);
-                phonesRef.current = phoneData;
+                const e164Phone = toE164(params.phone);
+                if (e164Phone) {
+                    const phoneData = [
+                        {
+                            id: "phone-0",
+                            label: "Mobile",
+                            value: e164Phone,
+                        },
+                    ];
+                    setPhones(phoneData);
+                    phonesRef.current = phoneData;
+                }
             }
 
             // Set email if available
@@ -389,11 +393,25 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
 
             if (patientData?.numbers && patientData?.numbers?.length > 0) {
-                const phoneData = patientData.numbers.map((phone: any, index: number) => ({
-                    id: `phone-${index}`,
-                    label: phone.type,
-                    value: phone.value,
-                }));
+                const phoneData = patientData.numbers
+                    .map((phone: any, index: number) => {
+                        if (!phone || !phone.value) return null;
+
+                        const phoneValue = String(phone.value).trim();
+                        // Convert to E.164 format (handles both E.164 and formatted formats)
+                        const e164Value = toE164(phoneValue);
+
+                        // Only include if valid E.164 format
+                        if (e164Value) {
+                            return {
+                                id: `phone-${index}`,
+                                label: phone.type,
+                                value: e164Value,
+                            };
+                        }
+                        return null;
+                    })
+                    .filter((phone: any) => phone !== null);
                 setPhones(phoneData);
                 phonesRef.current = phoneData;
             }
@@ -454,16 +472,29 @@ export const AddPatientPhotoScreen: React.FC = () => {
         // Use ref to always get the latest phones value (avoid closure issues)
         const currentPhones = phonesRef.current;
 
+        // Convert phone values to E.164 format (+1XXXXXXXXXX)
+        // Import toE164 at the top of the file
         const phoneNumbers = currentPhones
             .filter((phone) => {
                 if (!phone || !phone.value) return false;
-                const valueStr = String(phone.value);
-                return valueStr.trim() !== "";
+                const valueStr = String(phone.value).trim();
+                return valueStr !== "" && valueStr !== "+1";
             })
-            .map((phone) => ({
-                type: phone.label || "Mobile",
-                value: String(phone.value).trim(),
-            }));
+            .map((phone) => {
+                const phoneValue = String(phone.value).trim();
+                // Convert to E.164 format (will return empty string if invalid)
+                const e164Value = toE164(phoneValue);
+
+                // Only include if valid E.164 format
+                if (e164Value) {
+                    return {
+                        type: phone.label || "Mobile",
+                        value: e164Value,
+                    };
+                }
+                return null;
+            })
+            .filter((phone) => phone !== null) as Array<{ type: string; value: string }>;
 
         const emailAddresses = emailsRef.current
             .filter((email) => email.value && email.value.trim() !== "")

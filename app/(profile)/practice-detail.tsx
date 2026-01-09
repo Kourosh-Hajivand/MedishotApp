@@ -3,6 +3,7 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useGetPracticeById, useGetPracticeList } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
@@ -179,7 +180,7 @@ const PracticeDetails = ({ practice }: { practice?: Practice | null }) => {
         { label: "Practice Name", value: practice?.name },
         { label: "Speciality", value: practice?.type },
         { label: "Website", value: metadata?.website ? metadata.website : null, isLink: true },
-        { label: "Phone Number", value: metadata?.phone },
+        { label: "Phone Number", value: metadata?.phone ? e164ToDisplay(metadata.phone) || metadata.phone : null },
         { label: "Email", value: metadata?.email },
         { label: "Address", value: fullAddress },
         { label: "Patients Count", value: practice?.patients_count },
