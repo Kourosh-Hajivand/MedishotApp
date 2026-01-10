@@ -15,6 +15,12 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Share, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import TextRecognition from "react-native-text-recognition";
+import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
+import { ConsentTabContent } from "./_components/ConsentTabContent";
+import { IDTabContent } from "./_components/IDTabContent";
+import { blurValue } from "./_layout";
 // Conditional import for DocumentScanner (optional native module)
 let DocumentScanner: any = null;
 try {
@@ -22,12 +28,6 @@ try {
 } catch (error) {
     console.warn("DocumentScanner module not available:", error);
 }
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import TextRecognition from "react-native-text-recognition";
-import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
-import { ConsentTabContent } from "./_components/ConsentTabContent";
-import { IDTabContent } from "./_components/IDTabContent";
-import { blurValue } from "./_layout";
 
 type RowKind = "header" | "tabs" | "content";
 

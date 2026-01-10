@@ -1,5 +1,6 @@
 import { BaseText } from "@/components";
-import { AdjustChange, ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { AdjustChange, DrawingCanvas, ImageChange, MagicChange, PenChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
@@ -161,6 +162,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
     const hasRequestedRef = useRef(false);
 
+    // Pen tool states
+    const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
+    const [selectedPenColor, setSelectedPenColor] = useState("#FF3B30");
+    const [selectedStrokeWidth, setSelectedStrokeWidth] = useState(4);
+
     const scale = useSharedValue(1);
 
     // Move note callback - update note position
@@ -200,7 +206,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     // Memoize gestures
     const composedGesture = useMemo(() => {
         const pinch = Gesture.Pinch()
-            .enabled(activeTool !== "Note")
+            .enabled(activeTool !== "Note" && activeTool !== "Pen")
             .onUpdate((e) => {
                 scale.value = e.scale;
             })
@@ -280,7 +286,21 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 setMagicSelection(selection);
                 updateDisplayedImageFromResult(selection);
             }
+        } else if (change.type === "pen") {
+            const penData = change.data as PenChange;
+            if (penData.strokes) {
+                setPenStrokes(penData.strokes);
+            }
         }
+    };
+
+    // Handle pen strokes change from DrawingCanvas
+    const handlePenStrokesChange = (strokes: Stroke[]) => {
+        setPenStrokes(strokes);
+        setImageChanges((prev) => {
+            const filtered = prev.filter((c) => c.type !== "pen");
+            return [...filtered, { type: "pen", data: { strokes } }];
+        });
     };
 
     // ✅ تبدیل عکس به base64
@@ -469,7 +489,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             case "Magic":
                 return <ToolMagic {...commonProps} />;
             case "Pen":
-                return <ToolPen {...commonProps} />;
+                return <ToolPen {...commonProps} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onColorChange={setSelectedPenColor} onStrokeWidthChange={setSelectedStrokeWidth} />;
             default:
                 return null;
         }
@@ -522,12 +542,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                 style={styles.imageContainer}
                                 onLayout={(event) => {
                                     const { width, height, x, y } = event.nativeEvent.layout;
-                                    console.log("🟣🟣🟣 IMAGE CONTAINER LAYOUT (Modal) 🟣🟣🟣");
-                                    console.log("📏 Width:", width, "Height:", height);
+
                                     setImageContainerLayout({ width, height, x, y });
                                 }}
                             >
                                 <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+
+                                {/* Drawing Canvas for Pen Tool */}
+                                <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
 
                                 {/* Note Markers */}
                                 {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} isActive={activeNoteId === note.id} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
@@ -536,7 +558,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     </GestureDetector>
                 </View>
 
-                <View className="w-full pt-4 ">{renderActiveToolPanel()}</View>
+                <View className="w-full">{renderActiveToolPanel()}</View>
 
                 <View className="flex-row items-center justify-center gap-5">
                     {tools.map((t) => (

@@ -1,9 +1,8 @@
-export * from "./types";
+export { DrawingCanvas } from "./DrawingCanvas";
+export { ImageEditorModal } from "./ImageEditorModal";
 export { ToolAdjust } from "./ToolAdjust";
 export { ToolCrop } from "./ToolCrop";
-export { ToolNote } from "./ToolNote";
 export { ToolMagic } from "./ToolMagic";
+export { ToolNote } from "./ToolNote";
 export { ToolPen } from "./ToolPen";
-export { ImageEditorModal } from "./ImageEditorModal";
-
-
+export * from "./types";
