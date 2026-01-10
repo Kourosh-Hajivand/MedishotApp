@@ -205,13 +205,6 @@ export const ToolPen: React.FC<ToolPenProps> = ({ imageUri, onChange, onApply, o
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setSelectedColor(color);
         onColorChange?.(color);
-
-        onChange({
-            type: "pen",
-            data: {
-                strokes: [],
-            },
-        });
     };
 
     const handleStrokeWidthSelect = (width: number) => {

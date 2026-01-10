@@ -14,7 +14,7 @@ import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { Note } from "./ToolNote";
 
 const { width, height } = Dimensions.get("window");
@@ -164,8 +164,30 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
     // Pen tool states
     const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
+    const [penStrokesHistory, setPenStrokesHistory] = useState<Stroke[][]>([[]]);
+    const [penHistoryIndex, setPenHistoryIndex] = useState(0);
     const [selectedPenColor, setSelectedPenColor] = useState("#FF3B30");
     const [selectedStrokeWidth, setSelectedStrokeWidth] = useState(4);
+
+    // Undo/Redo handlers for pen
+    const canUndo = penHistoryIndex > 0;
+    const canRedo = penHistoryIndex < penStrokesHistory.length - 1;
+
+    const handlePenUndo = () => {
+        if (!canUndo) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const newIndex = penHistoryIndex - 1;
+        setPenHistoryIndex(newIndex);
+        setPenStrokes(penStrokesHistory[newIndex]);
+    };
+
+    const handlePenRedo = () => {
+        if (!canRedo) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const newIndex = penHistoryIndex + 1;
+        setPenHistoryIndex(newIndex);
+        setPenStrokes(penStrokesHistory[newIndex]);
+    };
 
     const scale = useSharedValue(1);
 
@@ -297,6 +319,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     // Handle pen strokes change from DrawingCanvas
     const handlePenStrokesChange = (strokes: Stroke[]) => {
         setPenStrokes(strokes);
+
+        // Update history - remove any redo states after current index
+        const newHistory = penStrokesHistory.slice(0, penHistoryIndex + 1);
+        newHistory.push(strokes);
+        setPenStrokesHistory(newHistory);
+        setPenHistoryIndex(newHistory.length - 1);
+
         setImageChanges((prev) => {
             const filtered = prev.filter((c) => c.type !== "pen");
             return [...filtered, { type: "pen", data: { strokes } }];
@@ -528,6 +557,18 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                         </Button>
                     </Host>
 
+                    {/* Undo/Redo buttons for Pen tool */}
+                    {activeTool === "Pen" && (
+                        <View style={styles.undoRedoContainer}>
+                            <TouchableOpacity style={[styles.undoRedoButton, !canUndo && styles.undoRedoButtonDisabled]} onPress={handlePenUndo} disabled={!canUndo}>
+                                <IconSymbol name="arrow.uturn.backward.circle" size={26} color={canUndo ? colors.system.black : colors.system.gray3} />
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.undoRedoButton, !canRedo && styles.undoRedoButtonDisabled]} onPress={handlePenRedo} disabled={!canRedo}>
+                                <IconSymbol name="arrow.uturn.forward.circle" size={26} color={canRedo ? colors.system.black : colors.system.gray3} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
                     <Host style={{ width: 65, height: 40 }}>
                         <Button variant="glassProminent" color="#FFCC00" onPress={onClose}>
                             <Text color="black">Done</Text>
@@ -535,7 +576,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     </Host>
                 </View>
 
-                <View style={styles.canvasContainer}>
+                <Animated.View style={styles.canvasContainer} layout={LinearTransition.duration(250)}>
                     <GestureDetector gesture={composedGesture}>
                         <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
                             <View
@@ -556,9 +597,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                             </View>
                         </Animated.View>
                     </GestureDetector>
-                </View>
+                </Animated.View>
 
-                <View className="w-full">{renderActiveToolPanel()}</View>
+                <Animated.View key={activeTool} className="w-full" entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(250)}>
+                    {renderActiveToolPanel()}
+                </Animated.View>
 
                 <View className="flex-row items-center justify-center gap-5">
                     {tools.map((t) => (
@@ -633,5 +676,17 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
+    },
+    undoRedoContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 16,
+    },
+    undoRedoButton: {
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    undoRedoButtonDisabled: {
+        opacity: 0.5,
     },
 });
