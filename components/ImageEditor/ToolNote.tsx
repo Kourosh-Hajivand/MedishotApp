@@ -66,8 +66,8 @@ const PickerItem: React.FC<{
     };
 
     // Scale/opacity based on center state
-    const scale = isCenter ? 1 : 0.85;
-    const opacity = isCenter ? 1 : 0.4;
+    const scale = isCenter ? 1 : 0.9;
+    const opacity = isCenter ? 1 : 0.9;
 
     return (
         <View style={styles.pickerItemWrapper}>
@@ -168,20 +168,16 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
     const editingNote = propNotes.find((n) => n.id === editingNoteId);
     const editingNoteIndex = propNotes.findIndex((n) => n.id === editingNoteId);
 
-    // Scroll to active note when it changes from outside & open edit mode
+    // Scroll to active note when it changes from outside (but don't open keyboard)
     useEffect(() => {
         if (activeNoteId && propNotes.length > 0 && !isScrolling.current) {
             const noteIndex = propNotes.findIndex((n) => n.id === activeNoteId);
             if (noteIndex >= 0) {
-                // Scroll to the note
+                // Only scroll to the note - don't open keyboard
                 if (noteIndex !== centerIndex) {
                     setCenterIndex(noteIndex);
                     const targetY = noteIndex * ITEM_HEIGHT;
                     scrollViewRef.current?.scrollTo({ y: targetY, animated: true });
-                }
-                // Open edit mode for the new/selected note (auto-focus input)
-                if (editingNoteId !== activeNoteId) {
-                    setEditingNoteId(activeNoteId);
                 }
             }
         }
