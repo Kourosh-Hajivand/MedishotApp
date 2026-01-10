@@ -10,13 +10,129 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import { Note } from "./ToolNote";
 
 const { width, height } = Dimensions.get("window");
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+
+// Note Marker Component - Draggable & Tappable
+const NoteMarker: React.FC<{
+    note: Note;
+    index: number;
+    containerWidth: number;
+    containerHeight: number;
+    isActive: boolean;
+    onMove: (id: string, x: number, y: number) => void;
+    onSelect: (id: string) => void;
+}> = ({ note, index, containerWidth, containerHeight, isActive, onMove, onSelect }) => {
+    const markerScale = useSharedValue(0);
+    const translateX = useSharedValue(0);
+    const translateY = useSharedValue(0);
+    const isDragging = useSharedValue(false);
+
+    // Store the previous position to detect actual changes
+    const prevX = useRef(note.x);
+    const prevY = useRef(note.y);
+
+    React.useEffect(() => {
+        markerScale.value = withTiming(1, { duration: 200 });
+    }, []);
+
+    // Reset translation only when position actually changes from parent (after drag ends)
+    React.useEffect(() => {
+        // Only reset if position changed and we're not currently dragging
+        if (prevX.current !== note.x || prevY.current !== note.y) {
+            prevX.current = note.x;
+            prevY.current = note.y;
+            // Reset translation immediately since position is now updated
+            translateX.value = 0;
+            translateY.value = 0;
+        }
+    }, [note.x, note.y]);
+
+    const tapGesture = Gesture.Tap().onEnd(() => {
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+        runOnJS(onSelect)(note.id);
+    });
+
+    const panGesture = Gesture.Pan()
+        .onStart(() => {
+            isDragging.value = true;
+            markerScale.value = withSpring(1.2, { damping: 15, stiffness: 200 });
+            runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+            runOnJS(onSelect)(note.id); // Select on drag start
+        })
+        .onUpdate((event) => {
+            translateX.value = event.translationX;
+            translateY.value = event.translationY;
+        })
+        .onEnd(() => {
+            isDragging.value = false;
+            markerScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+
+            // Calculate new position as percentage
+            const currentX = note.x * containerWidth + translateX.value;
+            const currentY = note.y * containerHeight + translateY.value;
+
+            // Clamp to container bounds
+            const clampedX = Math.max(0, Math.min(currentX, containerWidth));
+            const clampedY = Math.max(0, Math.min(currentY, containerHeight));
+
+            const newX = clampedX / containerWidth;
+            const newY = clampedY / containerHeight;
+
+            // Don't reset translation here - let useEffect handle it after state updates
+            runOnJS(onMove)(note.id, newX, newY);
+            runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+        });
+
+    // Combine tap and pan - pan takes priority if dragging
+    const composedGesture = Gesture.Race(panGesture, tapGesture);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { scale: markerScale.value }],
+    }));
+
+    if (containerWidth === 0 || containerHeight === 0) return null;
+
+    const x = note.x * containerWidth;
+    const y = note.y * containerHeight;
+
+    return (
+        <GestureDetector gesture={composedGesture}>
+            <Animated.View
+                style={[
+                    {
+                        position: "absolute",
+                        left: x - 15,
+                        top: y - 15,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 15,
+                        backgroundColor: isActive ? colors.system.blue : "rgba(255, 255, 255, 0.2)",
+                        borderWidth: isActive ? 2 : 1.5,
+                        borderColor: colors.system.white,
+                        shadowColor: isActive ? colors.system.blue : colors.system.black,
+                        shadowOffset: { width: 0, height: isActive ? 4 : 2 },
+                        shadowOpacity: isActive ? 0.5 : 0.3,
+                        shadowRadius: isActive ? 8 : 4,
+                        alignItems: "center",
+                        justifyContent: "center",
+                    },
+                    animatedStyle,
+                ]}
+            >
+                <BaseText type="Caption2" color="system.white" style={{ fontSize: 13, fontWeight: "700" }}>
+                    {index + 1}
+                </BaseText>
+            </Animated.View>
+        </GestureDetector>
+    );
+};
 
 interface ImageEditorModalProps {
     visible: boolean;
@@ -40,16 +156,66 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [displayedImageUri, setDisplayedImageUri] = useState<string | null>(null);
     const [originalImageUri, setOriginalImageUri] = useState<string | null>(null);
     const [adjustmentValues, setAdjustmentValues] = useState<AdjustChange | null>(null);
+    const [notes, setNotes] = useState<Note[]>([]);
+    const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+    const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
     const hasRequestedRef = useRef(false);
 
     const scale = useSharedValue(1);
-    const pinch = Gesture.Pinch()
-        .onUpdate((e) => {
-            scale.value = e.scale;
-        })
-        .onEnd(() => {
-            scale.value = withTiming(1, { duration: 200 });
+
+    // Move note callback - update note position
+    const handleMoveNote = (id: string, newX: number, newY: number) => {
+        setNotes((prevNotes) => prevNotes.map((note) => (note.id === id ? { ...note, x: newX, y: newY } : note)));
+    };
+
+    // Add note callback - uses functional update to get latest notes
+    const addNoteCallback = (locationX: number, locationY: number) => {
+        const { width, height } = imageContainerLayout;
+        if (width === 0 || height === 0) return;
+
+        const x = locationX / width;
+        const y = locationY / height;
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        const newNote: Note = {
+            id: Date.now().toString(),
+            x,
+            y,
+            text: "",
+        };
+
+        // Use functional update to get latest notes
+        setNotes((prevNotes) => [...prevNotes, newNote]);
+
+        // Focus on the new note
+        setActiveNoteId(newNote.id);
+
+        setImageChanges((prev) => {
+            const filtered = prev.filter((c) => c.type !== "note");
+            return [...filtered, { type: "note", data: { notes: [...notes, newNote] } }];
         });
+    };
+
+    // Memoize gestures
+    const composedGesture = useMemo(() => {
+        const pinch = Gesture.Pinch()
+            .enabled(activeTool !== "Note")
+            .onUpdate((e) => {
+                scale.value = e.scale;
+            })
+            .onEnd(() => {
+                scale.value = withTiming(1, { duration: 200 });
+            });
+
+        const tap = Gesture.Tap()
+            .enabled(activeTool === "Note")
+            .onEnd((event) => {
+                runOnJS(addNoteCallback)(event.x, event.y);
+            });
+
+        return Gesture.Exclusive(tap, pinch);
+    }, [activeTool, imageContainerLayout, scale]);
 
     const animatedImageStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -95,7 +261,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             return [...filtered, change];
         });
 
-        if (change.type === "adjust") {
+        // Handle note changes (update notes state)
+        if (change.type === "note") {
+            const noteData = change.data as { notes: Note[] };
+            setNotes(noteData.notes);
+        } else if (change.type === "adjust") {
             const adjustments = change.data as AdjustChange;
             setAdjustmentValues(adjustments);
         } else if (change.type === "magic") {
@@ -295,7 +465,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             case "Crop":
                 return <ToolCrop {...commonProps} />;
             case "Note":
-                return <ToolNote {...commonProps} />;
+                return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
                 return <ToolMagic {...commonProps} />;
             case "Pen":
@@ -346,10 +516,21 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 </View>
 
                 <View style={styles.canvasContainer}>
-                    <GestureDetector gesture={pinch}>
+                    <GestureDetector gesture={composedGesture}>
                         <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
-                            <View style={styles.imageContainer}>
+                            <View
+                                style={styles.imageContainer}
+                                onLayout={(event) => {
+                                    const { width, height, x, y } = event.nativeEvent.layout;
+                                    console.log("🟣🟣🟣 IMAGE CONTAINER LAYOUT (Modal) 🟣🟣🟣");
+                                    console.log("📏 Width:", width, "Height:", height);
+                                    setImageContainerLayout({ width, height, x, y });
+                                }}
+                            >
                                 <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+
+                                {/* Note Markers */}
+                                {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} isActive={activeNoteId === note.id} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
                             </View>
                         </Animated.View>
                     </GestureDetector>

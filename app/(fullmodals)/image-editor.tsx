@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { AdjustChange, ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
+import { Note } from "@/components/ImageEditor/ToolNote";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
 import { Button, Host } from "@expo/ui/swift-ui";
@@ -11,17 +12,127 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
 
+// Note Marker Component - Draggable & Tappable
+type NoteMarkerProps = {
+    note: Note;
+    index: number;
+    containerWidth: number;
+    containerHeight: number;
+    onMove: (id: string, x: number, y: number) => void;
+    onSelect: (id: string) => void;
+};
+
+const NoteMarker: React.FC<NoteMarkerProps> = ({ note, index, containerWidth, containerHeight, onMove, onSelect }) => {
+    const markerScale = useSharedValue(0);
+    const translateX = useSharedValue(0);
+    const translateY = useSharedValue(0);
+
+    React.useEffect(() => {
+        markerScale.value = withTiming(1, { duration: 200 });
+    }, []);
+
+    // Reset position when note position changes from parent
+    React.useEffect(() => {
+        translateX.value = 0;
+        translateY.value = 0;
+    }, [note.x, note.y]);
+
+    const tapGesture = Gesture.Tap().onEnd(() => {
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+        runOnJS(onSelect)(note.id);
+    });
+
+    const panGesture = Gesture.Pan()
+        .onStart(() => {
+            markerScale.value = withSpring(1.2, { damping: 15, stiffness: 200 });
+            runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+            runOnJS(onSelect)(note.id); // Select on drag start
+        })
+        .onUpdate((event) => {
+            translateX.value = event.translationX;
+            translateY.value = event.translationY;
+        })
+        .onEnd(() => {
+            markerScale.value = withSpring(1, { damping: 15, stiffness: 200 });
+
+            // Calculate new position as percentage
+            const currentX = note.x * containerWidth + translateX.value;
+            const currentY = note.y * containerHeight + translateY.value;
+
+            // Clamp to container bounds
+            const clampedX = Math.max(0, Math.min(currentX, containerWidth));
+            const clampedY = Math.max(0, Math.min(currentY, containerHeight));
+
+            const newX = clampedX / containerWidth;
+            const newY = clampedY / containerHeight;
+
+            runOnJS(onMove)(note.id, newX, newY);
+            runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+
+            translateX.value = 0;
+            translateY.value = 0;
+        });
+
+    // Combine tap and pan - pan takes priority if dragging
+    const composedGesture = Gesture.Race(panGesture, tapGesture);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { scale: markerScale.value }],
+    }));
+
+    if (containerWidth === 0 || containerHeight === 0) return null;
+
+    const x = note.x * containerWidth;
+    const y = note.y * containerHeight;
+
+    return (
+        <GestureDetector gesture={composedGesture}>
+            <Animated.View
+                style={[
+                    {
+                        position: "absolute",
+                        left: x - 15,
+                        top: y - 15,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 15,
+                        backgroundColor: "rgba(255, 255, 255, 0.2)",
+                        borderWidth: 1.5,
+                        borderColor: colors.system.white,
+                        shadowColor: colors.system.black,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.3,
+                        shadowRadius: 4,
+                        elevation: 4,
+                        alignItems: "center",
+                        justifyContent: "center",
+                    },
+                    animatedStyle,
+                ]}
+            >
+                <BaseText type="Caption2" color="system.white" style={{ fontSize: 13, fontWeight: "600" }}>
+                    {index + 1}
+                </BaseText>
+            </Animated.View>
+        </GestureDetector>
+    );
+};
+
 export default function ImageEditorScreen() {
     const { uri, initialTool } = useLocalSearchParams<{ uri?: string; initialTool?: string }>();
     const [activeTool, setActiveTool] = useState(initialTool || "Magic");
+
+    console.log("🚀🚀🚀 IMAGE EDITOR SCREEN LOADED 🚀🚀🚀");
+    console.log("🔵 Active Tool:", activeTool);
+    console.log("🔵 Image URI:", uri);
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -35,16 +146,85 @@ export default function ImageEditorScreen() {
     const [displayedImageUri, setDisplayedImageUri] = useState<string | null>(null);
     const [originalImageUri, setOriginalImageUri] = useState<string | null>(null);
     const [adjustmentValues, setAdjustmentValues] = useState<AdjustChange | null>(null);
+    const [notes, setNotes] = useState<Note[]>([]);
+    const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+    const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
     const hasRequestedRef = useRef(false);
 
     const scale = useSharedValue(1);
-    const pinch = Gesture.Pinch()
-        .onUpdate((e) => {
-            scale.value = e.scale;
-        })
-        .onEnd(() => {
-            scale.value = withTiming(1, { duration: 200 });
+
+    // Wrapper for logging (needed for runOnJS)
+    const logMessage = (msg: string) => {
+        console.log(msg);
+    };
+
+    // Move note callback - update note position
+    const handleMoveNote = (id: string, newX: number, newY: number) => {
+        setNotes((prevNotes) => prevNotes.map((note) => (note.id === id ? { ...note, x: newX, y: newY } : note)));
+    };
+
+    // Add note callback - uses functional update to get latest notes
+    const addNoteCallback = (locationX: number, locationY: number) => {
+        console.log("💚 Adding note at:", locationX, locationY);
+
+        const { width, height } = imageContainerLayout;
+
+        if (width === 0 || height === 0) {
+            console.log("❌ Container size is zero!");
+            return;
+        }
+
+        const x = locationX / width;
+        const y = locationY / height;
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+        const newNote: Note = {
+            id: Date.now().toString(),
+            x,
+            y,
+            text: "",
+        };
+
+        // Use functional update to get latest notes
+        setNotes((prevNotes) => {
+            const updatedNotes = [...prevNotes, newNote];
+            console.log("📝 Total notes:", updatedNotes.length);
+            return updatedNotes;
         });
+
+        setImageChanges((prev) => {
+            const filtered = prev.filter((c) => c.type !== "note");
+            return [...filtered, { type: "note", data: { notes: [...notes, newNote] } }];
+        });
+    };
+
+    // Memoize gestures
+    const composedGesture = useMemo(() => {
+        console.log("⭐⭐⭐ CREATING GESTURES ⭐⭐⭐");
+        console.log("🟠 Current Tool:", activeTool);
+
+        const pinch = Gesture.Pinch()
+            .enabled(activeTool !== "Note")
+            .onUpdate((e) => {
+                scale.value = e.scale;
+            })
+            .onEnd(() => {
+                scale.value = withTiming(1, { duration: 200 });
+            });
+
+        const tap = Gesture.Tap()
+            .enabled(activeTool === "Note")
+            .onStart(() => {
+                runOnJS(logMessage)("💙💙💙 TAP STARTED 💙💙💙");
+            })
+            .onEnd((event) => {
+                runOnJS(logMessage)("💛💛💛 TAP ENDED 💛💛💛");
+                runOnJS(addNoteCallback)(event.x, event.y);
+            });
+
+        return Gesture.Exclusive(pinch, tap);
+    }, [activeTool, imageContainerLayout, scale]);
 
     const animatedImageStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -59,6 +239,7 @@ export default function ImageEditorScreen() {
     ];
 
     const handleToolPress = (tool: string) => {
+        console.log("🔶🔶🔶 TOOL CHANGED TO:", tool, "🔶🔶🔶");
         Haptics.selectionAsync();
         setActiveTool(tool);
     };
@@ -97,6 +278,12 @@ export default function ImageEditorScreen() {
     };
 
     const handleImageChange = async (change: ImageChange) => {
+        // Handle note changes separately
+        if (change.type === "note") {
+            const noteData = change.data as { notes: Note[] };
+            setNotes(noteData.notes);
+        }
+
         setImageChanges((prev) => {
             const filtered = prev.filter((c) => c.type !== change.type);
             return [...filtered, change];
@@ -300,7 +487,7 @@ export default function ImageEditorScreen() {
             case "Crop":
                 return <ToolCrop {...commonProps} />;
             case "Note":
-                return <ToolNote {...commonProps} />;
+                return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
                 return <ToolMagic {...commonProps} />;
             case "Pen":
@@ -354,10 +541,22 @@ export default function ImageEditorScreen() {
             </View>
 
             <View style={styles.canvasContainer}>
-                <GestureDetector gesture={pinch}>
+                <GestureDetector gesture={composedGesture}>
                     <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
-                        <View style={styles.imageContainer}>
+                        <View
+                            style={styles.imageContainer}
+                            onLayout={(event) => {
+                                const { width, height, x, y } = event.nativeEvent.layout;
+                                console.log("🟣🟣🟣 IMAGE CONTAINER LAYOUT 🟣🟣🟣");
+                                console.log("📏 Width:", width, "Height:", height);
+                                console.log("📍 X:", x, "Y:", y);
+                                setImageContainerLayout({ width, height, x, y });
+                            }}
+                        >
                             <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+
+                            {/* Note Markers Overlay */}
+                            {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
                         </View>
                     </Animated.View>
                 </GestureDetector>

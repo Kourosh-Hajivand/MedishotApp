@@ -64,4 +64,10 @@ export interface ImageEditorToolProps {
     onChange: (change: ImageChange) => void;
     onApply?: () => void;
     onCancel?: () => void;
+    notes?: Array<{
+        id: string;
+        x: number;
+        y: number;
+        text: string;
+    }>;
 }
