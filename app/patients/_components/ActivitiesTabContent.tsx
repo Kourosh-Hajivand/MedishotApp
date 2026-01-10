@@ -40,7 +40,7 @@ export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = ({ acti
         );
     }
 
-    return <FlatList data={activities} renderItem={renderActivityItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom }]} showsVerticalScrollIndicator={false} />;
+    return <FlatList data={activities} renderItem={renderActivityItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={[styles.listContent]} style={{ paddingBottom: insets.bottom }} showsVerticalScrollIndicator={false} />;
 };
 
 const styles = StyleSheet.create({
