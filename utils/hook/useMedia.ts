@@ -65,9 +65,9 @@ export const useDeletePatientMedia = (onSuccess?: (data: PatientMediaDeleteRespo
     });
 };
 
-export const useTempUpload = (onSuccess?: (data: TempUploadResponse) => void, onError?: (error: Error) => void): UseMutationResult<TempUploadResponse, Error, File> => {
+export const useTempUpload = (onSuccess?: (data: TempUploadResponse) => void, onError?: (error: Error) => void): UseMutationResult<TempUploadResponse, Error, File | { uri: string; type: string; name: string }> => {
     return useMutation({
-        mutationFn: (file: File) => MediaService.tempUpload(file),
+        mutationFn: (file: File | { uri: string; type: string; name: string }) => MediaService.tempUpload(file),
         onSuccess: (data) => {
             onSuccess?.(data);
         },

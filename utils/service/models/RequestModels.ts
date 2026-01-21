@@ -302,6 +302,7 @@ export interface UploadMediaWithTemplateRequest {
     template_id: number;
     type?: string;
     data?: string; // JSON string
+    media?: File | string; // Optional preview/composite image (File or Livewire temp filename)
     images: UploadMediaWithTemplateImage[];
 }
 

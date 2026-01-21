@@ -2,8 +2,9 @@ import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
-import { useUploadPatientMedia, useUploadPatientMediaWithTemplate } from "@/utils/hook/useMedia";
+import { useTempUpload, useUploadPatientMedia, useUploadPatientMediaWithTemplate } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
+import { useGetTemplateById } from "@/utils/hook/useTemplate";
 import { CapturedPhoto } from "@/utils/types/camera.types";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -12,9 +13,42 @@ import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ViewShot, { captureRef } from "react-native-view-shot";
+import { LayoutPattern } from "./_components/create-template/types";
+import { getItemLayoutStyle } from "./_components/create-template/utils";
 
 const { width, height } = Dimensions.get("window");
 const MINT_COLOR = "#00c7be";
+
+// Thumbnail component to avoid hooks in map
+const ThumbnailItem: React.FC<{
+    photo: CapturedPhoto;
+    index: number;
+    isActive: boolean;
+    onPress: (index: number) => void;
+}> = ({ photo, index, isActive, onPress }) => {
+    const borderRadius = useSharedValue(0);
+
+    React.useEffect(() => {
+        borderRadius.value = withTiming(10, { duration: 300 });
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => {
+        return {
+            borderRadius: borderRadius.value,
+        };
+    });
+
+    return (
+        <Animated.View entering={FadeInDown.delay(index * 50).springify()}>
+            <Animated.View style={animatedStyle}>
+                <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive]} onPress={() => onPress(index)} activeOpacity={0.8}>
+                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                </TouchableOpacity>
+            </Animated.View>
+        </Animated.View>
+    );
+};
 
 export default function ReviewScreen() {
     const insets = useSafeAreaInsets();
@@ -28,6 +62,9 @@ export default function ReviewScreen() {
 
     // Get patient data from API
     const { data: patientData, isLoading: isPatientLoading } = useGetPatientById(patientId || "");
+
+    // Get template data from API
+    const { data: templateData } = useGetTemplateById(templateId || "", !!templateId);
 
     // Extract patient info
     const patientName = useMemo(() => {
@@ -46,6 +83,47 @@ export default function ReviewScreen() {
 
     const capturedPhotos: CapturedPhoto[] = photos ? JSON.parse(photos) : [];
 
+    // Extract ghost items from template
+    type GhostItemData = {
+        gostId: string;
+        imageUrl?: string | null;
+        rowIndex?: number;
+        columnIndex?: number;
+    };
+
+    const ghostItemsData: GhostItemData[] = useMemo(() => {
+        if (!templateData?.data) return [];
+
+        const template = templateData.data as any;
+        const items: GhostItemData[] = [];
+
+        if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
+            const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                if (a.row_index !== b.row_index) return a.row_index - b.row_index;
+                return a.column_index - b.column_index;
+            });
+            items.push(
+                ...sortedCells.map((cell: any) => ({
+                    gostId: String(cell.gost.id),
+                    imageUrl: cell.gost.gost_image?.url || null,
+                    rowIndex: cell.row_index,
+                    columnIndex: cell.column_index,
+                })),
+            );
+        } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
+            items.push(
+                ...template.gosts.map((gost: any, index: number) => ({
+                    gostId: String(gost.id),
+                    imageUrl: gost.gost_image?.url || null,
+                    rowIndex: Math.floor(index / 2), // Assume 2 columns
+                    columnIndex: index % 2,
+                })),
+            );
+        }
+
+        return items;
+    }, [templateData]);
+
     // Log captured photos to debug tempFilename issue
     React.useEffect(() => {
         console.log(
@@ -61,9 +139,208 @@ export default function ReviewScreen() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [isScrolling, setIsScrolling] = useState(false);
+    const [compositePhoto, setCompositePhoto] = useState<CapturedPhoto | null>(null);
+    const [isGeneratingComposite, setIsGeneratingComposite] = useState(false);
+    const [compositeLayoutReady, setCompositeLayoutReady] = useState(false);
+    
+    // Debug: Log compositePhoto state changes
+    React.useEffect(() => {
+        console.log("🖼️ [Composite] State changed:", compositePhoto ? {
+            id: compositePhoto.id,
+            tempFilename: compositePhoto.tempFilename,
+            uploadStatus: compositePhoto.uploadStatus,
+            uri: compositePhoto.uri ? "exists" : "missing",
+            isComposite: compositePhoto.isComposite,
+        } : "null");
+    }, [compositePhoto]);
+    const compositeViewRef = useRef<ViewShot>(null);
 
     // Ref to track upload progress for photos without template
     const uploadProgressRef = useRef({ count: 0, total: 0 });
+
+    // Reset composite photo when capturedPhotos change (e.g., after retake)
+    React.useEffect(() => {
+        const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
+        
+        if (hasTemplate && compositePhoto) {
+            // Check if any template photo has changed by comparing timestamps
+            // If a photo was retaken, its timestamp will be newer
+            const templatePhotos = capturedPhotos.filter((p) => p.templateId !== "no-template");
+            const hasNewerPhoto = templatePhotos.some((photo) => {
+                // If composite was generated before this photo, we need to regenerate
+                return photo.timestamp > compositePhoto.timestamp;
+            });
+            
+            if (hasNewerPhoto) {
+                console.log("🖼️ [Composite] Template photos changed, resetting composite photo...");
+                setCompositePhoto(null);
+                setIsGeneratingComposite(false);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [capturedPhotos]);
+
+    // Generate composite photo when template photos are available
+    React.useEffect(() => {
+        const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
+        const allPhotosLoaded = capturedPhotos.every((p) => p.templateId === "no-template" || p.uri);
+        
+        if (hasTemplate && ghostItemsData.length > 0 && capturedPhotos.length > 0 && !compositePhoto && !isGeneratingComposite && compositeLayoutReady && allPhotosLoaded) {
+            console.log("🖼️ [Composite] Starting composite generation...");
+            generateCompositePhoto();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [templateId, capturedPhotos.length, ghostItemsData.length, compositeLayoutReady, compositePhoto]);
+
+    const generateCompositePhoto = async () => {
+        if (!templateId || ghostItemsData.length === 0 || capturedPhotos.length === 0) return;
+
+        setIsGeneratingComposite(true);
+
+        try {
+            // Wait for images to load
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            if (!compositeViewRef.current) {
+                console.error("🖼️ [Composite] ViewShot ref is null");
+                setIsGeneratingComposite(false);
+                return;
+            }
+
+            console.log("🖼️ [Composite] Capturing composite photo...");
+            const uri = await captureRef(compositeViewRef.current, {
+                format: "jpg",
+                quality: 0.95,
+                result: "tmpfile",
+            });
+
+            console.log("🖼️ [Composite] Composite photo generated:", uri);
+
+            const newCompositePhoto: CapturedPhoto = {
+                id: `composite-${Date.now()}`,
+                uri,
+                templateId: "composite",
+                templateName: "Composite",
+                timestamp: Date.now(),
+                isCompleted: true,
+                uploadStatus: "uploading",
+                isComposite: true,
+            };
+
+            setCompositePhoto(newCompositePhoto);
+            setCurrentIndex(0); // Reset to show composite photo first
+            console.log("🖼️ [Composite] Composite photo added to list, state:", {
+                id: newCompositePhoto.id,
+                uri: newCompositePhoto.uri ? "exists" : "missing",
+                uploadStatus: newCompositePhoto.uploadStatus,
+                isComposite: newCompositePhoto.isComposite,
+            });
+
+            // Upload composite photo to temp-upload
+            try {
+                console.log("🖼️ [Composite] Starting upload to temp-upload endpoint...");
+                console.log("🖼️ [Composite] File object:", {
+                    uri: uri.substring(0, 50) + "...",
+                    type: "image/jpeg",
+                    name: `composite-${Date.now()}.jpg`,
+                });
+                // Prepare file object for React Native FormData
+                const filename = `composite-${Date.now()}.jpg`;
+                const file = {
+                    uri: uri,
+                    type: "image/jpeg",
+                    name: filename,
+                } as any;
+                
+                console.log("🖼️ [Composite] Calling tempUploadComposite mutation...");
+                tempUploadComposite(file, {
+                    onSuccess: (data) => {
+                        console.log("🖼️ [Composite] ✅ tempUploadComposite onSuccess callback called!", data);
+                    },
+                    onError: (error) => {
+                        console.error("🖼️ [Composite] ❌ tempUploadComposite onError callback called!", error);
+                    },
+                });
+                console.log("🖼️ [Composite] tempUploadComposite mutation called (async)");
+            } catch (error) {
+                console.error("🖼️ [Composite] Error preparing composite photo for upload:", error);
+                // Still allow saving without composite media field
+                setCompositePhoto({
+                    ...newCompositePhoto,
+                    uploadStatus: "pending",
+                });
+            }
+
+            setIsGeneratingComposite(false);
+        } catch (error) {
+            console.error("🖼️ [Composite] Error generating composite photo:", error);
+            setIsGeneratingComposite(false);
+        }
+    };
+
+    // Hook for temp upload (for composite photo)
+    const { mutate: tempUploadComposite } = useTempUpload(
+        (data) => {
+            console.log("🖼️ [Composite] ✅✅✅ Temp upload SUCCESS callback triggered!");
+            console.log("🖼️ [Composite] Response data:", JSON.stringify(data, null, 2));
+            
+            // Extract filename from TempUploadResponse
+            const filename = data?.filename;
+            console.log("🖼️ [Composite] Filename extracted:", filename);
+            console.log("🖼️ [Composite] Data structure:", {
+                hasData: !!data,
+                hasFilename: !!data?.filename,
+                fullData: data,
+            });
+            
+            if (!filename) {
+                console.error("🖼️ [Composite] ❌ No filename found in response!");
+                return;
+            }
+            
+            // Update composite photo with tempFilename using functional update
+            setCompositePhoto((prev) => {
+                console.log("🖼️ [Composite] Updating state, previous state:", prev ? {
+                    id: prev.id,
+                    tempFilename: prev.tempFilename,
+                    uploadStatus: prev.uploadStatus,
+                } : "null");
+                
+                if (prev) {
+                    const updated = {
+                        ...prev,
+                        tempFilename: filename,
+                        uploadStatus: "success" as const,
+                    };
+                    console.log("🖼️ [Composite] New state:", {
+                        id: updated.id,
+                        tempFilename: updated.tempFilename,
+                        uploadStatus: updated.uploadStatus,
+                    });
+                    return updated;
+                }
+                console.warn("🖼️ [Composite] ⚠️ Previous state was null, cannot update!");
+                return prev;
+            });
+        },
+        (error) => {
+            console.error("🖼️ [Composite] ❌❌❌ Temp upload ERROR callback triggered!");
+            console.error("🖼️ [Composite] Error details:", error);
+            console.error("🖼️ [Composite] Error message:", error?.message);
+            console.error("🖼️ [Composite] Error stack:", error?.stack);
+            
+            // Update status to error
+            setCompositePhoto((prev) => {
+                if (prev) {
+                    return {
+                        ...prev,
+                        uploadStatus: "error",
+                    };
+                }
+                return prev;
+            });
+        },
+    );
 
     // Hooks for saving photos
     const { mutate: uploadMediaWithTemplate } = useUploadPatientMediaWithTemplate(
@@ -120,7 +397,51 @@ export default function ReviewScreen() {
         },
     );
 
-    const currentPhoto = capturedPhotos[currentIndex];
+    // Combine composite photo with captured photos (composite first)
+    // If composite is being generated, add a placeholder with loading state
+    const allPhotos = useMemo(() => {
+        const photos = [...capturedPhotos];
+        const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
+        
+        if (hasTemplate) {
+            if (compositePhoto) {
+                photos.unshift(compositePhoto);
+            } else if (isGeneratingComposite) {
+                // Add placeholder for composite photo while generating
+                photos.unshift({
+                    id: "composite-placeholder",
+                    uri: "",
+                    templateId: "composite",
+                    templateName: "Composite",
+                    timestamp: Date.now(),
+                    isCompleted: false,
+                    uploadStatus: "uploading",
+                    isComposite: true,
+                } as CapturedPhoto);
+            }
+        }
+        console.log("🖼️ [Composite] All photos count:", photos.length, "Composite:", !!compositePhoto, "Generating:", isGeneratingComposite, "Captured:", capturedPhotos.length);
+        if (compositePhoto) {
+            console.log("🖼️ [Composite] Composite in allPhotos:", {
+                id: compositePhoto.id,
+                tempFilename: compositePhoto.tempFilename,
+                uploadStatus: compositePhoto.uploadStatus,
+            });
+        }
+        return photos;
+    }, [capturedPhotos, compositePhoto, isGeneratingComposite, templateId]);
+
+    // Scroll to composite photo when it's generated
+    React.useEffect(() => {
+        if (compositePhoto && allPhotos.length > 0) {
+            setCurrentIndex(0);
+            setTimeout(() => {
+                flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+            }, 100);
+        }
+    }, [compositePhoto]);
+
+    const currentPhoto = allPhotos[currentIndex];
 
     const handleThumbnailPress = (index: number) => {
         if (index === currentIndex) return; // Don't do anything if already on this index
@@ -138,6 +459,11 @@ export default function ReviewScreen() {
     };
 
     const handleRetake = () => {
+        // Don't allow retake for composite photo
+        if (currentPhoto?.isComposite) {
+            return;
+        }
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
         // Go back to camera with templateId and retakeTemplateId to retake the current photo
@@ -192,13 +518,46 @@ export default function ReviewScreen() {
             return;
         }
 
+        // Check if composite photo is ready (for template uploads)
+        const hasTemplate = templateId && photosToSave.some((p) => p.templateId !== "no-template");
+        
+        // Find composite photo from allPhotos (more reliable than state)
+        const compositeFromAllPhotos = allPhotos.find((p) => p.isComposite);
+        
+        console.log("💾 [handleSave] Checking composite photo:", {
+            hasTemplate,
+            compositePhotoFromState: compositePhoto ? {
+                id: compositePhoto.id,
+                tempFilename: compositePhoto.tempFilename,
+                uploadStatus: compositePhoto.uploadStatus,
+                uri: compositePhoto.uri ? "exists" : "missing",
+            } : null,
+            compositePhotoFromAllPhotos: compositeFromAllPhotos ? {
+                id: compositeFromAllPhotos.id,
+                tempFilename: compositeFromAllPhotos.tempFilename,
+                uploadStatus: compositeFromAllPhotos.uploadStatus,
+                uri: compositeFromAllPhotos.uri ? "exists" : "missing",
+            } : null,
+            isGeneratingComposite,
+        });
+        
+        // Use compositeFromAllPhotos if available, otherwise fall back to state
+        const finalCompositePhoto = compositeFromAllPhotos || compositePhoto;
+        
+        if (hasTemplate && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
+            console.log("⚠️ [handleSave] Composite photo not ready:", {
+                exists: !!finalCompositePhoto,
+                hasTempFilename: !!finalCompositePhoto?.tempFilename,
+                uploadStatus: finalCompositePhoto?.uploadStatus,
+            });
+            Alert.alert("Please wait", "Composite image is still being generated. Please wait a moment.");
+            return;
+        }
+
         setIsSaving(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         try {
-            // Check if photos were taken with template
-            const hasTemplate = templateId && photosToSave.some((p) => p.templateId !== "no-template");
-
             if (hasTemplate && templateId) {
                 // Upload with template: /patients/media/{patient}/with-template
                 const templateIdNum = parseInt(templateId, 10);
@@ -234,6 +593,35 @@ export default function ReviewScreen() {
                     data: JSON.stringify({}),
                     images: images,
                 };
+
+                // Add composite photo media if available (required for template uploads)
+                if (finalCompositePhoto?.tempFilename) {
+                    requestData.media = finalCompositePhoto.tempFilename;
+                    console.log("📤 [handleSave] Adding composite photo media (tempFilename):", finalCompositePhoto.tempFilename);
+                } else {
+                    console.error("⚠️ [handleSave] Composite photo tempFilename is missing! Cannot proceed without media field.");
+                    Alert.alert("Error", "Composite image is not ready yet. Please wait.");
+                    setIsSaving(false);
+                    return;
+                }
+
+                // Log final request data before sending
+                console.log("📤 [handleSave] ========== FINAL REQUEST DATA TO BACKEND ==========");
+                console.log("📤 [handleSave] Patient ID:", patientId);
+                console.log("📤 [handleSave] Template ID:", requestData.template_id);
+                console.log("📤 [handleSave] Type:", requestData.type);
+                console.log("📤 [handleSave] Media (composite tempFilename):", requestData.media);
+                console.log("📤 [handleSave] Data:", requestData.data);
+                console.log("📤 [handleSave] Images count:", requestData.images.length);
+                console.log("📤 [handleSave] Images details:");
+                requestData.images.forEach((img: any, idx: number) => {
+                    console.log(`📤 [handleSave]   Image ${idx + 1}:`, {
+                        gost_id: img.gost_id,
+                        media: img.media,
+                        notes: img.notes,
+                    });
+                });
+                console.log("📤 [handleSave] ==================================================");
 
                 // Call API
                 uploadMediaWithTemplate({
@@ -330,18 +718,90 @@ export default function ReviewScreen() {
 
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / width);
-        if (index !== currentIndex && index >= 0 && index < capturedPhotos.length) {
+        if (index !== currentIndex && index >= 0 && index < allPhotos.length) {
             setCurrentIndex(index);
         }
     };
 
     const renderMainImage = ({ item, index }: { item: CapturedPhoto; index: number }) => {
+        const isCompositeLoading = item.isComposite && (!item.uri || isGeneratingComposite || item.uploadStatus === "uploading");
+        
         return (
             <View style={styles.mainImageContainer}>
-                <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />
+                {isCompositeLoading ? (
+                    <View style={[styles.mainImage, { justifyContent: "center", alignItems: "center", backgroundColor: colors.system.white }]}>
+                        <ActivityIndicator size="large" color={colors.system.blue} />
+                        <BaseText type="Body" weight={400} color="labels.secondary" style={{ marginTop: 16 }}>
+                            Generating composite image...
+                        </BaseText>
+                    </View>
+                ) : item.uri ? (
+                    <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />
+                ) : null}
             </View>
         );
     };
+
+    // Helper function to get layout style with 3:2 aspect ratio
+    // Uses the same logic as PreviewCanvas but scaled to 3:2 ratio with 12px padding
+    const getCompositeLayoutStyle = (index: number, total: number, layoutPattern: LayoutPattern) => {
+        // PreviewCanvas uses: width - 40, height: (width - 40) * 0.92
+        // We want: width - 24 (12px padding each side), height: width * (3/2) - 24 (12px padding top/bottom)
+        const padding = 12;
+        const previewBoxWidth = width - 40;
+        const previewBoxHeight = previewBoxWidth * 0.92;
+        const compositeBoxWidth = width - padding * 2; // Account for padding
+        const compositeBoxHeight = width * (3 / 2) - padding * 2; // Account for padding
+        
+        // Get base layout style using PreviewCanvas dimensions (same as PreviewCanvas)
+        const baseStyle = getItemLayoutStyle(index, total, layoutPattern);
+        
+        // Calculate scale factors
+        const scaleX = compositeBoxWidth / previewBoxWidth;
+        const scaleY = compositeBoxHeight / previewBoxHeight;
+        
+        console.log(`🖼️ [Composite] Layout calculation for index ${index}/${total}:`, {
+            previewBoxWidth,
+            previewBoxHeight,
+            compositeBoxWidth,
+            compositeBoxHeight,
+            scaleX: scaleX.toFixed(3),
+            scaleY: scaleY.toFixed(3),
+            baseStyle,
+        });
+        
+        // Scale all positions and sizes, then add padding offset
+        const scaledStyle: any = {
+            position: baseStyle.position || "absolute",
+        };
+        
+        if (baseStyle.left !== undefined) {
+            scaledStyle.left = padding + baseStyle.left * scaleX;
+        }
+        if (baseStyle.right !== undefined) {
+            scaledStyle.right = padding + baseStyle.right * scaleX;
+        }
+        if (baseStyle.top !== undefined) {
+            scaledStyle.top = padding + baseStyle.top * scaleY;
+        }
+        if (baseStyle.bottom !== undefined) {
+            scaledStyle.bottom = padding + baseStyle.bottom * scaleY;
+        }
+        if (baseStyle.width !== undefined) {
+            scaledStyle.width = baseStyle.width * scaleX;
+        }
+        if (baseStyle.height !== undefined) {
+            scaledStyle.height = baseStyle.height * scaleY;
+        }
+        
+        console.log(`🖼️ [Composite] Scaled style for index ${index}:`, scaledStyle);
+        
+        return scaledStyle;
+    };
+
+    // Check if we need to wait for composite photo
+    const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
+    const isCompositeGenerating = hasTemplate && (isGeneratingComposite || (compositePhoto && compositePhoto.uploadStatus === "uploading"));
 
     // Loading state
     if (isPatientLoading) {
@@ -375,12 +835,68 @@ export default function ReviewScreen() {
                 <View style={{ width: 36 }} />
             </View>
 
+            {/* Composite Photo Generator (Hidden) */}
+            {templateId && ghostItemsData.length > 0 && capturedPhotos.length > 0 && (
+                <View style={styles.hiddenCompositeContainer}>
+                    <ViewShot
+                        ref={compositeViewRef}
+                        style={styles.compositeViewShot}
+                        options={{ format: "jpg", quality: 0.95 }}
+                        onLayout={() => {
+                            console.log("🖼️ [Composite] Layout ready");
+                            setCompositeLayoutReady(true);
+                        }}
+                    >
+                        <View style={styles.compositeContainer}>
+                            {(() => {
+                                // Filter to only include ghost items that have photos
+                                const itemsWithPhotos = ghostItemsData
+                                    .map((ghostItem) => {
+                                        const photo = capturedPhotos.find((p) => p.templateId === ghostItem.gostId);
+                                        return photo ? { ghostItem, photo } : null;
+                                    })
+                                    .filter((item): item is { ghostItem: GhostItemData; photo: CapturedPhoto } => item !== null);
+
+                                // Get layout pattern from template data
+                                const template = templateData?.data as any;
+                                const layoutPattern: LayoutPattern = template?.layout_pattern || "grid-2x2";
+
+                                console.log(`🖼️ [Composite] Rendering ${itemsWithPhotos.length} images with layout pattern: ${layoutPattern}`);
+
+                                return itemsWithPhotos.map(({ ghostItem, photo }, index) => {
+                                    // Use helper function to get layout style with 3:2 aspect ratio
+                                    // Index is based on filtered array (only items with photos)
+                                    const layoutStyle = getCompositeLayoutStyle(index, itemsWithPhotos.length, layoutPattern);
+
+                                    console.log(`🖼️ [Composite] Image ${index + 1}/${itemsWithPhotos.length}:`, {
+                                        gostId: ghostItem.gostId,
+                                        layoutStyle,
+                                    });
+
+                                    return (
+                                        <View
+                                            key={ghostItem.gostId}
+                                            style={[
+                                                styles.compositeCell,
+                                                layoutStyle,
+                                            ]}
+                                        >
+                                            <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                                        </View>
+                                    );
+                                });
+                            })()}
+                        </View>
+                    </ViewShot>
+                </View>
+            )}
+
             {/* Main Image Carousel */}
             <View style={styles.carouselContainer}>
-                {capturedPhotos.length > 0 ? (
+                {allPhotos.length > 0 ? (
                     <FlatList
                         ref={flatListRef}
-                        data={capturedPhotos}
+                        data={allPhotos}
                         renderItem={renderMainImage}
                         keyExtractor={(item) => item.id}
                         horizontal
@@ -409,43 +925,30 @@ export default function ReviewScreen() {
                     </View>
                 )}
 
-                {/* Retake button overlay */}
-                <View style={styles.retakeContainer}>
-                    <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
-                        <BaseText type="Subhead" color="labels.primary">
-                            Retake
-                        </BaseText>
-                    </TouchableOpacity>
-                </View>
+                {/* Retake button overlay - hide for composite */}
+                {!currentPhoto?.isComposite && (
+                    <View style={styles.retakeContainer}>
+                        <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
+                            <BaseText type="Subhead" color="labels.primary">
+                                Retake
+                            </BaseText>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
 
             {/* Thumbnails */}
             <View style={styles.thumbnailsSection}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailsScroll}>
-                    {capturedPhotos.map((photo, index) => {
-                        const isActive = index === currentIndex;
-                        const borderRadius = useSharedValue(0);
-
-                        React.useEffect(() => {
-                            borderRadius.value = withTiming(10, { duration: 300 });
-                        }, []);
-
-                        const animatedStyle = useAnimatedStyle(() => {
-                            return {
-                                borderRadius: borderRadius.value,
-                            };
-                        });
-
-                        return (
-                            <Animated.View key={photo.id} entering={FadeInDown.delay(index * 50).springify()}>
-                                <Animated.View style={animatedStyle}>
-                                    <TouchableOpacity style={[styles.thumbnail, isActive && styles.thumbnailActive]} onPress={() => handleThumbnailPress(index)} activeOpacity={0.8}>
-                                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                                    </TouchableOpacity>
-                                </Animated.View>
-                            </Animated.View>
-                        );
-                    })}
+                    {allPhotos.map((photo, index) => (
+                        <ThumbnailItem
+                            key={photo.id}
+                            photo={photo}
+                            index={index}
+                            isActive={index === currentIndex}
+                            onPress={handleThumbnailPress}
+                        />
+                    ))}
                 </ScrollView>
             </View>
 
@@ -470,7 +973,7 @@ export default function ReviewScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.system.gray6,
+        backgroundColor: colors.system.white,
     },
     header: {
         flexDirection: "row",
@@ -587,5 +1090,31 @@ const styles = StyleSheet.create({
     },
     saveButtonDisabled: {
         backgroundColor: colors.system.gray3,
+    },
+    hiddenCompositeContainer: {
+        position: "absolute",
+        left: -width * 2, // Move off screen but keep it renderable
+        top: 0,
+        width: width,
+        height: width * (3 / 2), // 3:2 aspect ratio
+        zIndex: -1,
+    },
+    compositeViewShot: {
+        width: width,
+        height: width * (3 / 2), // 3:2 aspect ratio
+        backgroundColor: colors.system.white,
+    },
+    compositeContainer: {
+        width: width,
+        height: width * (3 / 2), // 3:2 aspect ratio
+        backgroundColor: colors.system.white,
+        position: "relative",
+        padding: 12, // 12px padding from all sides
+    },
+    compositeCell: {
+        position: "absolute",
+        borderRadius: 8,
+        overflow: "hidden",
+        backgroundColor: colors.system.white,
     },
 });

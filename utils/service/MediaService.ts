@@ -72,6 +72,11 @@ const MediaService = {
                 formData.append("data", typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data));
             }
 
+            // Add optional media field (composite/preview image)
+            if (payload.media) {
+                formData.append("media", payload.media);
+            }
+
             payload.images.forEach((image, index) => {
                 formData.append(`images[${index}][gost_id]`, String(image.gost_id));
                 formData.append(`images[${index}][media]`, image.media);
@@ -79,6 +84,24 @@ const MediaService = {
                     formData.append(`images[${index}][notes]`, image.notes);
                 }
             });
+
+            // Log FormData contents before sending
+            console.log("📤 [MediaService] ========== FORM DATA BEING SENT TO BACKEND ==========");
+            console.log("📤 [MediaService] URL:", baseUrl + uploadMediaWithTemplate(patientId));
+            console.log("📤 [MediaService] Patient ID:", patientId);
+            console.log("📤 [MediaService] Template ID:", payload.template_id);
+            console.log("📤 [MediaService] Type:", payload.type || "undefined");
+            console.log("📤 [MediaService] Media (composite):", payload.media || "undefined");
+            console.log("📤 [MediaService] Data:", payload.data || "undefined");
+            console.log("📤 [MediaService] Images count:", payload.images.length);
+            payload.images.forEach((img, idx) => {
+                console.log(`📤 [MediaService]   Image ${idx + 1}:`, {
+                    gost_id: img.gost_id,
+                    media: typeof img.media === "string" ? img.media : "[File/Object]",
+                    notes: img.notes || "undefined",
+                });
+            });
+            console.log("📤 [MediaService] ====================================================");
 
             const response: AxiosResponse<PatientMediaWithTemplateResponse> = await axiosInstance.post(baseUrl + uploadMediaWithTemplate(patientId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
@@ -107,19 +130,52 @@ const MediaService = {
     },
 
     // Temporary File Upload
-    tempUpload: async (file: File): Promise<TempUploadResponse> => {
+    tempUpload: async (file: File | { uri: string; type: string; name: string }): Promise<TempUploadResponse> => {
         try {
+            console.log("📤 [MediaService] tempUpload called with file:", {
+                uri: typeof file === "object" && "uri" in file ? file.uri.substring(0, 50) + "..." : "N/A",
+                type: typeof file === "object" && "type" in file ? file.type : "N/A",
+                name: typeof file === "object" && "name" in file ? file.name : "N/A",
+            });
             const formData = new FormData();
-            formData.append("file", file);
+            formData.append("file", file as any);
+            console.log("📤 [MediaService] FormData prepared, calling API endpoint:", baseUrl + tempUpload());
 
-            const response: AxiosResponse<TempUploadResponse> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
+            const response: AxiosResponse<any> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
-            return response.data;
+            console.log("📤 [MediaService] ✅ tempUpload API response received:", {
+                status: response.status,
+                statusText: response.statusText,
+                data: response.data,
+                filename: response.data?.data?.filename || response.data?.filename,
+                dataStructure: {
+                    hasData: !!response.data,
+                    hasDataData: !!response.data?.data,
+                    hasDataFilename: !!response.data?.filename,
+                    hasDataDataFilename: !!response.data?.data?.filename,
+                },
+            });
+            
+            // Response structure: {success: true, message: null, data: {filename: '...'}}
+            // Extract the inner data object (TempUploadResponse)
+            const tempUploadResponse: TempUploadResponse = response.data?.data || response.data;
+            console.log("📤 [MediaService] Extracted TempUploadResponse:", tempUploadResponse);
+            return tempUploadResponse;
         } catch (error) {
-            console.error("Error in TempUpload:", error);
-            if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Temporary upload failed");
+            console.error("📤 [MediaService] ❌ Error in TempUpload:", error);
+            if (axios.isAxiosError(error)) {
+                console.error("📤 [MediaService] ❌ Axios error details:", {
+                    message: error.message,
+                    response: error.response ? {
+                        status: error.response.status,
+                        statusText: error.response.statusText,
+                        data: error.response.data,
+                    } : "No response",
+                });
+                if (error.response) {
+                    throw new Error(error.response.data.message || "Temporary upload failed");
+                }
             }
             throw error;
         }
