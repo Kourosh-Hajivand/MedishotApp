@@ -47,6 +47,21 @@ export const AlbumScreen: React.FC = () => {
         return [];
     }, [albumsData?.data]);
 
+    // Extract raw media data for GalleryWithMenu (for template media support)
+    const rawMediaData = useMemo(() => {
+        if (!albums || albums.length === 0) return [];
+        const mediaArray: any[] = [];
+        albums.forEach((album) => {
+            album.media.forEach((mediaItem: any) => {
+                // Only include media with template and original_media
+                if (mediaItem.template && mediaItem.original_media) {
+                    mediaArray.push(mediaItem);
+                }
+            });
+        });
+        return mediaArray;
+    }, [albums]);
+
     // Extract unique gosts and group photos by gost, also extract patientId
     const { gostsWithPhotos, extractedPatientId } = useMemo(() => {
         if (!albums || albums.length === 0) return { gostsWithPhotos: [], extractedPatientId: null };
@@ -70,7 +85,23 @@ export const AlbumScreen: React.FC = () => {
                     patientId = mediaItem.patient_id;
                 }
 
-                if (mediaItem.images && Array.isArray(mediaItem.images)) {
+                // If media has a template, only show original_media in gallery (not individual images)
+                if (mediaItem.template && mediaItem.original_media?.url) {
+                    // Find the gost_id from template images to determine which gost this belongs to
+                    if (mediaItem.images && Array.isArray(mediaItem.images) && mediaItem.images.length > 0) {
+                        const firstImageGostId = mediaItem.images[0]?.gost_id;
+                        if (firstImageGostId && gostMap.has(firstImageGostId)) {
+                            const mediaObj: Media = {
+                                id: mediaItem.id || Date.now(),
+                                url: mediaItem.original_media.url,
+                                created_at: mediaItem.created_at,
+                                updated_at: mediaItem.updated_at,
+                            };
+                            gostMap.get(firstImageGostId)!.photos.push(mediaObj);
+                        }
+                    }
+                } else if (mediaItem.images && Array.isArray(mediaItem.images)) {
+                    // For non-template media, show all images
                     mediaItem.images.forEach((imageItem: any) => {
                         const imageGostId = imageItem.gost_id;
                         if (imageGostId && imageItem.image && gostMap.has(imageGostId)) {
@@ -109,23 +140,37 @@ export const AlbumScreen: React.FC = () => {
         }
     }, [gostsWithPhotos, selectedGostId]);
 
-    // Get all photos from all gosts
+    // Get all photos from all gosts, sorted by created_at (newest first)
     const allPhotos = useMemo(() => {
         const all: Media[] = [];
         gostsWithPhotos.forEach(({ photos }) => {
             all.push(...photos);
         });
-        return all;
+        // Sort by created_at (newest first)
+        return all.sort((a, b) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateB - dateA;
+        });
     }, [gostsWithPhotos]);
 
-    // Get photos for selected gost (null = "All")
+    // Get photos for selected gost (null = "All"), sorted by created_at (newest first)
     const photos = useMemo(() => {
+        let result: Media[] = [];
         if (selectedGostId === null) {
-            // Return all photos when "All" is selected
-            return allPhotos;
+            // Return all photos when "All" is selected (already sorted in allPhotos)
+            result = allPhotos;
+        } else {
+            const selectedGost = gostsWithPhotos.find((g) => g.gost.id === selectedGostId);
+            result = selectedGost?.photos || [];
+            // Sort by created_at (newest first)
+            result = [...result].sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                return dateB - dateA;
+            });
         }
-        const selectedGost = gostsWithPhotos.find((g) => g.gost.id === selectedGostId);
-        return selectedGost?.photos || [];
+        return result;
     }, [selectedGostId, gostsWithPhotos, allPhotos]);
 
     // Get recent patients (6 most recent)
@@ -188,11 +233,21 @@ export const AlbumScreen: React.FC = () => {
         });
 
         return Array.from(imagesByDate.entries())
-            .map(([date, images]) => ({ title: date, data: images }))
+            .map(([date, images]) => {
+                // Sort images within each section by created_at (newest first)
+                const sortedImages = [...images].sort((a, b) => {
+                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                    return dateB - dateA; // Newest first
+                });
+                return { title: date, data: sortedImages };
+            })
             .sort((a, b) => {
-                const dateA = new Date(a.title);
-                const dateB = new Date(b.title);
-                return dateB.getTime() - dateA.getTime();
+                // Sort sections by date (newest first)
+                // Get the most recent photo from each section to determine section order
+                const mostRecentA = a.data[0]?.created_at ? new Date(a.data[0].created_at).getTime() : 0;
+                const mostRecentB = b.data[0]?.created_at ? new Date(b.data[0].created_at).getTime() : 0;
+                return mostRecentB - mostRecentA;
             });
     }, [photos]);
 
@@ -225,6 +280,17 @@ export const AlbumScreen: React.FC = () => {
         });
         return map;
     }, [photos, bookmarkedImages]);
+
+    // Create map from image URL to created_at timestamp
+    const imageUrlToCreatedAtMap = useMemo(() => {
+        const map = new Map<string, string>();
+        photos.forEach((photo) => {
+            if (photo.url && photo.created_at) {
+                map.set(photo.url, photo.created_at);
+            }
+        });
+        return map;
+    }, [photos]);
 
     // Determine view state
     const hasPhotos = photos.length > 0;
@@ -516,7 +582,9 @@ export const AlbumScreen: React.FC = () => {
                             sections={gallerySections}
                             imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                             imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                            imageUrlToCreatedAtMap={imageUrlToCreatedAtMap}
                             patientId={extractedPatientId ?? undefined}
+                            rawMediaData={rawMediaData}
                             actions={{
                                 showBookmark: false,
                                 showEdit: false,

@@ -46,7 +46,7 @@ export default function AddPatientRedirect() {
                 // If user is doctor, go directly to photo (no need to select doctor)
                 if (currentUserRole === "doctor") {
                     router.push("/(modals)/add-patient/form");
-                } else if (currentUserRole === "admin" || currentUserRole === "owner") {
+                } else if (currentUserRole === "staff" || currentUserRole === "owner") {
                     // If there's only one doctor, go directly to photo with that doctor
                     if (availableDoctors.length === 1) {
                         const singleDoctor = availableDoctors[0];

@@ -624,8 +624,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 onSuccess: (data) => {
                     // Navigate to the newly created patient's detail page
                     if (data?.data?.id) {
+                        // Dismiss all modals first, then navigate to patient detail
                         router.dismissAll();
-                        router.push(`/patients/${data.data.id}`);
+                        // Use setTimeout to ensure dismissAll completes before navigation
+                        setTimeout(() => {
+                            router.replace(`/patients/${data.data.id}` as any);
+                        }, 100);
                     }
                 },
             });

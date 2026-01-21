@@ -40,6 +40,27 @@ interface MediaItem {
     createdAt?: string;
 }
 
+// Raw media data structure from API (with template and images)
+interface RawMediaData {
+    id: number | string;
+    template?: {
+        id: number | string;
+        [key: string]: any;
+    } | null;
+    original_media?: {
+        url: string;
+        [key: string]: any;
+    } | null;
+    images?: Array<{
+        image?: {
+            url: string;
+            [key: string]: any;
+        } | null;
+        [key: string]: any;
+    }>;
+    [key: string]: any;
+}
+
 interface GalleryWithMenuProps {
     images?: string[]; // For backward compatibility
     sections?: ImageSection[]; // New grouped format
@@ -56,6 +77,8 @@ interface GalleryWithMenuProps {
     imageUrlToCreatedAtMap?: Map<string, string>;
     patientId?: string | number;
     actions?: ViewerActionsConfig;
+    // Raw media data from API (with template and images structure) - used to build originalMediaToAllImagesMap internally
+    rawMediaData?: RawMediaData[];
 }
 
 const { width } = Dimensions.get("window");
@@ -74,11 +97,13 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     imageUrlToCreatedAtMap,
     patientId,
     actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
+    rawMediaData,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [viewerImagesList, setViewerImagesList] = useState<string[]>([]);
     const scale = useSharedValue(1);
 
     // Fetch patient data if patientId is provided (for ImageViewerModal)
@@ -111,7 +136,33 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         });
     }, [imageSections, numColumns]);
 
-    // Flatten all images for the viewer modal
+    // Create a map from original_media URL to all images (original_media + template images) for viewer
+    const originalMediaToAllImagesMap = useMemo(() => {
+        const map = new Map<string, string[]>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            // Only process media with template
+            if (media.template && media.original_media?.url) {
+                const allImages: string[] = [media.original_media.url]; // Start with original_media
+                
+                // Add all template images
+                if (media.images && Array.isArray(media.images)) {
+                    media.images.forEach((img: any) => {
+                        if (img.image?.url) {
+                            allImages.push(img.image.url);
+                        }
+                    });
+                }
+                
+                map.set(media.original_media.url, allImages);
+            }
+        });
+
+        return map;
+    }, [rawMediaData]);
+
+    // Flatten all images for the viewer modal (gallery view - only original_media for template media)
     const allImages = useMemo(() => {
         return imageSections.flatMap((section) => section.data);
     }, [imageSections]);
@@ -134,12 +185,28 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
 
     const handleImagePress = (uri: string) => {
         if (onImagePress) onImagePress(uri);
-        const index = allImages.indexOf(uri);
+        
+        // Check if this is original_media of a template - if so, use expanded images
+        const expandedImages = originalMediaToAllImagesMap?.get(uri);
+        const imagesToShow = expandedImages || allImages;
+        
+        // Find the index of the clicked image in the imagesToShow array
+        const index = imagesToShow.indexOf(uri);
         if (index !== -1) {
+            // Set the images list for viewer and the selected index
+            setViewerImagesList(imagesToShow);
             setSelectedIndex(index);
             setViewerVisible(true);
         }
     };
+    
+    // Get images to show in viewer (use viewerImagesList if set, otherwise allImages)
+    const viewerImages = useMemo(() => {
+        if (viewerImagesList.length > 0) {
+            return viewerImagesList;
+        }
+        return allImages;
+    }, [viewerImagesList, allImages]);
 
     const renderImageItem = (uri: string, index: number) => {
         const gap = 0.5;
@@ -227,9 +294,12 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
 
             <ImageViewerModal
                 visible={viewerVisible}
-                images={allImages}
+                images={viewerImages}
                 initialIndex={selectedIndex}
-                onClose={() => setViewerVisible(false)}
+                onClose={() => {
+                    setViewerVisible(false);
+                    setViewerImagesList([]); // Reset viewer images list when closing
+                }}
                 mediaData={mediaData}
                 imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}

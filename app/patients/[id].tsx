@@ -166,8 +166,8 @@ export default function PatientDetailsScreen() {
             return [];
         }
 
-        // Map to store images grouped by date
-        const imagesByDate = new Map<string, string[]>();
+        // Map to store images grouped by date with timestamps for sorting
+        const imagesByDate = new Map<string, Array<{ url: string; timestamp: number }>>();
 
         patientMediaData.data.forEach((media: any) => {
             // Get the date from created_at
@@ -177,6 +177,7 @@ export default function PatientDetailsScreen() {
             // Format date as "MMMM D, YYYY" (e.g., "January 2, 2026")
             const date = new Date(createdAt);
             const dateKey = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+            const timestamp = date.getTime();
 
             // Initialize array for this date if it doesn't exist
             if (!imagesByDate.has(dateKey)) {
@@ -185,39 +186,52 @@ export default function PatientDetailsScreen() {
 
             const dateImages = imagesByDate.get(dateKey)!;
 
-            // If media has a template, extract images from template.images array
-            if (media.template && media.images && Array.isArray(media.images)) {
+            // If media has a template, only show original_media in gallery (not individual images)
+            if (media.template && media.original_media?.url) {
+                dateImages.push({ url: media.original_media.url, timestamp });
+            }
+            // If media has a template but no original_media, fallback to images (backward compatibility)
+            else if (media.template && media.images && Array.isArray(media.images)) {
                 media.images.forEach((img: any) => {
                     if (img.image?.url) {
-                        dateImages.push(img.image.url);
+                        const imgTimestamp = img.created_at ? new Date(img.created_at).getTime() : timestamp;
+                        dateImages.push({ url: img.image.url, timestamp: imgTimestamp });
                     }
                 });
             }
             // If media doesn't have a template, use original_media
             else if (media.original_media?.url) {
-                dateImages.push(media.original_media.url);
+                dateImages.push({ url: media.original_media.url, timestamp });
             }
             // Fallback: check if media.media exists (old structure)
             else if (media.media?.url) {
-                dateImages.push(media.media.url);
+                dateImages.push({ url: media.media.url, timestamp });
             }
         });
 
         // Convert Map to array of sections, sorted by date (newest first)
+        // Also sort images within each section by timestamp (newest first)
         const sections = Array.from(imagesByDate.entries())
-            .map(([date, images]) => ({
-                title: date,
-                data: images,
-            }))
+            .map(([date, imageItems]) => {
+                // Sort images within section by timestamp (newest first)
+                const sortedImages = [...imageItems]
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .map((item) => item.url);
+                return {
+                    title: date,
+                    data: sortedImages,
+                    timestamp: imageItems[0]?.timestamp || 0, // Use first image timestamp for section sorting
+                };
+            })
             .sort((a, b) => {
-                // Sort by date (newest first)
-                const dateA = new Date(a.title);
-                const dateB = new Date(b.title);
-                return dateB.getTime() - dateA.getTime();
-            });
+                // Sort sections by timestamp (newest first)
+                return b.timestamp - a.timestamp;
+            })
+            .map(({ title, data }) => ({ title, data })); // Remove timestamp from final result
 
         return sections;
     }, [patientMediaData?.data]);
+
 
     // Archive media mutation
     const { mutate: archiveMedia, isPending: isArchiving } = useDeletePatientMedia(
@@ -243,7 +257,7 @@ export default function PatientDetailsScreen() {
                 text: "Archive",
                 style: "destructive",
                 onPress: () => {
-                    archiveMedia({ patientId: id, mediaId });
+                    archiveMedia({ patientId: id, mediaId });           
                 },
             },
         ]);
@@ -689,6 +703,7 @@ export default function PatientDetailsScreen() {
                         imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                         imageUrlToBookmarkMap={imageUrlToBookmarkMap}
                         patientId={id}
+                        rawMediaData={patientMediaData?.data}
                     />
                 )}
                 {activeTab === 0 && (

@@ -46,62 +46,65 @@ export default function PatientArchiveScreen() {
         console.log("Archived data received:", archivedData.data.length, "items");
 
         // Map to store images grouped by date with timestamp for sorting
-        const imagesByDate = new Map<string, { images: string[]; timestamp: number }>();
+        const imagesByDate = new Map<string, { images: Array<{ url: string; timestamp: number }>; sectionTimestamp: number }>();
 
         archivedData.data.forEach((media: any) => {
-            // Extract image URLs from media.images array
-            if (media.images && Array.isArray(media.images) && media.images.length > 0) {
+            const createdAt = media.created_at || media.updated_at;
+            if (!createdAt) return;
+
+            const dateKey = formatDate(createdAt);
+            const sectionTimestamp = new Date(createdAt).getTime();
+
+            // Initialize array for this date if it doesn't exist
+            if (!imagesByDate.has(dateKey)) {
+                imagesByDate.set(dateKey, { images: [], sectionTimestamp });
+            }
+
+            const dateData = imagesByDate.get(dateKey)!;
+
+            // If media has a template, only show original_media in gallery (not individual images)
+            if (media.template && media.original_media?.url) {
+                dateData.images.push({ url: media.original_media.url, timestamp: sectionTimestamp });
+            }
+            // If media has images array (template media without original_media, or non-template)
+            else if (media.images && Array.isArray(media.images) && media.images.length > 0) {
                 media.images.forEach((imageItem: any) => {
                     if (imageItem.image?.url) {
-                        // Use image's created_at or fallback to media's created_at
-                        const createdAt = imageItem.created_at || media.created_at || media.updated_at;
-                        if (!createdAt) return;
-
-                        const dateKey = formatDate(createdAt);
-                        const timestamp = new Date(createdAt).getTime();
-
-                        // Initialize array for this date if it doesn't exist
-                        if (!imagesByDate.has(dateKey)) {
-                            imagesByDate.set(dateKey, { images: [], timestamp });
-                        }
-
-                        const dateData = imagesByDate.get(dateKey)!;
-                        dateData.images.push(imageItem.image.url);
+                        const imgTimestamp = imageItem.created_at ? new Date(imageItem.created_at).getTime() : sectionTimestamp;
+                        dateData.images.push({ url: imageItem.image.url, timestamp: imgTimestamp });
                     }
                 });
             }
             // Fallback to old structure for backward compatibility
             else {
-                const createdAt = media.created_at || media.updated_at;
-                if (!createdAt) return;
-
-                const dateKey = formatDate(createdAt);
-                const timestamp = new Date(createdAt).getTime();
-
-                // Initialize array for this date if it doesn't exist
-                if (!imagesByDate.has(dateKey)) {
-                    imagesByDate.set(dateKey, { images: [], timestamp });
-                }
-
-                const dateData = imagesByDate.get(dateKey)!;
-
+                let imageUrl: string | undefined;
                 if (media.url) {
-                    dateData.images.push(media.url);
+                    imageUrl = media.url;
                 } else if (media.image?.url) {
-                    dateData.images.push(media.image.url);
+                    imageUrl = media.image.url;
                 } else if (media.original_media?.url) {
-                    dateData.images.push(media.original_media.url);
+                    imageUrl = media.original_media.url;
+                }
+                if (imageUrl) {
+                    dateData.images.push({ url: imageUrl, timestamp: sectionTimestamp });
                 }
             }
         });
 
         // Convert Map to array of sections, sorted by date (newest first)
+        // Also sort images within each section by timestamp (newest first)
         const sections = Array.from(imagesByDate.entries())
-            .map(([date, { images, timestamp }]) => ({
-                title: date,
-                data: images,
-                timestamp,
-            }))
+            .map(([date, { images, sectionTimestamp }]) => {
+                // Sort images within section by timestamp (newest first)
+                const sortedImages = [...images]
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .map((item) => item.url);
+                return {
+                    title: date,
+                    data: sortedImages,
+                    timestamp: sectionTimestamp,
+                };
+            })
             .sort((a, b) => b.timestamp - a.timestamp)
             .map(({ title, data }) => ({ title, data })); // Remove timestamp from final result
 
@@ -229,6 +232,7 @@ export default function PatientArchiveScreen() {
                     sections={gallerySections}
                     mediaData={mediaData}
                     patientId={id}
+                    rawMediaData={archivedData?.data}
                     actions={{
                         showBookmark: false,
                         showEdit: false,
