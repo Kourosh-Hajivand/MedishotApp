@@ -124,18 +124,6 @@ export default function ReviewScreen() {
         return items;
     }, [templateData]);
 
-    // Log captured photos to debug tempFilename issue
-    React.useEffect(() => {
-        console.log(
-            "📋 [review] Captured photos received:",
-            capturedPhotos.map((p) => ({
-                id: p.id,
-                tempFilename: p.tempFilename,
-                uploadStatus: p.uploadStatus,
-                templateId: p.templateId,
-            })),
-        );
-    }, [capturedPhotos]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isSaving, setIsSaving] = useState(false);
     const [isScrolling, setIsScrolling] = useState(false);
@@ -143,16 +131,6 @@ export default function ReviewScreen() {
     const [isGeneratingComposite, setIsGeneratingComposite] = useState(false);
     const [compositeLayoutReady, setCompositeLayoutReady] = useState(false);
     
-    // Debug: Log compositePhoto state changes
-    React.useEffect(() => {
-        console.log("🖼️ [Composite] State changed:", compositePhoto ? {
-            id: compositePhoto.id,
-            tempFilename: compositePhoto.tempFilename,
-            uploadStatus: compositePhoto.uploadStatus,
-            uri: compositePhoto.uri ? "exists" : "missing",
-            isComposite: compositePhoto.isComposite,
-        } : "null");
-    }, [compositePhoto]);
     const compositeViewRef = useRef<ViewShot>(null);
 
     // Ref to track upload progress for photos without template
@@ -172,7 +150,6 @@ export default function ReviewScreen() {
             });
             
             if (hasNewerPhoto) {
-                console.log("🖼️ [Composite] Template photos changed, resetting composite photo...");
                 setCompositePhoto(null);
                 setIsGeneratingComposite(false);
             }
@@ -186,7 +163,6 @@ export default function ReviewScreen() {
         const allPhotosLoaded = capturedPhotos.every((p) => p.templateId === "no-template" || p.uri);
         
         if (hasTemplate && ghostItemsData.length > 0 && capturedPhotos.length > 0 && !compositePhoto && !isGeneratingComposite && compositeLayoutReady && allPhotosLoaded) {
-            console.log("🖼️ [Composite] Starting composite generation...");
             generateCompositePhoto();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -202,19 +178,15 @@ export default function ReviewScreen() {
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             if (!compositeViewRef.current) {
-                console.error("🖼️ [Composite] ViewShot ref is null");
                 setIsGeneratingComposite(false);
                 return;
             }
 
-            console.log("🖼️ [Composite] Capturing composite photo...");
             const uri = await captureRef(compositeViewRef.current, {
                 format: "jpg",
                 quality: 0.95,
                 result: "tmpfile",
             });
-
-            console.log("🖼️ [Composite] Composite photo generated:", uri);
 
             const newCompositePhoto: CapturedPhoto = {
                 id: `composite-${Date.now()}`,
@@ -229,21 +201,9 @@ export default function ReviewScreen() {
 
             setCompositePhoto(newCompositePhoto);
             setCurrentIndex(0); // Reset to show composite photo first
-            console.log("🖼️ [Composite] Composite photo added to list, state:", {
-                id: newCompositePhoto.id,
-                uri: newCompositePhoto.uri ? "exists" : "missing",
-                uploadStatus: newCompositePhoto.uploadStatus,
-                isComposite: newCompositePhoto.isComposite,
-            });
 
             // Upload composite photo to temp-upload
             try {
-                console.log("🖼️ [Composite] Starting upload to temp-upload endpoint...");
-                console.log("🖼️ [Composite] File object:", {
-                    uri: uri.substring(0, 50) + "...",
-                    type: "image/jpeg",
-                    name: `composite-${Date.now()}.jpg`,
-                });
                 // Prepare file object for React Native FormData
                 const filename = `composite-${Date.now()}.jpg`;
                 const file = {
@@ -252,18 +212,8 @@ export default function ReviewScreen() {
                     name: filename,
                 } as any;
                 
-                console.log("🖼️ [Composite] Calling tempUploadComposite mutation...");
-                tempUploadComposite(file, {
-                    onSuccess: (data) => {
-                        console.log("🖼️ [Composite] ✅ tempUploadComposite onSuccess callback called!", data);
-                    },
-                    onError: (error) => {
-                        console.error("🖼️ [Composite] ❌ tempUploadComposite onError callback called!", error);
-                    },
-                });
-                console.log("🖼️ [Composite] tempUploadComposite mutation called (async)");
+                tempUploadComposite(file);
             } catch (error) {
-                console.error("🖼️ [Composite] Error preparing composite photo for upload:", error);
                 // Still allow saving without composite media field
                 setCompositePhoto({
                     ...newCompositePhoto,
@@ -273,7 +223,6 @@ export default function ReviewScreen() {
 
             setIsGeneratingComposite(false);
         } catch (error) {
-            console.error("🖼️ [Composite] Error generating composite photo:", error);
             setIsGeneratingComposite(false);
         }
     };
@@ -281,54 +230,26 @@ export default function ReviewScreen() {
     // Hook for temp upload (for composite photo)
     const { mutate: tempUploadComposite } = useTempUpload(
         (data) => {
-            console.log("🖼️ [Composite] ✅✅✅ Temp upload SUCCESS callback triggered!");
-            console.log("🖼️ [Composite] Response data:", JSON.stringify(data, null, 2));
-            
             // Extract filename from TempUploadResponse
             const filename = data?.filename;
-            console.log("🖼️ [Composite] Filename extracted:", filename);
-            console.log("🖼️ [Composite] Data structure:", {
-                hasData: !!data,
-                hasFilename: !!data?.filename,
-                fullData: data,
-            });
             
             if (!filename) {
-                console.error("🖼️ [Composite] ❌ No filename found in response!");
                 return;
             }
             
             // Update composite photo with tempFilename using functional update
             setCompositePhoto((prev) => {
-                console.log("🖼️ [Composite] Updating state, previous state:", prev ? {
-                    id: prev.id,
-                    tempFilename: prev.tempFilename,
-                    uploadStatus: prev.uploadStatus,
-                } : "null");
-                
                 if (prev) {
-                    const updated = {
+                    return {
                         ...prev,
                         tempFilename: filename,
                         uploadStatus: "success" as const,
                     };
-                    console.log("🖼️ [Composite] New state:", {
-                        id: updated.id,
-                        tempFilename: updated.tempFilename,
-                        uploadStatus: updated.uploadStatus,
-                    });
-                    return updated;
                 }
-                console.warn("🖼️ [Composite] ⚠️ Previous state was null, cannot update!");
                 return prev;
             });
         },
         (error) => {
-            console.error("🖼️ [Composite] ❌❌❌ Temp upload ERROR callback triggered!");
-            console.error("🖼️ [Composite] Error details:", error);
-            console.error("🖼️ [Composite] Error message:", error?.message);
-            console.error("🖼️ [Composite] Error stack:", error?.stack);
-            
             // Update status to error
             setCompositePhoto((prev) => {
                 if (prev) {
@@ -362,7 +283,6 @@ export default function ReviewScreen() {
             }, 100);
         },
         (error) => {
-            console.error("Error uploading with template:", error);
             Alert.alert("Error", "Failed to save photos. Please try again.");
             setIsSaving(false);
         },
@@ -391,7 +311,6 @@ export default function ReviewScreen() {
             }
         },
         (error) => {
-            console.error("Error uploading media:", error);
             Alert.alert("Error", "Failed to save photos. Please try again.");
             setIsSaving(false);
         },
@@ -419,14 +338,6 @@ export default function ReviewScreen() {
                     isComposite: true,
                 } as CapturedPhoto);
             }
-        }
-        console.log("🖼️ [Composite] All photos count:", photos.length, "Composite:", !!compositePhoto, "Generating:", isGeneratingComposite, "Captured:", capturedPhotos.length);
-        if (compositePhoto) {
-            console.log("🖼️ [Composite] Composite in allPhotos:", {
-                id: compositePhoto.id,
-                tempFilename: compositePhoto.tempFilename,
-                uploadStatus: compositePhoto.uploadStatus,
-            });
         }
         return photos;
     }, [capturedPhotos, compositePhoto, isGeneratingComposite, templateId]);
@@ -506,14 +417,6 @@ export default function ReviewScreen() {
         // Check if all photos have tempFilename
         const photosWithoutFilename = photosToSave.filter((p) => !p.tempFilename);
         if (photosWithoutFilename.length > 0) {
-            console.log(
-                "⚠️ [handleSave] Photos without tempFilename:",
-                photosWithoutFilename.map((p) => ({ id: p.id, uploadStatus: p.uploadStatus })),
-            );
-            console.log(
-                "⚠️ [handleSave] All capturedPhotos:",
-                capturedPhotos.map((p) => ({ id: p.id, tempFilename: p.tempFilename, uploadStatus: p.uploadStatus })),
-            );
             Alert.alert("Uploading...", "Some photos are still uploading. Please wait a moment and try again.");
             return;
         }
@@ -524,32 +427,10 @@ export default function ReviewScreen() {
         // Find composite photo from allPhotos (more reliable than state)
         const compositeFromAllPhotos = allPhotos.find((p) => p.isComposite);
         
-        console.log("💾 [handleSave] Checking composite photo:", {
-            hasTemplate,
-            compositePhotoFromState: compositePhoto ? {
-                id: compositePhoto.id,
-                tempFilename: compositePhoto.tempFilename,
-                uploadStatus: compositePhoto.uploadStatus,
-                uri: compositePhoto.uri ? "exists" : "missing",
-            } : null,
-            compositePhotoFromAllPhotos: compositeFromAllPhotos ? {
-                id: compositeFromAllPhotos.id,
-                tempFilename: compositeFromAllPhotos.tempFilename,
-                uploadStatus: compositeFromAllPhotos.uploadStatus,
-                uri: compositeFromAllPhotos.uri ? "exists" : "missing",
-            } : null,
-            isGeneratingComposite,
-        });
-        
         // Use compositeFromAllPhotos if available, otherwise fall back to state
         const finalCompositePhoto = compositeFromAllPhotos || compositePhoto;
         
         if (hasTemplate && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
-            console.log("⚠️ [handleSave] Composite photo not ready:", {
-                exists: !!finalCompositePhoto,
-                hasTempFilename: !!finalCompositePhoto?.tempFilename,
-                uploadStatus: finalCompositePhoto?.uploadStatus,
-            });
             Alert.alert("Please wait", "Composite image is still being generated. Please wait a moment.");
             return;
         }
@@ -597,31 +478,11 @@ export default function ReviewScreen() {
                 // Add composite photo media if available (required for template uploads)
                 if (finalCompositePhoto?.tempFilename) {
                     requestData.media = finalCompositePhoto.tempFilename;
-                    console.log("📤 [handleSave] Adding composite photo media (tempFilename):", finalCompositePhoto.tempFilename);
                 } else {
-                    console.error("⚠️ [handleSave] Composite photo tempFilename is missing! Cannot proceed without media field.");
                     Alert.alert("Error", "Composite image is not ready yet. Please wait.");
                     setIsSaving(false);
                     return;
                 }
-
-                // Log final request data before sending
-                console.log("📤 [handleSave] ========== FINAL REQUEST DATA TO BACKEND ==========");
-                console.log("📤 [handleSave] Patient ID:", patientId);
-                console.log("📤 [handleSave] Template ID:", requestData.template_id);
-                console.log("📤 [handleSave] Type:", requestData.type);
-                console.log("📤 [handleSave] Media (composite tempFilename):", requestData.media);
-                console.log("📤 [handleSave] Data:", requestData.data);
-                console.log("📤 [handleSave] Images count:", requestData.images.length);
-                console.log("📤 [handleSave] Images details:");
-                requestData.images.forEach((img: any, idx: number) => {
-                    console.log(`📤 [handleSave]   Image ${idx + 1}:`, {
-                        gost_id: img.gost_id,
-                        media: img.media,
-                        notes: img.notes,
-                    });
-                });
-                console.log("📤 [handleSave] ==================================================");
 
                 // Call API
                 uploadMediaWithTemplate({
@@ -643,14 +504,9 @@ export default function ReviewScreen() {
                 uploadProgressRef.current.count = 0;
                 uploadProgressRef.current.total = photosWithoutTemplate.length;
 
-                console.log("📤 [handleSave] ========== UPLOAD WITHOUT TEMPLATE ==========");
-                console.log("📤 [handleSave] Patient ID:", patientId);
-                console.log("📤 [handleSave] Total photos to upload:", photosWithoutTemplate.length);
-
                 photosWithoutTemplate.forEach((photo, index) => {
                     // Use tempFilename from temp-upload, fallback to error if not available
                     if (!photo.tempFilename) {
-                        console.error(`📤 [handleSave] Photo ${index + 1} does not have tempFilename. Please wait for upload to complete.`);
                         Alert.alert("Error", `Photo ${index + 1} is still uploading. Please wait.`);
                         setIsSaving(false);
                         return;
@@ -662,25 +518,14 @@ export default function ReviewScreen() {
                         data: {},
                     };
 
-                    // Log the data model before sending
-                    console.log(`📤 [handleSave] Photo ${index + 1}/${photosWithoutTemplate.length}:`);
-                    console.log("📤 [handleSave]   - Photo URI:", photo.uri);
-                    console.log("📤 [handleSave]   - Photo ID:", photo.id);
-                    console.log("📤 [handleSave]   - Photo Timestamp:", photo.timestamp);
-                    console.log("📤 [handleSave]   - Temp Filename:", photo.tempFilename);
-                    console.log("📤 [handleSave]   - Request Data:", JSON.stringify(requestData, null, 2));
-
                     // Call API
                     uploadMedia({
                         patientId,
                         data: requestData,
                     });
                 });
-
-                console.log("📤 [handleSave] ===========================================");
             }
         } catch (error) {
-            console.error("Error saving photos:", error);
             Alert.alert("Error", "Failed to save photos. Please try again.");
             setIsSaving(false);
         }
@@ -760,16 +605,6 @@ export default function ReviewScreen() {
         const scaleX = compositeBoxWidth / previewBoxWidth;
         const scaleY = compositeBoxHeight / previewBoxHeight;
         
-        console.log(`🖼️ [Composite] Layout calculation for index ${index}/${total}:`, {
-            previewBoxWidth,
-            previewBoxHeight,
-            compositeBoxWidth,
-            compositeBoxHeight,
-            scaleX: scaleX.toFixed(3),
-            scaleY: scaleY.toFixed(3),
-            baseStyle,
-        });
-        
         // Scale all positions and sizes, then add padding offset
         const scaledStyle: any = {
             position: baseStyle.position || "absolute",
@@ -793,8 +628,6 @@ export default function ReviewScreen() {
         if (baseStyle.height !== undefined) {
             scaledStyle.height = baseStyle.height * scaleY;
         }
-        
-        console.log(`🖼️ [Composite] Scaled style for index ${index}:`, scaledStyle);
         
         return scaledStyle;
     };
@@ -843,7 +676,6 @@ export default function ReviewScreen() {
                         style={styles.compositeViewShot}
                         options={{ format: "jpg", quality: 0.95 }}
                         onLayout={() => {
-                            console.log("🖼️ [Composite] Layout ready");
                             setCompositeLayoutReady(true);
                         }}
                     >
@@ -861,17 +693,10 @@ export default function ReviewScreen() {
                                 const template = templateData?.data as any;
                                 const layoutPattern: LayoutPattern = template?.layout_pattern || "grid-2x2";
 
-                                console.log(`🖼️ [Composite] Rendering ${itemsWithPhotos.length} images with layout pattern: ${layoutPattern}`);
-
                                 return itemsWithPhotos.map(({ ghostItem, photo }, index) => {
                                     // Use helper function to get layout style with 3:2 aspect ratio
                                     // Index is based on filtered array (only items with photos)
                                     const layoutStyle = getCompositeLayoutStyle(index, itemsWithPhotos.length, layoutPattern);
-
-                                    console.log(`🖼️ [Composite] Image ${index + 1}/${itemsWithPhotos.length}:`, {
-                                        gostId: ghostItem.gostId,
-                                        layoutStyle,
-                                    });
 
                                     return (
                                         <View
