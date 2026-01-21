@@ -32,7 +32,7 @@ export default function PatientsScreen() {
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
-    const { q } = useLocalSearchParams<{ q?: string }>();
+    const { q, sortBy, nameOrder } = useLocalSearchParams<{ q?: string; sortBy?: string; nameOrder?: string }>();
 
     // Get current user's role in the selected practice
     const currentUserRole = useMemo(() => {
@@ -109,8 +109,40 @@ export default function PatientsScreen() {
         return items;
     }, []);
 
-    const currentPatients = USE_MOCK_PATIENTS ? mockPatients : patients?.data;
+    const rawPatients = USE_MOCK_PATIENTS ? mockPatients : patients?.data;
     const isLoading = isPatientsLoading;
+
+    // Apply sorting based on sortBy and nameOrder params
+    const currentPatients = useMemo(() => {
+        if (!rawPatients || rawPatients.length === 0) return rawPatients;
+
+        const sorted = [...rawPatients];
+
+        // Sort by Name or Date
+        if (sortBy === "date") {
+            // Sort by created_at (newest first by default, or oldest first if nameOrder is "asc")
+            sorted.sort((a, b) => {
+                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                // If nameOrder is "asc", show oldest first; otherwise show newest first
+                return nameOrder === "asc" ? dateA - dateB : dateB - dateA;
+            });
+        } else {
+            // Sort by Name (default)
+            sorted.sort((a, b) => {
+                const nameA = (a.full_name || "").toLowerCase();
+                const nameB = (b.full_name || "").toLowerCase();
+                // If nameOrder is "desc", sort Z → A; otherwise sort A → Z
+                if (nameOrder === "desc") {
+                    return nameB.localeCompare(nameA);
+                } else {
+                    return nameA.localeCompare(nameB);
+                }
+            });
+        }
+
+        return sorted;
+    }, [rawPatients, sortBy, nameOrder]);
 
     const archivePatientMutation = useArchivePatient(
         () => {
@@ -122,18 +154,28 @@ export default function PatientsScreen() {
         },
     );
 
-    const groupedPatients =
-        currentPatients?.reduce(
-            (acc: Record<string, Patient[]>, patient: Patient) => {
-                const firstChar = patient.full_name?.[0]?.toUpperCase();
-                // اگر حرف اول وجود نداشته باشد یا در A-Z نباشد، آن را به بخش "#" اضافه کن
-                const letter = firstChar && alphabet.includes(firstChar) ? firstChar : "#";
-                if (!acc[letter]) acc[letter] = [];
-                acc[letter].push(patient);
-                return acc;
-            },
-            {} as Record<string, Patient[]>,
-        ) || {};
+    // Group patients based on sortBy: if sorting by date, use a single section; otherwise group by first letter
+    const groupedPatients = useMemo(() => {
+        if (!currentPatients || currentPatients.length === 0) return {};
+
+        if (sortBy === "date") {
+            // When sorting by date, use a single section with all patients
+            return { "All": currentPatients };
+        } else {
+            // When sorting by name, group by first letter
+            return currentPatients.reduce(
+                (acc: Record<string, Patient[]>, patient: Patient) => {
+                    const firstChar = patient.full_name?.[0]?.toUpperCase();
+                    // اگر حرف اول وجود نداشته باشد یا در A-Z نباشد، آن را به بخش "#" اضافه کن
+                    const letter = firstChar && alphabet.includes(firstChar) ? firstChar : "#";
+                    if (!acc[letter]) acc[letter] = [];
+                    acc[letter].push(patient);
+                    return acc;
+                },
+                {} as Record<string, Patient[]>,
+            );
+        }
+    }, [currentPatients, sortBy]);
 
     const [search, setSearch] = useState("");
     useEffect(() => {
@@ -149,17 +191,29 @@ export default function PatientsScreen() {
     const [activeLetter, setActiveLetter] = useState<string | null>(null);
     const activeIndexSV = useSharedValue(-1);
 
-    const filteredGroupedPatients = Object.keys(groupedPatients || {}).reduce(
-        (acc, letter) => {
-            const items = groupedPatients?.[letter]?.filter((p: Patient) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
-            if (items && items.length > 0) acc[letter] = items;
-            return acc;
-        },
-        {} as Record<string, Patient[]>,
-    );
+    const filteredGroupedPatients = useMemo(() => {
+        return Object.keys(groupedPatients || {}).reduce(
+            (acc, letter) => {
+                const items = groupedPatients?.[letter]?.filter((p: Patient) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
+                if (items && items.length > 0) acc[letter] = items;
+                return acc;
+            },
+            {} as Record<string, Patient[]>,
+        );
+    }, [groupedPatients, search]);
 
-    const sections = (() => {
+    const sections = useMemo(() => {
         const keys = Object.keys(filteredGroupedPatients);
+        
+        // If sorting by date, return single section
+        if (sortBy === "date") {
+            return keys.map((key) => ({
+                title: key,
+                data: filteredGroupedPatients[key],
+            }));
+        }
+        
+        // Otherwise, sort alphabetically
         const hashSection = keys.find((key) => key === "#");
         const otherKeys = keys.filter((key) => key !== "#").sort();
         const sortedKeys = hashSection ? [...otherKeys, hashSection] : otherKeys;
@@ -167,11 +221,13 @@ export default function PatientsScreen() {
             title: letter,
             data: filteredGroupedPatients[letter],
         }));
-    })();
+    }, [filteredGroupedPatients, sortBy]);
 
     const alphabetWithHash = useMemo(() => {
+        // Hide alphabet sidebar when sorting by date
+        if (sortBy === "date") return [];
         return sections.some((s) => s.title === "#") ? [...alphabet, "#"] : alphabet;
-    }, [sections]);
+    }, [sections, sortBy]);
 
     const alphabetWithHashRef = useRef<string[]>(alphabetWithHash);
     useEffect(() => {
@@ -488,13 +544,19 @@ export default function PatientsScreen() {
                             </Host>
                         );
                     }}
-                    renderSectionHeader={({ section: { title } }) => (
-                        <View style={styles.sectionHeader} className="px-4">
-                            <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
-                                {title}
-                            </BaseText>
-                        </View>
-                    )}
+                    renderSectionHeader={({ section: { title } }) => {
+                        // Hide header when sorting by date (title is "All")
+                        if (sortBy === "date" && title === "All") {
+                            return null;
+                        }
+                        return (
+                            <View style={styles.sectionHeader} className="px-4">
+                                <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
+                                    {title}
+                                </BaseText>
+                            </View>
+                        );
+                    }}
                 />
             ) : search.length > 0 ? (
                 <View style={styles.noResults} className="flex-1 items-center justify-center">

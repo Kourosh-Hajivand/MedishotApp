@@ -92,15 +92,42 @@ export default function PatientsLayout() {
                                     <ContextMenu.Items>
                                         {/* Submenu 1: Sort By */}
                                         <Submenu button={<Button systemImage="arrow.up.arrow.down">Sort By</Button>}>
-                                            <Button systemImage="textformat.abc">Name</Button>
-                                            <Button systemImage="calendar">Date</Button>
-                                            <Button systemImage="exclamationmark.triangle">Priority</Button>
+                                            <Button
+                                                systemImage="textformat.abc"
+                                                onPress={() => {
+                                                    router.setParams({ sortBy: "name" });
+                                                }}
+                                            >
+                                                Name
+                                            </Button>
+                                            <Button
+                                                systemImage="calendar"
+                                                onPress={() => {
+                                                    router.setParams({ sortBy: "date" });
+                                                }}
+                                            >
+                                                Date
+                                            </Button>
                                         </Submenu>
 
                                         {/* Submenu 2: Name Order */}
                                         <Submenu button={<Button systemImage="textformat">Name Order</Button>}>
-                                            <Button systemImage="arrow.up">A → Z</Button>
-                                            <Button systemImage="arrow.down">Z → A</Button>
+                                            <Button
+                                                systemImage="arrow.up"
+                                                onPress={() => {
+                                                    router.setParams({ nameOrder: "asc" });
+                                                }}
+                                            >
+                                                A → Z
+                                            </Button>
+                                            <Button
+                                                systemImage="arrow.down"
+                                                onPress={() => {
+                                                    router.setParams({ nameOrder: "desc" });
+                                                }}
+                                            >
+                                                Z → A
+                                            </Button>
                                         </Submenu>
                                         {canSeeDoctorFilter && (
                                             <Submenu button={<Button systemImage="line.3.horizontal.decrease">Doctor Filter</Button>}>
