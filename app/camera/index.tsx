@@ -22,10 +22,8 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const THUMBNAIL_SIZE = 48;
 const MINT_COLOR = "#00c7be";
 
-// 3:2 Aspect Ratio Constants
+// 3:2 Aspect Ratio Constant
 const ASPECT_RATIO = 3 / 2; // 1.5 - Portrait mode (height = width * 1.5)
-const VIEWPORT_WIDTH = SCREEN_WIDTH;
-const VIEWPORT_HEIGHT = VIEWPORT_WIDTH * ASPECT_RATIO;
 
 const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "auto", icon: "bolt.badge.automatic", label: "Auto" },
@@ -575,17 +573,32 @@ export default function CameraScreen() {
         );
     }
 
-    // Calculate 3:2 viewport dimensions
+    // Calculate 3:2 viewport dimensions that fit within available space
     const headerHeight = insets.top + 64; // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
     const bottomHeight = (hasGhostItems ? 172 : 108) + insets.bottom;
     const availableHeight = SCREEN_HEIGHT - headerHeight - bottomHeight;
     
-    // 3:2 viewport - width is full screen, height is calculated
-    const viewportWidth = VIEWPORT_WIDTH;
-    const viewportHeight = VIEWPORT_HEIGHT;
+    // 3:2 viewport - fit within available space while maintaining ratio
+    // Calculate max viewport that fits: either full width with calculated height, or full height with calculated width
+    const maxViewportHeightByWidth = SCREEN_WIDTH * ASPECT_RATIO; // Height if we use full width
+    const maxViewportWidthByHeight = availableHeight / ASPECT_RATIO; // Width if we use full height
     
-    // Center the viewport vertically if there's extra space, otherwise position at top
-    const viewportTop = headerHeight + Math.max(0, (availableHeight - viewportHeight) / 2);
+    let viewportWidth: number;
+    let viewportHeight: number;
+    
+    if (maxViewportHeightByWidth <= availableHeight) {
+        // Full width fits, use it
+        viewportWidth = SCREEN_WIDTH;
+        viewportHeight = maxViewportHeightByWidth;
+    } else {
+        // Need to scale down to fit available height
+        viewportHeight = availableHeight;
+        viewportWidth = maxViewportWidthByHeight;
+    }
+    
+    // Center the viewport
+    const viewportTop = headerHeight + (availableHeight - viewportHeight) / 2;
+    const viewportLeft = (SCREEN_WIDTH - viewportWidth) / 2;
     const viewportBottom = SCREEN_HEIGHT - viewportTop - viewportHeight;
 
     return (
@@ -599,14 +612,24 @@ export default function CameraScreen() {
             {/* Bottom Mask - Covers area below viewport */}
             <View style={[styles.viewportMask, { bottom: 0, left: 0, right: 0, height: viewportBottom }]} />
 
+            {/* Left Mask - Covers area to the left of viewport (when viewport is narrower than screen) */}
+            {viewportLeft > 0 && (
+                <View style={[styles.viewportMask, { top: viewportTop, left: 0, width: viewportLeft, height: viewportHeight }]} />
+            )}
+
+            {/* Right Mask - Covers area to the right of viewport (when viewport is narrower than screen) */}
+            {viewportLeft > 0 && (
+                <View style={[styles.viewportMask, { top: viewportTop, right: 0, width: viewportLeft, height: viewportHeight }]} />
+            )}
+
             {/* 3:2 Viewport Container */}
             <View
                 style={[
                     styles.viewportContainer,
                     {
                         top: viewportTop,
-                        left: 0,
-                        right: 0,
+                        left: viewportLeft,
+                        width: viewportWidth,
                         height: viewportHeight,
                     },
                 ]}
@@ -641,9 +664,7 @@ export default function CameraScreen() {
                         {/* Ghost Overlay */}
                         {currentGhostImage && (
                             <View style={[styles.ghostOverlay, StyleSheet.absoluteFill]}>
-                                <View style={styles.ghostFrame}>
-                                    <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
-                                </View>
+                                <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
                             </View>
                         )}
                     </>
@@ -702,6 +723,9 @@ export default function CameraScreen() {
                 <View style={styles.headerRight}>
                     {/* Save Button - Only enable when conditions are met */}
                     {(() => {
+                        // Check if any photo is currently uploading
+                        const isUploading = capturedPhotos.some((p) => p.uploadStatus === "uploading");
+
                         // Check if save button should be enabled
                         let canSave = false;
 
@@ -724,11 +748,13 @@ export default function CameraScreen() {
                             canSave = allCaptured && allUploaded;
                         }
 
+                        const isDisabled = !canSave || isUploading;
+
                         return (
                             <TouchableOpacity
-                                style={[styles.saveButtonHeader, !canSave && styles.saveButtonHeaderDisabled]}
+                                style={[styles.saveButtonHeader, isDisabled && styles.saveButtonHeaderDisabled]}
                                 onPress={() => {
-                                    if (canSave) {
+                                    if (canSave && !isUploading) {
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                         // Merge tempFilename from ref into photos before going to review
                                         const finalPhotos = capturedPhotos.map((p) => {
@@ -741,11 +767,15 @@ export default function CameraScreen() {
                                         handleGoToReview(finalPhotos);
                                     }
                                 }}
-                                disabled={!canSave}
+                                disabled={isDisabled}
                             >
-                                <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
-                                    Save
-                                </BaseText>
+                                {isUploading ? (
+                                    <ActivityIndicator size="small" color={colors.system.gray} />
+                                ) : (
+                                    <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
+                                        Save
+                                    </BaseText>
+                                )}
                             </TouchableOpacity>
                         );
                     })()}
@@ -1084,12 +1114,6 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    ghostFrame: {
-        width: VIEWPORT_WIDTH,
-        height: VIEWPORT_HEIGHT,
         justifyContent: "center",
         alignItems: "center",
     },
