@@ -11,15 +11,21 @@ import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.type
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const { width, height } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const THUMBNAIL_SIZE = 48;
 const MINT_COLOR = "#00c7be";
+
+// 3:2 Aspect Ratio Constants
+const ASPECT_RATIO = 3 / 2; // 1.5 - Portrait mode (height = width * 1.5)
+const VIEWPORT_WIDTH = SCREEN_WIDTH;
+const VIEWPORT_HEIGHT = VIEWPORT_WIDTH * ASPECT_RATIO;
 
 const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "auto", icon: "bolt.badge.automatic", label: "Auto" },
@@ -378,12 +384,58 @@ export default function CameraScreen() {
             });
 
             if (photo) {
+                // Crop photo to 3:2 aspect ratio (what user sees is what they get)
+                const originalWidth = photo.width;
+                const originalHeight = photo.height;
+                const targetRatio = ASPECT_RATIO; // 3:2 = 1.5
+
+                let cropWidth: number;
+                let cropHeight: number;
+                let cropX: number;
+                let cropY: number;
+
+                const currentRatio = originalHeight / originalWidth;
+
+                if (currentRatio > targetRatio) {
+                    // Image is taller than 3:2, crop top and bottom
+                    cropWidth = originalWidth;
+                    cropHeight = Math.round(originalWidth * targetRatio);
+                    cropX = 0;
+                    cropY = Math.round((originalHeight - cropHeight) / 2);
+                } else {
+                    // Image is wider than 3:2, crop left and right
+                    cropHeight = originalHeight;
+                    cropWidth = Math.round(originalHeight / targetRatio);
+                    cropX = Math.round((originalWidth - cropWidth) / 2);
+                    cropY = 0;
+                }
+
+                // Crop the image to 3:2 ratio
+                const croppedPhoto = await ImageManipulator.manipulateAsync(
+                    photo.uri,
+                    [
+                        {
+                            crop: {
+                                originX: cropX,
+                                originY: cropY,
+                                width: cropWidth,
+                                height: cropHeight,
+                            },
+                        },
+                    ],
+                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+                );
+
+                console.log(`📷 [Camera] Cropped from ${originalWidth}x${originalHeight} to ${cropWidth}x${cropHeight} (3:2 ratio)`);
+
+                const finalPhotoUri = croppedPhoto.uri;
+
                 const ghostId = currentGhostData?.gostId || currentGhostItem || "no-template";
                 const ghostName = currentGhostData?.name || currentGhostItem || "Quick Photo";
                 const photoTimestamp = Date.now();
                 const newPhoto: CapturedPhoto = {
                     id: `photo-${photoTimestamp}`,
-                    uri: photo.uri,
+                    uri: finalPhotoUri,
                     templateId: ghostId,
                     templateName: ghostName,
                     timestamp: photoTimestamp,
@@ -404,12 +456,12 @@ export default function CameraScreen() {
 
                 // Immediately upload ALL photos to temp-upload service
                 try {
-                    const filename = photo.uri.split("/").pop() || "image.jpg";
+                    const filename = finalPhotoUri.split("/").pop() || "image.jpg";
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : "image/jpeg";
 
                     const file = {
-                        uri: photo.uri,
+                        uri: finalPhotoUri,
                         type: type,
                         name: filename,
                     } as any;
@@ -523,42 +575,62 @@ export default function CameraScreen() {
         );
     }
 
+    // Calculate 3:2 viewport dimensions
+    const headerHeight = insets.top + 64; // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
+    const bottomHeight = (hasGhostItems ? 172 : 108) + insets.bottom;
+    const availableHeight = SCREEN_HEIGHT - headerHeight - bottomHeight;
+    
+    // 3:2 viewport - width is full screen, height is calculated
+    const viewportWidth = VIEWPORT_WIDTH;
+    const viewportHeight = VIEWPORT_HEIGHT;
+    
+    // Center the viewport vertically if there's extra space, otherwise position at top
+    const viewportTop = headerHeight + Math.max(0, (availableHeight - viewportHeight) / 2);
+    const viewportBottom = SCREEN_HEIGHT - viewportTop - viewportHeight;
+
     return (
         <View style={styles.container}>
-            {/* Camera View */}
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0}>
+            {/* Camera View - Full screen behind everything */}
+            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0} />
+
+            {/* Top Mask - Covers area above viewport */}
+            <View style={[styles.viewportMask, { top: 0, left: 0, right: 0, height: viewportTop }]} />
+
+            {/* Bottom Mask - Covers area below viewport */}
+            <View style={[styles.viewportMask, { bottom: 0, left: 0, right: 0, height: viewportBottom }]} />
+
+            {/* 3:2 Viewport Container */}
+            <View
+                style={[
+                    styles.viewportContainer,
+                    {
+                        top: viewportTop,
+                        left: 0,
+                        right: 0,
+                        height: viewportHeight,
+                    },
+                ]}
+                pointerEvents="box-none"
+            >
                 {/* Show captured photo if exists, otherwise show grid and ghost overlay */}
                 {hasCurrentPhoto && currentGhostPhoto ? (
-                    /* Captured Photo Overlay - Show the taken photo instead of camera view */
-                    <View
-                        style={[
-                            styles.capturedPhotoOverlay,
-                            {
-                                top: insets.top + 64,
-                                left: 0,
-                                right: 0,
-                                bottom: (hasGhostItems ? 172 : 108) + insets.bottom,
-                                backgroundColor: colors.system.black,
-                            },
-                        ]}
-                    >
+                    /* Captured Photo Overlay - Show the taken photo */
+                    <View style={[styles.capturedPhotoOverlay, { backgroundColor: colors.system.black }]}>
                         <Image source={{ uri: currentGhostPhoto.uri }} style={styles.capturedPhotoImage} contentFit="contain" />
                     </View>
                 ) : (
                     <>
-                        {/* Grid Overlay - Only in camera viewport, not in header/bottom areas */}
-                        {cameraState.isGridEnabled && (
+                        {/* Development Overlay - Border to show 3:2 capture area */}
+                        {__DEV__ && (
                             <View
-                                style={[
-                                    styles.gridContainer,
-                                    {
-                                        top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
-                                        left: 0,
-                                        right: 0,
-                                        bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 16 (paddingTop) + 64 (thumbnails: 48 + 16 marginBottom) + 76 (shutter) + 16 (paddingBottom) = 172, without = 16 + 76 + 16 = 108
-                                    },
-                                ]}
-                            >
+                                style={[StyleSheet.absoluteFill, { borderWidth: 2, borderColor: "rgba(0,199,190,0.8)", borderStyle: "dashed" }]}
+                                pointerEvents="none"
+                            />
+                        )}
+
+                        {/* Grid Overlay */}
+                        {cameraState.isGridEnabled && (
+                            <View style={[styles.gridContainer, StyleSheet.absoluteFill]}>
                                 <View style={[styles.gridLine, styles.gridVertical, { left: "33.33%" }]} />
                                 <View style={[styles.gridLine, styles.gridVertical, { left: "66.66%" }]} />
                                 <View style={[styles.gridLine, styles.gridHorizontal, { top: "33.33%" }]} />
@@ -566,19 +638,9 @@ export default function CameraScreen() {
                             </View>
                         )}
 
-                        {/* Ghost Overlay - Only in camera viewport, not in header/bottom areas */}
+                        {/* Ghost Overlay */}
                         {currentGhostImage && (
-                            <View
-                                style={[
-                                    styles.ghostOverlay,
-                                    {
-                                        top: insets.top + 64, // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
-                                        left: 0,
-                                        right: 0,
-                                        bottom: (hasGhostItems ? 172 : 108) + insets.bottom, // Bottom: with thumbnails = 172, without = 108
-                                    },
-                                ]}
-                            >
+                            <View style={[styles.ghostOverlay, StyleSheet.absoluteFill]}>
                                 <View style={styles.ghostFrame}>
                                     <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
                                 </View>
@@ -586,242 +648,242 @@ export default function CameraScreen() {
                         )}
                     </>
                 )}
+            </View>
 
-                {/* Sample/Retake Button and Camera Controls - Absolute positioned above thumbnails */}
-                {hasGhostItems && (
-                    <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none" }}>
-                        {/* If photo is captured, only show Retake button */}
-                        {hasCurrentPhoto ? (
-                            <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" />
-                        ) : (
-                            <View style={styles.bottomControlsRow}>
-                                {/* Grid Control */}
-                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
-                                    <View style={styles.bottomControlButtonBg}>
-                                        <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
-                                    </View>
-                                </TouchableOpacity>
+            {/* Sample/Retake Button and Camera Controls - Absolute positioned above thumbnails */}
+            {hasGhostItems && (
+                <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none", zIndex: 10 }}>
+                    {/* If photo is captured, only show Retake button */}
+                    {hasCurrentPhoto ? (
+                        <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" />
+                    ) : (
+                        <View style={styles.bottomControlsRow}>
+                            {/* Grid Control */}
+                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
+                                <View style={styles.bottomControlButtonBg}>
+                                    <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
+                                </View>
+                            </TouchableOpacity>
 
-                                {/* Sample Button */}
-                                <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />
+                            {/* Sample Button */}
+                            <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />
 
-                                {/* Flash Control */}
-                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
-                                    <View style={styles.bottomControlButtonBg}>
-                                        <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                    </View>
-                )}
-
-                {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-                    <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
-                        <View style={styles.closeButtonBg}>
-                            <IconSymbol name="chevron.left" size={24} color={colors.system.white} />
+                            {/* Flash Control */}
+                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
+                                <View style={styles.bottomControlButtonBg}>
+                                    <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
+                                </View>
+                            </TouchableOpacity>
                         </View>
-                    </TouchableOpacity>
+                    )}
+                </View>
+            )}
 
-                    <View style={styles.patientInfo}>
-                        <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={doctorColor as string} />
-                        <View style={styles.patientTextContainer}>
-                            <BaseText type="Subhead" weight={600} color="system.white">
-                                {patientName || "Patient Name"}
-                            </BaseText>
-                            <BaseText type="Caption1" color="system.white" style={{ opacity: 0.8 }}>
-                                {doctorName || "Dr. Name"}
-                            </BaseText>
-                        </View>
+            {/* Header */}
+            <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+                <TouchableOpacity style={styles.closeButton} onPress={handleClose} activeOpacity={0.7}>
+                    <View style={styles.closeButtonBg}>
+                        <IconSymbol name="chevron.left" size={24} color={colors.system.white} />
                     </View>
+                </TouchableOpacity>
 
-                    <View style={styles.headerRight}>
-                        {/* Save Button - Only enable when conditions are met */}
-                        {(() => {
-                            // Check if save button should be enabled
-                            let canSave = false;
+                <View style={styles.patientInfo}>
+                    <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={doctorColor as string} />
+                    <View style={styles.patientTextContainer}>
+                        <BaseText type="Subhead" weight={600} color="system.white">
+                            {patientName || "Patient Name"}
+                        </BaseText>
+                        <BaseText type="Caption1" color="system.white" style={{ opacity: 0.8 }}>
+                            {doctorName || "Dr. Name"}
+                        </BaseText>
+                    </View>
+                </View>
 
-                            if (!hasGhostItems) {
-                                // No template: need at least one photo uploaded
-                                const noTemplatePhotos = capturedPhotos.filter((p) => p.templateId === "no-template");
-                                canSave =
-                                    noTemplatePhotos.length > 0 &&
-                                    noTemplatePhotos.every((p) => {
-                                        // Check state first, then ref
-                                        return p.tempFilename || tempFilenameMapRef.current.has(p.id);
-                                    });
-                            } else {
-                                // With template: need all photos captured and uploaded
-                                const allCaptured = capturedPhotos.length === ghostItemsData.length;
-                                const allUploaded = capturedPhotos.every((p) => {
+                <View style={styles.headerRight}>
+                    {/* Save Button - Only enable when conditions are met */}
+                    {(() => {
+                        // Check if save button should be enabled
+                        let canSave = false;
+
+                        if (!hasGhostItems) {
+                            // No template: need at least one photo uploaded
+                            const noTemplatePhotos = capturedPhotos.filter((p) => p.templateId === "no-template");
+                            canSave =
+                                noTemplatePhotos.length > 0 &&
+                                noTemplatePhotos.every((p) => {
                                     // Check state first, then ref
                                     return p.tempFilename || tempFilenameMapRef.current.has(p.id);
                                 });
-                                canSave = allCaptured && allUploaded;
-                            }
+                        } else {
+                            // With template: need all photos captured and uploaded
+                            const allCaptured = capturedPhotos.length === ghostItemsData.length;
+                            const allUploaded = capturedPhotos.every((p) => {
+                                // Check state first, then ref
+                                return p.tempFilename || tempFilenameMapRef.current.has(p.id);
+                            });
+                            canSave = allCaptured && allUploaded;
+                        }
 
-                            return (
-                                <TouchableOpacity
-                                    style={[styles.saveButtonHeader, !canSave && styles.saveButtonHeaderDisabled]}
-                                    onPress={() => {
-                                        if (canSave) {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            // Merge tempFilename from ref into photos before going to review
-                                            const finalPhotos = capturedPhotos.map((p) => {
-                                                const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
-                                                if (tempFilenameFromRef && !p.tempFilename) {
-                                                    return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
-                                                }
-                                                return p;
-                                            });
-                                            handleGoToReview(finalPhotos);
-                                        }
-                                    }}
-                                    disabled={!canSave}
-                                >
-                                    <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
-                                        Save
-                                    </BaseText>
-                                </TouchableOpacity>
-                            );
-                        })()}
-                    </View>
-                </View>
-
-                {/* Template Badge - shows current ghost name */}
-                {/* {hasGhostItems && (
-                    <View style={styles.templateBadge}>
-                        <BaseText type="Caption1" weight={600} color="system.white">
-                            {currentGhostData?.name || currentGhostItem || "Template"} ({currentGhostIndex + 1}/{ghostItemsData.length})
-                        </BaseText>
-                    </View>
-                )} */}
-
-                {/* Template Select Button and Camera Controls - Only show when no ghost items selected */}
-                {!hasGhostItems && (
-                    <View style={styles.templateButtonContainer}>
-                        {/* If photo is captured, only show Retake button */}
-                        {hasCurrentPhoto ? (
-                            <BaseButton
-                                ButtonStyle="Gray"
+                        return (
+                            <TouchableOpacity
+                                style={[styles.saveButtonHeader, !canSave && styles.saveButtonHeaderDisabled]}
                                 onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+                                    if (canSave) {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        // Merge tempFilename from ref into photos before going to review
+                                        const finalPhotos = capturedPhotos.map((p) => {
+                                            const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                            if (tempFilenameFromRef && !p.tempFilename) {
+                                                return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                            }
+                                            return p;
+                                        });
+                                        handleGoToReview(finalPhotos);
+                                    }
                                 }}
-                                label="Retake"
-                            />
-                        ) : (
-                            <View style={styles.bottomControlsRow}>
-                                {/* Grid Control */}
-                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
-                                    <View style={styles.bottomControlButtonBg}>
-                                        <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
-                                    </View>
-                                </TouchableOpacity>
+                                disabled={!canSave}
+                            >
+                                <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
+                                    Save
+                                </BaseText>
+                            </TouchableOpacity>
+                        );
+                    })()}
+                </View>
+            </View>
 
-                                {/* Template Select Button */}
-                                <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
-                                    <BaseText type="Body" weight={600} color="system.white">
-                                        Select a template
-                                    </BaseText>
-                                </TouchableOpacity>
+            {/* Template Badge - shows current ghost name */}
+            {/* {hasGhostItems && (
+                <View style={styles.templateBadge}>
+                    <BaseText type="Caption1" weight={600} color="system.white">
+                        {currentGhostData?.name || currentGhostItem || "Template"} ({currentGhostIndex + 1}/{ghostItemsData.length})
+                    </BaseText>
+                </View>
+            )} */}
 
-                                {/* Flash Control */}
-                                <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
-                                    <View style={styles.bottomControlButtonBg}>
-                                        <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
-                                    </View>
-                                </TouchableOpacity>
-                            </View>
-                        )}
+            {/* Template Select Button and Camera Controls - Only show when no ghost items selected */}
+            {!hasGhostItems && (
+                <View style={styles.templateButtonContainer}>
+                    {/* If photo is captured, only show Retake button */}
+                    {hasCurrentPhoto ? (
+                        <BaseButton
+                            ButtonStyle="Gray"
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+                            }}
+                            label="Retake"
+                        />
+                    ) : (
+                        <View style={styles.bottomControlsRow}>
+                            {/* Grid Control */}
+                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
+                                <View style={styles.bottomControlButtonBg}>
+                                    <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
+                                </View>
+                            </TouchableOpacity>
+
+                            {/* Template Select Button */}
+                            <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
+                                <BaseText type="Body" weight={600} color="system.white">
+                                    Select a template
+                                </BaseText>
+                            </TouchableOpacity>
+
+                            {/* Flash Control */}
+                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
+                                <View style={styles.bottomControlButtonBg}>
+                                    <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
+            )}
+
+            {/* Flash effect overlay */}
+            <Animated.View style={[styles.flashOverlay, flashOverlayStyle]} pointerEvents="none" />
+
+            {/* Checkmark animation */}
+            <Animated.View style={[styles.checkmarkOverlay, checkmarkAnimStyle]}>
+                <View style={styles.checkmarkCircle}>
+                    <IconSymbol name="checkmark" size={48} color={colors.system.white} />
+                </View>
+            </Animated.View>
+
+            <View style={[styles.bottomControlsWrapper, { paddingBottom: insets.bottom + 16 }]}>
+                {/* Ghost item thumbnails - only show when has ghost items */}
+                {hasGhostItems && (
+                    <View style={styles.thumbnailsContainer}>
+                        <FlatList
+                            data={ghostItemsData}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.thumbnailsList}
+                            keyExtractor={(item, index) => item.gostId || String(index)}
+                            renderItem={({ item: ghostItem, index }) => {
+                                const ghostId = ghostItem.gostId;
+                                const photo = capturedPhotos.find((p) => p.templateId === ghostId);
+                                const isActive = index === currentGhostIndex;
+                                const isCompleted = !!photo;
+                                // Use iconUrl (icon.url) for thumbnails, fallback to local icon
+                                const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
+                                return (
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setCurrentGhostIndex(index);
+                                        }}
+                                        style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
+                                    >
+                                        {photo ? (
+                                            <>
+                                                <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                                                <View style={styles.thumbnailCheck}>
+                                                    <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
+                                                </View>
+                                            </>
+                                        ) : iconSource ? (
+                                            <Image
+                                                source={iconSource}
+                                                style={styles.thumbnailIcon}
+                                                contentFit="contain"
+                                                onError={(error) => {
+                                                    console.log("Icon load error for:", ghostId, error);
+                                                }}
+                                            />
+                                        ) : (
+                                            <View style={styles.thumbnailPlaceholder}>
+                                                <BaseText type="Caption2" color="labels.tertiary">
+                                                    {index + 1}
+                                                </BaseText>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
                     </View>
                 )}
 
-                {/* Flash effect overlay */}
-                <Animated.View style={[styles.flashOverlay, flashOverlayStyle]} pointerEvents="none" />
+                <View style={styles.bottomControls}>
+                    {/* Gallery Thumbnail */}
+                    <TouchableOpacity style={styles.galleryThumbnail} activeOpacity={0.8}>
+                        {capturedPhotos.length > 0 ? <Image source={{ uri: capturedPhotos[capturedPhotos.length - 1].uri }} style={styles.galleryThumbnailImage} /> : <View style={styles.galleryThumbnailPlaceholder} />}
+                    </TouchableOpacity>
 
-                {/* Checkmark animation */}
-                <Animated.View style={[styles.checkmarkOverlay, checkmarkAnimStyle]}>
-                    <View style={styles.checkmarkCircle}>
-                        <IconSymbol name="checkmark" size={48} color={colors.system.white} />
-                    </View>
-                </Animated.View>
-
-                <View style={[styles.bottomControlsWrapper, { paddingBottom: insets.bottom + 16 }]}>
-                    {/* Ghost item thumbnails - only show when has ghost items */}
-                    {hasGhostItems && (
-                        <View style={styles.thumbnailsContainer}>
-                            <FlatList
-                                data={ghostItemsData}
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.thumbnailsList}
-                                keyExtractor={(item, index) => item.gostId || String(index)}
-                                renderItem={({ item: ghostItem, index }) => {
-                                    const ghostId = ghostItem.gostId;
-                                    const photo = capturedPhotos.find((p) => p.templateId === ghostId);
-                                    const isActive = index === currentGhostIndex;
-                                    const isCompleted = !!photo;
-                                    // Use iconUrl (icon.url) for thumbnails, fallback to local icon
-                                    const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
-                                    return (
-                                        <TouchableOpacity
-                                            onPress={() => {
-                                                setCurrentGhostIndex(index);
-                                            }}
-                                            style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
-                                        >
-                                            {photo ? (
-                                                <>
-                                                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                                                    <View style={styles.thumbnailCheck}>
-                                                        <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
-                                                    </View>
-                                                </>
-                                            ) : iconSource ? (
-                                                <Image
-                                                    source={iconSource}
-                                                    style={styles.thumbnailIcon}
-                                                    contentFit="contain"
-                                                    onError={(error) => {
-                                                        console.log("Icon load error for:", ghostId, error);
-                                                    }}
-                                                />
-                                            ) : (
-                                                <View style={styles.thumbnailPlaceholder}>
-                                                    <BaseText type="Caption2" color="labels.tertiary">
-                                                        {index + 1}
-                                                    </BaseText>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                }}
-                            />
+                    {/* Shutter Button */}
+                    <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
+                        <View style={styles.shutterOuter}>
+                            <View style={styles.shutterInner}>{isCapturing && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
                         </View>
-                    )}
+                    </TouchableOpacity>
 
-                    <View style={styles.bottomControls}>
-                        {/* Gallery Thumbnail */}
-                        <TouchableOpacity style={styles.galleryThumbnail} activeOpacity={0.8}>
-                            {capturedPhotos.length > 0 ? <Image source={{ uri: capturedPhotos[capturedPhotos.length - 1].uri }} style={styles.galleryThumbnailImage} /> : <View style={styles.galleryThumbnailPlaceholder} />}
-                        </TouchableOpacity>
-
-                        {/* Shutter Button */}
-                        <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
-                            <View style={styles.shutterOuter}>
-                                <View style={styles.shutterInner}>{isCapturing && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
-                            </View>
-                        </TouchableOpacity>
-
-                        {/* Switch Camera */}
-                        <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCamera} activeOpacity={0.7}>
-                            <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color={colors.system.white} />
-                        </TouchableOpacity>
-                    </View>
+                    {/* Switch Camera */}
+                    <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCamera} activeOpacity={0.7}>
+                        <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color={colors.system.white} />
+                    </TouchableOpacity>
                 </View>
-            </CameraView>
+            </View>
 
             {/* Guide Modal */}
             {/* <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
@@ -881,6 +943,16 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.system.black,
     },
+    viewportMask: {
+        position: "absolute",
+        backgroundColor: colors.system.black,
+        zIndex: 1,
+    },
+    viewportContainer: {
+        position: "absolute",
+        overflow: "hidden",
+        zIndex: 2,
+    },
     permissionContainer: {
         justifyContent: "center",
         alignItems: "center",
@@ -903,6 +975,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 12,
         backgroundColor: colors.system.black,
+        zIndex: 10,
     },
     headerRight: {
         flexDirection: "row",
@@ -1015,8 +1088,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     ghostFrame: {
-        width: width * 1,
-        height: width * 1,
+        width: VIEWPORT_WIDTH,
+        height: VIEWPORT_HEIGHT,
         justifyContent: "center",
         alignItems: "center",
     },
@@ -1044,6 +1117,7 @@ const styles = StyleSheet.create({
         right: 0,
         backgroundColor: colors.system.black,
         paddingTop: 16,
+        zIndex: 10,
     },
     thumbnailsContainer: {
         marginBottom: 16,
@@ -1230,11 +1304,11 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         padding: 20,
         alignItems: "center",
-        width: width * 0.85,
+        width: SCREEN_WIDTH * 0.85,
     },
     guideImage: {
         width: "100%",
-        height: width * 1.085,
+        height: SCREEN_WIDTH * 1.085,
     },
     closeGuideButton: {
         marginTop: 20,

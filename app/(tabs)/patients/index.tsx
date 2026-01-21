@@ -23,6 +23,7 @@ import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+const USE_MOCK_PATIENTS = false;
 
 export default function PatientsScreen() {
     const { selectedPractice, viewMode, selectedDoctor } = useProfileStore();
@@ -78,7 +79,37 @@ export default function PatientsScreen() {
     }, [canSeeDoctorFilter, selectedDoctor, currentUserRole, profile?.id]);
 
     const { data: patients, isLoading: isPatientsLoading, refetch: refetchPatients } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
-    const currentPatients = patients?.data;
+
+    const mockPatients = useMemo(() => {
+        if (!USE_MOCK_PATIENTS) return null;
+        const now = new Date().toISOString();
+        const items: Patient[] = [];
+        alphabet.forEach((letter) => {
+            for (let i = 1; i <= 5; i += 1) {
+                items.push({
+                    id: parseInt(`${letter.charCodeAt(0)}${i}`),
+                    chart_number: null,
+                    first_name: `${letter}`,
+                    last_name: `Test ${i}`,
+                    full_name: `${letter} Test ${i}`,
+                    birth_date: null,
+                    gender: null,
+                    email: [],
+                    numbers: [],
+                    addresses: [],
+                    links: [],
+                    doctor: undefined,
+                    profile_image: null,
+                    id_card: null,
+                    created_at: now,
+                    updated_at: now,
+                });
+            }
+        });
+        return items;
+    }, []);
+
+    const currentPatients = USE_MOCK_PATIENTS ? mockPatients : patients?.data;
     const isLoading = isPatientsLoading;
 
     const archivePatientMutation = useArchivePatient(
@@ -113,6 +144,7 @@ export default function PatientsScreen() {
     const scrollViewRef = useRef<SectionList>(null);
     const [isDragging, setIsDragging] = useState(false);
     const alphabetContainerRef = useRef<View>(null);
+    const alphabetWrapperRef = useRef<View>(null);
     const [alphabetContainerLayout, setAlphabetContainerLayout] = useState({ y: 0, height: 0 });
     const [activeLetter, setActiveLetter] = useState<string | null>(null);
     const activeIndexSV = useSharedValue(-1);
@@ -154,34 +186,69 @@ export default function PatientsScreen() {
 
     const handleAlphabetPress = (letter: string, animated = true) => {
         const sectionIndex = sections.findIndex((sec) => sec.title === letter);
-        if (sectionIndex === -1 || !scrollViewRef.current) return;
+        if (sectionIndex === -1 || !scrollViewRef.current) {
+            console.log("[Scroll] Section not found for letter:", letter);
+            return;
+        }
 
+        const ITEM_HEIGHT = 60;
+        const SECTION_HEADER_HEIGHT = 24;
         const stickyHeaderHeight = headerHeight || 0;
 
+        // Calculate offset for the first item of the target section
+        let offset = 0;
+        for (let i = 0; i < sectionIndex; i++) {
+            offset += SECTION_HEADER_HEIGHT + (sections[i].data.length * ITEM_HEIGHT);
+        }
+        // Add section header height for the target section
+        offset += SECTION_HEADER_HEIGHT;
+        // First item is at offset + 0 (already included)
+
+        // Subtract header height so first item appears below header
+        const finalOffset = Math.max(0, offset - stickyHeaderHeight);
+
+        console.log("[Scroll] letter:", letter, "sectionIndex:", sectionIndex, "offset:", offset, "finalOffset:", finalOffset, "headerHeight:", stickyHeaderHeight);
+
+        // Use scrollToOffset instead of scrollToLocation for more precise control
         setTimeout(() => {
             try {
-                scrollViewRef.current?.scrollToLocation({
-                    sectionIndex,
-                    itemIndex: 0,
+                (scrollViewRef.current as any)?.scrollTo({
+                    y: finalOffset,
                     animated,
-                    viewPosition: 0,
-                    viewOffset: stickyHeaderHeight,
                 });
             } catch (e) {
-                console.warn("ScrollToLocation error:", e);
+                console.warn("ScrollTo error:", e);
+                // Fallback to scrollToLocation
+                try {
+                    scrollViewRef.current?.scrollToLocation({
+                        sectionIndex,
+                        itemIndex: 0,
+                        animated,
+                        viewPosition: 0,
+                        viewOffset: stickyHeaderHeight,
+                    });
+                } catch (e2) {
+                    console.warn("ScrollToLocation error:", e2);
+                }
             }
-        }, 50);
+        }, 100);
     };
 
     const handleGestureUpdate = (index: number) => {
         const letter = alphabetWithHashRef.current[index] || "";
         setActiveLetter(letter);
+        const hasSection = sections.some((s) => s.title === letter);
+        console.log("[Alphabet Drag] letter:", letter, "hasSection:", hasSection, "index:", index);
+        if (!hasSection) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         handleAlphabetPress(letter, false);
     };
 
     const handleGestureTap = (index: number) => {
         const letter = alphabetWithHashRef.current[index] || "";
+        const hasSection = sections.some((s) => s.title === letter);
+        console.log("[Alphabet Tap] letter:", letter, "hasSection:", hasSection, "index:", index);
+        if (!hasSection) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         handleAlphabetPress(letter, true);
     };
@@ -195,9 +262,7 @@ export default function PatientsScreen() {
         .onBegin((e) => {
             if (alphabetContainerLayout.height === 0) return;
 
-            const relativeX = e.absoluteX - (alphabetContainerLayout.y > 0 ? 0 : 0);
-            const relativeY = e.absoluteY - alphabetContainerLayout.y;
-
+            const relativeY = e.y;
             if (relativeY < 0 || relativeY > alphabetContainerLayout.height) {
                 return;
             }
@@ -208,13 +273,14 @@ export default function PatientsScreen() {
             const containerHeight = alphabetContainerLayout.height;
             if (containerHeight === 0) return;
 
-            const relativeY = e.absoluteY - alphabetContainerLayout.y;
+            const relativeY = e.y;
             if (relativeY < 0 || relativeY > containerHeight) return;
 
             const alphabetLength = alphabetLengthSV.value;
             const itemHeight = containerHeight / alphabetLength;
             const index = Math.floor(relativeY / itemHeight);
             const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
+            console.log("[Pan Update] y:", e.y, "relativeY:", relativeY, "itemHeight:", itemHeight, "index:", index, "clampedIndex:", clampedIndex, "letter:", alphabetWithHashRef.current[clampedIndex]);
             if (clampedIndex !== activeIndexSV.value) {
                 activeIndexSV.value = clampedIndex;
                 runOnJS(handleGestureUpdate)(clampedIndex);
@@ -231,13 +297,14 @@ export default function PatientsScreen() {
         const containerHeight = alphabetContainerLayout.height;
         if (containerHeight === 0) return;
 
-        const relativeY = e.absoluteY - alphabetContainerLayout.y;
+        const relativeY = e.y;
         if (relativeY < 0 || relativeY > containerHeight) return;
 
         const alphabetLength = alphabetLengthSV.value;
         const itemHeight = containerHeight / alphabetLength;
         const index = Math.floor(relativeY / itemHeight);
         const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
+        console.log("[Tap] y:", e.y, "relativeY:", relativeY, "itemHeight:", itemHeight, "index:", index, "clampedIndex:", clampedIndex, "letter:", alphabetWithHashRef.current[clampedIndex]);
         runOnJS(handleGestureTap)(clampedIndex);
     });
 
@@ -292,7 +359,6 @@ export default function PatientsScreen() {
                     renderItem={({ item, index, section }) => {
                         const chartNumber = item.chart_number;
                         const hasChartNumber = chartNumber !== null && chartNumber !== undefined && (typeof chartNumber === "number" || (typeof chartNumber === "string" && chartNumber.trim() !== ""));
-                        console.log(`Patient ${item.id} - chart_number:`, chartNumber, "hasChartNumber:", hasChartNumber);
                         return (
                             <Host matchContents>
                                 <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
@@ -499,15 +565,20 @@ export default function PatientsScreen() {
             )}
 
             {sections.length > 0 && (
-                <View className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center" ref={alphabetContainerRef} onLayout={onAlphabetContainerLayout} style={{ zIndex: 1 }} pointerEvents="box-none">
+                <View className="absolute  right-0 top-1/2 -translate-y-1/2 items-center justify-center" ref={alphabetContainerRef} style={{ zIndex: 1 }} pointerEvents="box-none">
                     <GestureDetector gesture={composedGesture}>
-                        <View style={styles.alphabetWrapper} pointerEvents="auto">
+                        <View ref={alphabetWrapperRef} style={styles.alphabetWrapper} pointerEvents="auto" onLayout={onAlphabetContainerLayout}>
                             {alphabetWithHash.map((letter) => {
                                 const hasSection = sections.some((s) => s.title === letter);
                                 const isActive = isDragging && activeLetter === letter;
                                 return (
                                     <View key={letter} style={[styles.alphabetItem, isActive && styles.activeAlphabetItem]}>
-                                        <BaseText type="Caption1" color={isActive ? "system.blue" : hasSection ? "system.blue" : "labels.tertiary"} weight={isActive ? "700" : "500"} style={{ transform: [{ scale: isActive ? 1.4 : 1 }] }}>
+                                        <BaseText
+                                            type="Caption1"
+                                            color="system.blue"
+                                            weight={600}
+                                           
+                                        >
                                             {letter}
                                         </BaseText>
                                     </View>
@@ -526,7 +597,7 @@ const styles = StyleSheet.create({
     listItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.system.gray5 },
     sectionHeader: { backgroundColor: colors.background, paddingHorizontal: 0 },
     alphabetWrapper: { alignItems: "center", justifyContent: "center" },
-    alphabetItem: { paddingHorizontal: spacing["1"], marginVertical: 1 },
+    alphabetItem: { paddingHorizontal: spacing["0.5"], marginVertical: 0 },
     activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
     noResults: { alignItems: "center", justifyContent: "center", gap: spacing["1"] },
     emptyStateContainer: {
