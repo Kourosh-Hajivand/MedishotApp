@@ -3,6 +3,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import axiosInstance from "@/utils/AxiosInstans";
 import { clearFailedRequest, FailedRequest, getFailedRequest } from "@/utils/helper/failedRequestStorage";
+import { getTokens } from "@/utils/helper/tokenStorage";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -13,21 +14,61 @@ export default function ErrorScreen() {
     const [isRetrying, setIsRetrying] = useState(false);
     const [failedRequest, setFailedRequest] = useState<FailedRequest | null>(null);
 
+    // Check if user has token
+    const checkAuthAndNavigate = async (targetRoute: () => void) => {
+        try {
+            const tokens = await getTokens();
+            if (!tokens?.accessToken) {
+                // No token, redirect to welcome
+                router.replace("/welcome");
+                return;
+            }
+            // Has token, proceed with navigation
+            targetRoute();
+        } catch (error) {
+            // Error getting tokens, redirect to welcome
+            router.replace("/welcome");
+        }
+    };
+
     useEffect(() => {
         // Load failed request on mount
         getFailedRequest().then((request) => {
             setFailedRequest(request);
         });
+
+        // Check authentication on mount - if no token, redirect to welcome
+        // This prevents users from accessing protected routes after error
+        const checkAuthOnMount = async () => {
+            try {
+                const tokens = await getTokens();
+                if (!tokens?.accessToken) {
+                    // No token, redirect to welcome after a short delay to allow UI to render
+                    setTimeout(() => {
+                        router.replace("/welcome");
+                    }, 100);
+                }
+            } catch (error) {
+                // Error getting tokens, redirect to welcome
+                setTimeout(() => {
+                    router.replace("/welcome");
+                }, 100);
+            }
+        };
+
+        checkAuthOnMount();
     }, []);
 
     const handleRetry = async () => {
         if (!failedRequest) {
-            // If no failed request, just go back
-            try {
-                router.back();
-            } catch {
-                router.replace("/(tabs)/patients");
-            }
+            // If no failed request, check auth and navigate
+            await checkAuthAndNavigate(() => {
+                try {
+                    router.back();
+                } catch {
+                    router.replace("/(tabs)/patients");
+                }
+            });
             return;
         }
 
@@ -61,21 +102,27 @@ export default function ErrorScreen() {
             // Make the request
             await axiosInstance(config);
 
-            // If successful, go back
-            try {
-                router.back();
-            } catch {
-                router.replace("/(tabs)/patients");
-            }
+            // If successful, check auth and navigate
+            await checkAuthAndNavigate(() => {
+                try {
+                    router.back();
+                } catch {
+                    router.replace("/(tabs)/patients");
+                }
+            });
         } catch (error) {
             // If retry fails, stay on error page
-            console.error("Retry failed:", error);
+            if (__DEV__) {
+                console.error("Retry failed:", error);
+            }
             setIsRetrying(false);
         }
     };
 
-    const handleGoHome = () => {
-        router.replace("/(tabs)/patients");
+    const handleGoHome = async () => {
+        await checkAuthAndNavigate(() => {
+            router.replace("/(tabs)/patients");
+        });
     };
 
     return (

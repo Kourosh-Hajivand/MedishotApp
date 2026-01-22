@@ -13,6 +13,7 @@ export { SignatureCanvas } from "./SignatureCanvas";
 export type { SignatureCanvasRef } from "./SignatureCanvas";
 export { AnimatedSplashScreen } from "./SplashScreen";
 export { AuthSplashScreen } from "./AuthSplashScreen";
+export { AuthGuard } from "./AuthGuard";
 export { TabletWrapper } from "./tablet-wrapper";
 export { BaseText } from "./text/BaseText";
 export { PracticeDocumentHeader, PracticeDocumentFooter } from "./practice";

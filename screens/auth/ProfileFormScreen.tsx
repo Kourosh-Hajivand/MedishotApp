@@ -125,21 +125,17 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
-            console.log("✅ [uploadImage] Success callback triggered");
-            console.log("✅ [uploadImage] Response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("✅ [uploadImage] Filename:", filename);
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
             setHasImageChanged(true); // Mark that image was changed and uploaded
-            console.log("✅ [uploadImage] Image uploaded successfully:", filename);
         },
         (error) => {
-            console.error("❌ [uploadImage] Error callback triggered");
-            console.error("❌ [uploadImage] Error uploading image:", error);
-            console.error("❌ [uploadImage] Error message:", error.message);
+            if (__DEV__) {
+                console.error("Error uploading image:", error);
+            }
             setHasImageChanged(false); // Reset on error
         },
     );
@@ -210,7 +206,6 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     }, [onFormReady, handleSubmit, control, errors, phones, emails, addresses, urls, uploadedFilename, getValues, hasImageChanged, mode]);
 
     const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
-        console.log("📸 [handleImageSelected] Image selected:", result.uri);
         Keyboard.dismiss();
         setLocalImageUri(result.uri); // Save local URI for preview
         setHasImageChanged(true); // Mark that user selected a new image
@@ -226,15 +221,11 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                 name: filename,
             } as any;
 
-            console.log("📤 [handleImageSelected] Preparing to upload file:", {
-                uri: file.uri,
-                type: file.type,
-                name: file.name,
-            });
-            console.log("📤 [handleImageSelected] Calling uploadImage...");
             uploadImage(file);
         } catch (error) {
-            console.error("❌ [handleImageSelected] Error preparing image for upload:", error);
+            if (__DEV__) {
+                console.error("Error preparing image for upload:", error);
+            }
         }
     };
 
@@ -270,12 +261,11 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             <Image
                                 source={{ uri: displaySelectedImage }}
                                 style={styles.avatarImage}
-                                onError={(error) => {
-                                    console.error("❌ [Image] Error loading image:", error.nativeEvent.error);
-                                    console.error("❌ [Image] Failed URI:", displaySelectedImage);
+                                onError={() => {
+                                    // Silently handle image load errors
                                 }}
                                 onLoad={() => {
-                                    console.log("✅ [Image] Image loaded successfully:", displaySelectedImage);
+                                    // Image loaded successfully
                                 }}
                             />
                         ) : (

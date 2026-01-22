@@ -181,9 +181,6 @@ export const CreatePracticeScreen: React.FC = () => {
             ...(uploadedFilename ? { image: uploadedFilename } : {}),
         };
 
-        // Log request body being sent to backend
-        console.log("📤 Request Body:", JSON.stringify(createData, null, 2));
-
         createPractice(createData);
     };
     useLayoutEffect(() => {

@@ -18,8 +18,6 @@ export default function Index() {
     const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
     const { setSelectedPractice, selectedPractice } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
-    console.log("================selectedPractice====================");
-    console.log(selectedPractice);
 
     // Get current user's role in the selected practice
     const currentUserRole = React.useMemo(() => {

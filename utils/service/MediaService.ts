@@ -132,47 +132,22 @@ const MediaService = {
     // Temporary File Upload
     tempUpload: async (file: File | { uri: string; type: string; name: string }): Promise<TempUploadResponse> => {
         try {
-            console.log("📤 [MediaService] tempUpload called with file:", {
-                uri: typeof file === "object" && "uri" in file ? file.uri.substring(0, 50) + "..." : "N/A",
-                type: typeof file === "object" && "type" in file ? file.type : "N/A",
-                name: typeof file === "object" && "name" in file ? file.name : "N/A",
-            });
             const formData = new FormData();
             formData.append("file", file as any);
-            console.log("📤 [MediaService] FormData prepared, calling API endpoint:", baseUrl + tempUpload());
 
             const response: AxiosResponse<any> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
-            });
-            console.log("📤 [MediaService] ✅ tempUpload API response received:", {
-                status: response.status,
-                statusText: response.statusText,
-                data: response.data,
-                filename: response.data?.data?.filename || response.data?.filename,
-                dataStructure: {
-                    hasData: !!response.data,
-                    hasDataData: !!response.data?.data,
-                    hasDataFilename: !!response.data?.filename,
-                    hasDataDataFilename: !!response.data?.data?.filename,
-                },
             });
             
             // Response structure: {success: true, message: null, data: {filename: '...'}}
             // Extract the inner data object (TempUploadResponse)
             const tempUploadResponse: TempUploadResponse = response.data?.data || response.data;
-            console.log("📤 [MediaService] Extracted TempUploadResponse:", tempUploadResponse);
             return tempUploadResponse;
         } catch (error) {
-            console.error("📤 [MediaService] ❌ Error in TempUpload:", error);
             if (axios.isAxiosError(error)) {
-                console.error("📤 [MediaService] ❌ Axios error details:", {
-                    message: error.message,
-                    response: error.response ? {
-                        status: error.response.status,
-                        statusText: error.response.statusText,
-                        data: error.response.data,
-                    } : "No response",
-                });
+                if (__DEV__) {
+                    console.error("Error in tempUpload:", error);
+                }
                 if (error.response) {
                     throw new Error(error.response.data.message || "Temporary upload failed");
                 }

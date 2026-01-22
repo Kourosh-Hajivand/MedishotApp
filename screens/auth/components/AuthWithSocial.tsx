@@ -27,10 +27,9 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
     useEffect(() => {
         if (response?.type === "success") {
             const { authentication } = response;
-            console.log("authentication:", authentication);
             googleCallback(authentication?.idToken || "");
         }
-    }, [response]);
+    }, [response, googleCallback]);
 
     const handleAppleLogin = async () => {
         try {

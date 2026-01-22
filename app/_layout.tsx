@@ -1,4 +1,4 @@
-import { AuthSplashScreen, TabletWrapper } from "@/components";
+import { AuthGuard, AuthSplashScreen, TabletWrapper } from "@/components";
 import { Layout } from "@/constants/theme";
 import TenstackProvider from "@/utils/Providers/TenstackProvider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -28,12 +28,13 @@ export default function RootLayout() {
             ) : (
                 <BottomSheetModalProvider>
                     <TenstackProvider>
-                        <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
-                            <Stack
-                                screenOptions={{
-                                    headerShown: false,
-                                }}
-                            >
+                        <AuthGuard>
+                            <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
+                                <Stack
+                                    screenOptions={{
+                                        headerShown: false,
+                                    }}
+                                >
                                 <Stack.Screen name="index" />
                                 <Stack.Screen options={{ presentation: "modal" }} name="(auth)" />
                                 <Stack.Screen name="(tabs)" />
@@ -67,6 +68,7 @@ export default function RootLayout() {
 
                         <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
                         <ToastManager />
+                        </AuthGuard>
                     </TenstackProvider>
                 </BottomSheetModalProvider>
             )}

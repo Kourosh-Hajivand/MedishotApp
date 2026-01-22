@@ -78,7 +78,9 @@ export default function CompleteProfile() {
                 },
                 (errors) => {
                     // Validation failed - errors are handled by form
-                    console.log("Validation errors:", errors);
+                    if (__DEV__) {
+                        console.log("Validation errors:", errors);
+                    }
                 },
             )();
         }
