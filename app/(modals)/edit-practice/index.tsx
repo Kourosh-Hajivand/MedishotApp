@@ -143,7 +143,8 @@ export default function EditPracticeScreen() {
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
         },
         (error) => {
-            // Error handled silently
+            setLocalImageUri(null);
+            setUploadedFilename(null);
         },
     );
 

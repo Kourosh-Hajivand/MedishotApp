@@ -188,6 +188,7 @@ export default function PatientsLayout() {
                                                 }}
                                             />
                                         ))}
+                                        <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
                                     </ContextMenu.Items>
 
                                     <ContextMenu.Trigger>

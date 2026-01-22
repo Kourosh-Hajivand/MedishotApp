@@ -116,7 +116,10 @@ export default function AddPracticeMemberForm() {
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
         },
-        (error) => {},
+        (error) => {
+            setLocalImageUri(null);
+            setUploadedFilename(null);
+        },
     );
 
     const {

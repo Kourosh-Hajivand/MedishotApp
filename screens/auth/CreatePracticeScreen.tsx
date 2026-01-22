@@ -102,7 +102,9 @@ export const CreatePracticeScreen: React.FC = () => {
             setUploadedFilename(response.filename ?? null);
         },
         (error) => {
-            // Error handled silently
+
+            setSelectedImage(null);
+            setUploadedFilename(null);
         },
     );
 
@@ -187,13 +189,13 @@ export const CreatePracticeScreen: React.FC = () => {
         navigation.setOptions({
             headerRight: () => (
                 <Host style={{ width: 65, height: 35 }}>
-                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending}>
+                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending ||isUploading}>
                         Create
                     </Button>
                 </Host>
             ),
         });
-    }, [navigation, handleSubmit, onSubmit, isPending]);
+    }, [navigation, handleSubmit, onSubmit, isPending ,isUploading]);
     return (
         <KeyboardAwareScrollView style={styles.scrollView} backgroundColor={colors.background} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }}>
             <View style={styles.avatarContainer}>

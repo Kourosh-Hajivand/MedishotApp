@@ -136,6 +136,8 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             if (__DEV__) {
                 console.error("Error uploading image:", error);
             }
+            setLocalImageUri(null);
+            setUploadedFilename(null);
             setHasImageChanged(false); // Reset on error
         },
     );

@@ -268,7 +268,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
         },
         (error) => {
             console.error("❌ [uploadImage] Error:", error);
-            // Error handled silently
+            setLocalImageUri(null);
+            setUploadedFilename(null);
         },
     );
 
@@ -280,7 +281,8 @@ export const AddPatientPhotoScreen: React.FC = () => {
             setIdCardFilename(filename);
         },
         (error) => {
-            // Error handled silently
+            setIdCardImage(null);
+            setIdCardFilename(null);
         },
     );
 
