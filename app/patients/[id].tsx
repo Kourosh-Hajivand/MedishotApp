@@ -1,4 +1,4 @@
-import { BaseButton, BaseText } from "@/components";
+import { BaseButton, BaseText, PatientDetailSkeleton } from "@/components";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import { ImageEditorModal } from "@/components/ImageEditor";
 import Avatar from "@/components/avatar";
@@ -14,7 +14,7 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Linking, Share, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, Dimensions, Linking, ScrollView, Share, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
 import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
@@ -470,13 +470,22 @@ export default function PatientDetailsScreen() {
 
     if (isLoading) {
         return (
-            <View className="flex-1 items-center justify-center">
-                <ActivityIndicator size="large" color={colors.system.blue} />
+            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
+                <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ 
+                        paddingTop: headerHeight,
+                        paddingBottom: safe.bottom + spacing["4"] 
+                    }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <PatientDetailSkeleton />
+                </ScrollView>
             </View>
         );
     }
 
-    // ترتیب آیتم‌ها: Header → Tabs(sticky) → Content
+
     const DATA: { key: RowKind }[] = [{ key: "header" }, { key: "tabs" }, { key: "content" }];
     const renderRow = ({ item }: { item: { key: RowKind } }) => {
         if (item.key === "header") {

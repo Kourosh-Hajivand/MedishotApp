@@ -1,4 +1,5 @@
 import { useAuth } from "@/utils/hook/useAuth";
+import { useNetworkStatus } from "@/utils/hook/useNetworkStatus";
 import { useGetPracticeList } from "@/utils/hook/usePractice";
 import { router, useSegments } from "expo-router";
 import React, { useEffect } from "react";
@@ -18,10 +19,11 @@ interface AuthGuardProps {
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const { isAuthenticated, profile, isProfileLoading } = useAuth();
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
+    const { isOffline } = useNetworkStatus();
     const segments = useSegments();
 
     // Routes that don't require authentication
-    const publicRoutes = ["welcome", "(auth)", "error"];
+    const publicRoutes = ["welcome", "(auth)", "error", "offline"];
 
     // Check if current route is public
     const isPublicRoute = React.useMemo(() => {
@@ -34,6 +36,16 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }, [segments]);
 
     useEffect(() => {
+        // Check network status first - if offline, redirect to offline page
+        if (isOffline && !isPublicRoute) {
+            // Only redirect if not already on offline page
+            const isOnOfflinePage = segments.some((segment) => segment === "offline");
+            if (!isOnOfflinePage) {
+                router.replace("/offline");
+            }
+            return;
+        }
+
         // Only check authentication and practice for protected routes
         if (isPublicRoute || isInAuthFlow) {
             return;
@@ -61,7 +73,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 }
             }
         }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow]);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, isOffline, segments]);
 
     // If checking authentication, show loading
     if (isAuthenticated === null && !isPublicRoute && !isInAuthFlow) {

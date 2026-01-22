@@ -177,17 +177,24 @@ export default function PatientsLayout() {
                             <Host style={{ width: headerButtonWidth }}>
                                 <ContextMenu activationMethod="longPress">
                                     <ContextMenu.Items>
-                                        {practiceList?.data.map((practice, index) => (
-                                            <Switch
-                                                key={index}
-                                                label={practice.name}
-                                                variant="switch"
-                                                value={selectedPractice?.id === practice.id}
-                                                onValueChange={() => {
-                                                    setSelectedPractice(practice);
-                                                }}
-                                            />
-                                        ))}
+                                        {practiceList?.data
+                                            ?.slice()
+                                            .sort((a, b) => {
+                                                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                                                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                                                return dateB - dateA;
+                                            })
+                                            .map((practice, index) => (
+                                                <Switch
+                                                    key={index}
+                                                    label={practice.name}
+                                                    variant="switch"
+                                                    value={selectedPractice?.id === practice.id}
+                                                    onValueChange={() => {
+                                                        setSelectedPractice(practice);
+                                                    }}
+                                                />
+                                            ))}
                                         <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
                                     </ContextMenu.Items>
 

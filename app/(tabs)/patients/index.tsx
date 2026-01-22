@@ -1,5 +1,5 @@
 import { SearchGlyphIcon } from "@/assets/icons";
-import { BaseText } from "@/components";
+import { BaseText, PatientSkeleton } from "@/components";
 import Avatar from "@/components/avatar";
 import BaseButton from "@/components/button/BaseButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -17,7 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -366,15 +366,39 @@ export default function PatientsScreen() {
 
     const composedGesture = Gesture.Race(pan, tap);
 
+    // Create skeleton sections for loading state
+    const skeletonSections = useMemo(() => {
+        if (!isLoading) return [];
+        // Create sections similar to real data structure - 10 items total
+        const letters = ["A", "B", "C", "D", "E"];
+        return letters.map((letter) => ({
+            title: letter,
+            data: Array.from({ length: 2 }), // 2 items per section = 10 total
+        }));
+    }, [isLoading]);
+
     return (
         <>
             {isLoading ? (
-                <View className="flex-1 py-[60%] items-center justify-center">
-                    <ActivityIndicator size="large" color="#007AFF" />
-                    <BaseText type="Body" color="labels.secondary" weight={500} style={{ marginTop: 8 }}>
-                        Loading patients...
-                    </BaseText>
-                </View>
+                <SectionList
+                    style={{ flex: 1, backgroundColor: "white" }}
+                    sections={skeletonSections}
+                    keyExtractor={(_, index) => `skeleton-${index}`}
+                    stickySectionHeadersEnabled={false}
+                    showsVerticalScrollIndicator={false}
+                    contentInsetAdjustmentBehavior="automatic"
+                    contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white" }}
+                    renderItem={({ index }) => (
+                        <PatientSkeleton haveRing={index % 3 === 0} />
+                    )}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <View style={styles.sectionHeader} className="px-4">
+                            <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
+                                {title}
+                            </BaseText>
+                        </View>
+                    )}
+                />
             ) : currentPatients && currentPatients.length > 0 ? (
                 <SectionList
                     ref={scrollViewRef}

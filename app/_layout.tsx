@@ -63,6 +63,24 @@ export default function RootLayout() {
                                         headerShown: false,
                                     }}
                                 />
+                                <Stack.Screen
+                                    name="offline"
+                                    options={{
+                                        gestureEnabled: false,
+                                        fullScreenGestureEnabled: false,
+                                        animation: "fade",
+                                        headerShown: false,
+                                    }}
+                                />
+                                <Stack.Screen
+                                    name="error"
+                                    options={{
+                                        gestureEnabled: false,
+                                        fullScreenGestureEnabled: false,
+                                        animation: "fade",
+                                        headerShown: false,
+                                    }}
+                                />
                             </Stack>
                         </TabletWrapper>
 
