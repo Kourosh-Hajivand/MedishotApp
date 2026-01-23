@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import { router } from "expo-router";
 import { routes } from "../routes/routes";
 import { storeFailedRequest } from "./helper/failedRequestStorage";
@@ -13,25 +13,17 @@ const axiosInstance = axios.create({
 // Flag to prevent multiple redirects to error page
 let isRedirectingToError = false;
 
-axiosInstance.interceptors.request.use(async (config) => {
-    const tokens = await getTokens();
-    if (tokens.accessToken) {
-        config.headers.Authorization = `Bearer ${tokens.accessToken}`;
-    }
-
-    // Log request URL and body
-    const method = config.method?.toUpperCase() || "GET";
+// Helper function to format request/response for logging
+const formatRequestForLog = (config: AxiosRequestConfig) => {
+    const method = (config.method || "GET").toUpperCase();
+    const url = config.url || "";
     const fullUrl = config.baseURL && config.url ? `${config.baseURL}${config.url}` : config.url || "Unknown";
-
-    // Extract request body
+    
     let requestBody = null;
     if (config.data) {
-        // Handle FormData
         if (config.data instanceof FormData) {
-            // For FormData, we can't easily serialize it, so just log that it's FormData
-            requestBody = "[FormData]";
+            requestBody = "[FormData - Multipart]";
         } else if (typeof config.data === "string") {
-            // Try to parse if it's a JSON string
             try {
                 requestBody = JSON.parse(config.data);
             } catch {
@@ -42,12 +34,96 @@ axiosInstance.interceptors.request.use(async (config) => {
         }
     }
 
-    // Log request details
-    console.log(`📤 [${method}] ${fullUrl}`);
-    if (requestBody && requestBody !== "[FormData]") {
-        console.log("📤 Request Body:", requestBody);
-    } else if (requestBody === "[FormData]") {
-        console.log("📤 Request Body: [FormData - Multipart]");
+    return {
+        method,
+        url: fullUrl,
+        endpoint: url,
+        headers: config.headers,
+        params: config.params,
+        body: requestBody,
+    };
+};
+
+const formatResponseForLog = (response: AxiosResponse) => {
+    const method = (response.config?.method || "GET").toUpperCase();
+    const url = response.config?.url || "";
+    const fullUrl = response.config?.baseURL && response.config?.url ? `${response.config.baseURL}${response.config.url}` : response.config?.url || "Unknown";
+    
+    return {
+        method,
+        url: fullUrl,
+        endpoint: url,
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data,
+    };
+};
+
+const formatErrorForLog = (error: AxiosError) => {
+    const method = (error.config?.method || "GET").toUpperCase();
+    const url = error.config?.url || "";
+    const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
+
+    if (error.response) {
+        interface ErrorResponseData {
+            message?: string;
+            exception?: string;
+            [key: string]: unknown;
+        }
+        const responseData = error.response.data as ErrorResponseData | undefined;
+        return {
+            method,
+            url: fullUrl,
+            endpoint: url,
+            status: error.response.status,
+            statusText: error.response.statusText,
+            headers: error.response.headers,
+            data: error.response.data,
+            message: responseData?.message || responseData?.exception || error.message,
+        };
+    } else if (error.request) {
+        return {
+            method,
+            url: fullUrl,
+            endpoint: url,
+            error: "No Response",
+            message: error.message,
+        };
+    } else {
+        return {
+            method,
+            url: fullUrl,
+            endpoint: url,
+            error: "Request Setup Error",
+            message: error.message,
+        };
+    }
+};
+
+axiosInstance.interceptors.request.use(async (config) => {
+    const tokens = await getTokens();
+    if (tokens.accessToken) {
+        config.headers.Authorization = `Bearer ${tokens.accessToken}`;
+    }
+
+    // Log request in development mode
+    if (__DEV__) {
+        const requestInfo = formatRequestForLog(config);
+        console.group(`🌐 [${requestInfo.method}] ${requestInfo.endpoint}`);
+        console.log("📍 Full URL:", requestInfo.url);
+        console.log("📤 Request Headers:", requestInfo.headers);
+        if (requestInfo.params) {
+            console.log("🔗 Query Params:", requestInfo.params);
+        }
+        if (requestInfo.body) {
+            if (requestInfo.body === "[FormData - Multipart]") {
+                console.log("📦 Request Body:", requestInfo.body);
+            } else {
+                console.log("📦 Request Body:", JSON.stringify(requestInfo.body, null, 2));
+            }
+        }
+        console.groupEnd();
     }
 
     return config;
@@ -58,14 +134,16 @@ axiosInstance.interceptors.response.use(
         // Reset redirect flag on successful response
         isRedirectingToError = false;
 
-        // Log response details
-        const method = response.config?.method?.toUpperCase() || "GET";
-        const fullUrl = response.config?.baseURL && response.config?.url ? `${response.config.baseURL}${response.config.url}` : response.config?.url || "Unknown";
-        const status = response.status;
-
-        console.log(`📥 [${method}] ${fullUrl} - Status: ${status}`);
-        if (response.data) {
-            console.log(`📥 Response Body [${method} ${fullUrl}]:`, response.data);
+        // Log response in development mode
+        if (__DEV__) {
+            const responseInfo = formatResponseForLog(response);
+            const statusColor = responseInfo.status >= 200 && responseInfo.status < 300 ? "✅" : responseInfo.status >= 300 && responseInfo.status < 400 ? "⚠️" : "❌";
+            
+            console.group(`${statusColor} [${responseInfo.method}] ${responseInfo.endpoint} - ${responseInfo.status} ${responseInfo.statusText}`);
+            console.log("📍 Full URL:", responseInfo.url);
+            console.log("📥 Response Headers:", responseInfo.headers);
+            console.log("📥 Response Data:", JSON.stringify(responseInfo.data, null, 2));
+            console.groupEnd();
         }
 
         return response;
@@ -73,41 +151,29 @@ axiosInstance.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // Log detailed error information
-        if (error.response) {
-            const requestUrl = error.config?.url || "Unknown";
-            const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
-            const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
-
-            console.error("🚨 Axios Error Response:", {
-                status: error.response.status,
-                method: requestMethod,
-                url: fullUrl,
-                endpoint: requestUrl,
-                data: error.response.data,
-                headers: error.response.headers,
-            });
-
-            // Log a more readable error message
-            console.error(`❌ API Error [${requestMethod}] ${fullUrl}:`, error.response.data?.message || error.response.data?.exception || "Unknown error");
-        } else if (error.request) {
-            const requestUrl = error.config?.url || "Unknown";
-            const requestMethod = error.config?.method?.toUpperCase() || "Unknown";
-            const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${requestUrl}` : requestUrl;
-
-            console.error("🚨 Axios Error Request (No Response):", {
-                method: requestMethod,
-                url: fullUrl,
-                endpoint: requestUrl,
-            });
-        } else {
-            console.error("🚨 Axios Error Message:", error.message);
+        // Log error in development mode
+        if (__DEV__) {
+            const errorInfo = formatErrorForLog(error);
+            console.group(`❌ [${errorInfo.method}] ${errorInfo.endpoint} - Error`);
+            console.log("📍 Full URL:", errorInfo.url);
+            if (error.response) {
+                console.log("📥 Status:", errorInfo.status, errorInfo.statusText);
+                console.log("📥 Response Headers:", errorInfo.headers);
+                console.log("📥 Response Data:", JSON.stringify(errorInfo.data, null, 2));
+                console.log("💬 Error Message:", errorInfo.message);
+            } else if (error.request) {
+                console.log("⚠️ No Response Received");
+                console.log("💬 Error Message:", errorInfo.message);
+            } else {
+                console.log("⚠️ Request Setup Error");
+                console.log("💬 Error Message:", errorInfo.message);
+            }
+            console.groupEnd();
         }
 
         // Handle 500 Internal Server Error
         if (error.response?.status === 500 && !isRedirectingToError) {
             isRedirectingToError = true;
-            console.warn("Server error (500) detected, redirecting to error page...");
 
             // Store failed request for retry
             if (originalRequest) {
@@ -126,7 +192,7 @@ axiosInstance.interceptors.response.use(
             try {
                 router.replace("/error");
             } catch (navError) {
-                console.error("Failed to navigate to error page:", navError);
+                // Navigation error handled silently
             }
 
             // Reset flag after a delay to allow retry
@@ -146,14 +212,12 @@ axiosInstance.interceptors.response.use(
                 if (originalRequest.url?.includes("auth/refresh")) {
                     // If refresh endpoint itself fails, clear tokens and redirect
                     await removeTokens();
-                    console.warn("Refresh token expired, redirecting to auth...");
                     throw error;
                 }
 
                 // Attempt to refresh the access token
                 const tokens = await getTokens();
                 if (tokens.refreshToken) {
-                    console.log("Attempting to refresh token...");
                     const refreshResponse = await AuthService.refresh();
 
                     if (refreshResponse.data.token) {
@@ -163,7 +227,6 @@ axiosInstance.interceptors.response.use(
                     }
                 }
             } catch (refreshError) {
-                console.warn("Token refresh failed, clearing tokens and redirecting to welcome...");
                 await removeTokens();
                 // Navigate to welcome page after token refresh fails
                 router.replace("/welcome");

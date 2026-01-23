@@ -44,7 +44,6 @@ export const openMessage = (phoneNumber: string) => {
             }
         })
         .catch((err) => {
-            console.error("Error opening message:", err);
             Alert.alert("Error", "Could not open message app");
         });
 };
@@ -84,7 +83,6 @@ export const openCall = (phoneNumber: string) => {
             }
         })
         .catch((err) => {
-            console.error("Error opening call:", err);
             Alert.alert("Error", "Could not open phone app");
         });
 };
@@ -126,7 +124,6 @@ export const openWhatsApp = (phoneNumber: string) => {
             }
         })
         .catch((err) => {
-            console.error("Error opening WhatsApp:", err);
             Alert.alert("Error", "Could not open WhatsApp");
         });
 };

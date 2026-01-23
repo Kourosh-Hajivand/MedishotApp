@@ -148,10 +148,14 @@ export type Colors = typeof colors;
 // Helper functions برای دسترسی آسان‌تر
 export const getColor = (path: string): ColorToken => {
   const keys = path.split('.');
-  let value: any = colors;
+  let value: unknown = colors;
 
   for (const key of keys) {
-    value = value[key];
+    if (typeof value === 'object' && value !== null && key in value) {
+      value = (value as Record<string, unknown>)[key];
+    } else {
+      throw new Error(`Color not found: ${path}`);
+    }
     if (value === undefined) {
       throw new Error(`Color not found: ${path}`);
     }

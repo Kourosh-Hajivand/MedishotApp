@@ -1,11 +1,11 @@
 /** @format */
 
 import { useState, useEffect } from "react";
-type props = {
- value: any;
+type props<T> = {
+ value: T;
  Delay: number;
 };
-function useDebounce({ value, Delay }: props) {
+function useDebounce<T>({ value, Delay }: props<T>) {
  const [debouncedValue, setDebouncedValue] = useState(value);
  useEffect(() => {
   const debounce = setTimeout(() => {

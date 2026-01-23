@@ -55,9 +55,15 @@ export function adjustmentsToCSSFilter(adjustments: AdjustChange | null): string
 export function getAdjustmentOverlays(adjustments: AdjustChange | null) {
     if (!adjustments) return [];
 
+    interface AdjustmentConfig {
+        intensity?: number;
+        range?: [number, number];
+        [key: string]: unknown;
+    }
+
     const overlays: Array<{
         type: "brightness" | "contrast" | "saturation" | "warmth" | "highlights" | "shadows";
-        config: any;
+        config: AdjustmentConfig;
     }> = [];
 
     // Brightness

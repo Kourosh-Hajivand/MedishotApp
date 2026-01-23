@@ -39,7 +39,7 @@ export interface ExternalIds {
 
 export interface Metadata {
   wheelchair_accessible?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface FeatureProperties {

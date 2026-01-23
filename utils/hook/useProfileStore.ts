@@ -51,7 +51,7 @@ export async function persistProfileSelection() {
 
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch (error) {
-        console.error("خطا در ذخیره انتخاب profile:", error);
+        // Error handled silently
     }
 }
 
@@ -76,7 +76,7 @@ async function initializeDefaultSelection(practiceList?: Practice[]) {
             }),
         );
     } catch (error) {
-        console.error("خطا در ذخیره وضعیت پیش‌فرض profile:", error);
+        // Error handled silently
     }
 }
 
@@ -115,7 +115,6 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
                 await persistProfileSelection();
             }
         } catch (error) {
-            console.error("خطا در دریافت اطلاعات کامل practice:", error);
             // If fetch fails, keep the practice data we already have
         }
     },
@@ -144,7 +143,7 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
         try {
             await AsyncStorage.removeItem(STORAGE_KEY);
         } catch (error) {
-            console.error("خطا در حذف انتخاب practice:", error);
+            // Error handled silently
         }
     },
 }));
@@ -154,13 +153,11 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
 
     // اگر در حال لود است، از فراخوانی مکرر جلوگیری کن
     if (currentState.isLoading) {
-        console.log("Already loading, skipping...");
         return;
     }
 
     // اگر practiceList وجود ندارد، صبر کن تا لود شود
     if (!practiceList || practiceList.length === 0) {
-        console.log("Practice list not available yet, skipping...");
         return;
     }
 
@@ -169,34 +166,28 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
     if (currentState.isLoaded && currentState.selectedPractice) {
         const isValidPractice = practiceList.some((p) => p.id === currentState.selectedPractice?.id);
         if (isValidPractice) {
-            console.log("Already loaded with valid practice, keeping it...");
             // Practice معتبر است، آن را نگه دار
             // Doctor را reset نکن چون practice عوض نشده است
             return;
         } else {
-            console.log("Stored practice is no longer valid, reloading...");
             useProfileStore.setState({ isLoaded: false });
         }
     }
 
     // اگر isLoaded است اما selectedPractice وجود ندارد، isLoaded را reset کن
     if (currentState.isLoaded && !currentState.selectedPractice) {
-        console.log("Resetting isLoaded because selectedPractice is null");
         useProfileStore.setState({ isLoaded: false });
     }
 
     try {
-        console.log("loadProfileSelection called with:", practiceList);
         useProfileStore.setState({ isLoading: true });
 
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        console.log("stored data:", stored);
 
         if (stored) {
             const parsed = JSON.parse(stored) as Partial<StoredProfileSelection> & { selectedProfile?: unknown; settingView?: unknown };
 
             if (parsed.selectedProfile !== undefined || parsed.settingView !== undefined || !parsed.viewMode) {
-                console.log("Old data structure detected, recreating default state");
                 await AsyncStorage.removeItem(STORAGE_KEY);
                 await initializeDefaultSelection(practiceList);
             } else {
@@ -208,7 +199,6 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 if (selectedPractice) {
                     const isValidPractice = practiceList.some((p) => p.id === selectedPractice?.id);
                     if (!isValidPractice) {
-                        console.log("Stored practice is no longer valid, selecting default");
                         selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                         viewMode = determineDefaultViewMode(selectedPractice);
                         needsPersistence = true;
@@ -218,7 +208,6 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 } else {
                     // فقط اگر هیچ پرکتیسی در store نبود (کاربر تازه وارد شده)، اولین پرکتیس را انتخاب کن
                     if (practiceList && practiceList.length > 0) {
-                        console.log("No stored practice found, selecting first practice");
                         selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                         viewMode = determineDefaultViewMode(selectedPractice);
                         needsPersistence = true;
@@ -249,7 +238,6 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
             await initializeDefaultSelection(practiceList);
         }
     } catch (error) {
-        console.error("خطا در بارگذاری انتخاب practice:", error);
         // در صورت خطا، اولین پرکتیس را انتخاب کن
         if (practiceList && practiceList.length > 0) {
             const defaultPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
@@ -289,8 +277,6 @@ export const validateAndSetDefaultSelection = async (practiceList?: Practice[]) 
 };
 
 export const forceReloadProfileSelection = async (practiceList?: Practice[]) => {
-    console.log("Force reloading profile selection...");
-
     // Reset the store state
     useProfileStore.setState({
         selectedPractice: null,
@@ -303,7 +289,7 @@ export const forceReloadProfileSelection = async (practiceList?: Practice[]) => 
     try {
         await AsyncStorage.removeItem(STORAGE_KEY);
     } catch (error) {
-        console.error("خطا در حذف داده‌های ذخیره شده:", error);
+        // Error handled silently
     }
 
     // Load fresh selection

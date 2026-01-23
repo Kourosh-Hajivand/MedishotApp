@@ -2,9 +2,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { StorageKeys } from "../../models/enums";
 
-// Flag to log tokens only once
-let hasLoggedTokens = false;
-
 const setItemWithFallback = async (key: string, value: string) => {
     const isSecureStoreAvailable = await SecureStore.isAvailableAsync();
 
@@ -13,14 +10,13 @@ const setItemWithFallback = async (key: string, value: string) => {
             await SecureStore.setItemAsync(key, value);
             return;
         } catch (secureError) {
-            console.warn("SecureStore setItemAsync failed, falling back to AsyncStorage", secureError);
+            // SecureStore failed, falling back to AsyncStorage
         }
     }
 
     try {
         await AsyncStorage.setItem(key, value);
     } catch (asyncStorageError) {
-        console.error("AsyncStorage setItem failed", asyncStorageError);
         throw asyncStorageError;
     }
 };
@@ -35,14 +31,13 @@ const getItemWithFallback = async (key: string) => {
                 return value;
             }
         } catch (secureError) {
-            console.warn("SecureStore getItemAsync failed, falling back to AsyncStorage", secureError);
+            // SecureStore failed, falling back to AsyncStorage
         }
     }
 
     try {
         return await AsyncStorage.getItem(key);
     } catch (asyncStorageError) {
-        console.error("AsyncStorage getItem failed", asyncStorageError);
         return null;
     }
 };
@@ -55,14 +50,13 @@ const removeItemWithFallback = async (key: string) => {
             await SecureStore.deleteItemAsync(key);
             return;
         } catch (secureError) {
-            console.warn("SecureStore deleteItemAsync failed, falling back to AsyncStorage", secureError);
+            // SecureStore failed, falling back to AsyncStorage
         }
     }
 
     try {
         await AsyncStorage.removeItem(key);
     } catch (asyncStorageError) {
-        console.error("AsyncStorage removeItem failed", asyncStorageError);
         throw asyncStorageError;
     }
 };
@@ -72,23 +66,11 @@ const removeItemWithFallback = async (key: string) => {
  */
 export const storeTokens = async (accessToken: string, refreshToken?: string): Promise<void> => {
     try {
-        // Log tokens only once
-        if (!hasLoggedTokens) {
-            console.log("💾 [storeTokens] Storing Access Token:", accessToken ? `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}` : "null");
-            console.log("💾 [storeTokens] Full Access Token:", accessToken);
-            if (refreshToken) {
-                console.log("💾 [storeTokens] Storing Refresh Token:", refreshToken ? `${refreshToken.substring(0, 20)}...${refreshToken.substring(refreshToken.length - 10)}` : "null");
-                console.log("💾 [storeTokens] Full Refresh Token:", refreshToken);
-            }
-            hasLoggedTokens = true;
-        }
-        
         await setItemWithFallback(StorageKeys.token, accessToken);
         if (refreshToken) {
             await setItemWithFallback(StorageKeys.refreshToken, refreshToken);
         }
     } catch (error) {
-        console.error("Error storing tokens:", error);
         throw new Error("Failed to store tokens");
     }
 };
@@ -104,21 +86,11 @@ export const getTokens = async (): Promise<{
         const accessToken = await getItemWithFallback(StorageKeys.token);
         const refreshToken = await getItemWithFallback(StorageKeys.refreshToken);
         
-        // Log tokens only once
-        if (!hasLoggedTokens) {
-            console.log("🔑 [getTokens] Access Token:", accessToken ? `${accessToken.substring(0, 20)}...${accessToken.substring(accessToken.length - 10)}` : "null");
-            console.log("🔑 [getTokens] Refresh Token:", refreshToken ? `${refreshToken.substring(0, 20)}...${refreshToken.substring(refreshToken.length - 10)}` : "null");
-            console.log("🔑 [getTokens] Full Access Token:", accessToken);
-            console.log("🔑 [getTokens] Full Refresh Token:", refreshToken);
-            hasLoggedTokens = true;
-        }
-        
         return {
             accessToken,
             refreshToken,
         };
     } catch (error) {
-        console.error("Error retrieving tokens:", error);
         return { accessToken: null, refreshToken: null };
     }
 };
@@ -131,7 +103,6 @@ export const removeTokens = async (): Promise<void> => {
         await removeItemWithFallback(StorageKeys.token);
         await removeItemWithFallback(StorageKeys.refreshToken);
     } catch (error) {
-        console.error("Error removing tokens:", error);
         throw new Error("Failed to remove tokens");
     }
 };

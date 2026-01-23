@@ -48,7 +48,7 @@ const createEmptyAddressValue = (): AddressValue => ({
     country: "United States",
 });
 
-const normalizeAddressValue = (address: any): AddressValue => {
+const normalizeAddressValue = (address: string | AddressValue | { value?: string | AddressValue } | null | undefined): AddressValue => {
     const base = createEmptyAddressValue();
 
     if (!address) {
@@ -133,15 +133,21 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const [hasAppliedScannedData, setHasAppliedScannedData] = useState(false); // Track if scanned data has been applied
     const [idCardImage, setIdCardImage] = useState<string | null>(null);
     const [idCardFilename, setIdCardFilename] = useState<string | null>(null);
+    interface DynamicFieldItem {
+        id: string;
+        label: string;
+        value: string | AddressValue;
+    }
+
     // States for dynamic inputs
-    const [phones, setPhones] = useState<any[]>([]);
-    const phonesRef = useRef<any[]>([]);
-    const [emails, setEmails] = useState<any[]>([]);
-    const emailsRef = useRef<any[]>([]);
-    const [addresses, setAddresses] = useState<any[]>([]);
-    const addressesRef = useRef<any[]>([]);
-    const [urls, setUrls] = useState<any[]>([]);
-    const urlsRef = useRef<any[]>([]);
+    const [phones, setPhones] = useState<DynamicFieldItem[]>([]);
+    const phonesRef = useRef<DynamicFieldItem[]>([]);
+    const [emails, setEmails] = useState<DynamicFieldItem[]>([]);
+    const emailsRef = useRef<DynamicFieldItem[]>([]);
+    const [addresses, setAddresses] = useState<DynamicFieldItem[]>([]);
+    const addressesRef = useRef<DynamicFieldItem[]>([]);
+    const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
+    const urlsRef = useRef<DynamicFieldItem[]>([]);
 
     const {
         control,
@@ -259,15 +265,16 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response) => {
             // Handle both wrapped and unwrapped response structures
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
-            console.log("📸 [uploadImage] Success - Filename received:", filename);
+            interface TempUploadResponse {
+                filename?: string;
+                data?: { filename?: string };
+            }
+            const tempResponse = response as TempUploadResponse | { data: TempUploadResponse };
+            const filename = ("data" in tempResponse ? tempResponse.data?.filename : (response as TempUploadResponse).filename) || null;
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
-            console.log("📸 [uploadImage] State updated - uploadedFilename:", filename, "ref:", uploadedFilenameRef.current);
         },
         (error) => {
-            console.error("❌ [uploadImage] Error:", error);
             setLocalImageUri(null);
             setUploadedFilename(null);
         },
@@ -276,8 +283,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const { mutate: uploadIdCardImage, isPending: isUploadingIdCard } = useTempUpload(
         (response) => {
             // Handle both wrapped and unwrapped response structures
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            interface TempUploadResponse {
+                filename?: string;
+                data?: { filename?: string };
+            }
+            const tempResponse = response as TempUploadResponse | { data: TempUploadResponse };
+            const filename = ("data" in tempResponse ? tempResponse.data?.filename : (response as TempUploadResponse).filename) || null;
             setIdCardFilename(filename);
         },
         (error) => {
@@ -317,11 +328,17 @@ export const AddPatientPhotoScreen: React.FC = () => {
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : "image/jpeg";
 
-                    const file = {
+                    interface FileUpload {
+                        uri: string;
+                        type: string;
+                        name: string;
+                    }
+
+                    const file: FileUpload = {
                         uri: params.scannedImageUri,
                         type,
                         name: filename,
-                    } as any;
+                    };
 
                     // Upload the scanned ID card image
                     uploadIdCardImage(file);
@@ -395,8 +412,13 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
 
             if (patientData?.numbers && patientData?.numbers?.length > 0) {
+                interface PhoneItem {
+                    type?: string;
+                    value: string;
+                }
+
                 const phoneData = patientData.numbers
-                    .map((phone: any, index: number) => {
+                    .map((phone: PhoneItem, index: number) => {
                         if (!phone || !phone.value) return null;
 
                         const phoneValue = String(phone.value).trim();
@@ -407,20 +429,20 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         if (e164Value) {
                             return {
                                 id: `phone-${index}`,
-                                label: phone.type,
+                                label: phone.type || "Mobile",
                                 value: e164Value,
                             };
                         }
                         return null;
                     })
-                    .filter((phone: any) => phone !== null);
+                    .filter((phone): phone is { id: string; label: string; value: string } => phone !== null);
                 setPhones(phoneData);
                 phonesRef.current = phoneData;
             }
 
             if (patientData?.email) {
                 if (Array.isArray(patientData.email)) {
-                    const emailData = patientData.email.map((email: any, index: number) => ({
+                    const emailData = patientData.email.map((email: string, index: number) => ({
                         id: `email-${index}`,
                         label: "Personal",
                         value: email,
@@ -438,7 +460,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
 
             if (patientData?.addresses && patientData?.addresses?.length > 0) {
-                const addressData = patientData.addresses.map((address: any, index: number) => {
+                interface AddressItem {
+                    type?: string;
+                    value?: string | AddressValue;
+                }
+
+                const addressData = patientData.addresses.map((address: AddressItem | string, index: number) => {
                     const label = typeof address === "object" && address?.type ? address.type : "Home";
                     const valueSource = typeof address === "object" && "value" in address ? address.value : address;
                     return {
@@ -451,7 +478,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
 
             if (patientData?.links && patientData?.links?.length > 0) {
-                const linkData = patientData.links.map((link: any, index: number) => {
+                interface LinkItem {
+                    type?: string;
+                    value?: string;
+                }
+
+                const linkData = patientData.links.map((link: LinkItem | string, index: number) => {
                     if (typeof link === "string") {
                         return {
                             id: `link-${index}`,
@@ -571,23 +603,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
         const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
         const originalImageUrl = patient?.data?.profile_image?.url || null;
 
-        // Debug logging
-        console.log("📸 [onSubmit] Image Debug:", {
-            isEditMode,
-            localImageUri: !!localImageUri,
-            uploadedFilename,
-            uploadedFilenameRef: uploadedFilenameRef.current,
-            currentUploadedFilename,
-            originalImageUrl,
-        });
-
         // Only include image if:
         // 1. In create mode and we have an uploaded filename (new image selected)
         // 2. In edit mode: if we have a new uploaded filename that's different from original, or if localImageUri exists (user selected new image)
         if (!isEditMode && currentUploadedFilename) {
             // Create mode: include image if we have one
             patientData.image = currentUploadedFilename;
-            console.log("✅ [onSubmit] Image added to patientData (create mode):", currentUploadedFilename);
         } else if (isEditMode) {
             // Edit mode: include image if:
             // - User selected a new image (localImageUri exists) AND we have uploadedFilename
@@ -597,20 +618,13 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
             if (hasNewImage || hasDifferentUploadedImage) {
                 patientData.image = currentUploadedFilename;
-                console.log("✅ [onSubmit] Image added to patientData (edit mode):", currentUploadedFilename);
-            } else {
-                console.log("⚠️ [onSubmit] Edit mode - no new image to upload");
             }
-        } else {
-            console.log("⚠️ [onSubmit] Image not added - conditions not met");
         }
 
         if (idCardFilename) {
             patientData.id_card = idCardFilename;
         }
 
-        // Log request body being sent to backend
-        console.log("📤 Request Body:", JSON.stringify(patientData, null, 2));
 
         if (isEditMode && params.id) {
             updatePatient(
@@ -630,7 +644,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         router.dismissAll();
                         // Use setTimeout to ensure dismissAll completes before navigation
                         setTimeout(() => {
-                            router.replace(`/patients/${data.data.id}` as any);
+                            router.replace(`/patients/${data.data.id}`);
                         }, 100);
                     }
                 },
@@ -726,11 +740,17 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : "image/jpeg";
 
-                const file = {
+                interface FileUpload {
+                    uri: string;
+                    type: string;
+                    name: string;
+                }
+
+                const file: FileUpload = {
                     uri,
                     type,
                     name: filename,
-                } as any;
+                };
 
                 uploadImage(file);
             } catch (err) {
@@ -761,11 +781,17 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : "image/jpeg";
 
-                const file = {
+                interface FileUpload {
+                    uri: string;
+                    type: string;
+                    name: string;
+                }
+
+                const file: FileUpload = {
                     uri,
                     type,
                     name: filename,
-                } as any;
+                };
 
                 uploadImage(file);
             } catch (err) {

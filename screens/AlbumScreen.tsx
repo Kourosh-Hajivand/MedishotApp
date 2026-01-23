@@ -9,7 +9,7 @@ import { useBookmarkMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
 import { useGetPatients } from "@/utils/hook/usePatient";
 import { useGetPracticeAlbums } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { Gost, Media, PatientMediaAlbum } from "@/utils/service/models/ResponseModels";
+import { Gost, Media, PatientMedia, PatientMediaAlbum, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -42,9 +42,9 @@ export const AlbumScreen: React.FC = () => {
     const albums = useMemo(() => {
         if (!albumsData?.data || !Array.isArray(albumsData.data)) return [];
         // Check if data is an array of PatientMediaAlbum (has gost and media properties)
-        const data = albumsData.data as unknown as any[];
+        const data = albumsData.data as unknown as PatientMediaAlbum[];
         if (data.length > 0 && data[0]?.gost && data[0]?.media) {
-            return data as unknown as PatientMediaAlbum[];
+            return data;
         }
         return [];
     }, [albumsData?.data]);
@@ -52,13 +52,37 @@ export const AlbumScreen: React.FC = () => {
     // Extract raw media data for GalleryWithMenu (for template media support)
     const rawMediaData = useMemo(() => {
         if (!albums?.length) return [];
-        const mediaArray: any[] = [];
+        interface RawMediaDataItem {
+            id: number | string;
+            template?: {
+                id: number | string;
+                [key: string]: unknown;
+            } | null;
+            original_media?: {
+                url: string;
+                [key: string]: unknown;
+            } | null;
+            [key: string]: unknown;
+        }
+
+        const mediaArray: RawMediaDataItem[] = [];
         albums.forEach((album) => {
             if (album.media?.length) {
-                album.media.forEach((mediaItem: any) => {
-                    // Only include media with template and original_media
-                    if (mediaItem?.template && mediaItem?.original_media) {
-                        mediaArray.push(mediaItem);
+                album.media.forEach((mediaItem) => {
+                    // Type guard: check if mediaItem has template property
+                    // PatientMedia can have template in data field or as extended property
+                    const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
+                    const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === 'object' && 'template' in mediaWithTemplate.data);
+                    if (hasTemplate && mediaWithTemplate.original_media?.url) {
+                        mediaArray.push({
+                            id: mediaItem.id,
+                            template: mediaWithTemplate.template ? {
+                                id: (mediaWithTemplate.template as { id?: number | string }).id || mediaItem.id,
+                            } as { id: number | string; [key: string]: unknown } : null,
+                            original_media: mediaWithTemplate.original_media ? {
+                                url: mediaWithTemplate.original_media.url,
+                            } : null,
+                        });
                     }
                 });
             }
@@ -83,41 +107,48 @@ export const AlbumScreen: React.FC = () => {
 
         // Then, collect all images from all albums and group by gost_id
         albums.forEach((album) => {
-            album.media.forEach((mediaItem: any) => {
+            album.media.forEach((mediaItem) => {
                 // Extract patientId from first media item
                 if (!patientId && mediaItem.patient_id) {
                     patientId = mediaItem.patient_id;
                 }
 
+                // Type guard: check if mediaItem has template property
+                // PatientMedia can have template in data field or as extended property
+                const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
+                const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === 'object' && 'template' in mediaWithTemplate.data);
+
                 // If media has a template, only show original_media in gallery (not individual images)
-                if (mediaItem.template && mediaItem.original_media?.url) {
+                if (hasTemplate && mediaItem.original_media?.url) {
                     // Find the gost_id from template images to determine which gost this belongs to
-                    if (mediaItem.images && Array.isArray(mediaItem.images) && mediaItem.images.length > 0) {
-                        const firstImageGostId = mediaItem.images[0]?.gost_id;
+                    // PatientMediaWithTemplate has images array with gost_id
+                    if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images) && mediaWithTemplate.images.length > 0) {
+                        const firstImage = mediaWithTemplate.images[0];
+                        const firstImageGostId = firstImage?.gost?.id;
                         if (firstImageGostId && gostMap.has(firstImageGostId)) {
                             const mediaObj: Media = {
-                                id: mediaItem.id || Date.now(),
+                                id: mediaItem.id,
                                 url: mediaItem.original_media.url,
-                                created_at: mediaItem.created_at,
-                                updated_at: mediaItem.updated_at,
+                                created_at: mediaItem.created_at || "",
+                                updated_at: mediaItem.created_at || "",
                             };
                             gostMap.get(firstImageGostId)!.photos.push(mediaObj);
                         }
                     }
-                } else if (mediaItem.images && Array.isArray(mediaItem.images)) {
+                } else if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
                     // For non-template media, show all images
-                    mediaItem.images.forEach((imageItem: any) => {
-                        const imageGostId = imageItem.gost_id;
-                        if (imageGostId && imageItem.image && gostMap.has(imageGostId)) {
+                    mediaWithTemplate.images.forEach((imageItem: typeof mediaWithTemplate.images[0]) => {
+                        const imageGostId = imageItem?.gost?.id;
+                        if (imageGostId && imageItem?.image && gostMap.has(imageGostId)) {
                             // Add the image Media object
-                            const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url || imageItem.image;
+                            const imageUrl = typeof imageItem.image === "string" ? imageItem.image : null;
 
                             if (imageUrl) {
                                 const mediaObj: Media = {
-                                    id: imageItem.image?.id || imageItem.id || Date.now(),
+                                    id: imageItem.id || Date.now(),
                                     url: imageUrl,
                                     created_at: imageItem.created_at,
-                                    updated_at: imageItem.updated_at,
+                                    updated_at: imageItem.updated_at || imageItem.created_at,
                                 };
                                 gostMap.get(imageGostId)!.photos.push(mediaObj);
                             }
@@ -363,7 +394,10 @@ export const AlbumScreen: React.FC = () => {
 
     // Show error state if there's an error
     if (isAlbumsError) {
-        const errorMessage = (albumsError as any)?.message || "Failed to load albums. Please try again.";
+        interface ErrorWithMessage {
+            message?: string;
+        }
+        const errorMessage = (albumsError as ErrorWithMessage)?.message || "Failed to load albums. Please try again.";
         return (
             <View style={styles.errorContainer}>
                 <IconSymbol name="exclamationmark.triangle.fill" size={48} color={colors.system.red} />
@@ -601,9 +635,10 @@ export const AlbumScreen: React.FC = () => {
                                                 message: message,
                                                 url: imageUri,
                                             });
-                                        } catch (error: any) {
+                                        } catch (error: unknown) {
                                             // Only show error if user didn't cancel the share action
-                                            if (error?.message !== "User did not share") {
+                                            const shareError = error as { message?: string };
+                                            if (shareError?.message !== "User did not share") {
                                                 Alert.alert("Error", "Failed to share image");
                                             }
                                         }

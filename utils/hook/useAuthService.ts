@@ -28,7 +28,8 @@ export const useGetMe = (enabled: boolean = true, tokens?: { accessToken: string
         enabled: isAuthenticated && enabled && !isTokensLoading,
         retry: (failureCount, error) => {
             // اگر 401 یا 403 باشد، retry نکن
-            const status = (error as any)?.response?.status;
+            const axiosError = error as AxiosError;
+            const status = axiosError?.response?.status;
             if (status === 401 || status === 403) {
                 return false;
             }

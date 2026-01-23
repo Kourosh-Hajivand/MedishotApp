@@ -17,7 +17,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaListResponse> = await axiosInstance.get(baseUrl + getMedia(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in GetPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patient media failed");
             }
@@ -31,7 +30,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaAlbumsResponse> = await axiosInstance.get(baseUrl + getMediaAlbums(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in GetPatientMediaAlbums:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patient media albums failed");
             }
@@ -51,7 +49,6 @@ const MediaService = {
             });
             return response.data;
         } catch (error) {
-            console.error("Error in UploadPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Upload patient media failed");
             }
@@ -85,30 +82,11 @@ const MediaService = {
                 }
             });
 
-            // Log FormData contents before sending
-            console.log("📤 [MediaService] ========== FORM DATA BEING SENT TO BACKEND ==========");
-            console.log("📤 [MediaService] URL:", baseUrl + uploadMediaWithTemplate(patientId));
-            console.log("📤 [MediaService] Patient ID:", patientId);
-            console.log("📤 [MediaService] Template ID:", payload.template_id);
-            console.log("📤 [MediaService] Type:", payload.type || "undefined");
-            console.log("📤 [MediaService] Media (composite):", payload.media || "undefined");
-            console.log("📤 [MediaService] Data:", payload.data || "undefined");
-            console.log("📤 [MediaService] Images count:", payload.images.length);
-            payload.images.forEach((img, idx) => {
-                console.log(`📤 [MediaService]   Image ${idx + 1}:`, {
-                    gost_id: img.gost_id,
-                    media: typeof img.media === "string" ? img.media : "[File/Object]",
-                    notes: img.notes || "undefined",
-                });
-            });
-            console.log("📤 [MediaService] ====================================================");
-
             const response: AxiosResponse<PatientMediaWithTemplateResponse> = await axiosInstance.post(baseUrl + uploadMediaWithTemplate(patientId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
         } catch (error) {
-            console.error("Error in UploadPatientMediaWithTemplate:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Upload patient media with template failed");
             }
@@ -121,7 +99,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaDeleteResponse> = await axiosInstance.delete(baseUrl + deleteMedia(patientId, mediaId));
             return response.data;
         } catch (error) {
-            console.error("Error in DeletePatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Delete patient media failed");
             }
@@ -133,7 +110,7 @@ const MediaService = {
     tempUpload: async (file: File | { uri: string; type: string; name: string }): Promise<TempUploadResponse> => {
         try {
             const formData = new FormData();
-            formData.append("file", file as any);
+            formData.append("file", file as File | Blob);
 
             const response: AxiosResponse<any> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
@@ -145,9 +122,6 @@ const MediaService = {
             return tempUploadResponse;
         } catch (error) {
             if (axios.isAxiosError(error)) {
-                if (__DEV__) {
-                    console.error("Error in tempUpload:", error);
-                }
                 if (error.response) {
                     throw new Error(error.response.data.message || "Temporary upload failed");
                 }
@@ -162,7 +136,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaTrashResponse> = await axiosInstance.get(baseUrl + getTrashMedia(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in GetTrashMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get trash media failed");
             }
@@ -175,7 +148,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaRestoreResponse> = await axiosInstance.post(baseUrl + restoreMedia(mediaId));
             return response.data;
         } catch (error) {
-            console.error("Error in RestoreMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Restore media failed");
             }
@@ -194,7 +166,6 @@ const MediaService = {
             });
             return response.data;
         } catch (error) {
-            console.error("Error in EditPatientMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Edit patient media failed");
             }
@@ -208,7 +179,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaBookmarkResponse> = await axiosInstance.post(baseUrl + bookmarkMedia(mediaId));
             return response.data;
         } catch (error) {
-            console.error("Error in BookmarkMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Bookmark media failed");
             }
@@ -222,7 +192,6 @@ const MediaService = {
             const response: AxiosResponse<PatientMediaBookmarkResponse> = await axiosInstance.delete(baseUrl + unbookmarkMedia(mediaId));
             return response.data;
         } catch (error) {
-            console.error("Error in UnbookmarkMedia:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Unbookmark media failed");
             }

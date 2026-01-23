@@ -1,4 +1,4 @@
-import { BottomSheetBackdrop, BottomSheetModal } from "@gorhom/bottom-sheet";
+import { BottomSheetBackdrop, BottomSheetModal, BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
 import { ResizeMode, Video } from "expo-av";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
@@ -15,7 +15,7 @@ export const WelcomeScreen: React.FC = () => {
     const handleContinue = () => {
         router.push("/(auth)/login");
     };
-    const renderBackdrop = useCallback((props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
+    const renderBackdrop = useCallback((props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
 
     useEffect(() => {
         const backHandler = BackHandler.addEventListener("hardwareBackPress", () => {

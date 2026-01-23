@@ -6,14 +6,21 @@ import { BaseButton, BaseText, KeyboardAwareScrollView } from "../components";
 import { spacing } from "../styles/spaces";
 import colors from "../theme/colors.shared.js";
 
+interface PatientReviewData {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    age?: string;
+    notes?: string;
+}
+
 export const AddPatientReviewScreen: React.FC = () => {
     const params = useLocalSearchParams<{ patientData?: string; photoUri?: string }>();
-    const patientData = params.patientData ? JSON.parse(params.patientData as string) : ({} as any);
+    const patientData: PatientReviewData = params.patientData ? JSON.parse(params.patientData) : {};
     const photoUri = params.photoUri as string | undefined;
 
     const handleSubmit = () => {
         // TODO: Submit patient data to API
-        console.log("Submitting patient data:", { patientData, photoUri });
 
         // Close modal and go back to main screen
         router.back();

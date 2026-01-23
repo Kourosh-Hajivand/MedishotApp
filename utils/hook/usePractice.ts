@@ -84,28 +84,20 @@ export const useGetPatientArchivedMedia = (practiceId: number, patientId: string
         select: (data) => {
             // Filter archived photos for the specific patient
             if (!data?.data) {
-                console.log("useGetPatientArchivedMedia: No data received");
                 return data;
             }
 
-            console.log("useGetPatientArchivedMedia: Raw data received:", data.data.length, "items");
-            console.log("useGetPatientArchivedMedia: Filtering for patientId:", patientId, "type:", typeof patientId);
+            interface MediaItem {
+                patient_id?: number | string;
+            }
 
             const patientIdNum = Number(patientId);
             const patientIdStr = String(patientId);
 
-            const filteredData = data.data.filter((media: any) => {
+            const filteredData = data.data.filter((media: MediaItem) => {
                 const mediaPatientId = media.patient_id;
-                const matches = mediaPatientId === patientIdNum || mediaPatientId === patientIdStr || String(mediaPatientId) === patientIdStr || Number(mediaPatientId) === patientIdNum;
-
-                if (!matches) {
-                    console.log("useGetPatientArchivedMedia: Filtered out item - media.patient_id:", mediaPatientId, "type:", typeof mediaPatientId, "target:", patientId);
-                }
-
-                return matches;
+                return mediaPatientId === patientIdNum || mediaPatientId === patientIdStr || String(mediaPatientId) === patientIdStr || Number(mediaPatientId) === patientIdNum;
             });
-
-            console.log("useGetPatientArchivedMedia: Filtered data:", filteredData.length, "items");
 
             return {
                 ...data,

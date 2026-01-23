@@ -16,7 +16,18 @@ export const AddPatientFormScreen: React.FC = () => {
 
     const [scannedImage, setScannedImage] = useState<string | null>(null);
     const [extractedText, setExtractedText] = useState<string | null>(null);
-    const [parsedData, setParsedData] = useState<any>(null);
+    interface ParsedIDData {
+        firstName?: string;
+        lastName?: string;
+        birthDate?: string;
+        gender?: string;
+        idNumber?: string;
+        address?: string;
+        phone?: string;
+        email?: string;
+    }
+
+    const [parsedData, setParsedData] = useState<ParsedIDData | null>(null);
 
     const scanDocument = async () => {
         try {
@@ -26,9 +37,6 @@ export const AddPatientFormScreen: React.FC = () => {
 
             if (scannedImages && scannedImages.length > 0) {
                 // Only take the first image (ensure only 1 image is used)
-                if (scannedImages.length > 1) {
-                    console.warn(`⚠️ [scanDocument] Received ${scannedImages.length} images, using only the first one`);
-                }
                 const imagePath = scannedImages[0];
                 setScannedImage(imagePath);
 
@@ -37,24 +45,33 @@ export const AddPatientFormScreen: React.FC = () => {
                 const lines = await TextRecognition.recognize(path);
                 const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                 setExtractedText(fullText);
-                console.log("OCR:", fullText);
                 // Parse the extracted data
                 const parsed = parseUSIDCardData(fullText, imagePath);
                 setParsedData(parsed);
-                console.log("Parsed ID Card Data:", parsed);
-            } else {
-                console.warn("⚠️ [scanDocument] No images scanned");
             }
         } catch (error) {
-            console.error("Document scan or OCR failed:", error);
-            // setExtractedText('OCR failed. Please try a clearer scan.');
+            // Error handled silently
         }
     };
+
+    interface RouteParams {
+        firstName?: string;
+        lastName?: string;
+        birthDate?: string;
+        gender?: string;
+        idNumber?: string;
+        address?: string;
+        phone?: string;
+        email?: string;
+        scannedImageUri?: string;
+        doctor_id?: string;
+        [key: string]: string | undefined;
+    }
 
     const handleContinue = () => {
         if (parsedData && scannedImage) {
             // Encode the parsed data and image as base64 or pass as params
-            const routeParams: any = {
+            const routeParams: RouteParams = {
                 ...parsedData,
                 scannedImageUri: scannedImage,
             };
@@ -71,7 +88,7 @@ export const AddPatientFormScreen: React.FC = () => {
             });
         } else {
             // If no scan, go to photo screen normally
-            const routeParams: any = {};
+            const routeParams: RouteParams = {};
             if (params.doctor_id) {
                 routeParams.doctor_id = params.doctor_id;
             }
@@ -105,7 +122,7 @@ export const AddPatientFormScreen: React.FC = () => {
                     size="Large"
                     ButtonStyle="Plain"
                     onPress={() => {
-                        const routeParams: any = {};
+                        const routeParams: RouteParams = {};
                         if (params.doctor_id) {
                             routeParams.doctor_id = params.doctor_id;
                         }

@@ -540,7 +540,7 @@ export interface SubscriptionStatus {
         current_doctor_count?: number;
         doctor_limit?: number;
         remaining_doctor_slots?: number;
-        [key: string]: any;
+        [key: string]: unknown;
     };
 
     // Support for practice detail response structure

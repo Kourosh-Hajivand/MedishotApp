@@ -49,7 +49,6 @@ const Mapbox = {
         throw new Error(`Request failed with status ${response.status}`);
       }
     } catch (error) {
-      console.error('Error in Mapbox Search function:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
           error.response.data.message || 'Unknown error occurred',
@@ -82,7 +81,6 @@ const Mapbox = {
         throw new Error(`Request failed with status ${response.status}`);
       }
     } catch (error) {
-      console.error('Error in Mapbox Retrieve function:', error);
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(
           error.response.data.message || 'Unknown error occurred',

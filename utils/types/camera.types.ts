@@ -1,10 +1,12 @@
 // Camera Flow Types
 
+import { ImageSource } from "expo-image";
+
 export interface PhotoTemplate {
     id: string;
     name: string;
     category: "face" | "teeth" | "body" | "custom";
-    overlayImage: any; // require() image or URI
+    overlayImage: ImageSource; // require() image or URI
     description?: string;
     isCustom?: boolean;
 }

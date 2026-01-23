@@ -35,7 +35,6 @@ const PatientService = {
             const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
-            console.error("Error in GetPatients:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patients failed");
             }
@@ -58,7 +57,6 @@ const PatientService = {
             const response: AxiosResponse<DoctorPatientsResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
-            console.error("Error in GetDoctorPatients:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get doctor patients failed");
             }
@@ -125,17 +123,8 @@ const PatientService = {
 
             // OpenAPI expects `profile` - keep backward compatibility with `image`
             const profile = payload.profile ?? payload.image;
-            console.log("📤 [CreatePatient] Profile/Image check:", {
-                hasProfile: !!payload.profile,
-                hasImage: !!payload.image,
-                profileValue: profile,
-                profileType: typeof profile,
-            });
             if (profile) {
                 formData.append("profile", profile);
-                console.log("✅ [CreatePatient] Profile added to formData:", profile);
-            } else {
-                console.log("⚠️ [CreatePatient] No profile/image to add");
             }
 
             if (payload.id_card) {
@@ -153,7 +142,6 @@ const PatientService = {
             });
             return response.data;
         } catch (error) {
-            console.error("Error in CreatePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Create patient failed");
             }
@@ -166,7 +154,6 @@ const PatientService = {
             const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.get(baseUrl + getById(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in GetPatientById:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patient failed");
             }
@@ -250,7 +237,6 @@ const PatientService = {
             });
             return response.data;
         } catch (error) {
-            console.error("Error in UpdatePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Update patient failed");
             }
@@ -263,7 +249,6 @@ const PatientService = {
             const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteRoute(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in DeletePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Delete patient failed");
             }
@@ -289,7 +274,6 @@ const PatientService = {
             const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {
-            console.error("Error in GetArchivedPatients:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get archived patients failed");
             }
@@ -303,7 +287,6 @@ const PatientService = {
             const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + archive(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in ArchivePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Archive patient failed");
             }
@@ -317,7 +300,6 @@ const PatientService = {
             const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + unarchive(patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in UnarchivePatient:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Unarchive patient failed");
             }
@@ -331,7 +313,6 @@ const PatientService = {
             const response: AxiosResponse<PatientActivitiesResponse> = await axiosInstance.get(baseUrl + getActivities(practiseId, patientId));
             return response.data;
         } catch (error) {
-            console.error("Error in GetPatientActivities:", error);
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Get patient activities failed");
             }

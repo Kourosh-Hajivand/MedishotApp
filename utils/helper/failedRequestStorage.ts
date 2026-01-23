@@ -6,8 +6,8 @@ export interface FailedRequest {
     url: string;
     method: string;
     baseURL?: string;
-    data?: any;
-    params?: any;
+    data?: unknown;
+    params?: unknown;
     headers?: Record<string, string>;
 }
 
@@ -18,7 +18,7 @@ export const storeFailedRequest = async (request: FailedRequest): Promise<void> 
     try {
         await AsyncStorage.setItem(FAILED_REQUEST_KEY, JSON.stringify(request));
     } catch (error) {
-        console.error("Failed to store failed request:", error);
+        // Error handled silently
     }
 };
 
@@ -33,7 +33,6 @@ export const getFailedRequest = async (): Promise<FailedRequest | null> => {
         }
         return null;
     } catch (error) {
-        console.error("Failed to get failed request:", error);
         return null;
     }
 };
@@ -45,6 +44,6 @@ export const clearFailedRequest = async (): Promise<void> => {
     try {
         await AsyncStorage.removeItem(FAILED_REQUEST_KEY);
     } catch (error) {
-        console.error("Failed to clear failed request:", error);
+        // Error handled silently
     }
 };
