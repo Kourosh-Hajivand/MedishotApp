@@ -1,4 +1,4 @@
-import { BackButton, BaseText } from "@/components";
+import { BackButton, BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
@@ -14,8 +14,8 @@ export default function ContractDetailScreen() {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
 
-    const { data: contractData, isLoading: isLoadingContract } = useGetContract(contractId || "", !!contractId);
-    const { data: patientData, isLoading: isLoadingPatient } = useGetPatientById(patientId || "");
+    const { data: contractData, isLoading: isLoadingContract, error: contractError, isError: isContractError, refetch: refetchContract } = useGetContract(contractId || "", !!contractId);
+    const { data: patientData, isLoading: isLoadingPatient, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(patientId || "");
 
     const contract = contractData?.data;
     const patient = patientData?.data;
@@ -30,8 +30,10 @@ export default function ContractDetailScreen() {
                 url: contract.contract_file.url,
                 message: `Contract: ${contract.contract_template?.title || "Contract"}`,
             });
-        } catch (error) {
-            console.error("Error sharing contract:", error);
+        } catch (error: any) {
+            if (error?.message !== "User did not share") {
+                // Silent fail for user cancellation
+            }
         }
     };
 
@@ -56,11 +58,28 @@ export default function ContractDetailScreen() {
     }, [patient, contract, navigation]);
 
     const isLoading = isLoadingContract || isLoadingPatient;
+    const isError = isContractError || isPatientError;
+    const error = contractError || patientError;
 
     if (isLoading) {
         return (
             <View className="flex-1 items-center justify-center bg-system-gray6">
                 <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
+
+    if (isError) {
+        return (
+            <View className="flex-1 items-center justify-center bg-system-gray6">
+                <ErrorState 
+                    message={(error as any)?.message || "Failed to load contract"} 
+                    onRetry={() => {
+                        refetchContract();
+                        refetchPatient();
+                    }} 
+                    title="Failed to load contract"
+                />
             </View>
         );
     }

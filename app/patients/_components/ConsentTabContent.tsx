@@ -1,4 +1,4 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { formatDate } from "@/utils/helper/dateUtils";
@@ -7,8 +7,8 @@ import { router } from "expo-router";
 import React from "react";
 import { ActivityIndicator, Image, ScrollView, TouchableOpacity, View } from "react-native";
 
-export function ConsentTabContent({ patientId }: { patientId: string }) {
-    const { data: contractsData, isLoading } = useGetPatientContracts(patientId, !!patientId);
+export const ConsentTabContent = React.memo(({ patientId }: { patientId: string }) => {
+    const { data: contractsData, isLoading, error, isError, refetch } = useGetPatientContracts(patientId, !!patientId);
     const contracts = contractsData?.data || [];
 
     if (isLoading) {
@@ -16,6 +16,16 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
             <View className="flex-1 items-center justify-center">
                 <ActivityIndicator size="large" color={colors.system.blue} />
             </View>
+        );
+    }
+
+    if (isError) {
+        return (
+            <ErrorState 
+                message={(error as any)?.message || "Failed to load contracts"} 
+                onRetry={refetch} 
+                title="Failed to load contracts"
+            />
         );
     }
 
@@ -77,4 +87,4 @@ export function ConsentTabContent({ patientId }: { patientId: string }) {
             </ScrollView>
         </View>
     );
-}
+});

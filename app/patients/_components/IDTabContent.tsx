@@ -1,10 +1,10 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { PatientDocument } from "@/utils/service/models/ResponseModels";
-import React from "react";
+import React, { useCallback } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,13 +13,16 @@ const { width: screenWidth } = Dimensions.get("window");
 interface IDTabContentProps {
     documents: PatientDocument[];
     isLoading: boolean;
+    error?: Error | null;
+    isError?: boolean;
+    onRetry?: () => void;
     onDocumentPress?: (document: PatientDocument) => void;
 }
 
-export const IDTabContent: React.FC<IDTabContentProps> = ({ documents, isLoading, onDocumentPress }) => {
+export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents, isLoading, error, isError, onRetry, onDocumentPress }) => {
     const insets = useSafeAreaInsets();
 
-    const renderDocumentItem = ({ item }: { item: PatientDocument }) => {
+    const renderDocumentItem = useCallback(({ item }: { item: PatientDocument }) => {
         // Handle both string URL and Media object
         const imageUrl = typeof item.image === "string" ? item.image : item.image?.url;
 
@@ -47,13 +50,23 @@ export const IDTabContent: React.FC<IDTabContentProps> = ({ documents, isLoading
                 </View>
             </TouchableOpacity>
         );
-    };
+    }, [onDocumentPress]);
 
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.system.blue} />
             </View>
+        );
+    }
+
+    if (isError) {
+        return (
+            <ErrorState 
+                message={(error as any)?.message || "Failed to load documents"} 
+                onRetry={onRetry} 
+                title="Failed to load documents"
+            />
         );
     }
 
@@ -74,7 +87,7 @@ export const IDTabContent: React.FC<IDTabContentProps> = ({ documents, isLoading
     const paddingBottom = insets.bottom;
 
     return <FlatList data={documents} renderItem={renderDocumentItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={styles.listContent} contentInsetAdjustmentBehavior="automatic" showsVerticalScrollIndicator={false} numColumns={1} ListFooterComponent={<View style={{ height: paddingBottom }} />} />;
-};
+});
 
 const styles = StyleSheet.create({
     loadingContainer: {

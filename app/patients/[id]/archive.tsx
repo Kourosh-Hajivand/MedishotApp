@@ -1,4 +1,4 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import { useGetTrashMedia, useRestoreMedia } from "@/utils/hook";
 
@@ -23,9 +23,7 @@ export default function PatientArchiveScreen() {
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
 
-    console.log("PatientArchiveScreen: id from params:", id, "type:", typeof id);
-
-    const { data: archivedData, isLoading, refetch } = useGetTrashMedia(id || "", !!id);
+    const { data: archivedData, isLoading, error, isError, refetch } = useGetTrashMedia(id || "", !!id);
 
     const restoreMediaMutation = useRestoreMedia(
         () => {
@@ -42,8 +40,6 @@ export default function PatientArchiveScreen() {
         if (!archivedData?.data || !Array.isArray(archivedData.data)) {
             return [];
         }
-
-        console.log("Archived data received:", archivedData.data.length, "items");
 
         // Map to store images grouped by date with timestamp for sorting
         const imagesByDate = new Map<string, { images: Array<{ url: string; timestamp: number }>; sectionTimestamp: number }>();
@@ -108,14 +104,6 @@ export default function PatientArchiveScreen() {
             .sort((a, b) => b.timestamp - a.timestamp)
             .map(({ title, data }) => ({ title, data })); // Remove timestamp from final result
 
-        console.log(
-            "Gallery sections created:",
-            sections.length,
-            "sections with",
-            sections.reduce((sum, s) => sum + s.data.length, 0),
-            "total images",
-        );
-
         return sections;
     }, [archivedData?.data]);
 
@@ -179,6 +167,12 @@ export default function PatientArchiveScreen() {
                 <View style={styles.centerContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
                 </View>
+            ) : isError ? (
+                <ErrorState 
+                    message={(error as any)?.message || "Failed to load archived photos"} 
+                    onRetry={refetch} 
+                    title="Failed to load archived photos"
+                />
             ) : hasPhotos ? (
                 <GalleryWithMenu
                     menuItems={[
@@ -194,7 +188,6 @@ export default function PatientArchiveScreen() {
                                         url: imageUri,
                                     });
                                 } catch (error: any) {
-                                    console.error("Error sharing image:", error);
                                     if (error?.message !== "User did not share") {
                                         Alert.alert("Error", "Failed to share image");
                                     }

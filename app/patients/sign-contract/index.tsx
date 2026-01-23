@@ -1,4 +1,4 @@
-import { BaseButton, BaseText, PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
+import { BaseButton, BaseText, ErrorState, PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
@@ -46,13 +46,9 @@ export default function SignContractScreen() {
     const { selectedPractice } = useProfileStore();
     const { profile: me } = useAuth();
 
-    const { data: contractTemplate, isLoading: isLoadingTemplate } = useGetContractTemplate(templateId || "", !!templateId);
-    const { data: patientData, isLoading: isLoadingPatient } = useGetPatientById(patientId || "");
-    const { data: practiceData, isLoading: isLoadingPractice } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
-
-    console.log("=============== THIS IS THE CONTRACT TEMPLATE=====================");
-    console.log(contractTemplate?.data);
-    console.log("====================================");
+    const { data: contractTemplate, isLoading: isLoadingTemplate, error: templateError, isError: isTemplateError, refetch: refetchTemplate } = useGetContractTemplate(templateId || "", !!templateId);
+    const { data: patientData, isLoading: isLoadingPatient, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(patientId || "");
+    const { data: practiceData, isLoading: isLoadingPractice, error: practiceError, isError: isPracticeError, refetch: refetchPractice } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
 
     const [signature, setSignature] = useState<string | null>(null);
     const [signatureUri, setSignatureUri] = useState<string | null>(null);
@@ -99,7 +95,6 @@ export default function SignContractScreen() {
 
     const { mutate: uploadSignature, isPending: isUploadingSignature } = useTempUpload(
         (response) => {
-            console.log("Upload response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             // Try to get id first (from backend), then filename (Livewire temp filename)
@@ -109,19 +104,14 @@ export default function SignContractScreen() {
 
             if (isUploadingPDF && fileId) {
                 // If we're uploading PDF, submit contract data immediately
-                console.log("✅ PDF uploaded successfully, submitting contract with fileId:", fileId);
                 submitContractData(String(fileId));
                 setIsUploadingPDF(false);
             } else if (fileId) {
                 // Otherwise it's signature upload
-                console.log("Setting uploadedSignatureFilename:", fileId);
                 setUploadedSignatureFilename(String(fileId));
-            } else {
-                console.error("No id or filename in response:", response);
             }
         },
         (error) => {
-            console.error("Upload error:", error);
             Alert.alert("Error", error.message || "Failed to upload file");
             setIsUploadingPDF(false);
         },
@@ -160,14 +150,12 @@ export default function SignContractScreen() {
     // Function to generate PDF
     const generateContractPDF = useCallback(async (): Promise<string | null> => {
         if (!contractViewRef.current) {
-            console.error("contractViewRef.current is null");
             return null;
         }
 
         try {
             setIsGeneratingPDF(true);
             setIsCapturingView(true); // Show the view for capture
-            console.log("📸 Starting PDF capture...");
 
             // Wait for view to be visible and rendered
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -184,10 +172,8 @@ export default function SignContractScreen() {
                 snapshotContentContainer: false,
             });
 
-            console.log("✅ PDF captured successfully:", uri);
             return uri;
         } catch (error) {
-            console.error("❌ Error generating PDF:", error);
             Alert.alert("Error", "Failed to generate contract PDF: " + (error instanceof Error ? error.message : String(error)));
             return null;
         } finally {
@@ -240,33 +226,6 @@ export default function SignContractScreen() {
                 },
             };
 
-            console.log("========================================");
-            console.log("📤 SUBMITTING CONTRACT REQUEST DATA:");
-            console.log("========================================");
-            console.log("patientId:", requestData.patientId);
-            console.log("contract_template_id:", requestData.data.contract_template_id);
-            console.log("signature_image:", requestData.data.signature_image);
-            console.log("contract_file:", requestData.data.contract_file);
-            console.log("body type:", typeof requestData.data.body);
-            console.log("body length:", requestData.data.body?.length || 0);
-            console.log("body content (raw):", requestData.data.body);
-
-            // Try to parse and pretty print body if it's JSON
-            if (requestData.data.body) {
-                try {
-                    const parsedBody = JSON.parse(requestData.data.body);
-                    console.log("body content (parsed & formatted):");
-                    console.log(JSON.stringify(parsedBody, null, 2));
-                } catch (e) {
-                    console.log("body is not JSON, showing as string:", requestData.data.body);
-                }
-            } else {
-                console.log("body is empty or undefined");
-            }
-
-            console.log("Full requestData object:");
-            console.log(JSON.stringify(requestData, null, 2));
-            console.log("========================================");
 
             createContract(requestData);
         },
@@ -274,18 +233,12 @@ export default function SignContractScreen() {
     );
 
     const handleSubmit = useCallback(async () => {
-        console.log("=============handleSubmit CALLED=======================");
-        console.log("signature:", !!signature, "uploadedSignatureFilename:", uploadedSignatureFilename);
-        console.log("contractViewRef.current:", !!contractViewRef.current);
-
         if (!signature || !uploadedSignatureFilename) {
-            console.log("❌ Validation failed - signature or uploadedSignatureFilename is missing");
             Alert.alert("Error", "Please sign the contract first");
             return;
         }
 
         if (!contractViewRef.current) {
-            console.log("❌ contractViewRef.current is null, waiting...");
             // Wait a bit and try again
             await new Promise((resolve) => setTimeout(resolve, 1000));
             if (!contractViewRef.current) {
@@ -296,16 +249,11 @@ export default function SignContractScreen() {
 
         try {
             // Generate PDF first
-            console.log("📄 Generating PDF...");
             const pdfUri = await generateContractPDF();
-            console.log("📄 PDF URI:", pdfUri);
 
             if (!pdfUri) {
-                console.log("❌ PDF generation failed");
                 return; // Error already shown in generateContractPDF
             }
-
-            console.log("✅ PDF generated, uploading...");
 
             // Upload PDF to temp storage immediately
             setIsUploadingPDF(true);
@@ -318,7 +266,6 @@ export default function SignContractScreen() {
             // Use temp upload for PDF - will trigger submitContractData in uploadSignature callback
             uploadSignature(pdfFile);
         } catch (error) {
-            console.error("❌ Error in handleSubmit:", error);
             Alert.alert("Error", "Failed to process contract: " + (error instanceof Error ? error.message : String(error)));
             setIsUploadingPDF(false);
         }
@@ -326,19 +273,14 @@ export default function SignContractScreen() {
 
     // Setup header with patient info and Done button - MUST be before early returns
     const patient = patientData?.data;
+    const practice = practiceData?.data;
+    const template = contractTemplate?.data;
     const isDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature || isUploadingPDF || isGeneratingPDF;
+    
+    const isLoading = isLoadingTemplate || isLoadingPatient || isLoadingPractice;
+    const isError = isTemplateError || isPatientError || isPracticeError;
+    const error = templateError || patientError || practiceError;
 
-    // Debug logging
-    React.useEffect(() => {
-        console.log("📊 Signature state:", {
-            signature: !!signature,
-            signatureUri: !!signatureUri,
-            uploadedSignatureFilename,
-            isUploadingSignature,
-            isSubmitting,
-            isDoneDisabled,
-        });
-    }, [signature, signatureUri, uploadedSignatureFilename, isUploadingSignature, isSubmitting, isDoneDisabled]);
 
     useLayoutEffect(() => {
         if (!patient) {
@@ -382,8 +324,6 @@ export default function SignContractScreen() {
         });
     }, [patient, signature, uploadedSignatureFilename, isSubmitting, isUploadingSignature, isUploadingPDF, isGeneratingPDF, navigation, handleSubmit]);
 
-    const isLoading = isLoadingTemplate || isLoadingPatient || isLoadingPractice;
-
     if (isLoading) {
         return (
             <View className="flex-1 items-center justify-center">
@@ -392,8 +332,21 @@ export default function SignContractScreen() {
         );
     }
 
-    const practice = practiceData?.data;
-    const template = contractTemplate?.data;
+    if (isError) {
+        return (
+            <View className="flex-1 items-center justify-center">
+                <ErrorState 
+                    message={(error as any)?.message || "Failed to load contract data"} 
+                    onRetry={() => {
+                        refetchTemplate();
+                        refetchPatient();
+                        refetchPractice();
+                    }} 
+                    title="Failed to load contract"
+                />
+            </View>
+        );
+    }
 
     if (!patient || !practice || !template) {
         return (
@@ -422,7 +375,6 @@ export default function SignContractScreen() {
                 if (signatureDataUri.startsWith("data:")) {
                     const base64Data = signatureDataUri.split(",")[1];
                     if (!FileSystem.documentDirectory) {
-                        console.warn("documentDirectory not available, using data URI");
                         setSignatureFileUri(null);
                     } else {
                         const fileUri = `${FileSystem.documentDirectory}signature_${Date.now()}.png`;
@@ -430,13 +382,11 @@ export default function SignContractScreen() {
                             encoding: FileSystem.EncodingType.Base64,
                         });
                         setSignatureFileUri(fileUri);
-                        console.log("✅ Signature saved to file:", fileUri);
                     }
                 } else {
                     setSignatureFileUri(signatureDataUri);
                 }
-            } catch (error) {
-                console.error("Error saving signature to file:", error);
+            } catch {
                 // Fallback to data URI if file save fails
                 setSignatureFileUri(null);
             }
@@ -452,7 +402,6 @@ export default function SignContractScreen() {
 
                 uploadSignature(file);
             } catch (error) {
-                console.error("Error preparing signature for upload:", error);
                 Alert.alert("Error", "Failed to prepare signature for upload");
             }
         }
@@ -819,8 +768,8 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
             if (signatureRef.current) {
                 signatureRef.current.undo();
             }
-        } catch (error) {
-            console.error("Error in undo:", error);
+        } catch {
+            // Silent fail
         }
     }, []);
 
@@ -829,8 +778,8 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
             if (signatureRef.current) {
                 signatureRef.current.redo();
             }
-        } catch (error) {
-            console.error("Error in redo:", error);
+        } catch {
+            // Silent fail
         }
     }, []);
 
@@ -839,8 +788,8 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
             if (signatureRef.current) {
                 signatureRef.current.clearSignature();
             }
-        } catch (error) {
-            console.error("Error in clear:", error);
+        } catch {
+            // Silent fail
         }
     }, []);
 
@@ -1022,11 +971,6 @@ interface ContractPDFContentProps {
 
 const ContractPDFContent = React.memo(function ContractPDFContent({ template, patient, practice, signatureUri, radioGroupAnswers, printSettings, replacePlaceholders, stripHtml, metadata }: ContractPDFContentProps) {
     const { profile: me } = useAuth();
-
-    // Debug: Log signatureUri
-    React.useEffect(() => {
-        console.log("📝 ContractPDFContent - signatureUri:", signatureUri ? signatureUri.substring(0, 50) + "..." : "null");
-    }, [signatureUri]);
 
     return (
         <View style={{ flex: 1, backgroundColor: "white" }}>

@@ -1,4 +1,4 @@
-import { BaseButton, BaseText, PatientDetailSkeleton } from "@/components";
+import { BaseButton, BaseText, ErrorState, PatientDetailSkeleton } from "@/components";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
 import { ImageEditorModal } from "@/components/ImageEditor";
 import Avatar from "@/components/avatar";
@@ -11,9 +11,10 @@ import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { PatientMedia, PatientMediaImage, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Linking, ScrollView, Share, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
@@ -25,8 +26,8 @@ import { blurValue } from "./_layout";
 let DocumentScanner: any = null;
 try {
     DocumentScanner = require("react-native-document-scanner-plugin").default;
-} catch (error) {
-    console.warn("DocumentScanner module not available:", error);
+} catch {
+    // DocumentScanner module not available - handled gracefully
 }
 
 type RowKind = "header" | "tabs" | "content";
@@ -35,20 +36,19 @@ export default function PatientDetailsScreen() {
     const { id, action, phoneIndex } = useLocalSearchParams<{ id: string; action?: string; phoneIndex?: string }>();
     const navigation = useNavigation();
     const { selectedPractice } = useProfileStore();
-    const { data: patient, isLoading } = useGetPatientById(id);
-    const { data: patientMediaData, isLoading: isLoadingMedia } = useGetPatientMedia(id, !!id);
-    const { data: activitiesData, isLoading: isLoadingActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
-    const { data: documentsData, isLoading: isLoadingDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
+    const { data: patient, isLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(id);
+    const { data: patientMediaData, isLoading: isLoadingMedia, error: patientMediaError, isError: isPatientMediaError, refetch: refetchPatientMedia } = useGetPatientMedia(id, !!id);
+    const { data: activitiesData, isLoading: isLoadingActivities, error: activitiesError, isError: isActivitiesError, refetch: refetchActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
+    const { data: documentsData, isLoading: isLoadingDocuments, error: documentsError, isError: isDocumentsError, refetch: refetchDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
 
     // Temp upload for scanned documents
     const { mutate: uploadScannedImage, isPending: isUploadingScannedImage } = useTempUpload(
         (response) => {
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            const responseAny = response as { data?: { filename?: string }; filename?: string };
+            const filename = (responseAny?.data?.filename ?? responseAny.filename) || null;
             if (filename) {
-                console.log("📸 [scanDocument] Image uploaded, filename:", filename);
                 // Create document with the filename
                 createDocument({
                     type: "id_card",
@@ -60,7 +60,6 @@ export default function PatientDetailsScreen() {
             }
         },
         (error) => {
-            console.error("❌ [scanDocument] Upload error:", error);
             Alert.alert("Error", "Failed to upload scanned image");
         },
     );
@@ -69,13 +68,11 @@ export default function PatientDetailsScreen() {
     const { mutate: createDocument } = useCreatePatientDocument(
         selectedPractice?.id,
         id,
-        (data) => {
-            console.log("✅ [scanDocument] Document created successfully:", data);
+        () => {
             Alert.alert("Success", "ID document uploaded successfully!");
         },
         (error) => {
-            console.error("❌ [scanDocument] Create document error:", error);
-            Alert.alert("Error", "Failed to create document");
+            Alert.alert("Error", error.message || "Failed to create document");
         },
     );
 
@@ -107,24 +104,28 @@ export default function PatientDetailsScreen() {
         const map = new Map<string, number>();
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
 
-        patientMediaData.data.forEach((media: any) => {
+        patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
             const mediaId = media.id; // patient_media_id
 
-            // If media has a template, extract images from template.images array
-            if (media.template && media.images && Array.isArray(media.images)) {
-                media.images.forEach((img: any) => {
-                    if (img.image?.url) {
-                        map.set(img.image.url, mediaId);
+            // Type guard: check if it's PatientMediaWithTemplate
+            const isTemplateMedia = 'template' in media && 'images' in media;
+            
+            if (isTemplateMedia && media.template && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: extract images from template.images array
+                media.images.forEach((img: PatientMediaImage) => {
+                    const imageUrl = typeof img.image === 'string' ? img.image : null;
+                    if (imageUrl) {
+                        map.set(imageUrl, mediaId);
                     }
                 });
-            }
-            // If media doesn't have a template, use original_media
-            else if (media.original_media?.url) {
-                map.set(media.original_media.url, mediaId);
-            }
-            // Fallback: check if media.media exists (old structure)
-            else if (media.media?.url) {
-                map.set(media.media.url, mediaId);
+            } else if (!isTemplateMedia) {
+                // PatientMedia: use original_media or media
+                const patientMedia = media as PatientMedia;
+                if (patientMedia.original_media?.url) {
+                    map.set(patientMedia.original_media.url, mediaId);
+                } else if (patientMedia.media?.url) {
+                    map.set(patientMedia.media.url, mediaId);
+                }
             }
         });
 
@@ -136,24 +137,27 @@ export default function PatientDetailsScreen() {
         const map = new Map<string, boolean>();
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
 
-        patientMediaData.data.forEach((media: any) => {
-            const isBookmarked = media.is_bookmarked ?? false;
+        patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
+            // Type guard: check if it's PatientMediaWithTemplate
+            const isTemplateMedia = 'template' in media && 'images' in media;
+            const isBookmarked = !isTemplateMedia ? (media as PatientMedia).is_bookmarked ?? false : false;
 
-            // If media has a template, extract images from template.images array
-            if (media.template && media.images && Array.isArray(media.images)) {
-                media.images.forEach((img: any) => {
-                    if (img.image?.url) {
-                        map.set(img.image.url, isBookmarked);
+            if (isTemplateMedia && media.template && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: extract images from template.images array
+                media.images.forEach((img: PatientMediaImage) => {
+                    const imageUrl = typeof img.image === 'string' ? img.image : null;
+                    if (imageUrl) {
+                        map.set(imageUrl, isBookmarked);
                     }
                 });
-            }
-            // If media doesn't have a template, use original_media
-            else if (media.original_media?.url) {
-                map.set(media.original_media.url, isBookmarked);
-            }
-            // Fallback: check if media.media exists (old structure)
-            else if (media.media?.url) {
-                map.set(media.media.url, isBookmarked);
+            } else if (!isTemplateMedia) {
+                // PatientMedia: use original_media or media
+                const patientMedia = media as PatientMedia;
+                if (patientMedia.original_media?.url) {
+                    map.set(patientMedia.original_media.url, isBookmarked);
+                } else if (patientMedia.media?.url) {
+                    map.set(patientMedia.media.url, isBookmarked);
+                }
             }
         });
 
@@ -169,7 +173,7 @@ export default function PatientDetailsScreen() {
         // Map to store images grouped by date with timestamps for sorting
         const imagesByDate = new Map<string, Array<{ url: string; timestamp: number }>>();
 
-        patientMediaData.data.forEach((media: any) => {
+        patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
             // Get the date from created_at
             const createdAt = media.created_at;
             if (!createdAt) return;
@@ -186,26 +190,25 @@ export default function PatientDetailsScreen() {
 
             const dateImages = imagesByDate.get(dateKey)!;
 
-            // If media has a template, only show original_media in gallery (not individual images)
-            if (media.template && media.original_media?.url) {
-                dateImages.push({ url: media.original_media.url, timestamp });
-            }
-            // If media has a template but no original_media, fallback to images (backward compatibility)
-            else if (media.template && media.images && Array.isArray(media.images)) {
-                media.images.forEach((img: any) => {
-                    if (img.image?.url) {
+            // Type guard: check if it's PatientMediaWithTemplate
+            if ('template' in media && 'images' in media && media.template && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: extract images from template.images array
+                const templateMedia = media as PatientMediaWithTemplate;
+                templateMedia.images.forEach((img: PatientMediaImage) => {
+                    const imageUrl = typeof img.image === 'string' ? img.image : null;
+                    if (imageUrl) {
                         const imgTimestamp = img.created_at ? new Date(img.created_at).getTime() : timestamp;
-                        dateImages.push({ url: img.image.url, timestamp: imgTimestamp });
+                        dateImages.push({ url: imageUrl, timestamp: imgTimestamp });
                     }
                 });
-            }
-            // If media doesn't have a template, use original_media
-            else if (media.original_media?.url) {
-                dateImages.push({ url: media.original_media.url, timestamp });
-            }
-            // Fallback: check if media.media exists (old structure)
-            else if (media.media?.url) {
-                dateImages.push({ url: media.media.url, timestamp });
+            } else {
+                // PatientMedia: use original_media or media
+                const patientMedia = media as PatientMedia;
+                if (patientMedia.original_media?.url) {
+                    dateImages.push({ url: patientMedia.original_media.url, timestamp });
+                } else if (patientMedia.media?.url) {
+                    dateImages.push({ url: patientMedia.media.url, timestamp });
+                }
             }
         });
 
@@ -239,12 +242,11 @@ export default function PatientDetailsScreen() {
             Alert.alert("Success", "Image archived successfully");
         },
         (error) => {
-            console.error("Error archiving media:", error);
             Alert.alert("Error", error.message || "Failed to archive image");
         },
     );
 
-    const handleArchiveImage = (imageUri: string) => {
+    const handleArchiveImage = useCallback((imageUri: string) => {
         const mediaId = imageUrlToMediaIdMap.get(imageUri);
         if (!mediaId) {
             Alert.alert("Error", "Could not find media ID for this image");
@@ -261,19 +263,19 @@ export default function PatientDetailsScreen() {
                 },
             },
         ]);
-    };
+    }, [imageUrlToMediaIdMap, id, archiveMedia]);
 
     const screenWidth = Dimensions.get("window").width;
     const screenHeight = Dimensions.get("window").height;
-    const tabWidth = (screenWidth - 32) / tabs.length;
+    const tabWidth = useMemo(() => (screenWidth - 32) / tabs.length, [screenWidth]);
     const translateX = useRef(new Animated.Value(0)).current;
 
-    const handleTabPress = (index: number) => {
+    const handleTabPress = useCallback((index: number) => {
         setActiveTab(index);
         Animated.spring(translateX, { toValue: index * tabWidth, useNativeDriver: true, speed: 20 }).start();
-    };
+    }, [tabWidth, translateX]);
 
-    const handleCall = async (index?: number) => {
+    const handleCall = useCallback(async (index?: number) => {
         const numbers = patient?.data?.numbers;
         if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
 
@@ -287,9 +289,9 @@ export default function PatientDetailsScreen() {
         } catch {
             Alert.alert("Error", "Error making phone call");
         }
-    };
+    }, [patient?.data?.numbers]);
 
-    const handleMessage = async (index?: number) => {
+    const handleMessage = useCallback(async (index?: number) => {
         const numbers = patient?.data?.numbers;
         if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
 
@@ -303,7 +305,7 @@ export default function PatientDetailsScreen() {
         } catch {
             Alert.alert("Error", "Error sending message");
         }
-    };
+    }, [patient?.data?.numbers]);
 
     // Handle action parameter
     useEffect(() => {
@@ -356,7 +358,6 @@ export default function PatientDetailsScreen() {
             if (scannedImages && scannedImages.length > 0) {
                 // Only take the first image (ensure only 1 image)
                 const imagePath = scannedImages[0];
-                console.log("📸 [scanDocument] Image scanned:", imagePath);
 
                 // Upload scanned image to temp-upload
                 try {
@@ -369,12 +370,10 @@ export default function PatientDetailsScreen() {
                         uri: imagePath, // Use imagePath directly (DocumentScanner returns proper URI format)
                         type: type,
                         name: filename,
-                    } as any;
+                    } as { uri: string; type: string; name: string };
 
-                    console.log("📤 [scanDocument] Uploading to temp-upload...", { uri: imagePath, type, name: filename });
                     uploadScannedImage(file);
                 } catch (uploadError) {
-                    console.error("❌ [scanDocument] Upload error:", uploadError);
                     Alert.alert("Error", "Failed to upload scanned image");
                 }
 
@@ -383,19 +382,13 @@ export default function PatientDetailsScreen() {
                     const path = imagePath.replace("file://", "");
                     const lines = await TextRecognition.recognize(path);
                     const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
-                    console.log("📝 [scanDocument] OCR Text:", fullText);
                     // Parse the extracted data (optional, for future use)
-                    const parsed = parseUSIDCardData(fullText, imagePath);
-                    console.log("📋 [scanDocument] Parsed ID Card Data:", parsed);
-                } catch (ocrError) {
-                    console.warn("⚠️ [scanDocument] OCR failed (non-critical):", ocrError);
+                    parseUSIDCardData(fullText, imagePath);
+                } catch {
                     // OCR failure is not critical, continue with upload
                 }
-            } else {
-                console.warn("⚠️ [scanDocument] No images scanned");
             }
         } catch (error) {
-            console.error("❌ [scanDocument] Scan failed:", error);
             Alert.alert("Error", "Failed to scan document. Please try again.");
         }
     };
@@ -434,7 +427,7 @@ export default function PatientDetailsScreen() {
 
     const SNAP_THRESHOLD = scrollStart + 50;
 
-    const handleSnapScroll = (event: any) => {
+    const handleSnapScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
         const y = event.nativeEvent.contentOffset.y;
 
         if (y > scrollStart && y < SNAP_THRESHOLD) {
@@ -454,7 +447,7 @@ export default function PatientDetailsScreen() {
                 bounciness: 0,
             }).start();
         }
-    };
+    }, [scrollY, scrollStart, SNAP_THRESHOLD, animationEnd]);
     useEffect(() => {
         const sub = scrollY.addListener(({ value }) => blurValue.setValue(value));
         return () => scrollY.removeListener(sub);
@@ -467,6 +460,25 @@ export default function PatientDetailsScreen() {
         });
         return () => scrollY.removeListener(sub);
     }, [navigation, patient?.data, animationEnd]);
+
+    // Show error state if there's an error with patient data
+    if (isPatientError) {
+        const errorMessage = (patientError as any)?.message || "Failed to load patient data. Please try again.";
+        return (
+            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
+                <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ 
+                        paddingTop: headerHeight,
+                        paddingBottom: safe.bottom + spacing["4"] 
+                    }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <ErrorState message={errorMessage} onRetry={refetchPatient} title="Failed to load patient" />
+                </ScrollView>
+            </View>
+        );
+    }
 
     if (isLoading) {
         return (
@@ -486,8 +498,8 @@ export default function PatientDetailsScreen() {
     }
 
 
-    const DATA: { key: RowKind }[] = [{ key: "header" }, { key: "tabs" }, { key: "content" }];
-    const renderRow = ({ item }: { item: { key: RowKind } }) => {
+    const DATA: { key: RowKind }[] = useMemo(() => [{ key: "header" }, { key: "tabs" }, { key: "content" }], []);
+    const renderRow = useCallback(({ item }: { item: { key: RowKind } }) => {
         if (item.key === "header") {
             return (
                 <>
@@ -650,6 +662,13 @@ export default function PatientDetailsScreen() {
         return (
             <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
                 {activeTab === 0 && (
+                    isPatientMediaError ? (
+                        <ErrorState 
+                            message={patientMediaError instanceof Error ? patientMediaError.message : (patientMediaError as { message?: string })?.message || "Failed to load media"} 
+                            onRetry={refetchPatientMedia} 
+                            title="Failed to load media"
+                        />
+                    ) : (
                     <GalleryWithMenu
                         menuItems={[
                             {
@@ -686,10 +705,10 @@ export default function PatientDetailsScreen() {
                                             message: message,
                                             url: imageUri,
                                         });
-                                    } catch (error: any) {
-                                        console.error("Error sharing image:", error);
+                                    } catch (error: unknown) {
                                         // If user cancels, don't show error
-                                        if (error?.message !== "User did not share") {
+                                        const errorMessage = error instanceof Error ? error.message : (error as { message?: string })?.message;
+                                        if (errorMessage !== "User did not share") {
                                             Alert.alert("Error", "Failed to share image");
                                         }
                                     }
@@ -714,18 +733,10 @@ export default function PatientDetailsScreen() {
                         patientId={id}
                         rawMediaData={patientMediaData?.data}
                     />
+                    )
                 )}
                 {activeTab === 0 && (
                     <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[8], paddingBottom: safe.bottom + spacing[4] }}>
-                        {/* <BaseButton
-                            label="Archived Photos"
-                            ButtonStyle=""
-                            leftIcon={<IconSymbol name="archivebox" color={colors.system.blue} size={18} />}
-                            onPress={() => {
-                                // TODO: Navigate to archived photos or open modal
-                                router.push("/(profile)/archive");
-                            }}
-                        /> */}
                         <TouchableOpacity
                             className="bg-system-gray6 py-3 px-4 rounded-xl flex-row items-center justify-between"
                             onPress={() => {
@@ -743,11 +754,11 @@ export default function PatientDetailsScreen() {
                     </View>
                 )}
                 {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} />}
-                {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} />}
+                {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} />}
+                {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
             </View>
         );
-    };
+    }, [activeTab, patient, patientAge, id, headerHeight, safe, tabs, tabWidth, translateX, handleTabPress, handleCall, handleMessage, scanDocument, groupedPatientImages, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientMediaData?.data, isPatientMediaError, patientMediaError, refetchPatientMedia, documentsData?.data, isLoadingDocuments, documentsError, isDocumentsError, refetchDocuments, activitiesData?.data, isLoadingActivities, activitiesError, isActivitiesError, refetchActivities, screenHeight, handleArchiveImage]);
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>

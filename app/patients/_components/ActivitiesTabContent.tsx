@@ -1,28 +1,41 @@
-import { ActivityItem, BaseText } from "@/components";
+import { ActivityItem, BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
-import React from "react";
+import React, { useCallback } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ActivitiesTabContentProps {
     activities: ActivityLog[];
     isLoading: boolean;
+    error?: Error | null;
+    isError?: boolean;
+    onRetry?: () => void;
 }
 
-export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = ({ activities, isLoading }) => {
+export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = React.memo(({ activities, isLoading, error, isError, onRetry }) => {
     const insets = useSafeAreaInsets();
 
-    const renderActivityItem = ({ item }: { item: ActivityLog }) => {
+    const renderActivityItem = useCallback(({ item }: { item: ActivityLog }) => {
         return <ActivityItem activity={item} />;
-    };
+    }, []);
 
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.system.blue} />
             </View>
+        );
+    }
+
+    if (isError) {
+        return (
+            <ErrorState 
+                message={(error as any)?.message || "Failed to load activities"} 
+                onRetry={onRetry} 
+                title="Failed to load activities"
+            />
         );
     }
 
@@ -41,7 +54,7 @@ export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = ({ acti
     }
 
     return <FlatList data={activities} renderItem={renderActivityItem} keyExtractor={(item) => item.id.toString()} contentContainerStyle={[styles.listContent]} style={{ paddingBottom: insets.bottom }} showsVerticalScrollIndicator={false} />;
-};
+});
 
 const styles = StyleSheet.create({
     loadingContainer: {

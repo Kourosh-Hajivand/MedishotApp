@@ -19,4 +19,5 @@ export { BaseText } from "./text/BaseText";
 export { PracticeDocumentHeader, PracticeDocumentFooter } from "./practice";
 export type { PracticeSettings } from "./practice";
 export { ActivityItem } from "./ActivityItem";
+export { ErrorState } from "./ErrorState";
 export { Skeleton, AvatarSkeleton, PatientSkeleton, PatientListSkeleton, ImageSkeleton, PatientDetailSkeleton } from "./skeleton";
