@@ -7,26 +7,41 @@ import { Button, Host } from "@expo/ui/swift-ui";
 import { router, useNavigation } from "expo-router";
 import React, { useCallback, useLayoutEffect, useRef } from "react";
 import { UseFormHandleSubmit } from "react-hook-form";
+import { Alert } from "react-native";
+
+interface ProfileFormRef {
+    handleSubmit: UseFormHandleSubmit<ProfileFormData>;
+    getFormData: () => {
+        formData: ProfileFormData;
+        phones: DynamicFieldItem[];
+        emails: DynamicFieldItem[];
+        addresses: DynamicFieldItem[];
+        urls: DynamicFieldItem[];
+        uploadedFilename: string | null;
+    };
+}
+
+interface MetadataObject {
+    phones?: Array<{ label: string; value: string }>;
+    emails?: Array<{ label: string; value: string }>;
+    addresses?: Array<{ label: string; value: string }>;
+    urls?: Array<{ label: string; value: string }>;
+}
 
 export default function CompleteProfile() {
-    const formRef = useRef<{
-        handleSubmit: UseFormHandleSubmit<ProfileFormData>;
-        getFormData: () => {
-            formData: ProfileFormData;
-            phones: DynamicFieldItem[];
-            emails: DynamicFieldItem[];
-            addresses: DynamicFieldItem[];
-            urls: DynamicFieldItem[];
-            uploadedFilename: string | null;
-        };
-    } | null>(null);
+    const formRef = useRef<ProfileFormRef | null>(null);
     const navigation = useNavigation();
 
-    const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfileFull(() => {
-        router.push("/(auth)/select-role");
-    });
+    const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfileFull(
+        () => {
+            router.push("/(auth)/select-role");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update profile. Please try again.");
+        },
+    );
 
-    const handleFormReady = useCallback((form: any) => {
+    const handleFormReady = useCallback((form: ProfileFormRef) => {
         formRef.current = form;
     }, []);
 
@@ -54,11 +69,19 @@ export default function CompleteProfile() {
                                       .filter((phone) => phone.value) // Filter out empty values
                                 : undefined;
                         const emailsData = formData.emails.length > 0 ? formData.emails.map((email) => ({ label: email.label, value: typeof email.value === "string" ? email.value : "" })) : undefined;
-                        const addressesData = formData.addresses.length > 0 ? formData.addresses.map((address) => ({ label: address.label, value: address.value })) : undefined;
+                        const addressesData =
+                            formData.addresses.length > 0
+                                ? formData.addresses
+                                      .map((address) => ({
+                                          label: address.label,
+                                          value: typeof address.value === "string" ? address.value : JSON.stringify(address.value),
+                                      }))
+                                      .filter((address) => address.value)
+                                : undefined;
                         const urlsData = formData.urls.length > 0 ? formData.urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;
 
                         // Build metadata object
-                        const metadataObject: any = {};
+                        const metadataObject: MetadataObject = {};
                         if (phonesData) metadataObject.phones = phonesData;
                         if (emailsData) metadataObject.emails = emailsData;
                         if (addressesData) metadataObject.addresses = addressesData;
@@ -78,9 +101,6 @@ export default function CompleteProfile() {
                 },
                 (errors) => {
                     // Validation failed - errors are handled by form
-                    if (__DEV__) {
-                        console.log("Validation errors:", errors);
-                    }
                 },
             )();
         }

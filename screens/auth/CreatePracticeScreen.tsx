@@ -4,9 +4,9 @@ import { Button, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, TextInput, View } from "react-native";
+import { Alert, ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
@@ -19,6 +19,7 @@ import { normalizeUSPhoneToDashedFormat, normalizeWebsiteUrl } from "../../utils
 import useDebounce from "../../utils/hook/useDebounce";
 import { useGetSearchDetail, useMapboxSearch } from "../../utils/hook/useGetMapboxSearch";
 import { useTempUpload } from "../../utils/hook/useMedia";
+import { TempUploadResponse } from "../../utils/service/models/ResponseModels";
 
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
@@ -98,7 +99,7 @@ export const CreatePracticeScreen: React.FC = () => {
     }, [data, setValue]);
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
+        (response: TempUploadResponse) => {
             setUploadedFilename(response.filename ?? null);
         },
         (error) => {
@@ -117,11 +118,17 @@ export const CreatePracticeScreen: React.FC = () => {
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : "image/jpeg";
 
-            const file = {
+            interface FileUpload {
+                uri: string;
+                type: string;
+                name: string;
+            }
+
+            const file: FileUpload = {
                 uri: result.uri,
                 type: type,
                 name: filename,
-            } as any;
+            };
 
             uploadImage(file);
         } catch (error) {
@@ -134,57 +141,70 @@ export const CreatePracticeScreen: React.FC = () => {
         mutate: createPractice,
         isPending,
         error,
-    } = useCreatePractice(async (data) => {
-        // Switch to the newly created practice - این practice جدید است که تازه ساخته شده
-        if (data?.data) {
-            // Set the newly created practice as selected immediately
-            await setSelectedPractice(data.data);
-        }
+    } = useCreatePractice(
+        async (data) => {
+            // Switch to the newly created practice - این practice جدید است که تازه ساخته شده
+            if (data?.data) {
+                // Set the newly created practice as selected immediately
+                await setSelectedPractice(data.data);
+            }
 
-        // Invalidate and refetch practice list to refresh it
-        queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+            // Invalidate and refetch practice list to refresh it
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
 
-        // Wait for practice list to refetch
-        await queryClient.refetchQueries({ queryKey: ["GetPracticeList"] });
+            // Wait for practice list to refetch
+            await queryClient.refetchQueries({ queryKey: ["GetPracticeList"] });
 
-        // Navigate to patients tab
-        router.replace("/(tabs)/patients");
-    });
+            // Navigate to patients tab
+            router.replace("/(tabs)/patients");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to create practice. Please try again.");
+        },
+    );
 
-    const onSubmit = (data: FormData) => {
-        const createData = {
-            name: data.practiceName,
-            metadata: JSON.stringify({
-                website: normalizeWebsiteUrl(data.website),
-                phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
-                street: data.street || "",
-                address: data.address,
-                zipcode: Number(data.zipCode),
-                print_settings: {
-                    avatar: "profile_picture",
-                    practiceName: true,
-                    doctorName: true,
-                    address: true,
-                    practicePhone: true,
-                    practiceURL: false,
-                    practiceEmail: false,
-                    practiceSocialMedia: false,
-                },
-                notification_settings: {
-                    imageAdded: true,
-                    notes: true,
-                    imageEnhanced: true,
-                    consentFilled: true,
-                    patientAdded: false,
-                },
-            }),
-            type: practiceType.id,
-            ...(uploadedFilename ? { image: uploadedFilename } : {}),
-        };
+    const onSubmit = useCallback(
+        (data: FormData) => {
+            if (!practiceType?.id) {
+                Alert.alert("Error", "Practice type is required. Please try again.");
+                return;
+            }
 
-        createPractice(createData);
-    };
+            const createData = {
+                name: data.practiceName,
+                metadata: JSON.stringify({
+                    website: normalizeWebsiteUrl(data.website),
+                    phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
+                    street: data.street || "",
+                    address: data.address,
+                    zipcode: Number(data.zipCode),
+                    print_settings: {
+                        avatar: "profile_picture",
+                        practiceName: true,
+                        doctorName: true,
+                        address: true,
+                        practicePhone: true,
+                        practiceURL: false,
+                        practiceEmail: false,
+                        practiceSocialMedia: false,
+                    },
+                    notification_settings: {
+                        imageAdded: true,
+                        notes: true,
+                        imageEnhanced: true,
+                        consentFilled: true,
+                        patientAdded: false,
+                    },
+                }),
+                type: practiceType.id,
+                ...(uploadedFilename ? { image: uploadedFilename } : {}),
+            };
+
+            createPractice(createData);
+        },
+        [createPractice, practiceType, uploadedFilename],
+    );
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (

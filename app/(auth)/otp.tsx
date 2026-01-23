@@ -3,7 +3,7 @@ import { storeTokens } from "@/utils/helper/tokenStorage";
 import { useCompleteRegistration, useInitiateRegistration, useVerifyOtpCode } from "@/utils/hook";
 import { Button, Host } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -72,23 +72,30 @@ export default function OTPScreen() {
         },
     );
 
-    const { mutate: verifyOtpCode, isPending: isVerifyingOtpCode } = useVerifyOtpCode(() => {
-        router.push("/(auth)/new-password");
-    });
+    const { mutate: verifyOtpCode, isPending: isVerifyingOtpCode } = useVerifyOtpCode(
+        () => {
+            router.push("/(auth)/new-password");
+        },
+        (error) => {
+            setError(error?.message || "Invalid verification code. Please try again.");
+        },
+    );
 
-    const handleResend = () => {
+    const handleResend = useCallback(() => {
         if (!canResend || !email) return;
         resendCode({ email });
-    };
+    }, [canResend, email, resendCode]);
+
     useEffect(() => {
         if (otp.length === 6) {
             if (params.forgetPassword) {
                 verifyOtpCode({ email, code: otp });
             } else {
-                verifyCode({ email, verification_code: otp, password: params.password as string, password_confirmation: params.password as string });
+                const password = typeof params.password === "string" ? params.password : "";
+                verifyCode({ email, verification_code: otp, password, password_confirmation: password });
             }
         }
-    }, [otp]);
+    }, [otp, params.forgetPassword, params.password, email, verifyOtpCode, verifyCode]);
 
     // Format timer display (mm:ss)
     const formatTime = (seconds: number) => {

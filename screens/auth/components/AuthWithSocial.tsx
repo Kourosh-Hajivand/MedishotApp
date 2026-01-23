@@ -4,7 +4,7 @@ import * as Google from "expo-auth-session/providers/google";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { AppleIcon, GoogleIcon } from "../../../assets/icons";
 import { OutlineButton } from "../../../components";
 import { BaseText } from "../../../components/text/BaseText";
@@ -21,9 +21,14 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
         shouldAutoExchangeCode: true,
         usePKCE: false,
     });
-    const { mutate: googleCallback } = useGoogleCallback(() => {
-        router.replace("/(tabs)/patients");
-    });
+    const { mutate: googleCallback } = useGoogleCallback(
+        () => {
+            router.replace("/(tabs)/patients");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to sign in with Google. Please try again.");
+        },
+    );
     useEffect(() => {
         if (response?.type === "success") {
             const { authentication } = response;
@@ -38,8 +43,9 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
             });
 
             // appleCallback(credential.identityToken || "");
-        } catch (e: any) {
-            if (e.code === "ERR_CANCELED") return;
+        } catch (e: unknown) {
+            const error = e as { code?: string };
+            if (error.code === "ERR_CANCELED") return;
         }
     };
 

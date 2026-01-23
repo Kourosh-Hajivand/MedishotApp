@@ -3,8 +3,8 @@ import { Button, Host } from "@expo/ui/swift-ui";
 import { BlurView } from "expo-blur";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useCallback, useLayoutEffect, useMemo, useState } from "react";
-import { Dimensions, FlatList, StyleSheet, View } from "react-native";
-import Animated, { Extrapolate, interpolate, interpolateColor, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import { Dimensions, FlatList, NativeSyntheticEvent, NativeScrollEvent, StyleSheet, View } from "react-native";
+import Animated, { Extrapolate, interpolate, interpolateColor, SharedValue, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { BaseText } from "../../components";
 import { spacing } from "../../styles/spaces";
@@ -15,12 +15,12 @@ const ITEM_WIDTH = width * 0.33;
 const CENTER_OFFSET = (width - ITEM_WIDTH) / 2;
 
 // Create an Animated version of FlatList
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as typeof FlatList<(typeof SPECIALTIES)[number]>;
 
 type SpecialtyItemProps = {
     item: (typeof SPECIALTIES)[number];
     index: number;
-    scrollX: any;
+    scrollX: SharedValue<number>;
 };
 
 const SpecialtyItem: React.FC<SpecialtyItemProps> = ({ item, index, scrollX }) => {
@@ -115,7 +115,7 @@ export const SelectRoleScreen: React.FC = () => {
         },
     });
 
-    const onMomentumEnd = useCallback((event: any) => {
+    const onMomentumEnd = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / ITEM_WIDTH);
         setCurrentIndex(index);
@@ -171,7 +171,7 @@ export const SelectRoleScreen: React.FC = () => {
             {/* Icons */}
             <AnimatedFlatList
                 data={SPECIALTIES}
-                keyExtractor={(item: any) => item.id.toString()}
+                keyExtractor={(item) => item.id.toString()}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 snapToInterval={ITEM_WIDTH}
@@ -180,7 +180,7 @@ export const SelectRoleScreen: React.FC = () => {
                     paddingHorizontal: CENTER_OFFSET,
                     paddingTop: 180,
                 }}
-                renderItem={({ item, index }: { item: any; index: number }) => <SpecialtyItem item={item} index={index} scrollX={scrollX} />}
+                renderItem={({ item, index }: { item: (typeof SPECIALTIES)[number]; index: number }) => <SpecialtyItem item={item} index={index} scrollX={scrollX} />}
                 onScroll={scrollHandler}
                 scrollEventThrottle={16}
                 initialNumToRender={3}

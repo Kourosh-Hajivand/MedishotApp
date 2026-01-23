@@ -3,9 +3,9 @@ import { useLogin } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Animated, Keyboard, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, Keyboard, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { BaseButton, BaseText, ControlledInput } from "../../components";
@@ -75,23 +75,31 @@ export const LoginScreen: React.FC = () => {
         mutate: login,
         isPending,
         error,
-    } = useLogin(async (response) => {
-        await storeTokens(response.data.token);
+    } = useLogin(
+        async (response) => {
+            await storeTokens(response.data.token);
 
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
-        queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
-        const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.tokens] });
+            queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+            const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
 
-        if (!hasCompletedProfile) {
-            router.replace("/(auth)/completeProfile");
-        } else {
-            router.replace("/(tabs)/patients");
-        }
-    });
+            if (!hasCompletedProfile) {
+                router.replace("/(auth)/completeProfile");
+            } else {
+                router.replace("/(tabs)/patients");
+            }
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to login. Please try again.");
+        },
+    );
 
-    const onSubmit = async (data: LoginFormData) => {
-        login(data);
-    };
+    const onSubmit = useCallback(
+        async (data: LoginFormData) => {
+            login(data);
+        },
+        [login],
+    );
 
     return (
         <View style={styles.container}>

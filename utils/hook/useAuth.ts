@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
+import { AxiosError } from "axios";
 import { useEffect, useRef } from "react";
 import { QueryKeys } from "../../models/enums";
 import { getTokens, removeTokens } from "../helper/tokenStorage";
@@ -21,7 +22,8 @@ export const useAuth = () => {
     // اگر token وجود دارد اما API call fail شود، token را invalidate کن
     useEffect(() => {
         if (hasToken && meError && !isMeLoading && !hasHandledError.current) {
-            const errorStatus = (meError as any)?.response?.status;
+            const axiosError = meError as AxiosError;
+            const errorStatus = axiosError?.response?.status;
             if (errorStatus === 401 || errorStatus === 403) {
                 // Token منقضی شده یا نامعتبر است
                 hasHandledError.current = true;
@@ -31,7 +33,9 @@ export const useAuth = () => {
                         queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
                         queryClient.invalidateQueries({ queryKey: ["GetMe"] });
                     })
-                    .catch(console.error);
+                    .catch(() => {
+                        // Error handled silently
+                    });
             }
         }
         

@@ -12,13 +12,17 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("window");
+
+// Constants
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+const API_TIMEOUT_MS = 1800000; // 30 minutes
+const DEFAULT_IMAGE_URI = "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900";
 
 // Note Marker Component - Draggable & Tappable
 type NoteMarkerProps = {
@@ -129,10 +133,6 @@ const NoteMarker: React.FC<NoteMarkerProps> = ({ note, index, containerWidth, co
 export default function ImageEditorScreen() {
     const { uri, initialTool } = useLocalSearchParams<{ uri?: string; initialTool?: string }>();
     const [activeTool, setActiveTool] = useState(initialTool || "Magic");
-
-    console.log("🚀🚀🚀 IMAGE EDITOR SCREEN LOADED 🚀🚀🚀");
-    console.log("🔵 Active Tool:", activeTool);
-    console.log("🔵 Image URI:", uri);
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -153,57 +153,47 @@ export default function ImageEditorScreen() {
 
     const scale = useSharedValue(1);
 
-    // Wrapper for logging (needed for runOnJS)
-    const logMessage = (msg: string) => {
-        console.log(msg);
-    };
-
     // Move note callback - update note position
-    const handleMoveNote = (id: string, newX: number, newY: number) => {
+    const handleMoveNote = useCallback((id: string, newX: number, newY: number) => {
         setNotes((prevNotes) => prevNotes.map((note) => (note.id === id ? { ...note, x: newX, y: newY } : note)));
-    };
+    }, []);
 
     // Add note callback - uses functional update to get latest notes
-    const addNoteCallback = (locationX: number, locationY: number) => {
-        console.log("💚 Adding note at:", locationX, locationY);
+    const addNoteCallback = useCallback(
+        (locationX: number, locationY: number) => {
+            const { width, height } = imageContainerLayout;
 
-        const { width, height } = imageContainerLayout;
+            if (width === 0 || height === 0) {
+                return;
+            }
 
-        if (width === 0 || height === 0) {
-            console.log("❌ Container size is zero!");
-            return;
-        }
+            const x = locationX / width;
+            const y = locationY / height;
 
-        const x = locationX / width;
-        const y = locationY / height;
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const newNote: Note = {
+                id: Date.now().toString(),
+                x,
+                y,
+                text: "",
+            };
 
-        const newNote: Note = {
-            id: Date.now().toString(),
-            x,
-            y,
-            text: "",
-        };
-
-        // Use functional update to get latest notes
-        setNotes((prevNotes) => {
-            const updatedNotes = [...prevNotes, newNote];
-            console.log("📝 Total notes:", updatedNotes.length);
-            return updatedNotes;
-        });
-
-        setImageChanges((prev) => {
-            const filtered = prev.filter((c) => c.type !== "note");
-            return [...filtered, { type: "note", data: { notes: [...notes, newNote] } }];
-        });
-    };
+            // Use functional update to get latest notes
+            setNotes((prevNotes) => {
+                const updatedNotes = [...prevNotes, newNote];
+                setImageChanges((prev) => {
+                    const filtered = prev.filter((c) => c.type !== "note");
+                    return [...filtered, { type: "note", data: { notes: updatedNotes } }];
+                });
+                return updatedNotes;
+            });
+        },
+        [imageContainerLayout],
+    );
 
     // Memoize gestures
     const composedGesture = useMemo(() => {
-        console.log("⭐⭐⭐ CREATING GESTURES ⭐⭐⭐");
-        console.log("🟠 Current Tool:", activeTool);
-
         const pinch = Gesture.Pinch()
             .enabled(activeTool !== "Note")
             .onUpdate((e) => {
@@ -215,16 +205,12 @@ export default function ImageEditorScreen() {
 
         const tap = Gesture.Tap()
             .enabled(activeTool === "Note")
-            .onStart(() => {
-                runOnJS(logMessage)("💙💙💙 TAP STARTED 💙💙💙");
-            })
             .onEnd((event) => {
-                runOnJS(logMessage)("💛💛💛 TAP ENDED 💛💛💛");
                 runOnJS(addNoteCallback)(event.x, event.y);
             });
 
         return Gesture.Exclusive(pinch, tap);
-    }, [activeTool, imageContainerLayout, scale]);
+    }, [activeTool, addNoteCallback, scale]);
 
     const animatedImageStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -238,81 +224,53 @@ export default function ImageEditorScreen() {
         { name: "Pen", icon: "pencil.tip.crop.circle", disabled: false },
     ];
 
-    const handleToolPress = (tool: string) => {
-        console.log("🔶🔶🔶 TOOL CHANGED TO:", tool, "🔶🔶🔶");
+    const handleToolPress = useCallback((tool: string) => {
         Haptics.selectionAsync();
         setActiveTool(tool);
-    };
+    }, []);
 
-    const applyAdjustments = async (imageUri: string, adjustments: AdjustChange): Promise<string | null> => {
-        try {
-            if (!adjustments || Object.keys(adjustments).length === 0 || !imageUri) {
+    const applyAdjustments = useCallback(
+        async (imageUri: string, adjustments: AdjustChange): Promise<string | null> => {
+            try {
+                if (!adjustments || Object.keys(adjustments).length === 0 || !imageUri) {
+                    return imageUri;
+                }
+
+                // Check if any adjustment has a non-zero value
+                const hasAdjustments = Object.values(adjustments).some((val) => val !== undefined && val !== 0);
+                if (!hasAdjustments) {
+                    return originalImageUri || imageUri;
+                }
+
+                // Convert adjustments to ImageManipulator format
+                // Brightness: -1 to 1 (we have -100 to 100, so divide by 100)
+                // Note: expo-image-manipulator only supports brightness and rotate
+                // For contrast, saturation, etc., we need a different approach
+
+                const brightness = adjustments.brightness !== undefined ? adjustments.brightness / 100 : 0;
+
+                // Use ImageManipulator for brightness
+                if (brightness !== 0) {
+                    // Note: expo-image-manipulator doesn't directly support brightness
+                    // We'll need to use a workaround or different library
+                    // For now, store adjustments and apply via style
+                }
+
+                return imageUri;
+            } catch (error) {
+                Alert.alert("Error", "Failed to apply image adjustments. Please try again.");
                 return imageUri;
             }
-
-            // Check if any adjustment has a non-zero value
-            const hasAdjustments = Object.values(adjustments).some((val) => val !== undefined && val !== 0);
-            if (!hasAdjustments) {
-                return originalImageUri || imageUri;
-            }
-
-            // Convert adjustments to ImageManipulator format
-            // Brightness: -1 to 1 (we have -100 to 100, so divide by 100)
-            // Note: expo-image-manipulator only supports brightness and rotate
-            // For contrast, saturation, etc., we need a different approach
-
-            const brightness = adjustments.brightness !== undefined ? adjustments.brightness / 100 : 0;
-
-            // Use ImageManipulator for brightness
-            if (brightness !== 0) {
-                // Note: expo-image-manipulator doesn't directly support brightness
-                // We'll need to use a workaround or different library
-                // For now, store adjustments and apply via style
-            }
-
-            return imageUri;
-        } catch (error) {
-            console.error("Error applying adjustments:", error);
-            return imageUri;
-        }
-    };
-
-    const handleImageChange = async (change: ImageChange) => {
-        // Handle note changes separately
-        if (change.type === "note") {
-            const noteData = change.data as { notes: Note[] };
-            setNotes(noteData.notes);
-        }
-
-        setImageChanges((prev) => {
-            const filtered = prev.filter((c) => c.type !== change.type);
-            return [...filtered, change];
-        });
-
-        if (change.type === "adjust") {
-            const adjustments = change.data as AdjustChange;
-            setAdjustmentValues(adjustments);
-        } else if (change.type === "magic") {
-            const { color, style } = change.data as MagicChange;
-            if (color?.modeKey && style?.resultType) {
-                const selection = {
-                    modeKey: color.modeKey,
-                    resultType: style.resultType,
-                    colorTitle: color.title,
-                    styleTitle: style.title,
-                };
-                setMagicSelection(selection);
-                updateDisplayedImageFromResult(selection);
-            }
-        }
-    };
+        },
+        [originalImageUri],
+    );
 
     // ✅ تبدیل عکس به base64
-    const convertImageToBase64 = async (imageUri: string): Promise<string | null> => {
+    const convertImageToBase64 = useCallback(async (imageUri: string): Promise<string | null> => {
         try {
             if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {
                 if (!FileSystem.documentDirectory) {
-                    console.error("Document directory not available");
+                    Alert.alert("Error", "Document directory not available. Please try again.");
                     return null;
                 }
                 const fileUri = FileSystem.documentDirectory + "temp_image.jpg";
@@ -323,6 +281,7 @@ export default function ImageEditorScreen() {
                     });
                     return base64;
                 }
+                Alert.alert("Error", "Failed to download image. Please check your connection and try again.");
                 return null;
             } else {
                 const base64 = await FileSystem.readAsStringAsync(imageUri, {
@@ -331,66 +290,150 @@ export default function ImageEditorScreen() {
                 return base64;
             }
         } catch (error) {
-            console.error("Error converting image to base64:", error);
+            Alert.alert("Error", "Failed to convert image to base64. Please try again.");
             return null;
         }
-    };
+    }, []);
 
     // ✅ ارسال به API
-    const sendImageToAPI = async (imageBase64: string) => {
-        const requestBody = {
-            image_base64: imageBase64,
-            color_settings: {
-                saturation_scale: 0.4,
-                yellow_hue_range: [15, 45],
-                red_hue_range: [0, 15],
-                sat_range: [0, 255],
-                l_range: [0, 255],
-            },
-            texture_modes: {
-                Mode_A1: {
-                    fade_power: 4.0,
-                    center_offset: [0.0, 0.1],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.5,
-                    blend_opacity: 0.8,
-                    mask_color: [92, 137, 170],
+    const sendImageToAPI = useCallback(
+        async (imageBase64: string) => {
+            const requestBody = {
+                image_base64: imageBase64,
+                color_settings: {
+                    saturation_scale: 0.4,
+                    yellow_hue_range: [15, 45],
+                    red_hue_range: [0, 15],
+                    sat_range: [0, 255],
+                    l_range: [0, 255],
                 },
-                Mode_C1: {
-                    fade_power: 6.0,
-                    center_offset: [0.0, 0.2],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.6,
-                    blend_opacity: 0.8,
-                    mask_color: [112, 158, 181],
+                texture_modes: {
+                    Mode_A1: {
+                        fade_power: 4.0,
+                        center_offset: [0.0, 0.1],
+                        stretch: [0.5, 0.8],
+                        center_opacity: 0.5,
+                        blend_opacity: 0.8,
+                        mask_color: [92, 137, 170],
+                    },
+                    Mode_C1: {
+                        fade_power: 6.0,
+                        center_offset: [0.0, 0.2],
+                        stretch: [0.5, 0.8],
+                        center_opacity: 0.6,
+                        blend_opacity: 0.8,
+                        mask_color: [112, 158, 181],
+                    },
+                    Mode_D3: {
+                        fade_power: 6.0,
+                        center_offset: [0.0, 0.2],
+                        stretch: [0.5, 0.6],
+                        center_opacity: 0.5,
+                        blend_opacity: 0.8,
+                        mask_color: [101, 152, 184],
+                    },
+                    Mode_A2: {
+                        fade_power: 4.0,
+                        center_offset: [0.0, 0.3],
+                        stretch: [0.5, 0.8],
+                        center_opacity: 0.99,
+                        blend_opacity: 0.7,
+                        mask_color: [91, 137, 170],
+                    },
                 },
-                Mode_D3: {
-                    fade_power: 6.0,
-                    center_offset: [0.0, 0.2],
-                    stretch: [0.5, 0.6],
-                    center_opacity: 0.5,
-                    blend_opacity: 0.8,
-                    mask_color: [101, 152, 184],
-                },
-                Mode_A2: {
-                    fade_power: 4.0,
-                    center_offset: [0.0, 0.3],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.99,
-                    blend_opacity: 0.7,
-                    mask_color: [91, 137, 170],
-                },
-            },
-        };
+            };
 
-        const { data } = await axios.post(API_URL, requestBody, {
-            headers: { "Content-Type": "application/json" },
-            timeout: 1800000,
-        });
+            try {
+                const { data } = await axios.post(API_URL, requestBody, {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: API_TIMEOUT_MS,
+                });
+                return data;
+            } catch (error) {
+                if (axios.isAxiosError(error)) {
+                    if (error.code === "ECONNABORTED") {
+                        Alert.alert("Error", "Request timed out. The image processing is taking too long. Please try again.");
+                    } else {
+                        Alert.alert("Error", error.response?.data?.message || "Failed to process image. Please try again.");
+                    }
+                } else {
+                    Alert.alert("Error", "An unexpected error occurred. Please try again.");
+                }
+                throw error;
+            }
+        },
+        [],
+    );
 
-        console.log("✅ Response keys:", data);
-        return data;
-    };
+    const formatBase64ToDataUri = useCallback((value: string) => {
+        if (!value) return null;
+        return value.startsWith("data:") ? value : `data:image/png;base64,${value}`;
+    }, []);
+
+    const getResultImageForSelection = useCallback(
+        (selection: { modeKey: string; resultType: "orig" | "pred" }) => {
+            const { modeKey, resultType } = selection;
+            if (!modeKey) return null;
+            const normalizedModeKey = modeKey.toLowerCase();
+            const entries = Object.entries(resultImages);
+
+            const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
+            const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
+            if (directMatch?.[1]) return directMatch[1];
+
+            const fallback = entries.find(([key]) => key.toLowerCase().includes(normalizedModeKey));
+            return fallback?.[1] ?? null;
+        },
+        [resultImages],
+    );
+
+    const updateDisplayedImageFromResult = useCallback(
+        (selection: { modeKey: string; resultType: "orig" | "pred"; colorTitle: string; styleTitle: string }) => {
+            const resultImage = getResultImageForSelection(selection);
+            if (resultImage) {
+                const formatted = formatBase64ToDataUri(resultImage);
+                if (formatted) {
+                    setDisplayedImageUri(formatted);
+                    return;
+                }
+            }
+            setDisplayedImageUri(uri ?? null);
+        },
+        [uri, getResultImageForSelection, formatBase64ToDataUri],
+    );
+
+    const handleImageChange = useCallback(
+        async (change: ImageChange) => {
+            // Handle note changes separately
+            if (change.type === "note") {
+                const noteData = change.data as { notes: Note[] };
+                setNotes(noteData.notes);
+            }
+
+            setImageChanges((prev) => {
+                const filtered = prev.filter((c) => c.type !== change.type);
+                return [...filtered, change];
+            });
+
+            if (change.type === "adjust") {
+                const adjustments = change.data as AdjustChange;
+                setAdjustmentValues(adjustments);
+            } else if (change.type === "magic") {
+                const { color, style } = change.data as MagicChange;
+                if (color?.modeKey && style?.resultType) {
+                    const selection = {
+                        modeKey: color.modeKey,
+                        resultType: style.resultType,
+                        colorTitle: color.title,
+                        styleTitle: style.title,
+                    };
+                    setMagicSelection(selection);
+                    updateDisplayedImageFromResult(selection);
+                }
+            }
+        },
+        [updateDisplayedImageFromResult],
+    );
 
     useEffect(() => {
         hasRequestedRef.current = false;
@@ -406,40 +449,7 @@ export default function ImageEditorScreen() {
     useEffect(() => {
         if (!magicSelection) return;
         updateDisplayedImageFromResult(magicSelection);
-    }, [magicSelection, resultImages]);
-
-    const formatBase64ToDataUri = (value: string) => {
-        if (!value) return null;
-        return value.startsWith("data:") ? value : `data:image/png;base64,${value}`;
-    };
-
-    const getResultImageForSelection = (selection: { modeKey: string; resultType: "orig" | "pred" }) => {
-        const { modeKey, resultType } = selection;
-        if (!modeKey) return null;
-        const normalizedModeKey = modeKey.toLowerCase();
-        const entries = Object.entries(resultImages);
-
-        const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
-        const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
-        if (directMatch?.[1]) return directMatch[1];
-
-        const fallback = entries.find(([key]) => key.toLowerCase().includes(normalizedModeKey));
-        return fallback?.[1] ?? null;
-    };
-
-    const updateDisplayedImageFromResult = (selection: { modeKey: string; resultType: "orig" | "pred"; colorTitle: string; styleTitle: string }) => {
-        const resultImage = getResultImageForSelection(selection);
-        if (resultImage) {
-            const formatted = formatBase64ToDataUri(resultImage);
-            if (formatted) {
-                console.log("🖼️ نمایش:", selection.colorTitle);
-                setDisplayedImageUri(formatted);
-                return;
-            }
-        }
-        console.log("🖼️ نمایش:", "اصلی");
-        setDisplayedImageUri(uri ?? null);
-    };
+    }, [magicSelection, updateDisplayedImageFromResult]);
 
     useEffect(() => {
         const processImage = async () => {
@@ -460,9 +470,11 @@ export default function ImageEditorScreen() {
                 if (imageBase64) {
                     const result = await sendImageToAPI(imageBase64);
                     setResultImages(result);
+                } else {
+                    Alert.alert("Error", "Failed to process image. Please try again.");
                 }
-            } catch (error) {
-                console.error("❌ Error processing image:", error);
+            } catch {
+                // Error already handled in sendImageToAPI or convertImageToBase64
             } finally {
                 setIsProcessing(false);
                 setIsLoading(false);
@@ -470,15 +482,19 @@ export default function ImageEditorScreen() {
         };
 
         processImage();
-    }, [uri, activeTool]);
+    }, [uri, activeTool, convertImageToBase64, sendImageToAPI]);
 
-    const renderActiveToolPanel = () => {
-        const imageUri = uri || "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900";
+    const renderActiveToolPanel = useCallback(() => {
+        const imageUri = uri || DEFAULT_IMAGE_URI;
         const commonProps = {
             imageUri,
             onChange: handleImageChange,
-            onApply: () => console.log("Apply changes"),
-            onCancel: () => console.log("Cancel changes"),
+            onApply: () => {
+                // Apply changes handler
+            },
+            onCancel: () => {
+                // Cancel changes handler
+            },
         };
 
         switch (activeTool) {
@@ -495,11 +511,11 @@ export default function ImageEditorScreen() {
             default:
                 return null;
         }
-    };
+    }, [uri, handleImageChange, notes, activeNoteId]);
 
-    const handleDone = () => {
+    const handleDone = useCallback(() => {
         router.back();
-    };
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -547,13 +563,10 @@ export default function ImageEditorScreen() {
                             style={styles.imageContainer}
                             onLayout={(event) => {
                                 const { width, height, x, y } = event.nativeEvent.layout;
-                                console.log("🟣🟣🟣 IMAGE CONTAINER LAYOUT 🟣🟣🟣");
-                                console.log("📏 Width:", width, "Height:", height);
-                                console.log("📍 X:", x, "Y:", y);
                                 setImageContainerLayout({ width, height, x, y });
                             }}
                         >
-                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} style={styles.image} adjustments={adjustmentValues} />
 
                             {/* Note Markers Overlay */}
                             {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}

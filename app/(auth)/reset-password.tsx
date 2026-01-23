@@ -2,9 +2,9 @@ import { BaseButton, BaseText, ControlledInput } from "@/components";
 import { useForgetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Animated, Keyboard, Platform, ScrollView, View } from "react-native";
+import { Alert, Animated, Keyboard, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z.object({
@@ -26,12 +26,17 @@ export default function ResetPassword() {
         },
     });
     const email = watch("email");
-    const { mutate: resetPassword, isPending: isResetting } = useForgetPassword(() => {
-        router.push({
-            pathname: "/(auth)/otp",
-            params: { email, forgetPassword: "true" },
-        });
-    });
+    const { mutate: resetPassword, isPending: isResetting } = useForgetPassword(
+        () => {
+            router.push({
+                pathname: "/(auth)/otp",
+                params: { email, forgetPassword: "true" },
+            });
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to send reset code. Please try again.");
+        },
+    );
 
     // انیمیشن برای دکمه Reset Password
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
@@ -63,9 +68,12 @@ export default function ResetPassword() {
         };
     }, [bottomSectionTranslateY]);
 
-    const onSubmit = (data: ResetPasswordFormData) => {
-        resetPassword(data);
-    };
+    const onSubmit = useCallback(
+        (data: ResetPasswordFormData) => {
+            resetPassword(data);
+        },
+        [resetPassword],
+    );
     return (
         <View style={{ flex: 1, backgroundColor: "white" }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, backgroundColor: "white" }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
@@ -95,7 +103,7 @@ export default function ResetPassword() {
                     transform: [{ translateY: bottomSectionTranslateY }],
                 }}
             >
-                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
+                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Password" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
             </Animated.View>
         </View>
     );

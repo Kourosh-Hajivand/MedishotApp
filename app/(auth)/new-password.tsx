@@ -2,9 +2,9 @@ import { BaseButton, BaseText, ControlledInput } from "@/components";
 import { useResetPassword } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Animated, Keyboard, Platform, ScrollView, TextInput, View } from "react-native";
+import { Alert, Animated, Keyboard, Platform, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import z from "zod";
 const ResetPasswordFormDataSchema = z
@@ -31,9 +31,14 @@ export default function NewPassword() {
             confirmPassword: "",
         },
     });
-    const { mutate: resetPassword, isPending: isResetting } = useResetPassword(() => {
-        router.push("/(auth)/login");
-    });
+    const { mutate: resetPassword, isPending: isResetting } = useResetPassword(
+        () => {
+            router.push("/(auth)/login");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to reset password. Please try again.");
+        },
+    );
 
     // انیمیشن برای دکمه Reset Password
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
@@ -70,9 +75,12 @@ export default function NewPassword() {
         };
     }, [bottomSectionTranslateY]);
 
-    const onSubmit = (data: ResetPasswordFormData) => {
-        resetPassword({ password: data.password, password_confirmation: data.confirmPassword });
-    };
+    const onSubmit = useCallback(
+        (data: ResetPasswordFormData) => {
+            resetPassword({ password: data.password, password_confirmation: data.confirmPassword });
+        },
+        [resetPassword],
+    );
     return (
         <View style={{ flex: 1, backgroundColor: "white" }}>
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, backgroundColor: "white" }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
@@ -103,7 +111,7 @@ export default function NewPassword() {
                     transform: [{ translateY: bottomSectionTranslateY }],
                 }}
             >
-                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Pasword" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
+                <BaseButton ButtonStyle="Filled" size="Large" label="Reset Password" className="!rounded-2xl" isLoading={isResetting} disabled={isResetting} onPress={handleSubmit(onSubmit)} />
             </Animated.View>
         </View>
     );

@@ -1,9 +1,9 @@
 import { useInitiateRegistration } from "@/utils/hook";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { router } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Animated, Keyboard, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, Keyboard, Platform, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BaseButton, BaseText, ControlledInput } from "../../components";
 import { spacing } from "../../styles/spaces";
@@ -30,15 +30,20 @@ export const SignUpScreen: React.FC = () => {
         mutate: initiateRegistration,
         isPending: isInitiateRegistrationPending,
         error: initiateRegistrationError,
-    } = useInitiateRegistration((data) => {
-        router.push({
-            pathname: "/(auth)/otp",
-            params: {
-                email: watch("email"),
-                password: watch("password"),
-            },
-        });
-    });
+    } = useInitiateRegistration(
+        (data) => {
+            router.push({
+                pathname: "/(auth)/otp",
+                params: {
+                    email: watch("email"),
+                    password: watch("password"),
+                },
+            });
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to create account. Please try again.");
+        },
+    );
 
     // انیمیشن برای دکمه Create Account
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
@@ -76,9 +81,12 @@ export const SignUpScreen: React.FC = () => {
         };
     }, [bottomSectionTranslateY]);
 
-    const onSubmit = async (data: SignUpFormData) => {
-        initiateRegistration(data);
-    };
+    const onSubmit = useCallback(
+        async (data: SignUpFormData) => {
+            initiateRegistration(data);
+        },
+        [initiateRegistration],
+    );
 
     return (
         <View style={styles.container}>

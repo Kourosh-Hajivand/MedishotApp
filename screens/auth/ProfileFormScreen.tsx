@@ -7,7 +7,7 @@ import { routes } from "@/routes/routes";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook";
-import { People } from "@/utils/service/models/ResponseModels";
+import { People, TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Control, FieldErrors, useForm, UseFormHandleSubmit } from "react-hook-form";
@@ -124,18 +124,15 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
+        (response: TempUploadResponse | { data: TempUploadResponse }) => {
             // Handle both wrapped and unwrapped response structures
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            const tempResponse = response as TempUploadResponse | { data: TempUploadResponse };
+            const filename = ("data" in tempResponse ? tempResponse.data?.filename : tempResponse.filename) || null;
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
             setHasImageChanged(true); // Mark that image was changed and uploaded
         },
         (error) => {
-            if (__DEV__) {
-                console.error("Error uploading image:", error);
-            }
             setLocalImageUri(null);
             setUploadedFilename(null);
             setHasImageChanged(false); // Reset on error
@@ -172,7 +169,6 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             // Don't set uploadedFilename for existing images - only for newly uploaded ones
             // This way we only send profile_photo to backend if image was changed
             if (initialData.profile_photo_url && !localImageUri) {
-                console.log("🖼️ [INIT] Existing profile image found:", initialData.profile_photo_url);
                 // Don't set uploadedFilename here - we only want to send it if image was changed
                 setHasImageChanged(false);
             }
@@ -217,17 +213,21 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : "image/jpeg";
 
-            const file = {
+            interface FileUpload {
+                uri: string;
+                type: string;
+                name: string;
+            }
+
+            const file: FileUpload = {
                 uri: result.uri,
                 type: type,
                 name: filename,
-            } as any;
+            };
 
             uploadImage(file);
         } catch (error) {
-            if (__DEV__) {
-                console.error("Error preparing image for upload:", error);
-            }
+            // Error handled silently
         }
     };
 
