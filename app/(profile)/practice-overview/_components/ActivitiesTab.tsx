@@ -1,11 +1,12 @@
 import { ActivityItem, BaseText } from "@/components";
+import { ActivitySkeleton } from "@/components/skeleton/ActivitySkeleton";
 import { colors } from "@/theme/colors";
 import { useGetPracticeActivities } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import dayjs from "dayjs";
 import React, { useMemo } from "react";
-import { ActivityIndicator, View } from "react-native";
+import { View } from "react-native";
 
 interface ActivitiesTabProps {
     practiceId?: number;
@@ -43,8 +44,10 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
 
     if (isLoading) {
         return (
-            <View className="flex-1 items-center justify-center py-12">
-                <ActivityIndicator size="large" color={colors.system.blue} />
+            <View className="pb-4">
+                {Array.from({ length: 5 }).map((_, index) => (
+                    <ActivitySkeleton key={`skeleton-${index}`} showDate={index === 0 || index === 2} showBorder={index < 4} />
+                ))}
             </View>
         );
     }

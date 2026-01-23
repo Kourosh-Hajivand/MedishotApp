@@ -1,9 +1,10 @@
 import { ActivityItem, BaseText, ErrorState } from "@/components";
+import { ActivitySkeleton } from "@/components/skeleton/ActivitySkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import React, { useCallback } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface ActivitiesTabContentProps {
@@ -24,7 +25,9 @@ export const ActivitiesTabContent: React.FC<ActivitiesTabContentProps> = React.m
     if (isLoading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.system.blue} />
+                {Array.from({ length: 5 }).map((_, index) => (
+                    <ActivitySkeleton key={`skeleton-${index}`} showDate={index === 0 || index === 2} showBorder={index < 4} />
+                ))}
             </View>
         );
     }

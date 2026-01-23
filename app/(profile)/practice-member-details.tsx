@@ -1,5 +1,7 @@
 import { ActivityItem, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
+import { AvatarSkeleton, Skeleton } from "@/components/skeleton";
+import { ActivitySkeleton } from "@/components/skeleton/ActivitySkeleton";
 import { useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import { Button, Host, Picker } from "@expo/ui/swift-ui";
@@ -24,7 +26,7 @@ interface MemberData {
 }
 
 // Component for Activities tab
-const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
+const MemberActivities = ({ memberData, isLoading }: { memberData?: MemberData; isLoading?: boolean }) => {
     return (
         <View className="gap-3">
             <View className="px-4">
@@ -32,7 +34,11 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
                     Recent Activities
                 </BaseText>
             </View>
-            {memberData?.activities && memberData.activities.length > 0 ? (
+            {isLoading || !memberData ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                    <ActivitySkeleton key={`skeleton-${index}`} showDate={index === 0} showBorder={index < 4} />
+                ))
+            ) : memberData.activities && memberData.activities.length > 0 ? (
                 memberData.activities.map((activity, index) => <ActivityItem key={index} activity={activity as ActivityLog} showBorder={false} />)
             ) : (
                 <View className="items-center py-8">
@@ -46,7 +52,7 @@ const MemberActivities = ({ memberData }: { memberData?: MemberData }) => {
 };
 
 // Component for Patients tab
-const MemberPatients = ({ memberData, practiceId }: { memberData?: MemberData; practiceId?: number }) => {
+const MemberPatients = ({ memberData, practiceId, isLoadingMemberData }: { memberData?: MemberData; practiceId?: number; isLoadingMemberData?: boolean }) => {
     const { data: patients, isLoading: isPatientsLoading } = useGetPatients(practiceId || 0, { doctor_id: memberData?.id });
 
     // Helper function to get email as string
@@ -67,13 +73,25 @@ const MemberPatients = ({ memberData, practiceId }: { memberData?: MemberData; p
         return "";
     };
 
+    const isLoading = isPatientsLoading || isLoadingMemberData || !memberData;
+
     return (
         <View className="gap-3 px-4">
             <BaseText type="Headline" weight={600} color="labels.primary">
                 Patients Statistics
             </BaseText>
 
-            {patients?.data && patients?.data?.length > 0 ? (
+            {isLoading ? (
+                Array.from({ length: 5 }).map((_, index) => (
+                    <View key={`patient-skeleton-${index}`} className={`flex-row items-center gap-3 ${index < 4 ? "pb-2 border-b border-system-gray5" : ""}`}>
+                        <AvatarSkeleton size={34} rounded={99} />
+                        <View className="flex-col gap-2">
+                            <Skeleton width={120} height={16} borderRadius={4} />
+                            <Skeleton width={150} height={14} borderRadius={4} />
+                        </View>
+                    </View>
+                ))
+            ) : patients?.data && patients?.data?.length > 0 ? (
                 patients.data.map((patient, index) => {
                     const emailString = getEmailString(patient.email);
                     return (
@@ -153,17 +171,27 @@ export default function PracticeMemberDetailsScreen() {
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + 60 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             <View className="gap-3">
-                <View className="flex-row items-center gap-2 px-4 ">
-                    <Avatar size={54} rounded={99} name={memberData?.data?.first_name && memberData?.data?.last_name ? memberData.data.first_name + " " + memberData.data.last_name : memberData?.data?.email || ""} imageUrl={memberData?.data?.image?.url} color={memberData?.data?.color} />
-                    <View className="gap-0">
-                        <BaseText type="Title3" weight={600} color="labels.primary">
-                            {memberData?.data?.first_name && memberData?.data?.last_name ? `${memberData.data.first_name} ${memberData.data.last_name}` : memberData?.data?.email}
-                        </BaseText>
-                        <BaseText type="Subhead" weight={400} color="labels.secondary" className="capitalize">
-                            {memberData?.data?.role}
-                        </BaseText>
+                {isLoading ? (
+                    <View className="flex-row items-center gap-2 px-4">
+                        <AvatarSkeleton size={54} rounded={99} />
+                        <View className="gap-2">
+                            <Skeleton width={150} height={20} borderRadius={4} />
+                            <Skeleton width={100} height={16} borderRadius={4} />
+                        </View>
                     </View>
-                </View>
+                ) : (
+                    <View className="flex-row items-center gap-2 px-4 ">
+                        <Avatar size={54} rounded={99} name={memberData?.data?.first_name && memberData?.data?.last_name ? memberData.data.first_name + " " + memberData.data.last_name : memberData?.data?.email || ""} imageUrl={memberData?.data?.image?.url} color={memberData?.data?.color} />
+                        <View className="gap-0">
+                            <BaseText type="Title3" weight={600} color="labels.primary">
+                                {memberData?.data?.first_name && memberData?.data?.last_name ? `${memberData.data.first_name} ${memberData.data.last_name}` : memberData?.data?.email}
+                            </BaseText>
+                            <BaseText type="Subhead" weight={400} color="labels.secondary" className="capitalize">
+                                {memberData?.data?.role}
+                            </BaseText>
+                        </View>
+                    </View>
+                )}
                 <View className="pt-2 border-t border-system-gray5 ">
                     <View className="px-4">
                         <Host style={{ width: "100%", height: 38 }}>
@@ -179,7 +207,7 @@ export default function PracticeMemberDetailsScreen() {
                         </Host>
                     </View>
 
-                    <View className="mt-4">{pickerType === 0 ? <MemberActivities memberData={memberData?.data} /> : <MemberPatients memberData={memberData?.data} practiceId={parseInt(practiceId || "0")} />}</View>
+                    <View className="mt-4">{pickerType === 0 ? <MemberActivities memberData={memberData?.data} isLoading={isLoading} /> : <MemberPatients memberData={memberData?.data} practiceId={parseInt(practiceId || "0")} isLoadingMemberData={isLoading} />}</View>
                 </View>
             </View>
         </ScrollView>
