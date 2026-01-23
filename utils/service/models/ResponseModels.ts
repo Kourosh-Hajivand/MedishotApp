@@ -148,6 +148,9 @@ export interface Practice {
     metadata?: PracticeMetadata | string; // Can be object or JSON string
     created_by?: People;
     patients_count?: number;
+    members_count?: number;
+    taken_images_count?: number;
+    consents_count?: number;
     role?: "owner" | "doctor" | "staff";
     subscriptions?: Subscription[];
     current_subscription?: Subscription;

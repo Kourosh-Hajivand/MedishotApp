@@ -1,24 +1,12 @@
 import { BaseText } from "@/components";
-import { useGetPatients } from "@/utils/hook/usePatient";
-import { useGetPracticeMembers, useGetRecentlyPhotos } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import React, { useMemo } from "react";
+import React from "react";
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export function OverviewStatisticsSection() {
     const { selectedPractice } = useProfileStore();
-    const { data: recentPhotos } = useGetRecentlyPhotos(selectedPractice?.id ?? 0, !!selectedPractice?.id);
-    const { data: patientsData } = useGetPatients(selectedPractice?.id);
-    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, !!selectedPractice?.id);
     const { bottom } = useSafeAreaInsets();
-    // Get all consents from all patients (for practice overview)
-    const allConsents = useMemo(() => {
-        if (!patientsData?.data) return [];
-        // This would need to fetch contracts for each patient, but for now we'll use a placeholder
-        // In a real implementation, you'd need an API endpoint for practice-level consents
-        return [];
-    }, [patientsData?.data]);
 
     return (
         <View style={{ paddingBottom: bottom }} className="bg-white px-4 py-3 gap-4">
@@ -31,7 +19,7 @@ export function OverviewStatisticsSection() {
                         Total Image Taken
                     </BaseText>
                     <BaseText type="Title2" weight="700" color="labels.primary">
-                        {recentPhotos?.data?.length ? recentPhotos.data.length * 100 : 0}
+                        {selectedPractice?.taken_images_count ?? 0}
                     </BaseText>
                 </View>
                 <View style={{ width: 0.33, height: 62, backgroundColor: "#c6c6c8" }} />
@@ -40,7 +28,7 @@ export function OverviewStatisticsSection() {
                         Total Consent Signed
                     </BaseText>
                     <BaseText type="Title2" weight="700" color="labels.primary">
-                        {allConsents.length}
+                        {selectedPractice?.consents_count ?? 0}
                     </BaseText>
                 </View>
             </View>
@@ -60,7 +48,7 @@ export function OverviewStatisticsSection() {
                         Team members
                     </BaseText>
                     <BaseText type="Title2" weight="700" color="labels.primary">
-                        {selectedPractice?.patients_count ?? 0}
+                        {selectedPractice?.members_count ?? 0}
                     </BaseText>
                 </View>
             </View>

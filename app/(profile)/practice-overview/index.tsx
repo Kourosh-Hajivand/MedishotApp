@@ -4,7 +4,6 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import { colors } from "@/theme/colors";
 import { formatDate } from "@/utils/helper/dateUtils";
-import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import React, { useRef, useState } from "react";
 import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -14,7 +13,6 @@ import { ActivitiesTab, OverviewTab, TeamTab } from "./_components";
 export default function PracticeOverviewScreen() {
     const insets = useSafeAreaInsets();
     const { selectedPractice } = useProfileStore();
-    const { profile, isAuthenticated } = useAuth();
     const [isExpanded, setIsExpanded] = useState(true);
     const tabs = ["Overview", "Team", "Activities"];
     const screenWidth = Dimensions.get("window").width;
