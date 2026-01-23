@@ -11,8 +11,9 @@ import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { PatientMedia, PatientMediaImage, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
+import { PatientMedia, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
+import { useFocusEffect } from "@react-navigation/native";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Linking, ScrollView, Share, TouchableOpacity, View } from "react-native";
@@ -111,13 +112,12 @@ export default function PatientDetailsScreen() {
             const isTemplateMedia = 'template' in media && 'images' in media;
             
             if (isTemplateMedia && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: extract images from template.images array
-                media.images.forEach((img: PatientMediaImage) => {
-                    const imageUrl = typeof img.image === 'string' ? img.image : null;
-                    if (imageUrl) {
-                        map.set(imageUrl, mediaId);
-                    }
-                });
+                // PatientMediaWithTemplate: only add original_media to map (for list display)
+                // All template images will be accessible in modal via rawMediaData
+                const templateMedia = media as PatientMediaWithTemplate;
+                if (templateMedia.original_media?.url) {
+                    map.set(templateMedia.original_media.url, mediaId);
+                }
             } else if (!isTemplateMedia) {
                 // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
@@ -143,13 +143,12 @@ export default function PatientDetailsScreen() {
             const isBookmarked = !isTemplateMedia ? (media as PatientMedia).is_bookmarked ?? false : false;
 
             if (isTemplateMedia && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: extract images from template.images array
-                media.images.forEach((img: PatientMediaImage) => {
-                    const imageUrl = typeof img.image === 'string' ? img.image : null;
-                    if (imageUrl) {
-                        map.set(imageUrl, isBookmarked);
-                    }
-                });
+                // PatientMediaWithTemplate: only add original_media to bookmark map (for list display)
+                // All template images will be accessible in modal via rawMediaData
+                const templateMedia = media as PatientMediaWithTemplate;
+                if (templateMedia.original_media?.url) {
+                    map.set(templateMedia.original_media.url, isBookmarked);
+                }
             } else if (!isTemplateMedia) {
                 // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
@@ -192,15 +191,12 @@ export default function PatientDetailsScreen() {
 
             // Type guard: check if it's PatientMediaWithTemplate
             if ('template' in media && 'images' in media && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: extract images from template.images array
+                // PatientMediaWithTemplate: only show original_media in list (composite image)
+                // All template images will be shown in modal when clicking on original_media
                 const templateMedia = media as PatientMediaWithTemplate;
-                templateMedia.images.forEach((img: PatientMediaImage) => {
-                    const imageUrl = typeof img.image === 'string' ? img.image : null;
-                    if (imageUrl) {
-                        const imgTimestamp = img.created_at ? new Date(img.created_at).getTime() : timestamp;
-                        dateImages.push({ url: imageUrl, timestamp: imgTimestamp });
-                    }
-                });
+                if (templateMedia.original_media?.url) {
+                    dateImages.push({ url: templateMedia.original_media.url, timestamp });
+                }
             } else {
                 // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
@@ -461,43 +457,16 @@ export default function PatientDetailsScreen() {
         return () => scrollY.removeListener(sub);
     }, [navigation, patient?.data, animationEnd]);
 
-    // Show error state if there's an error with patient data
-    if (isPatientError) {
-        const errorMessage = (patientError as any)?.message || "Failed to load patient data. Please try again.";
-        return (
-            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
-                <ScrollView 
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ 
-                        paddingTop: headerHeight,
-                        paddingBottom: safe.bottom + spacing["4"] 
-                    }}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <ErrorState message={errorMessage} onRetry={refetchPatient} title="Failed to load patient" />
-                </ScrollView>
-            </View>
-        );
-    }
+    // Refetch media data when screen is focused (e.g., after uploading new photos)
+    useFocusEffect(
+        useCallback(() => {
+            if (id) {
+                refetchPatientMedia();
+            }
+        }, [id, refetchPatientMedia])
+    );
 
-    if (isLoading) {
-        return (
-            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
-                <ScrollView 
-                    style={{ flex: 1 }}
-                    contentContainerStyle={{ 
-                        paddingTop: headerHeight,
-                        paddingBottom: safe.bottom + spacing["4"] 
-                    }}
-                    showsVerticalScrollIndicator={false}
-                >
-                    <PatientDetailSkeleton />
-                </ScrollView>
-            </View>
-        );
-    }
-
-
+    // Define DATA and renderRow hooks before any early returns
     const DATA: { key: RowKind }[] = useMemo(() => [{ key: "header" }, { key: "tabs" }, { key: "content" }], []);
     const renderRow = useCallback(({ item }: { item: { key: RowKind } }) => {
         if (item.key === "header") {
@@ -627,9 +596,7 @@ export default function PatientDetailsScreen() {
                     </View>
                 </>
             );
-        }
-
-        if (item.key === "tabs") {
+        } else if (item.key === "tabs") {
             return (
                 <View className="bg-white border-t  border-t-white" style={{ borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 100 }}>
                     <View className="px-5">
@@ -659,7 +626,8 @@ export default function PatientDetailsScreen() {
             );
         }
 
-        return (
+        if (item.key === "content") {
+            return (
             <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
                 {activeTab === 0 && (
                     isPatientMediaError ? (
@@ -732,6 +700,7 @@ export default function PatientDetailsScreen() {
                         imageUrlToBookmarkMap={imageUrlToBookmarkMap}
                         patientId={id}
                         rawMediaData={patientMediaData?.data}
+                        description="Date"
                     />
                     )
                 )}
@@ -758,7 +727,46 @@ export default function PatientDetailsScreen() {
                 {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
             </View>
         );
-    }, [activeTab, patient, patientAge, id, headerHeight, safe, tabs, tabWidth, translateX, handleTabPress, handleCall, handleMessage, scanDocument, groupedPatientImages, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientMediaData?.data, isPatientMediaError, patientMediaError, refetchPatientMedia, documentsData?.data, isLoadingDocuments, documentsError, isDocumentsError, refetchDocuments, activitiesData?.data, isLoadingActivities, activitiesError, isActivitiesError, refetchActivities, screenHeight, handleArchiveImage]);
+        }
+        return null as any;
+    }, [activeTab, patient, patientAge, id, headerHeight, safe, tabs, tabWidth, translateX, handleTabPress, handleCall, handleMessage, scanDocument, groupedPatientImages, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientMediaData?.data, isPatientMediaError, patientMediaError, refetchPatientMedia, documentsData?.data, isLoadingDocuments, documentsError, isDocumentsError, refetchDocuments, activitiesData?.data, isLoadingActivities, activitiesError, isActivitiesError, refetchActivities, screenHeight, handleArchiveImage, setImageEditorUri, setImageEditorTool, setImageEditorVisible]);
+
+    // Show error state if there's an error with patient data
+    if (isPatientError) {
+        const errorMessage = (patientError as any)?.message || "Failed to load patient data. Please try again.";
+        return (
+            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
+                <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ 
+                        paddingTop: headerHeight,
+                        paddingBottom: safe.bottom + spacing["4"] 
+                    }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <ErrorState message={errorMessage} onRetry={refetchPatient} title="Failed to load patient" />
+                </ScrollView>
+            </View>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
+                <ScrollView 
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ 
+                        paddingTop: headerHeight,
+                        paddingBottom: safe.bottom + spacing["4"] 
+                    }}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <PatientDetailSkeleton />
+                </ScrollView>
+            </View>
+        );
+    }
+
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>

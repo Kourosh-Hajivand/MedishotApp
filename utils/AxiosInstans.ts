@@ -14,6 +14,12 @@ const axiosInstance = axios.create({
 // Flag to prevent multiple redirects to error page
 let isRedirectingToError = false;
 
+// Track network error retries globally (not per request)
+let networkErrorRetryCount = 0;
+const MAX_NETWORK_RETRIES = 3;
+let isRedirectingToOffline = false;
+let networkErrorResetTimer: ReturnType<typeof setTimeout> | null = null;
+
 // Helper function to format request/response for logging
 const formatRequestForLog = (config: AxiosRequestConfig) => {
     const method = (config.method || "GET").toUpperCase();
@@ -131,6 +137,16 @@ axiosInstance.interceptors.response.use(
         // Reset redirect flag on successful response
         isRedirectingToError = false;
 
+        // Reset network error retry count on successful response
+        networkErrorRetryCount = 0;
+        isRedirectingToOffline = false;
+        
+        // Clear any pending reset timer
+        if (networkErrorResetTimer) {
+            clearTimeout(networkErrorResetTimer);
+            networkErrorResetTimer = null;
+        }
+
         // Log response in development mode
         if (__DEV__) {
             const responseInfo = formatResponseForLog(response);
@@ -197,6 +213,61 @@ axiosInstance.interceptors.response.use(
             throw error;
         }
 
+        // Handle Network Errors (no response received)
+        if (!error.response && error.request && !isRedirectingToOffline) {
+            // Check if this is a network error (no internet connection)
+            const isNetworkError = 
+                error.code === "ERR_NETWORK" || 
+                error.code === "ECONNABORTED" || 
+                error.code === "ETIMEDOUT" ||
+                error.message?.toLowerCase().includes("network") ||
+                error.message?.toLowerCase().includes("timeout");
+
+            if (isNetworkError) {
+                networkErrorRetryCount += 1;
+
+                // Clear any existing reset timer
+                if (networkErrorResetTimer) {
+                    clearTimeout(networkErrorResetTimer);
+                }
+
+                // Set a timer to reset retry count after 10 seconds (in case internet comes back)
+                networkErrorResetTimer = setTimeout(() => {
+                    networkErrorRetryCount = 0;
+                    isRedirectingToOffline = false;
+                    networkErrorResetTimer = null;
+                }, 10000);
+
+                // If we've had 3 network errors, navigate to offline page
+                if (networkErrorRetryCount >= MAX_NETWORK_RETRIES) {
+                    isRedirectingToOffline = true;
+                    
+                    // Clear reset timer since we're navigating
+                    if (networkErrorResetTimer) {
+                        clearTimeout(networkErrorResetTimer);
+                        networkErrorResetTimer = null;
+                    }
+                    
+                    // Navigate to offline page
+                    try {
+                        router.replace("/offline");
+                    } catch (navError) {
+                        // Navigation error handled silently
+                    }
+                }
+            }
+        } else if (error.response) {
+            // If we got a response (not a network error), reset retry count
+            networkErrorRetryCount = 0;
+            isRedirectingToOffline = false;
+            
+            // Clear any pending reset timer
+            if (networkErrorResetTimer) {
+                clearTimeout(networkErrorResetTimer);
+                networkErrorResetTimer = null;
+            }
+        }
+
         // Handle 401 Unauthorized errors
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
@@ -230,5 +301,15 @@ axiosInstance.interceptors.response.use(
         throw error;
     },
 );
+
+// Export function to reset network error retry count (used when internet comes back)
+export const resetNetworkErrorRetryCount = () => {
+    networkErrorRetryCount = 0;
+    isRedirectingToOffline = false;
+    if (networkErrorResetTimer) {
+        clearTimeout(networkErrorResetTimer);
+        networkErrorResetTimer = null;
+    }
+};
 
 export default axiosInstance;

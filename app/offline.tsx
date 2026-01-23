@@ -2,6 +2,7 @@ import { BaseButton, BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import { useNetworkStatus } from "@/utils/hook";
+import axiosInstance, { resetNetworkErrorRetryCount } from "@/utils/AxiosInstans";
 import { router, useSegments } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -28,6 +29,9 @@ export default function OfflineScreen() {
     useEffect(() => {
         const isOnOfflinePage = segments.some((segment) => segment === "offline");
         if (!isOffline && isOnOfflinePage) {
+            // Reset network error retry count when internet comes back
+            resetNetworkErrorRetryCount();
+            
             const timer = setTimeout(() => {
                 navigateAway();
             }, 100);

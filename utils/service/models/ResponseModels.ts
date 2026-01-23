@@ -757,7 +757,7 @@ export interface PatientMediaImage {
     patient_media_id: number;
     gost_id: number;
     notes: string | null;
-    image: string | null;
+    image: Media | string | null; // Can be Media object or string URL
     gost: Gost;
     created_at: string;
     updated_at: string;
@@ -772,6 +772,10 @@ export interface PatientMediaWithTemplate {
     taker_id: number | null;
     template: Template | null; // OpenAPI: template field
     images: PatientMediaImage[];
+    original_media?: Media | null; // Composite/preview image
+    edited_media?: Media | null;
+    is_bookmarked?: boolean;
+    taker?: People;
     created_at: string;
     updated_at: string;
 }

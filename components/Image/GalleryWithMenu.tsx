@@ -79,6 +79,8 @@ interface GalleryWithMenuProps {
     actions?: ViewerActionsConfig;
     // Raw media data from API (with template and images structure) - used to build originalMediaToAllImagesMap internally
     rawMediaData?: RawMediaData[];
+    // Display description option for ImageViewerModal: "Date" to show when photo was taken, "taker" to show who took it
+    description?: "Date" | "taker";
 }
 
 const { width } = Dimensions.get("window");
@@ -98,6 +100,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     patientId,
     actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
     rawMediaData,
+    description = "taker",
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
@@ -305,6 +308,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}
                 imageUrlToCreatedAtMap={imageUrlToCreatedAtMap}
                 patientId={patientId}
+                rawMediaData={rawMediaData}
+                description={description}
                 actions={{
                     showBookmark,
                     showEdit,

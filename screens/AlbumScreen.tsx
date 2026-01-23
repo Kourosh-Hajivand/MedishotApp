@@ -56,13 +56,28 @@ export const AlbumScreen: React.FC = () => {
             id: number | string;
             template?: {
                 id: number | string;
-                [key: string]: unknown;
+                [key: string]: any;
             } | null;
             original_media?: {
                 url: string;
-                [key: string]: unknown;
+                [key: string]: any;
             } | null;
-            [key: string]: unknown;
+            taker?: {
+                id?: number;
+                first_name?: string | null;
+                last_name?: string | null;
+                email?: string | null;
+            } | null;
+            created_at?: string;
+            images?: Array<{
+                image?: {
+                    url: string;
+                    [key: string]: any;
+                } | null;
+                created_at?: string;
+                [key: string]: any;
+            }>;
+            [key: string]: any;
         }
 
         const mediaArray: RawMediaDataItem[] = [];
@@ -72,18 +87,22 @@ export const AlbumScreen: React.FC = () => {
                     // Type guard: check if mediaItem has template property
                     // PatientMedia can have template in data field or as extended property
                     const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
-                    const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === 'object' && 'template' in mediaWithTemplate.data);
-                    if (hasTemplate && mediaWithTemplate.original_media?.url) {
-                        mediaArray.push({
-                            id: mediaItem.id,
-                            template: mediaWithTemplate.template ? {
-                                id: (mediaWithTemplate.template as { id?: number | string }).id || mediaItem.id,
-                            } as { id: number | string; [key: string]: unknown } : null,
-                            original_media: mediaWithTemplate.original_media ? {
-                                url: mediaWithTemplate.original_media.url,
-                            } : null,
-                        });
-                    }
+                    
+                    // Add all media items (both template and non-template) to rawMediaData
+                    // This ensures taker and created_at are available for all media items
+                    const rawItem: RawMediaDataItem = {
+                        id: mediaItem.id,
+                        template: mediaWithTemplate.template ? {
+                            id: (mediaWithTemplate.template as { id?: number | string }).id || mediaItem.id,
+                        } as { id: number | string; [key: string]: any } : null,
+                        original_media: mediaWithTemplate.original_media ? {
+                            url: mediaWithTemplate.original_media.url,
+                        } : null,
+                        taker: mediaWithTemplate.taker || null,
+                        created_at: mediaWithTemplate.created_at ? mediaWithTemplate.created_at : undefined,
+                        images: mediaWithTemplate.images ? (mediaWithTemplate.images as any[]) : undefined,
+                    };
+                    mediaArray.push(rawItem);
                 });
             }
         });
@@ -660,6 +679,7 @@ export const AlbumScreen: React.FC = () => {
                             initialColumns={2}
                             minColumns={2}
                             maxColumns={6}
+                            description="taker"
                         />
                     ) : (
                         <View style={styles.emptyGalleryContainer}>

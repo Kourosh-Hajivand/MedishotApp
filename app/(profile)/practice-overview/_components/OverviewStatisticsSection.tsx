@@ -12,7 +12,6 @@ export function OverviewStatisticsSection() {
     const { data: patientsData } = useGetPatients(selectedPractice?.id);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, !!selectedPractice?.id);
     const { bottom } = useSafeAreaInsets();
-
     // Get all consents from all patients (for practice overview)
     const allConsents = useMemo(() => {
         if (!patientsData?.data) return [];

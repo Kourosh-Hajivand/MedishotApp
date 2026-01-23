@@ -36,16 +36,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     }, [segments]);
 
     useEffect(() => {
-        // Check network status first - if offline, redirect to offline page
-        if (isOffline && !isPublicRoute) {
-            // Only redirect if not already on offline page
-            const isOnOfflinePage = segments.some((segment) => segment === "offline");
-            if (!isOnOfflinePage) {
-                router.replace("/offline");
-            }
-            return;
-        }
-
         // Only check authentication and practice for protected routes
         if (isPublicRoute || isInAuthFlow) {
             return;
@@ -73,7 +63,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 }
             }
         }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, isOffline, segments]);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, segments]);
 
     // If checking authentication, show loading
     if (isAuthenticated === null && !isPublicRoute && !isInAuthFlow) {

@@ -24,6 +24,34 @@ interface MediaItem {
     createdAt?: string;
 }
 
+// Raw media data structure from API (with template and images)
+interface RawMediaData {
+    id: number | string;
+    template?: {
+        id: number | string;
+        [key: string]: any;
+    } | null;
+    original_media?: {
+        url: string;
+        [key: string]: any;
+    } | null;
+    images?: Array<{
+        image?: {
+            url: string;
+            [key: string]: any;
+        } | null;
+        [key: string]: any;
+    }>;
+    taker?: {
+        id?: number;
+        first_name?: string | null;
+        last_name?: string | null;
+        email?: string | null;
+    } | null;
+    created_at?: string;
+    [key: string]: any;
+}
+
 interface ImageViewerModalProps {
     visible: boolean;
     images: string[]; // For backward compatibility
@@ -41,6 +69,10 @@ interface ImageViewerModalProps {
     // Map imageUrl to taker info for displaying who took the photo
     imageUrlToTakerMap?: Map<string, { first_name?: string | null; last_name?: string | null }>;
     actions?: ViewerActionsConfig;
+    // Raw media data from API (with template and images structure) - used to build taker and createdAt maps
+    rawMediaData?: RawMediaData[];
+    // Display description option: "Date" to show when photo was taken, "taker" to show who took it
+    description?: "Date" | "taker";
 }
 
 interface ThumbnailItemProps {
@@ -95,7 +127,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
     );
 };
 
-export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, mediaData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, imageUrlToCreatedAtMap, patientId, imageUrlToPatientIdMap, imageUrlToTakerMap, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true } }) => {
+export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, mediaData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, imageUrlToCreatedAtMap, patientId, imageUrlToPatientIdMap, imageUrlToTakerMap, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true }, rawMediaData, description = "taker" }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
 
     // Build maps from mediaData if provided, otherwise use legacy maps
@@ -174,14 +206,92 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         return patientId;
     }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
+    // Build maps from rawMediaData for taker and createdAt
+    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw } = React.useMemo(() => {
+        const takerMap = new Map<string, { first_name?: string | null; last_name?: string | null }>();
+        const createdAtMap = new Map<string, string>();
+
+        if (rawMediaData && Array.isArray(rawMediaData)) {
+            rawMediaData.forEach((media: RawMediaData) => {
+                const taker = media.taker;
+                const createdAt = media.created_at;
+
+                // Add original_media to maps if it exists
+                if (media.original_media?.url) {
+                    if (taker) {
+                        takerMap.set(media.original_media.url, {
+                            first_name: taker.first_name,
+                            last_name: taker.last_name,
+                        });
+                    }
+                    if (createdAt) {
+                        createdAtMap.set(media.original_media.url, createdAt);
+                    }
+                }
+
+                // Add all template images to maps
+                if (media.images && Array.isArray(media.images)) {
+                    media.images.forEach((img: any) => {
+                        const imageUrl = img.image?.url;
+                        if (imageUrl) {
+                            if (taker) {
+                                takerMap.set(imageUrl, {
+                                    first_name: taker.first_name,
+                                    last_name: taker.last_name,
+                                });
+                            }
+                            // Use image's created_at if available, otherwise use media's created_at
+                            const imgCreatedAt = img.created_at || createdAt;
+                            if (imgCreatedAt) {
+                                createdAtMap.set(imageUrl, imgCreatedAt);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        return {
+            imageUrlToTakerMapInternal: takerMap,
+            imageUrlToCreatedAtMapFromRaw: createdAtMap,
+        };
+    }, [rawMediaData]);
+
+    // Merge taker maps (rawMediaData takes precedence)
+    const finalTakerMap = React.useMemo(() => {
+        const merged = new Map(imageUrlToTakerMap || []);
+        imageUrlToTakerMapInternal.forEach((value, key) => {
+            merged.set(key, value);
+        });
+        return merged;
+    }, [imageUrlToTakerMap, imageUrlToTakerMapInternal]);
+
+    // Merge createdAt maps (rawMediaData takes precedence)
+    const finalCreatedAtMap = React.useMemo(() => {
+        const merged = new Map(imageUrlToCreatedAtMap || []);
+        imageUrlToCreatedAtMapFromRaw.forEach((value, key) => {
+            merged.set(key, value);
+        });
+        return merged;
+    }, [imageUrlToCreatedAtMap, imageUrlToCreatedAtMapFromRaw]);
+
     // Get current taker info
     const currentTaker = React.useMemo(() => {
-        if (imageUrlToTakerMap && imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
             const currentImageUrl = imagesList[currentIndex];
-            return imageUrlToTakerMap.get(currentImageUrl);
+            return finalTakerMap.get(currentImageUrl);
         }
         return null;
-    }, [currentIndex, imagesList, imageUrlToTakerMap]);
+    }, [currentIndex, imagesList, finalTakerMap]);
+
+    // Get current createdAt
+    const currentCreatedAt = React.useMemo(() => {
+        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return finalCreatedAtMap.get(currentImageUrl);
+        }
+        return null;
+    }, [currentIndex, imagesList, finalCreatedAtMap]);
 
     // Fetch patient data if patientId is provided
     const { data: patientDataResponse } = useGetPatientById(currentPatientId || "");
@@ -907,7 +1017,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         alignment="center"
                                         modifiers={[
                                             padding({ all: 4 }),
-                                            frame({ width: currentTaker ? 200 : 150 }),
+                                            frame({ width: (description === "taker" && currentTaker) ? 200 : 150 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -917,19 +1027,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         spacing={4}
                                     >
                                         <Text size={14}>{patientData?.full_name ?? ""}</Text>
-                                        {currentTaker ? (
+                                        {description === "taker" && currentTaker ? (
                                             <Text weight="light" size={12}>
                                                 {`taken by DR.${`${currentTaker.first_name || ""} ${currentTaker.last_name || ""}`.trim()}`}
                                             </Text>
-                                        ) : (
+                                        ) : description === "Date" && currentCreatedAt ? (
                                             <Text weight="light" size={12}>
-                                                {(() => {
-                                                    const currentImageUrl = imagesList[currentIndex];
-                                                    const createdAt = currentImageUrl && imageUrlToCreatedAtMapInternal.get(currentImageUrl);
-                                                    return createdAt ? getRelativeTime(createdAt) : "Now";
-                                                })()}
+                                                {getRelativeTime(currentCreatedAt)}
                                             </Text>
-                                        )}
+                                        ) : null}
                                     </VStack>
                                     <Spacer />
                                     <HStack

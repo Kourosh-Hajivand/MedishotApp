@@ -11,6 +11,8 @@ export const useGetPatientMedia = (patientId: number | string, enabled: boolean 
         queryKey: ["GetPatientMedia", patientId],
         queryFn: () => MediaService.getPatientMedia(patientId),
         enabled: enabled && !!patientId,
+        refetchOnMount: true, // Always refetch when component mounts to get latest data
+        staleTime: 0, // Consider data stale immediately to ensure fresh data after mutations
     });
 };
 
