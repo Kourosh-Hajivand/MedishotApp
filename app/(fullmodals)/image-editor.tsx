@@ -1,5 +1,5 @@
 import { BaseText } from "@/components";
-import { AdjustChange, ImageChange, MagicChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { AdjustChange, ImageChange, MagicChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { Note } from "@/components/ImageEditor/ToolNote";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
@@ -17,7 +17,19 @@ import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, V
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
-const { width, height } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// 3:2 aspect ratio – fit within canvas (full width × 55% height)
+const ASPECT_RATIO = 3 / 2; // width / height
+const CANVAS_MAX_WIDTH = SCREEN_WIDTH;
+const CANVAS_MAX_HEIGHT = SCREEN_HEIGHT * 0.55;
+
+let canvasWidth = CANVAS_MAX_WIDTH;
+let canvasHeight = CANVAS_MAX_WIDTH / ASPECT_RATIO;
+if (canvasHeight > CANVAS_MAX_HEIGHT) {
+    canvasHeight = CANVAS_MAX_HEIGHT;
+    canvasWidth = CANVAS_MAX_HEIGHT * ASPECT_RATIO;
+}
 
 // Constants
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
@@ -218,7 +230,7 @@ export default function ImageEditorScreen() {
 
     const tools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
         { name: "Adjust", icon: "dial.min.fill", disabled: false },
-        { name: "Crop", icon: "crop.rotate", disabled: false },
+        // { name: "Crop", icon: "crop.rotate", disabled: false }, // TODO: not complete yet
         { name: "Note", icon: "pin.circle.fill", disabled: false },
         { name: "Magic", icon: "sparkles", disabled: false },
         { name: "Pen", icon: "pencil.tip.crop.circle", disabled: false },
@@ -500,8 +512,8 @@ export default function ImageEditorScreen() {
         switch (activeTool) {
             case "Adjust":
                 return <ToolAdjust {...commonProps} />;
-            case "Crop":
-                return <ToolCrop {...commonProps} />;
+            // case "Crop":
+            //     return <ToolCrop {...commonProps} />; // TODO: not complete yet
             case "Note":
                 return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
@@ -566,7 +578,7 @@ export default function ImageEditorScreen() {
                                 setImageContainerLayout({ width, height, x, y });
                             }}
                         >
-                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} style={styles.image} adjustments={adjustmentValues} />
+                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} style={styles.image} adjustments={adjustmentValues} contentFit="contain" />
 
                             {/* Note Markers Overlay */}
                             {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
@@ -610,14 +622,14 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     imageWrapper: {
-        width: width,
-        height: height * 0.55,
+        width: SCREEN_WIDTH,
+        minHeight: CANVAS_MAX_HEIGHT,
         justifyContent: "center",
         alignItems: "center",
     },
     imageContainer: {
-        width: "100%",
-        height: "100%",
+        width: canvasWidth,
+        aspectRatio: 3 / 2,
         position: "relative",
     },
     image: {

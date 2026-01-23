@@ -9,6 +9,7 @@
  */
 
 import { AdjustChange } from "./types";
+import type { ImageContentFit } from "expo-image";
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { Image } from "expo-image";
@@ -18,16 +19,17 @@ interface FilteredImageProps {
     source: { uri: string };
     style?: any;
     adjustments: AdjustChange | null;
+    contentFit?: ImageContentFit;
 }
 
-export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adjustments }) => {
+export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adjustments, contentFit = "contain" }) => {
     // For now, use overlay approach (current implementation)
     // TODO: Consider using react-native-image-filter-kit for better performance
     // or WebView with CSS filters for more accurate results
 
     return (
         <View style={[styles.container, style]}>
-            <Image source={source} style={StyleSheet.absoluteFill} contentFit="cover" />
+            <Image source={source} style={StyleSheet.absoluteFill} contentFit={contentFit} />
             {adjustments && (
                 <>
                     {/* Brightness */}

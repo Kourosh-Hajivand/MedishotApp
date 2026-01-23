@@ -1,5 +1,5 @@
 import { BaseText } from "@/components";
-import { AdjustChange, DrawingCanvas, ImageChange, MagicChange, PenChange, ToolAdjust, ToolCrop, ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { AdjustChange, DrawingCanvas, ImageChange, MagicChange, PenChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
@@ -251,7 +251,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
     const tools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
         { name: "Adjust", icon: "dial.min.fill", disabled: false },
-        { name: "Crop", icon: "crop.rotate", disabled: false },
+        // { name: "Crop", icon: "crop.rotate", disabled: false }, // TODO: not complete yet
         { name: "Note", icon: "pin.circle.fill", disabled: false },
         { name: "Magic", icon: "sparkles", disabled: false },
         { name: "Pen", icon: "pencil.tip.crop.circle", disabled: false },
@@ -511,8 +511,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         switch (activeTool) {
             case "Adjust":
                 return <ToolAdjust {...commonProps} />;
-            case "Crop":
-                return <ToolCrop {...commonProps} />;
+            // case "Crop":
+            //     return <ToolCrop {...commonProps} />; // TODO: not complete yet
             case "Note":
                 return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
