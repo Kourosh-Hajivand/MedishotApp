@@ -812,6 +812,7 @@ export interface PatientDocumentDetailResponse {
 // ============= Patient Activities Responses =============
 export interface ActivityLog {
     id: number;
+    title?: string;
     description: string;
     event: string;
     causer?: {

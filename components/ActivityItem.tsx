@@ -96,9 +96,16 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
                         <IconSymbol name={icon as any} size={24} color={iconColor} />
                     </View>
                     <View style={styles.activityTextContainer}>
-                        <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
-                            {activity.description}
-                        </BaseText>
+                        {activity.title && (
+                            <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
+                                {activity.title}
+                            </BaseText>
+                        )}
+                        {activity.description && (
+                            <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
+                                {activity.description}
+                            </BaseText>
+                        )}
                         {activity.causer && (
                             <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.activityMetaText}>
                                 by {activity.causer.name}
