@@ -3,13 +3,14 @@ import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { View } from "react-native";
 
 export default function AddPatientRedirect() {
     const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
-    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: practiceMembers, error: practiceMembersError, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const hasNavigatedRef = useRef(false);
 
     // Get current user's role in the selected practice
     const currentUserRole = useMemo(() => {
@@ -22,27 +23,27 @@ export default function AddPatientRedirect() {
         return currentMember?.role || selectedPractice.role;
     }, [selectedPractice, practiceMembers?.data, profile?.email]);
 
-    // Get current user as member
-    const currentUserMember = useMemo(() => {
-        if (!practiceMembers?.data || !profile?.email) {
-            return null;
-        }
-        return practiceMembers.data.find((member) => member.email === profile.email) || null;
-    }, [practiceMembers?.data, profile?.email]);
-
     // Get available doctors (members with role "doctor" or "owner")
     const availableDoctors = useMemo(() => {
-        if (!practiceMembers?.data) return [];
+        if (!practiceMembers?.data?.length) return [];
         return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
     }, [practiceMembers?.data]);
 
-    useFocusEffect(
-        useCallback(() => {
+    // Navigate to patients tab first, then open modal
+    useEffect(() => {
+        // Don't navigate if there's an error
+        if (isPracticeMembersError) {
+            router.replace("/(tabs)/patients");
+            return;
+        }
+
+        if (currentUserRole && availableDoctors && !hasNavigatedRef.current) {
             // First navigate to patients tab
             router.replace("/(tabs)/patients");
+            hasNavigatedRef.current = true;
 
-            // // Then open modal after a short delay to ensure navigation completes
-            setTimeout(() => {
+            // Then open modal based on user role
+            const navigateToModal = () => {
                 // If user is doctor, go directly to photo (no need to select doctor)
                 if (currentUserRole === "doctor") {
                     router.push("/(modals)/add-patient/form");
@@ -66,8 +67,22 @@ export default function AddPatientRedirect() {
                     // Otherwise, go directly to add patient photo
                     router.push("/(modals)/add-patient/form");
                 }
-            }, 100);
-        }, [currentUserRole, availableDoctors]),
+            };
+
+            // Use requestAnimationFrame to ensure navigation completes before opening modal
+            requestAnimationFrame(() => {
+                requestAnimationFrame(navigateToModal);
+            });
+        }
+    }, [currentUserRole, availableDoctors]);
+
+    // Reset navigation flag when screen loses focus
+    useFocusEffect(
+        useCallback(() => {
+            return () => {
+                hasNavigatedRef.current = false;
+            };
+        }, []),
     );
 
     return <View style={{ flex: 1, backgroundColor: "white" }} />;

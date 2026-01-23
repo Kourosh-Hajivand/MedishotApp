@@ -1,6 +1,8 @@
 import { BaseText } from "@/components";
 import Avatar from "@/components/avatar";
+import BaseButton from "@/components/button/BaseButton";
 import { GalleryWithMenu } from "@/components/Image/GalleryWithMenu";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { useBookmarkMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
@@ -34,30 +36,32 @@ export const AlbumScreen: React.FC = () => {
     );
 
     // Get albums for the practice
-    const { data: albumsData, isLoading: isLoadingPhotos } = useGetPracticeAlbums(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const { data: albumsData, isLoading: isLoadingPhotos, error: albumsError, isError: isAlbumsError, refetch: refetchAlbums } = useGetPracticeAlbums(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
     // Parse response - it's an array of PatientMediaAlbum
     const albums = useMemo(() => {
-        if (!albumsData?.data) return [];
+        if (!albumsData?.data || !Array.isArray(albumsData.data)) return [];
         // Check if data is an array of PatientMediaAlbum (has gost and media properties)
-        const data = albumsData.data as any;
-        if (Array.isArray(data) && data.length > 0 && data[0]?.gost && data[0]?.media) {
-            return data as PatientMediaAlbum[];
+        const data = albumsData.data as unknown as any[];
+        if (data.length > 0 && data[0]?.gost && data[0]?.media) {
+            return data as unknown as PatientMediaAlbum[];
         }
         return [];
     }, [albumsData?.data]);
 
     // Extract raw media data for GalleryWithMenu (for template media support)
     const rawMediaData = useMemo(() => {
-        if (!albums || albums.length === 0) return [];
+        if (!albums?.length) return [];
         const mediaArray: any[] = [];
         albums.forEach((album) => {
-            album.media.forEach((mediaItem: any) => {
-                // Only include media with template and original_media
-                if (mediaItem.template && mediaItem.original_media) {
-                    mediaArray.push(mediaItem);
-                }
-            });
+            if (album.media?.length) {
+                album.media.forEach((mediaItem: any) => {
+                    // Only include media with template and original_media
+                    if (mediaItem?.template && mediaItem?.original_media) {
+                        mediaArray.push(mediaItem);
+                    }
+                });
+            }
         });
         return mediaArray;
     }, [albums]);
@@ -176,7 +180,7 @@ export const AlbumScreen: React.FC = () => {
     // Get recent patients (6 most recent)
     const { data: patientsData } = useGetPatients(selectedPractice?.id, { per_page: 6 });
     const recentPatients = useMemo(() => {
-        if (!patientsData?.data) return [];
+        if (!patientsData?.data?.length) return [];
         // Sort by created_at descending to get most recent first
         return [...patientsData.data]
             .sort((a, b) => {
@@ -356,6 +360,33 @@ export const AlbumScreen: React.FC = () => {
     };
 
     const insets = useSafeAreaInsets();
+
+    // Show error state if there's an error
+    if (isAlbumsError) {
+        const errorMessage = (albumsError as any)?.message || "Failed to load albums. Please try again.";
+        return (
+            <View style={styles.errorContainer}>
+                <IconSymbol name="exclamationmark.triangle.fill" size={48} color={colors.system.red} />
+                <BaseText type="Body" color="labels.primary" weight="600" style={{ marginTop: spacing["3"], marginBottom: spacing["1"] }}>
+                    Failed to load albums
+                </BaseText>
+                <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center", paddingHorizontal: spacing["5"] }}>
+                    {errorMessage}
+                </BaseText>
+                <BaseButton
+                    label="Try Again"
+                    ButtonStyle="Tinted"
+                    size="Medium"
+                    rounded={true}
+                    onPress={() => {
+                        refetchAlbums();
+                    }}
+                    leftIcon={<IconSymbol name="arrow.clockwise" size={20} color={colors.system.blue} />}
+                />
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             {isLoadingPhotos ? (
@@ -571,7 +602,7 @@ export const AlbumScreen: React.FC = () => {
                                                 url: imageUri,
                                             });
                                         } catch (error: any) {
-                                            console.error("Error sharing image:", error);
+                                            // Only show error if user didn't cancel the share action
                                             if (error?.message !== "User did not share") {
                                                 Alert.alert("Error", "Failed to share image");
                                             }
@@ -630,6 +661,13 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         minHeight: 200,
+    },
+    errorContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: spacing["5"],
+        backgroundColor: "white",
     },
     createAlbumCard: {
         padding: 20,

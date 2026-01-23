@@ -145,6 +145,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const isThumbnailProgrammaticScroll = useRef(false);
     const lastThumbnailIndex = useRef(initialIndex);
     const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isHandlingScrollEnd = useRef(false);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
@@ -344,10 +345,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         }
         const offsetX = event.nativeEvent.contentOffset.x;
         const currentPage = offsetX / width;
-        const index = Math.round(currentPage);
+        
+        // Clamp currentPage to valid range
+        const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
+        const index = Math.round(clampedPage);
 
         // Calculate scroll progress: -1 (swiping left) to 1 (swiping right)
-        const progress = currentPage - index;
+        const progress = clampedPage - index;
         scrollProgress.value = progress;
 
         // Update currentIndexShared to current rounded index
@@ -356,8 +360,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
         // Smoothly scroll thumbnail gallery to match exact current position (including fractional part)
         // This creates perfectly smooth animation during drag
-        if (currentPage >= 0 && currentPage < imagesList.length) {
-            scrollThumbnailToPosition(currentPage, false);
+        if (clampedPage >= 0 && clampedPage < imagesList.length) {
+            scrollThumbnailToPosition(clampedPage, false);
         }
     };
 
@@ -392,7 +396,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
 
         // Find which thumbnail is at center after drag ends
         let currentWidth = padding;
-        for (let i = 0; i < images.length; i++) {
+        for (let i = 0; i < imagesList.length; i++) {
             const isActive = i === currentIndex;
             const thumbWidth = isActive ? activeThumbnailWidth : inactiveThumbnailWidth;
             const thumbMargin = isActive ? activeThumbnailMargin : 0;
@@ -422,19 +426,102 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         }
     };
 
-    const handleMomentumScrollEnd = (event: any) => {
+    const handleScrollEndDrag = (event: any) => {
+        // Don't update index if scroll is programmatic
+        if (isProgrammaticScroll.current || isHandlingScrollEnd.current) {
+            return;
+        }
+        
         const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offsetX / width);
+        const currentPage = offsetX / width;
+        
+        // Clamp to valid range
+        const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
+        
+        // Calculate which index we're closest to
+        const baseIndex = Math.floor(clampedPage);
+        const progress = clampedPage - baseIndex;
+        
+        // Threshold: if less than 25% swiped, snap back to current image
+        // If more than 25%, snap to next/previous image
+        const SNAP_THRESHOLD = 0.25;
+        let targetIndex: number;
+        
+        // Determine target index based on swipe progress
+        if (progress < -SNAP_THRESHOLD && baseIndex >= 0) {
+            // Swiping left (to previous image) - more than threshold swiped
+            targetIndex = Math.max(0, baseIndex);
+        } else if (progress > SNAP_THRESHOLD && baseIndex < imagesList.length - 1) {
+            // Swiping right (to next image) - more than threshold swiped
+            targetIndex = Math.min(imagesList.length - 1, baseIndex + 1);
+        } else {
+            // Less than threshold swiped - snap back to current image
+            targetIndex = currentIndex;
+        }
+        
+        // Ensure targetIndex is valid
+        targetIndex = Math.max(0, Math.min(targetIndex, imagesList.length - 1));
+        
+        // Reset scroll progress
+        scrollProgress.value = withTiming(0, { duration: 200 });
+        
+        // Only update if target is different from current
+        if (targetIndex !== currentIndex) {
+            isHandlingScrollEnd.current = true;
+            isProgrammaticScroll.current = true;
+            setCurrentIndex(targetIndex);
+            currentIndexShared.value = targetIndex;
+            flatListRef.current?.scrollToIndex({ index: targetIndex, animated: true });
+            scrollThumbnailToIndex(targetIndex, true);
+            setTimeout(() => {
+                isProgrammaticScroll.current = false;
+                isHandlingScrollEnd.current = false;
+            }, 500);
+        } else {
+            // Snap back to current image smoothly
+            isHandlingScrollEnd.current = true;
+            isProgrammaticScroll.current = true;
+            flatListRef.current?.scrollToIndex({ index: currentIndex, animated: true });
+            scrollThumbnailToIndex(currentIndex, true);
+            setTimeout(() => {
+                isProgrammaticScroll.current = false;
+                isHandlingScrollEnd.current = false;
+            }, 500);
+        }
+    };
+
+    const handleMomentumScrollEnd = (event: any) => {
+        // Don't update index if scroll is programmatic or if we already handled scroll end
+        if (isProgrammaticScroll.current || isHandlingScrollEnd.current) {
+            return;
+        }
+        
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const currentPage = offsetX / width;
+        
+        // Clamp to valid range
+        const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
+        const index = Math.round(clampedPage);
+        
+        // Ensure index is valid
+        const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
+        
         scrollProgress.value = withTiming(0, { duration: 200 }); // Smoothly reset progress
 
-        if (index !== currentIndex && index >= 0 && index < imagesList.length) {
-            setCurrentIndex(index);
-            currentIndexShared.value = index;
+        if (validIndex !== currentIndex) {
+            isHandlingScrollEnd.current = true;
+            isProgrammaticScroll.current = true;
+            setCurrentIndex(validIndex);
+            currentIndexShared.value = validIndex;
             // Smoothly scroll thumbnail gallery to final position
-            scrollThumbnailToIndex(index, true);
-        } else if (index === currentIndex) {
+            scrollThumbnailToIndex(validIndex, true);
+            setTimeout(() => {
+                isProgrammaticScroll.current = false;
+                isHandlingScrollEnd.current = false;
+            }, 500);
+        } else {
             // Even if index didn't change, ensure thumbnail is centered
-            scrollThumbnailToIndex(index, true);
+            scrollThumbnailToIndex(validIndex, true);
         }
     };
 
@@ -868,17 +955,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                     <FlatList
                         ref={flatListRef}
                         horizontal
-                        pagingEnabled
+                        pagingEnabled={true}
                         initialScrollIndex={initialIndex}
-                        data={images}
+                        data={imagesList}
                         keyExtractor={(_, i) => i.toString()}
                         onScroll={handleScroll}
+                        onScrollEndDrag={handleScrollEndDrag}
                         onMomentumScrollEnd={handleMomentumScrollEnd}
                         scrollEventThrottle={16}
                         showsHorizontalScrollIndicator={false}
-                        decelerationRate="fast"
-                        snapToInterval={width}
-                        snapToAlignment="center"
+                        decelerationRate={0.9}
                         renderItem={renderImageItem}
                         getItemLayout={(_, index) => ({
                             length: width,
@@ -886,6 +972,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                             index,
                         })}
                         scrollEnabled={!isZoomed}
+                        disableIntervalMomentum={true}
+                        bounces={false}
                     />
 
                     {/* Bottom Bar with Thumbnails and Actions */}

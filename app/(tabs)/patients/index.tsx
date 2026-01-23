@@ -29,21 +29,22 @@ export default function PatientsScreen() {
     const { selectedPractice, viewMode, selectedDoctor } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
     const queryClient = useQueryClient();
-    const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: practiceMembers, error: practiceMembersError, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
     const { q, sortBy, nameOrder } = useLocalSearchParams<{ q?: string; sortBy?: string; nameOrder?: string }>();
 
     // Get current user's role in the selected practice
     const currentUserRole = useMemo(() => {
-        if (!selectedPractice || !practiceMembers?.data || !profile?.email) {
-            return selectedPractice?.role; // Fallback to practice role
+        if (!selectedPractice) return undefined;
+        if (!practiceMembers?.data || !profile?.email) {
+            return selectedPractice.role; // Fallback to practice role
         }
 
         // Find current user in practice members by email
         const currentMember = practiceMembers.data.find((member) => member.email === profile.email);
         return currentMember?.role || selectedPractice.role;
-    }, [selectedPractice, practiceMembers?.data, profile?.email]);
+    }, [selectedPractice?.id, selectedPractice?.role, practiceMembers?.data, profile?.email]);
 
     // Check if user can see doctor filter (only owner or admin)
     const canSeeDoctorFilter = useMemo(() => {
@@ -51,7 +52,7 @@ export default function PatientsScreen() {
     }, [selectedPractice?.role]);
 
     const availableDoctors = useMemo(() => {
-        if (!practiceMembers?.data) return [];
+        if (!practiceMembers?.data?.length) return [];
         return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
     }, [practiceMembers?.data]);
 
@@ -78,7 +79,7 @@ export default function PatientsScreen() {
         return undefined;
     }, [canSeeDoctorFilter, selectedDoctor, currentUserRole, profile?.id]);
 
-    const { data: patients, isLoading: isPatientsLoading, refetch: refetchPatients } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
+    const { data: patients, isLoading: isPatientsLoading, error: patientsError, isError: isPatientsError, refetch: refetchPatients } = useGetPatients(selectedPractice?.id, { doctor_id: doctorId });
 
     const mockPatients = useMemo(() => {
         if (!USE_MOCK_PATIENTS) return null;
@@ -192,10 +193,14 @@ export default function PatientsScreen() {
     const activeIndexSV = useSharedValue(-1);
 
     const filteredGroupedPatients = useMemo(() => {
-        return Object.keys(groupedPatients || {}).reduce(
+        if (!groupedPatients || Object.keys(groupedPatients).length === 0) return {};
+        if (!search.trim()) return groupedPatients;
+
+        const searchLower = search.toLowerCase();
+        return Object.keys(groupedPatients).reduce(
             (acc, letter) => {
-                const items = groupedPatients?.[letter]?.filter((p: Patient) => p.full_name.toLowerCase().includes(search.toLowerCase())) || [];
-                if (items && items.length > 0) acc[letter] = items;
+                const items = groupedPatients[letter]?.filter((p: Patient) => p.full_name?.toLowerCase().includes(searchLower)) || [];
+                if (items.length > 0) acc[letter] = items;
                 return acc;
             },
             {} as Record<string, Patient[]>,
@@ -243,7 +248,6 @@ export default function PatientsScreen() {
     const handleAlphabetPress = (letter: string, animated = true) => {
         const sectionIndex = sections.findIndex((sec) => sec.title === letter);
         if (sectionIndex === -1 || !scrollViewRef.current) {
-            console.log("[Scroll] Section not found for letter:", letter);
             return;
         }
 
@@ -263,30 +267,27 @@ export default function PatientsScreen() {
         // Subtract header height so first item appears below header
         const finalOffset = Math.max(0, offset - stickyHeaderHeight);
 
-        console.log("[Scroll] letter:", letter, "sectionIndex:", sectionIndex, "offset:", offset, "finalOffset:", finalOffset, "headerHeight:", stickyHeaderHeight);
-
         // Use scrollToOffset instead of scrollToLocation for more precise control
         setTimeout(() => {
             try {
                 (scrollViewRef.current as any)?.scrollTo({
                     y: finalOffset,
                     animated,
-                });
-            } catch (e) {
-                console.warn("ScrollTo error:", e);
-                // Fallback to scrollToLocation
-                try {
-                    scrollViewRef.current?.scrollToLocation({
-                        sectionIndex,
-                        itemIndex: 0,
-                        animated,
-                        viewPosition: 0,
-                        viewOffset: stickyHeaderHeight,
                     });
-                } catch (e2) {
-                    console.warn("ScrollToLocation error:", e2);
+                } catch (e) {
+                    // Fallback to scrollToLocation
+                    try {
+                        scrollViewRef.current?.scrollToLocation({
+                            sectionIndex,
+                            itemIndex: 0,
+                            animated,
+                            viewPosition: 0,
+                            viewOffset: stickyHeaderHeight,
+                        });
+                    } catch (e2) {
+                        // Silent fallback - navigation failed
+                    }
                 }
-            }
         }, 100);
     };
 
@@ -294,7 +295,6 @@ export default function PatientsScreen() {
         const letter = alphabetWithHashRef.current[index] || "";
         setActiveLetter(letter);
         const hasSection = sections.some((s) => s.title === letter);
-        console.log("[Alphabet Drag] letter:", letter, "hasSection:", hasSection, "index:", index);
         if (!hasSection) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         handleAlphabetPress(letter, false);
@@ -303,7 +303,6 @@ export default function PatientsScreen() {
     const handleGestureTap = (index: number) => {
         const letter = alphabetWithHashRef.current[index] || "";
         const hasSection = sections.some((s) => s.title === letter);
-        console.log("[Alphabet Tap] letter:", letter, "hasSection:", hasSection, "index:", index);
         if (!hasSection) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         handleAlphabetPress(letter, true);
@@ -336,7 +335,6 @@ export default function PatientsScreen() {
             const itemHeight = containerHeight / alphabetLength;
             const index = Math.floor(relativeY / itemHeight);
             const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
-            console.log("[Pan Update] y:", e.y, "relativeY:", relativeY, "itemHeight:", itemHeight, "index:", index, "clampedIndex:", clampedIndex, "letter:", alphabetWithHashRef.current[clampedIndex]);
             if (clampedIndex !== activeIndexSV.value) {
                 activeIndexSV.value = clampedIndex;
                 runOnJS(handleGestureUpdate)(clampedIndex);
@@ -360,7 +358,6 @@ export default function PatientsScreen() {
         const itemHeight = containerHeight / alphabetLength;
         const index = Math.floor(relativeY / itemHeight);
         const clampedIndex = Math.max(0, Math.min(index, alphabetLength - 1));
-        console.log("[Tap] y:", e.y, "relativeY:", relativeY, "itemHeight:", itemHeight, "index:", index, "clampedIndex:", clampedIndex, "letter:", alphabetWithHashRef.current[clampedIndex]);
         runOnJS(handleGestureTap)(clampedIndex);
     });
 
@@ -376,6 +373,32 @@ export default function PatientsScreen() {
             data: Array.from({ length: 2 }), // 2 items per section = 10 total
         }));
     }, [isLoading]);
+
+    // Show error state if there's an error
+    if (isPatientsError || isPracticeMembersError) {
+        const errorMessage = (patientsError as any)?.message || (practiceMembersError as any)?.message || "Failed to load data. Please try again.";
+        return (
+            <View style={[styles.errorContainer, { paddingTop: headerHeight + spacing["5"] }]}>
+                <IconSymbol name="exclamationmark.triangle.fill" size={48} color={colors.system.red} />
+                <BaseText type="Body" color="labels.primary" weight="600" style={{ marginTop: spacing["3"], marginBottom: spacing["1"] }}>
+                    Something went wrong
+                </BaseText>
+                <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center" }}>
+                    {errorMessage}
+                </BaseText>
+                <BaseButton
+                    label="Try Again"
+                    ButtonStyle="Tinted"
+                    size="Medium"
+                    rounded={true}
+                    onPress={() => {
+                        refetchPatients();
+                    }}
+                    leftIcon={<IconSymbol name="arrow.clockwise" size={20} color={colors.system.blue} />}
+                />
+            </View>
+        );
+    }
 
     return (
         <>
@@ -686,6 +709,13 @@ const styles = StyleSheet.create({
     alphabetItem: { paddingHorizontal: spacing["0.5"], marginVertical: 0 },
     activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
     noResults: { alignItems: "center", justifyContent: "center", gap: spacing["1"] },
+    errorContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: spacing["5"],
+        backgroundColor: "white",
+    },
     emptyStateContainer: {
         flex: 1,
         backgroundColor: "white",

@@ -11,18 +11,6 @@ export default function AlbumLayout() {
                     headerLargeTitle: false,
                     headerTransparent: false,
                     headerShadowVisible: true,
-                    // headerRight: () => (
-                    //     <Host style={{ width: 30, height: 50 }}>
-                    //         <TouchableOpacity
-                    //             onPress={() => {
-                    //                 // Add right button action if needed
-                    //             }}
-                    //             className="flex-row px-2 justify-center items-center"
-                    //         >
-                    //             <IconSymbol name="ellipsis.circle" size={20} color={colors.system.blue} />
-                    //         </TouchableOpacity>
-                    //     </Host>
-                    // ),
                 }}
             />
         </Stack>

@@ -173,7 +173,6 @@ export default function PatientsLayout() {
                             </Host>
                         ),
                         headerLeft: () => (
-                            // <Switch key={index} label={practice.name} variant="switch" value={selectedProfile === "practice" && selectedPractice?.id === practice.id} onValueChange={() => setSelectedProfile("practice", practice)} />
                             <Host style={{ width: headerButtonWidth }}>
                                 <ContextMenu activationMethod="longPress">
                                     <ContextMenu.Items>
