@@ -1,4 +1,5 @@
 import { BaseText } from "@/components";
+import { DynamicFieldItem } from "@/models";
 import { ProfileFormData, ProfileFormScreen } from "@/screens/auth/ProfileFormScreen";
 import { toE164 } from "@/utils/helper/phoneUtils";
 import { useUpdateProfileFull } from "@/utils/hook";
@@ -7,7 +8,26 @@ import { People } from "@/utils/service/models/ResponseModels";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { UseFormHandleSubmit } from "react-hook-form";
-import { TouchableOpacity } from "react-native";
+import { Alert, TouchableOpacity } from "react-native";
+
+interface ProfileFormRef {
+    handleSubmit: UseFormHandleSubmit<ProfileFormData>;
+    getFormData: () => {
+        formData: ProfileFormData;
+        phones: DynamicFieldItem[];
+        emails: DynamicFieldItem[];
+        addresses: DynamicFieldItem[];
+        urls: DynamicFieldItem[];
+        uploadedFilename: string | null;
+    };
+}
+
+interface MetadataObject {
+    phones?: Array<{ type: string; value: string }>;
+    emails?: Array<{ type: string; value: string }>;
+    addresses?: Array<{ type: string; value: string }>;
+    urls?: Array<{ type: string; value: string }>;
+}
 
 export default function EditProfileScreen() {
     const navigation = useNavigation();
@@ -25,31 +45,23 @@ export default function EditProfileScreen() {
         return null;
     }, [params.profile]);
 
-    console.log("🔄 [EditProfile] Profile data:", profile);
+    const formRef = useRef<ProfileFormRef | null>(null);
 
-    const formRef = useRef<{
-        handleSubmit: UseFormHandleSubmit<ProfileFormData>;
-        getFormData: () => {
-            formData: ProfileFormData;
-            phones: any[];
-            emails: any[];
-            addresses: any[];
-            urls: any[];
-            uploadedFilename: string | null;
-        };
-    } | null>(null);
+    const { mutate: updateProfile, isPending } = useUpdateProfileFull(
+        () => {
+            router.back();
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update profile. Please try again.");
+        },
+    );
 
-    const { mutate: updateProfile, isPending } = useUpdateProfileFull(() => {
-        router.back();
-    });
-
-    const handleFormReady = useCallback((form: any) => {
+    const handleFormReady = useCallback((form: ProfileFormRef) => {
         formRef.current = form;
     }, []);
 
     const handleSave = useCallback(() => {
         if (!formRef.current) {
-            console.error("❌ [handleSave] Form ref is not ready!");
             return;
         }
 
@@ -57,51 +69,53 @@ export default function EditProfileScreen() {
             (data: ProfileFormData) => {
                 const formData = formRef.current?.getFormData();
                 if (!formData) {
-                    console.error("❌ [handleSave] Form data is null!");
                     return;
                 }
 
-                console.log("🔍 [handleSave] Form data:", formData);
-                console.log("🔍 [handleSave] Uploaded filename:", formData.uploadedFilename);
-
                 // Build metadata object from dynamic fields
-                const metadataObject: any = {};
+                const metadataObject: MetadataObject = {};
 
-                if (formData.phones && formData.phones.length > 0) {
+                if (formData.phones?.length > 0) {
                     const phonesData = formData.phones
                         .map((phone) => {
                             // Ensure phone value is in E.164 format
-                            const e164Value = phone.value ? toE164(phone.value) || phone.value : "";
+                            const e164Value = phone.value ? toE164(String(phone.value)) || String(phone.value) : "";
                             return {
-                                type: phone.label,
+                                type: String(phone.label),
                                 value: e164Value,
                             };
                         })
-                        .filter((phone) => phone.value); // Filter out empty values
+                        .filter((phone) => phone.value);
                     if (phonesData.length > 0) metadataObject.phones = phonesData;
                 }
 
-                if (formData.emails && formData.emails.length > 0) {
-                    const emailsData = formData.emails.map((email) => ({
-                        type: email.label,
-                        value: email.value,
-                    }));
+                if (formData.emails?.length > 0) {
+                    const emailsData = formData.emails
+                        .map((email) => ({
+                            type: String(email.label),
+                            value: String(email.value),
+                        }))
+                        .filter((email) => email.value);
                     if (emailsData.length > 0) metadataObject.emails = emailsData;
                 }
 
-                if (formData.addresses && formData.addresses.length > 0) {
-                    const addressesData = formData.addresses.map((address) => ({
-                        type: address.label,
-                        value: address.value,
-                    }));
+                if (formData.addresses?.length > 0) {
+                    const addressesData = formData.addresses
+                        .map((address) => ({
+                            type: String(address.label),
+                            value: typeof address.value === "string" ? address.value : String(address.value),
+                        }))
+                        .filter((address) => address.value);
                     if (addressesData.length > 0) metadataObject.addresses = addressesData;
                 }
 
-                if (formData.urls && formData.urls.length > 0) {
-                    const urlsData = formData.urls.map((url) => ({
-                        type: url.label,
-                        value: url.value,
-                    }));
+                if (formData.urls?.length > 0) {
+                    const urlsData = formData.urls
+                        .map((url) => ({
+                            type: String(url.label),
+                            value: String(url.value),
+                        }))
+                        .filter((url) => url.value);
                     if (urlsData.length > 0) metadataObject.urls = urlsData;
                 }
 
@@ -115,19 +129,10 @@ export default function EditProfileScreen() {
                     ...(formData.uploadedFilename && { profile_photo: formData.uploadedFilename }),
                 };
 
-                updateProfile(payload, {
-                    onSuccess: (response) => {
-                        console.log("✅ [updateProfile] Success Response:", response);
-                    },
-                    onError: (error) => {
-                        console.error("❌ [updateProfile] Error:", error);
-                        console.error("❌ [updateProfile] Error Details:", JSON.stringify(error, null, 2));
-                    },
-                });
+                updateProfile(payload);
             },
-            (errors) => {
+            () => {
                 // Validation failed - errors are handled by form
-                console.log("❌ [handleSave] Validation errors:", errors);
             },
         )();
     }, [updateProfile]);

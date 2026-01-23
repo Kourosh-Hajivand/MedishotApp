@@ -10,12 +10,14 @@ import { useGetSearchDetail, useMapboxSearch } from "@/utils/hook/useGetMapboxSe
 import { useTempUpload } from "@/utils/hook/useMedia";
 import { useUpdatePractice } from "@/utils/hook/usePractice";
 import { Practice } from "@/utils/service/models/ResponseModels";
+import { UpdatePracticeDto } from "@/utils/service/models/RequestModels";
+import { TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { ActivityIndicator, Image, KeyboardTypeOptions, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, KeyboardTypeOptions, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -135,10 +137,9 @@ export default function EditPracticeScreen() {
     }, [practice?.image?.url, localImageUri]);
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
+        (response: TempUploadResponse) => {
             // Handle both wrapped and unwrapped response structures
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+            const filename = (response as { data?: { filename?: string }; filename?: string }).data?.filename ?? response.filename ?? null;
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
         },
@@ -156,11 +157,17 @@ export default function EditPracticeScreen() {
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : "image/jpeg";
 
-            const file = {
+            interface FileUpload {
+                uri: string;
+                type: string;
+                name: string;
+            }
+
+            const file: FileUpload = {
                 uri: result.uri,
                 type: type,
                 name: filename,
-            } as any;
+            };
 
             uploadImage(file);
         } catch (error) {
@@ -172,10 +179,15 @@ export default function EditPracticeScreen() {
         mutate: updatePractice,
         isPending,
         error,
-    } = useUpdatePractice(() => {
-        queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
-        router.back();
-    });
+    } = useUpdatePractice(
+        () => {
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            router.back();
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update practice. Please try again.");
+        },
+    );
 
     const onSubmit = useCallback(
         (data: FormData) => {
@@ -187,7 +199,7 @@ export default function EditPracticeScreen() {
             // Use ref to always get the latest value (avoid closure issues)
             const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
 
-            const updateData: any = {
+            const updateData: UpdatePracticeDto = {
                 name: data.practiceName,
                 metadata: JSON.stringify({
                     website: normalizeWebsiteUrl(data.website),
@@ -200,15 +212,8 @@ export default function EditPracticeScreen() {
                     print_settings: metadata?.print_settings,
                     notification_settings: metadata?.notification_settings,
                 }),
+                ...(localImageUri && currentUploadedFilename && { image: currentUploadedFilename }),
             };
-
-            // Only include image if user has changed/selected a new image
-            if (localImageUri && currentUploadedFilename) {
-                updateData.image = currentUploadedFilename;
-            }
-
-            // Log request body being sent to backend
-            console.log("📤 Request Body:", JSON.stringify(updateData, null, 2));
 
             updatePractice({
                 id: practice.id,

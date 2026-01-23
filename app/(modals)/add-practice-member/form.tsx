@@ -6,6 +6,8 @@ import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from
 import { spacing } from "@/styles/spaces";
 import themeColors, { colors } from "@/theme/colors";
 import { useAddMember, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
+import { AddMemberDto, UpdateMemberRoleDto } from "@/utils/service/models/RequestModels";
+import { TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
@@ -15,6 +17,19 @@ import { Controller, useForm } from "react-hook-form";
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
+
+interface MetadataObject {
+    phones?: Array<{ label: string; value: string }>;
+    emails?: Array<{ label: string; value: string }>;
+    addresses?: Array<{ label: string; value: string | DynamicFieldItem["value"] }>;
+    urls?: Array<{ label: string; value: string }>;
+}
+
+interface FileUpload {
+    uri: string;
+    type: string;
+    name: string;
+}
 
 interface AddMemberFormData {
     first_name: string;
@@ -110,9 +125,9 @@ export default function AddPracticeMemberForm() {
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
-        (response) => {
-            const responseAny = response as any;
-            const filename = (responseAny?.data?.filename ?? response.filename) || null;
+        (response: TempUploadResponse) => {
+            // Handle both wrapped and unwrapped response structures
+            const filename = (response as { data?: { filename?: string }; filename?: string }).data?.filename ?? response.filename ?? null;
             setUploadedFilename(filename); // Only save filename for submit, keep local URI for preview
             uploadedFilenameRef.current = filename; // Also update ref to always have latest value
         },
@@ -188,11 +203,11 @@ export default function AddPracticeMemberForm() {
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : "image/jpeg";
 
-            const file = {
+            const file: FileUpload = {
                 uri: result.uri,
                 type: type,
                 name: filename,
-            } as any;
+            };
 
             uploadImage(file);
         } catch (error) {}
@@ -202,10 +217,11 @@ export default function AddPracticeMemberForm() {
         (data: AddMemberFormData) => {
             if (isEditMode && memberData) {
                 // Update member role only - backend only accepts "staff" or "doctor"
+                const roleUpdate: UpdateMemberRoleDto = { role: data.role };
                 updateMemberRole({
                     practiceId: parseInt(practiceId),
                     memberId: memberData.id,
-                    data: { role: data.role as any },
+                    data: roleUpdate,
                 });
             } else {
                 // Add new member
@@ -216,7 +232,7 @@ export default function AddPracticeMemberForm() {
                 const urlsData = urls.length > 0 ? urls.map((url) => ({ label: url.label, value: typeof url.value === "string" ? url.value : "" })) : undefined;
 
                 // Build metadata object
-                const metadataObject: any = {};
+                const metadataObject: MetadataObject = {};
                 if (phonesData) metadataObject.phones = phonesData;
                 if (emailsData) metadataObject.emails = emailsData;
                 if (addressesData) metadataObject.addresses = addressesData;
@@ -226,20 +242,20 @@ export default function AddPracticeMemberForm() {
                 // Use ref to always get the latest value (avoid closure issues)
                 const currentUploadedFilename = uploadedFilenameRef.current || uploadedFilename;
 
+                const memberData: AddMemberDto = {
+                    first_name: data.first_name,
+                    last_name: data.last_name,
+                    email: data.email,
+                    role: data.role,
+                    ...(data.birth_date && { birth_date: data.birth_date }),
+                    ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
+                    ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
+                    ...(currentUploadedFilename && { profile_photo: currentUploadedFilename }),
+                };
+
                 addMember({
                     practiceId: parseInt(practiceId),
-                    data: {
-                        first_name: data.first_name,
-                        last_name: data.last_name,
-                        email: data.email,
-                        // Backend only accepts "staff" or "doctor" when creating a member
-                        role: data.role as any,
-                        ...(data.birth_date && { birth_date: data.birth_date }),
-                        // Ensure gender is lowercase for backend
-                        ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
-                        ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
-                        ...(currentUploadedFilename && { profile_photo: currentUploadedFilename }),
-                    },
+                    data: memberData,
                 });
             }
         },

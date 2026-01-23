@@ -1,19 +1,21 @@
 import { BaseText } from "@/components";
+import { ErrorState } from "@/components/ErrorState";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useGetPatientById } from "@/utils/hook";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useMemo } from "react";
 import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function PatientDetailsScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const insets = useSafeAreaInsets();
-    const { data: patient, isLoading } = useGetPatientById(id || "");
+    const { data: patient, isLoading, error, refetch } = useGetPatientById(id || "");
 
-    const handleCall = async (phoneNumber: string) => {
+    const handleCall = useCallback(async (phoneNumber: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const url = `tel:${phoneNumber}`;
         try {
@@ -23,13 +25,12 @@ export default function PatientDetailsScreen() {
             } else {
                 Alert.alert("Error", "Cannot make phone call");
             }
-        } catch (error) {
-            console.error("Error making phone call:", error);
+        } catch {
             Alert.alert("Error", "Error making phone call");
         }
-    };
+    }, []);
 
-    const handleMessage = async (phoneNumber: string) => {
+    const handleMessage = useCallback(async (phoneNumber: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const url = `sms:${phoneNumber}`;
         try {
@@ -39,11 +40,10 @@ export default function PatientDetailsScreen() {
             } else {
                 Alert.alert("Error", "Cannot send message");
             }
-        } catch (error) {
-            console.error("Error sending message:", error);
+        } catch {
             Alert.alert("Error", "Error sending message");
         }
-    };
+    }, []);
 
     const formatDate = (dateString: string | null | undefined) => {
         if (!dateString) return null;
@@ -76,7 +76,22 @@ export default function PatientDetailsScreen() {
         return gender.charAt(0).toUpperCase() + gender.slice(1);
     };
 
-    const formatAddress = (address: string | any): { type: string; formatted: string } | null => {
+    interface AddressValue {
+        street?: string;
+        street1?: string;
+        street2?: string;
+        city?: string;
+        state?: string;
+        zip?: string;
+        country?: string;
+    }
+
+    interface AddressObject {
+        type: string;
+        value: string | AddressValue;
+    }
+
+    const formatAddress = (address: string | AddressObject | unknown): { type: string; formatted: string } | null => {
         if (!address) return null;
 
         // If address is a string, return it as is
@@ -85,34 +100,36 @@ export default function PatientDetailsScreen() {
         }
 
         // If address is an object with type and value
-        if (typeof address === "object" && address.type && address.value) {
-            const addressType = address.type;
-            const addressValue = address.value;
+        if (typeof address === "object" && address !== null && "type" in address && "value" in address) {
+            const addressObj = address as AddressObject;
+            const addressType = addressObj.type;
+            const addressValue = addressObj.value;
 
             // If value is an object with address fields
-            if (typeof addressValue === "object") {
+            if (typeof addressValue === "object" && addressValue !== null) {
+                const addressValueObj = addressValue as AddressValue;
                 const parts: string[] = [];
 
                 // Street addresses first
-                if (addressValue.street) parts.push(addressValue.street);
-                if (addressValue.street1) parts.push(addressValue.street1);
-                if (addressValue.street2) parts.push(addressValue.street2);
+                if (addressValueObj.street) parts.push(addressValueObj.street);
+                if (addressValueObj.street1) parts.push(addressValueObj.street1);
+                if (addressValueObj.street2) parts.push(addressValueObj.street2);
 
                 // City, State, ZIP together
                 const cityStateZip: string[] = [];
-                if (addressValue.city) cityStateZip.push(addressValue.city);
-                if (addressValue.state) cityStateZip.push(addressValue.state);
-                if (addressValue.zip) cityStateZip.push(addressValue.zip);
+                if (addressValueObj.city) cityStateZip.push(addressValueObj.city);
+                if (addressValueObj.state) cityStateZip.push(addressValueObj.state);
+                if (addressValueObj.zip) cityStateZip.push(addressValueObj.zip);
 
                 if (cityStateZip.length > 0) {
                     parts.push(cityStateZip.join(", "));
                 }
 
                 // Country last
-                if (addressValue.country) parts.push(addressValue.country);
+                if (addressValueObj.country) parts.push(addressValueObj.country);
 
                 const formatted = parts.filter(Boolean).join(", ");
-                return { type: addressType, formatted: formatted || JSON.stringify(addressValue) };
+                return { type: addressType, formatted: formatted || JSON.stringify(addressValueObj) };
             }
 
             // If value is a string
@@ -145,6 +162,22 @@ export default function PatientDetailsScreen() {
         );
     }
 
+    if (error) {
+        return (
+            <View style={[styles.container, { paddingTop: insets.top }]}>
+                <View style={styles.header}>
+                    <BaseText type="Title1" weight="600" color="labels.primary">
+                        Patient Details
+                    </BaseText>
+                    <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
+                        <IconSymbol name="xmark" size={20} color={colors.labels.primary} />
+                    </TouchableOpacity>
+                </View>
+                <ErrorState message={error?.message || "Failed to load patient details"} onRetry={() => refetch()} />
+            </View>
+        );
+    }
+
     if (!patient?.data) {
         return (
             <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -166,26 +199,13 @@ export default function PatientDetailsScreen() {
     }
 
     const patientData = patient.data;
-    const age = calculateAge(patientData.birth_date);
-    const birthDateFormatted = formatDate(patientData.birth_date);
-    const genderFormatted = formatGender(patientData.gender);
+    const age = useMemo(() => calculateAge(patientData.birth_date), [patientData.birth_date]);
+    const birthDateFormatted = useMemo(() => formatDate(patientData.birth_date), [patientData.birth_date]);
+    const genderFormatted = useMemo(() => formatGender(patientData.gender), [patientData.gender]);
 
     return (
         <ScrollView style={[styles.scrollView, { paddingTop: insets.top }]} contentContainerStyle={styles.scrollContent}>
             <View style={styles.content}>
-                {/* Basic Information */}
-
-                {/* Personal Details */}
-                {/* {(genderFormatted || birthDateFormatted || age !== null) && (
-                    <View style={styles.sectionContainer}>
-                        <View style={styles.section}>
-                            {genderFormatted && <InfoRow label="Gender" value={genderFormatted} />}
-                            {birthDateFormatted && <InfoRow label="Birth Date" value={birthDateFormatted} />}
-                            {age !== null && <InfoRow label="Age" value={`${age} years old`} />}
-                        </View>
-                    </View>
-                )} */}
-
                 {/* Phone Numbers */}
                 {patientData.numbers && patientData.numbers.length > 0 && (
                     <View style={styles.sectionContainer}>
@@ -223,18 +243,10 @@ export default function PatientDetailsScreen() {
                     </View>
                 )}
 
-                {/* Email */}
-                {/* {patientData.email && patientData.email.length > 0 && (
-                    <View style={styles.sectionContainer}>
-                        <View style={styles.section}>{patientData.email.map((email, index) => email && <InfoRow key={index} label={index === 0 ? "Email" : ""} value={email} />)}</View>
-                    </View>
-                )} */}
-
                 {/* Addresses */}
                 <View style={styles.sectionContainer}>
-                    <InfoRow label="Gender" value={genderFormatted || ""} isLast={false} />
-                    <InfoRow label="Birth Date" value={`${birthDateFormatted} (${age} years old)` || ""} isLast={false} />
-                    <InfoRow label="Age" value={``} />
+                    {genderFormatted && <InfoRow label="Gender" value={genderFormatted} isLast={false} />}
+                    {birthDateFormatted && age !== null && <InfoRow label="Birth Date" value={`${birthDateFormatted} (${age} years old)`} isLast={false} />}
                     {patientData.addresses && patientData.addresses.length > 0 && (
                         <View style={styles.section}>
                             {patientData.addresses.map((address, index) => {
@@ -252,23 +264,14 @@ export default function PatientDetailsScreen() {
                         <View style={styles.section}>
                             {patientData.links.map((link, index) => {
                                 if (!link) return null;
-                                const linkValue = typeof link === "string" ? link : (link as any).value || String(link);
-                                const linkType = typeof link === "object" && (link as any).type ? (link as any).type : "link";
+                                const linkValue = typeof link === "string" ? link : (typeof link === "object" && link !== null && "value" in link ? String((link as { value: unknown }).value) : String(link));
+                                const linkType = typeof link === "object" && link !== null && "type" in link ? String((link as { type: unknown }).type) : "link";
                                 if (!linkValue) return null;
                                 return <InfoRow key={index} label={linkType} value={linkValue} isLast={index === patientData.links.length - 1} />;
                             })}
                         </View>
                     </View>
                 )}
-
-                {/* Doctor */}
-                {/* {patientData.doctor && (
-                    <View style={styles.sectionContainer}>
-                        <View style={styles.section}>
-                            <InfoRow label="Doctor" value={(patientData.doctor as any).full_name || `${patientData.doctor.first_name || ""} ${patientData.doctor.last_name || ""}`.trim()} />
-                        </View>
-                    </View>
-                )} */}
             </View>
         </ScrollView>
     );

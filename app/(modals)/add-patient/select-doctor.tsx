@@ -1,4 +1,5 @@
 import { BaseText } from "@/components";
+import { ErrorState } from "@/components/ErrorState";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
@@ -9,14 +10,14 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Member } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { router } from "expo-router";
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SelectDoctorScreen() {
     const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
-    const { data: practiceMembers, isLoading } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: practiceMembers, isLoading, error, refetch } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const headerHeight = useHeaderHeight();
     const insets = useSafeAreaInsets();
 
@@ -69,7 +70,7 @@ export default function SelectDoctorScreen() {
         }
     }, [isLoading, doctors.length, currentUserRole, currentUserMember, profile]);
 
-    const handleSelectDoctor = (doctor: Member | string | number) => {
+    const handleSelectDoctor = useCallback((doctor: Member | string | number) => {
         // If doctor is a Member object, extract ID and pass full object
         let numericId: string;
         let doctorObject: Member | null = null;
@@ -103,16 +104,24 @@ export default function SelectDoctorScreen() {
                 ...(doctorObject && { doctor: JSON.stringify(doctorObject) }),
             },
         });
-    };
+    }, []);
 
-    const handleBack = () => {
+    const handleBack = useCallback(() => {
         router.back();
-    };
+    }, []);
 
     if (isLoading) {
         return (
             <View className="flex-1 items-center justify-center" style={{ paddingTop: headerHeight }}>
                 <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View className="flex-1" style={{ backgroundColor: colors.system.gray6, paddingTop: headerHeight }}>
+                <ErrorState message={error?.message || "Failed to load practice members"} onRetry={() => refetch()} />
             </View>
         );
     }
@@ -141,24 +150,25 @@ export default function SelectDoctorScreen() {
                     paddingHorizontal: spacing["4"],
                     gap: spacing["2.5"],
                 }}
-                renderItem={({ item }) => {
-                    const doctorName = item.first_name && item.last_name ? `Dr. ${item.first_name} ${item.last_name}` : item.email;
+                renderItem={useCallback(
+                    ({ item }: { item: Member }) => {
+                        const doctorName = item.first_name && item.last_name ? `Dr. ${item.first_name} ${item.last_name}` : item.email;
 
-                    // Get color from member or use default blue
-
-                    return (
-                        <TouchableOpacity onPress={() => handleSelectDoctor(item)} className="bg-white p-3 rounded-xl">
-                            <View style={styles.doctorRow}>
-                                <Avatar haveRing name={doctorName} size={36} color={item.color} imageUrl={item.image?.url} />
-                                <View style={styles.nameContainer}>
-                                    <BaseText type="Callout" weight={600} color="labels.primary">
-                                        {doctorName}
-                                    </BaseText>
+                        return (
+                            <TouchableOpacity onPress={() => handleSelectDoctor(item)} className="bg-white p-3 rounded-xl">
+                                <View style={styles.doctorRow}>
+                                    <Avatar haveRing name={doctorName} size={36} color={item.color} imageUrl={item.image?.url} />
+                                    <View style={styles.nameContainer}>
+                                        <BaseText type="Callout" weight={600} color="labels.primary">
+                                            {doctorName}
+                                        </BaseText>
+                                    </View>
                                 </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
-                }}
+                            </TouchableOpacity>
+                        );
+                    },
+                    [handleSelectDoctor],
+                )}
             />
         </View>
     );
