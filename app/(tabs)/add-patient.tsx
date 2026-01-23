@@ -3,7 +3,7 @@ import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { View } from "react-native";
 
 export default function AddPatientRedirect() {
@@ -30,7 +30,7 @@ export default function AddPatientRedirect() {
     }, [practiceMembers?.data]);
 
     // Navigate to patients tab first, then open modal
-    useEffect(() => {
+    useFocusEffect(() => {
         // Don't navigate if there's an error
         if (isPracticeMembersError) {
             router.replace("/(tabs)/patients");
@@ -74,7 +74,7 @@ export default function AddPatientRedirect() {
                 requestAnimationFrame(navigateToModal);
             });
         }
-    }, [currentUserRole, availableDoctors]);
+    });
 
     // Reset navigation flag when screen loses focus
     useFocusEffect(

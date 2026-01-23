@@ -107,6 +107,16 @@ export interface UpdateMemberRoleDto {
     role: "owner" | "doctor" | "staff"; // OpenAPI: update role enum
 }
 
+export interface UpdateMemberDto {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    birth_date?: string; // YYYY-MM-DD format
+    gender?: "male" | "female" | "other";
+    profile_photo?: File | string; // File for direct upload or string for Livewire temp filename
+    metadata?: string; // JSON string
+}
+
 export interface TransferOwnershipDto {
     new_owner_id: number;
 }

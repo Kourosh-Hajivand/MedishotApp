@@ -38,6 +38,7 @@ export const routes = {
         getMembers: (practiseId: string | number) => `practises/${practiseId}/members`,
         addMember: (practiseId: string | number) => `practises/${practiseId}/members`,
         updateMemberRole: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}/role/update`,
+        updateMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}/update`,
         removeMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}`,
         leave: (practiseId: string | number) => `practises/${practiseId}/leave`,
         transferOwnership: (practiseId: string | number) => `practises/${practiseId}/transfer-ownership`,
@@ -67,6 +68,9 @@ export const routes = {
 
         // Contracts
         getLatestContracts: (practiseId: string | number) => `${practiseId}/contracts/latest`,
+
+        // Activities
+        getActivities: (practiseId: string | number) => `practises/${practiseId}/activities`,
 
         // Patients
         getPatients: (practiseId: string | number) => `${practiseId}/patients`,

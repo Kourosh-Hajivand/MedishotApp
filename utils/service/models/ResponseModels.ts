@@ -824,3 +824,10 @@ export interface PatientActivitiesResponse {
     message: string;
     data: ActivityLog[];
 }
+
+// ============= Practice Activities Responses =============
+export interface PracticeActivitiesResponse {
+    success: true;
+    message: string;
+    data: ActivityLog[];
+}

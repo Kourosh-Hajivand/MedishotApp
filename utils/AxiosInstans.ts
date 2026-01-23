@@ -1,8 +1,9 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 import { router } from "expo-router";
 import { routes } from "../routes/routes";
-import { storeFailedRequest } from "./helper/failedRequestStorage";
+import { FailedRequest, storeFailedRequest } from "./helper/failedRequestStorage";
 import { getTokens, removeTokens } from "./helper/tokenStorage";
+import { useErrorStore } from "./hook/useErrorStore";
 import { AuthService } from "./service/AuthService";
 
 const axiosInstance = axios.create({
@@ -117,11 +118,7 @@ axiosInstance.interceptors.request.use(async (config) => {
             console.log("🔗 Query Params:", requestInfo.params);
         }
         if (requestInfo.body) {
-            if (requestInfo.body === "[FormData - Multipart]") {
-                console.log("📦 Request Body:", requestInfo.body);
-            } else {
-                console.log("📦 Request Body:", JSON.stringify(requestInfo.body, null, 2));
-            }
+            console.log("📦 Request Body:", requestInfo.body);
         }
         console.groupEnd();
     }
@@ -142,7 +139,7 @@ axiosInstance.interceptors.response.use(
             console.group(`${statusColor} [${responseInfo.method}] ${responseInfo.endpoint} - ${responseInfo.status} ${responseInfo.statusText}`);
             console.log("📍 Full URL:", responseInfo.url);
             console.log("📥 Response Headers:", responseInfo.headers);
-            console.log("📥 Response Data:", JSON.stringify(responseInfo.data, null, 2));
+            console.log("📥 Response Data:", responseInfo.data);
             console.groupEnd();
         }
 
@@ -159,7 +156,7 @@ axiosInstance.interceptors.response.use(
             if (error.response) {
                 console.log("📥 Status:", errorInfo.status, errorInfo.statusText);
                 console.log("📥 Response Headers:", errorInfo.headers);
-                console.log("📥 Response Data:", JSON.stringify(errorInfo.data, null, 2));
+                console.log("📥 Response Data:", errorInfo.data);
                 console.log("💬 Error Message:", errorInfo.message);
             } else if (error.request) {
                 console.log("⚠️ No Response Received");
@@ -176,8 +173,9 @@ axiosInstance.interceptors.response.use(
             isRedirectingToError = true;
 
             // Store failed request for retry
+            let failedRequest: FailedRequest | null = null;
             if (originalRequest) {
-                const failedRequest = {
+                failedRequest = {
                     url: originalRequest.url || "",
                     method: (originalRequest.method || "GET").toUpperCase(),
                     baseURL: originalRequest.baseURL,
@@ -188,12 +186,8 @@ axiosInstance.interceptors.response.use(
                 await storeFailedRequest(failedRequest);
             }
 
-            // Navigate to error page
-            try {
-                router.replace("/error");
-            } catch (navError) {
-                // Navigation error handled silently
-            }
+            // Show error modal instead of navigating
+            useErrorStore.getState().setServerError(true, failedRequest);
 
             // Reset flag after a delay to allow retry
             setTimeout(() => {

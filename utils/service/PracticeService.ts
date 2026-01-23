@@ -1,8 +1,8 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, Member, PatientContractListResponse, PatientsCountResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
+import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
+import { ApiResponse, Member, PatientContractListResponse, PatientsCountResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
@@ -34,6 +34,8 @@ const {
         getAlbums,
         getMember,
         getLatestContracts,
+        getActivities,
+        updateMember,
     },
 } = routes;
 
@@ -161,6 +163,49 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to update member role");
+            }
+            throw error;
+        }
+    },
+
+    // Update unregistered member information
+    updateMember: async (practiceId: number, memberId: string | number, data: UpdateMemberDto): Promise<ApiResponse<any>> => {
+        try {
+            const formData = new FormData();
+
+            if (data.first_name) {
+                formData.append("first_name", data.first_name);
+            }
+            if (data.last_name) {
+                formData.append("last_name", data.last_name);
+            }
+            if (data.email) {
+                formData.append("email", data.email);
+            }
+            if (data.birth_date) {
+                formData.append("birth_date", data.birth_date);
+            }
+            if (data.gender) {
+                formData.append("gender", data.gender);
+            }
+            if (data.metadata) {
+                formData.append("metadata", data.metadata);
+            }
+            if (data.profile_photo) {
+                if (typeof data.profile_photo === "string") {
+                    formData.append("profile_photo", data.profile_photo);
+                } else {
+                    formData.append("profile_photo", data.profile_photo);
+                }
+            }
+
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + updateMember(practiceId, memberId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to update member");
             }
             throw error;
         }
@@ -416,6 +461,21 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to get latest contracts");
+            }
+            throw error;
+        }
+    },
+
+    // ============= Practice Activities =============
+
+    // Get practice activity log
+    getActivities: async (practiceId: number): Promise<PracticeActivitiesResponse> => {
+        try {
+            const response: AxiosResponse<PracticeActivitiesResponse> = await axiosInstance.get(baseUrl + getActivities(practiceId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get practice activities");
             }
             throw error;
         }

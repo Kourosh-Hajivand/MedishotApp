@@ -4,6 +4,7 @@ import { spacing } from "@/styles/spaces";
 import axiosInstance from "@/utils/AxiosInstans";
 import { clearFailedRequest, FailedRequest, getFailedRequest } from "@/utils/helper/failedRequestStorage";
 import { getTokens } from "@/utils/helper/tokenStorage";
+import { useErrorStore } from "@/utils/hook/useErrorStore";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -13,6 +14,7 @@ export default function ErrorScreen() {
     const insets = useSafeAreaInsets();
     const [isRetrying, setIsRetrying] = useState(false);
     const [failedRequest, setFailedRequest] = useState<FailedRequest | null>(null);
+    const { setServerError } = useErrorStore();
 
     // Check if user has token
     const checkAuthAndNavigate = async (targetRoute: () => void) => {
@@ -35,6 +37,27 @@ export default function ErrorScreen() {
         // Load failed request on mount
         getFailedRequest().then((request) => {
             setFailedRequest(request);
+            // If there's a failed request, show modal instead of staying on error page
+            if (request) {
+                setServerError(true, request);
+                // Navigate back after showing modal
+                setTimeout(() => {
+                    try {
+                        router.back();
+                    } catch {
+                        router.replace("/(tabs)/patients");
+                    }
+                }, 100);
+            } else {
+                // If no failed request, just go back
+                setTimeout(() => {
+                    try {
+                        router.back();
+                    } catch {
+                        router.replace("/(tabs)/patients");
+                    }
+                }, 100);
+            }
         });
 
         // Check authentication on mount - if no token, redirect to welcome
@@ -57,7 +80,7 @@ export default function ErrorScreen() {
         };
 
         checkAuthOnMount();
-    }, []);
+    }, [setServerError]);
 
     const handleRetry = async () => {
         if (!failedRequest) {
@@ -119,11 +142,26 @@ export default function ErrorScreen() {
         }
     };
 
-    const handleGoHome = async () => {
+    const handleGoBack = async () => {
         await checkAuthAndNavigate(() => {
-            router.replace("/(tabs)/patients");
+            try {
+                router.back();
+            } catch {
+                // If can't go back, navigate to patients tab
+                router.replace("/(tabs)/patients");
+            }
         });
     };
+
+    // Auto-redirect to previous page on mount if no failed request
+    useEffect(() => {
+        if (!failedRequest) {
+            const timer = setTimeout(() => {
+                handleGoBack();
+            }, 100);
+            return () => clearTimeout(timer);
+        }
+    }, [failedRequest]);
 
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top }]} contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + spacing["6"] }]} showsVerticalScrollIndicator={false}>
@@ -142,7 +180,7 @@ export default function ErrorScreen() {
 
                 <View style={styles.buttonContainer}>
                     <BaseButton label={isRetrying ? "Retrying..." : "Try Again"} onPress={handleRetry} ButtonStyle="Filled" size="Large" rounded style={styles.button} disabled={isRetrying} isLoading={isRetrying} />
-                    <BaseButton label="Go Home" onPress={handleGoHome} ButtonStyle="Tinted" size="Large" rounded style={styles.button} disabled={isRetrying} />
+                    <BaseButton label="Go Back" onPress={handleGoBack} ButtonStyle="Tinted" size="Large" rounded style={styles.button} disabled={isRetrying} />
                 </View>
             </View>
         </ScrollView>

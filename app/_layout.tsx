@@ -1,4 +1,5 @@
 import { AuthGuard, AuthSplashScreen, TabletWrapper } from "@/components";
+import { ServerErrorModal } from "@/components/ServerErrorModal";
 import { Layout } from "@/constants/theme";
 import TenstackProvider from "@/utils/Providers/TenstackProvider";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -86,6 +87,7 @@ export default function RootLayout() {
 
                         <StatusBar style={"dark"} animated backgroundColor={"#fff"} />
                         <ToastManager />
+                        <ServerErrorModal />
                         </AuthGuard>
                     </TenstackProvider>
                 </BottomSheetModalProvider>

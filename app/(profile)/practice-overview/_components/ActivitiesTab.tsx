@@ -2,42 +2,34 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { colors } from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
-import { useGetPracticeMembers } from "@/utils/hook/usePractice";
+import { useGetPracticeActivities } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { Member } from "@/utils/service/models/ResponseModels";
+import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import dayjs from "dayjs";
 import React, { useMemo } from "react";
-import { TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, TouchableOpacity, View } from "react-native";
 
 interface ActivitiesTabProps {
     practiceId?: number;
 }
 
 type ActivityItem = {
-    activity: NonNullable<Member["activities"]>[number];
-    member: Member;
+    activity: ActivityLog;
     date: string;
 };
 
 export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
     const { selectedPractice } = useProfileStore();
-    const { data: practiceMembers } = useGetPracticeMembers(practiceId ?? selectedPractice?.id ?? 0, !!practiceId || !!selectedPractice?.id);
+    const finalPracticeId = practiceId ?? selectedPractice?.id ?? 0;
+    const { data: practiceActivities, isLoading, error } = useGetPracticeActivities(finalPracticeId, !!finalPracticeId);
 
     // Group activities by date for Activities tab
     const groupedActivities = useMemo<Record<string, ActivityItem[]>>(() => {
-        if (!practiceMembers?.data) return {};
-        const allActivities: ActivityItem[] = [];
-        practiceMembers.data.forEach((member) => {
-            if (member.activities) {
-                member.activities.forEach((activity) => {
-                    allActivities.push({
-                        activity,
-                        member,
-                        date: dayjs(activity.created_at).format("YYYY-MM-DD"),
-                    });
-                });
-            }
-        });
+        if (!practiceActivities?.data) return {};
+        const allActivities: ActivityItem[] = practiceActivities.data.map((activity) => ({
+            activity,
+            date: dayjs(activity.created_at).format("YYYY-MM-DD"),
+        }));
         // Sort by date (newest first)
         allActivities.sort((a, b) => dayjs(b.activity.created_at).valueOf() - dayjs(a.activity.created_at).valueOf());
         // Group by date
@@ -49,7 +41,25 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
             grouped[item.date].push(item);
         });
         return grouped;
-    }, [practiceMembers?.data]);
+    }, [practiceActivities?.data]);
+
+    if (isLoading) {
+        return (
+            <View className="flex-1 items-center justify-center py-12">
+                <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View className="items-center justify-center py-12 px-4">
+                <BaseText type="Body" weight="400" color="labels.secondary">
+                    Failed to load activities
+                </BaseText>
+            </View>
+        );
+    }
 
     if (Object.keys(groupedActivities).length === 0) {
         return (
@@ -86,11 +96,11 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
                             </View>
                             {activities.map((item: ActivityItem, idx: number) => {
                                 const activity = item.activity;
-                                const member = item.member;
-                                const memberName = member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email;
-                                const isImageActivity = activity.description?.toLowerCase().includes("image") || activity.description?.toLowerCase().includes("picture");
+                                const causerName = activity.causer?.name || "Unknown";
+                                const isImageActivity = activity.description?.toLowerCase().includes("image") || activity.description?.toLowerCase().includes("picture") || activity.description?.toLowerCase().includes("media");
                                 const isNoteActivity = activity.description?.toLowerCase().includes("note");
                                 const isAppointmentActivity = activity.description?.toLowerCase().includes("appointment") || activity.description?.toLowerCase().includes("scheduled");
+                                const isContractActivity = activity.description?.toLowerCase().includes("contract");
 
                                 return (
                                     <View key={`activity-${dateKey}-${idx}`} className="border-b border-system-gray5">
@@ -106,7 +116,7 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
                                                             {activity.description}
                                                         </BaseText>
                                                         <BaseText type="Caption2" weight="400" color="labels.secondary">
-                                                            by {member.role} {memberName}
+                                                            by {causerName}
                                                         </BaseText>
                                                     </View>
                                                 </View>
@@ -119,7 +129,7 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
                                                 </View>
                                                 <View className="flex-1">
                                                     <BaseText type="Callout" weight="400" color="labels.secondary">
-                                                        note by {member.role} {memberName}:
+                                                        note by {causerName}:
                                                     </BaseText>
                                                     <BaseText type="Callout" weight="400" color="labels.primary" className="mt-1">
                                                         {activity.properties?.note || activity.description}
@@ -136,7 +146,21 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
                                                         {activity.description}
                                                     </BaseText>
                                                     <BaseText type="Caption2" weight="400" color="labels.secondary">
-                                                        by {member.role} {memberName}
+                                                        by {causerName}
+                                                    </BaseText>
+                                                </View>
+                                            </View>
+                                        ) : isContractActivity ? (
+                                            <View className="flex-row items-center gap-3 px-4 py-3">
+                                                <View className="w-[38px] h-[38px] rounded-lg bg-blue/20 items-center justify-center">
+                                                    <IconSymbol name="doc.text" size={20} color={colors.system.blue} />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <BaseText type="Callout" weight="400" color="labels.primary">
+                                                        {activity.description}
+                                                    </BaseText>
+                                                    <BaseText type="Caption2" weight="400" color="labels.secondary">
+                                                        by {causerName}
                                                     </BaseText>
                                                 </View>
                                             </View>
@@ -150,7 +174,7 @@ export function ActivitiesTab({ practiceId }: ActivitiesTabProps) {
                                                         {activity.description}
                                                     </BaseText>
                                                     <BaseText type="Caption2" weight="400" color="labels.secondary">
-                                                        by {member.role} {memberName}
+                                                        by {causerName}
                                                     </BaseText>
                                                 </View>
                                             </View>

@@ -110,6 +110,26 @@ export default function SelectDoctorScreen() {
         router.back();
     }, []);
 
+    const renderDoctorItem = useCallback(
+        ({ item }: { item: Member }) => {
+            const doctorName = item.first_name && item.last_name ? `Dr. ${item.first_name} ${item.last_name}` : item.email;
+
+            return (
+                <TouchableOpacity onPress={() => handleSelectDoctor(item)} className="bg-white p-3 rounded-xl">
+                    <View style={styles.doctorRow}>
+                        <Avatar haveRing name={doctorName} size={36} color={item.color} imageUrl={item.image?.url} />
+                        <View style={styles.nameContainer}>
+                            <BaseText type="Callout" weight={600} color="labels.primary">
+                                {doctorName}
+                            </BaseText>
+                        </View>
+                    </View>
+                </TouchableOpacity>
+            );
+        },
+        [handleSelectDoctor],
+    );
+
     if (isLoading) {
         return (
             <View className="flex-1 items-center justify-center" style={{ paddingTop: headerHeight }}>
@@ -150,25 +170,7 @@ export default function SelectDoctorScreen() {
                     paddingHorizontal: spacing["4"],
                     gap: spacing["2.5"],
                 }}
-                renderItem={useCallback(
-                    ({ item }: { item: Member }) => {
-                        const doctorName = item.first_name && item.last_name ? `Dr. ${item.first_name} ${item.last_name}` : item.email;
-
-                        return (
-                            <TouchableOpacity onPress={() => handleSelectDoctor(item)} className="bg-white p-3 rounded-xl">
-                                <View style={styles.doctorRow}>
-                                    <Avatar haveRing name={doctorName} size={36} color={item.color} imageUrl={item.image?.url} />
-                                    <View style={styles.nameContainer}>
-                                        <BaseText type="Callout" weight={600} color="labels.primary">
-                                            {doctorName}
-                                        </BaseText>
-                                    </View>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    },
-                    [handleSelectDoctor],
-                )}
+                renderItem={renderDoctorItem}
             />
         </View>
     );
