@@ -17,8 +17,25 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         // Map event types to appropriate icons
         if (!event) return "circle.fill";
         const eventLower = event.toLowerCase();
+        
+        // Check for specific event types first
         if (eventLower.includes("appointment") || eventLower.includes("scheduled")) {
             return "calendar";
+        }
+        if (eventLower.includes("patient_created") || (eventLower.includes("patient") && eventLower.includes("created"))) {
+            return "person.badge.plus.fill";
+        }
+        if (eventLower.includes("patient_updated") || (eventLower.includes("patient") && eventLower.includes("updated"))) {
+            return "person.crop.circle.badge.checkmark";
+        }
+        if (eventLower.includes("patient_deleted") || (eventLower.includes("patient") && eventLower.includes("deleted"))) {
+            return "person.crop.circle.badge.minus";
+        }
+        if (eventLower.includes("upload") || eventLower.includes("media") || eventLower.includes("image")) {
+            return "photo.badge.plus.fill";
+        }
+        if (eventLower.includes("consent") || eventLower.includes("contract")) {
+            return "doc.text.fill";
         }
         if (eventLower.includes("created") || eventLower.includes("create")) {
             return "plus.circle.fill";
@@ -29,18 +46,32 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         if (eventLower.includes("deleted") || eventLower.includes("delete")) {
             return "trash.circle.fill";
         }
-        if (eventLower.includes("upload") || eventLower.includes("media")) {
-            return "photo.badge.plus.fill";
-        }
-        if (eventLower.includes("consent") || eventLower.includes("contract")) {
-            return "doc.text.fill";
-        }
         return "circle.fill";
     };
 
     const getActivityColor = (event?: string | null): string => {
         if (!event) return colors.system.gray;
         const eventLower = event.toLowerCase();
+        
+        // Check for specific event types first
+        if (eventLower.includes("appointment") || eventLower.includes("scheduled")) {
+            return "#FF3B30"; // Red color for appointment
+        }
+        if (eventLower.includes("patient_created") || (eventLower.includes("patient") && eventLower.includes("created"))) {
+            return colors.system.green;
+        }
+        if (eventLower.includes("patient_updated") || (eventLower.includes("patient") && eventLower.includes("updated"))) {
+            return colors.system.blue;
+        }
+        if (eventLower.includes("patient_deleted") || (eventLower.includes("patient") && eventLower.includes("deleted"))) {
+            return colors.system.red;
+        }
+        if (eventLower.includes("upload") || eventLower.includes("media") || eventLower.includes("image")) {
+            return colors.system.purple;
+        }
+        if (eventLower.includes("consent") || eventLower.includes("contract")) {
+            return colors.system.orange;
+        }
         if (eventLower.includes("created") || eventLower.includes("create")) {
             return colors.system.green;
         }
@@ -49,15 +80,6 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         }
         if (eventLower.includes("deleted") || eventLower.includes("delete")) {
             return colors.system.red;
-        }
-        if (eventLower.includes("upload") || eventLower.includes("media")) {
-            return colors.system.purple;
-        }
-        if (eventLower.includes("consent") || eventLower.includes("contract")) {
-            return colors.system.orange;
-        }
-        if (eventLower.includes("appointment") || eventLower.includes("scheduled")) {
-            return "#FF3B30"; // Red color for appointment
         }
         return colors.system.gray;
     };
@@ -97,7 +119,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
                     </View>
                     <View style={styles.activityTextContainer}>
                         {activity.title && (
-                            <BaseText type="Body" weight="400" color="labels.primary" style={styles.activityDescription}>
+                            <BaseText type="Body" weight="400" color={activity.description ? "labels.secondary" : "labels.primary"} style={styles.activityDescription}>
                                 {activity.title}
                             </BaseText>
                         )}
@@ -107,7 +129,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
                             </BaseText>
                         )}
                         {activity.causer && (
-                            <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.activityMetaText}>
+                            <BaseText type="Caption1" weight="400" color={activity.description ? "labels.tertiary" : "labels.secondary"}  style={styles.activityMetaText}>
                                 by {activity.causer.name}
                             </BaseText>
                         )}
