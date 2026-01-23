@@ -1,14 +1,14 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetPracticeTemplates } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { PracticeTemplate, Template } from "@/utils/service/models/ResponseModels";
+import { PracticeTemplate, Template, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
 import { Button, Host } from "@expo/ui/swift-ui";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -78,43 +78,43 @@ export default function TemplateSelectScreen() {
 
     // Fetch global templates (Ready Templates) - using practice templates endpoint which returns both global and practice templates
     // We need to fetch from a practice to get global templates (practise_id = null)
-    const { data: globalTemplatesData, isLoading: isLoadingGlobalTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const { data: globalTemplatesData, isLoading: isLoadingGlobalTemplates, error: globalTemplatesError, isError: isGlobalTemplatesError, refetch: refetchGlobalTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
     // Fetch practice templates (Custom Templates)
-    const { data: practiceTemplatesData, isLoading: isLoadingPracticeTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const { data: practiceTemplatesData, isLoading: isLoadingPracticeTemplates, error: practiceTemplatesError, isError: isPracticeTemplatesError, refetch: refetchPracticeTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
     // Convert API templates to TemplateType
     const globalTemplates: TemplateType[] = useMemo(() => {
         if (!globalTemplatesData?.data) return [];
 
         // Handle both array and paginated response
-        let templates: any[] = [];
+        let templates: PracticeTemplate[] = [];
         if (Array.isArray(globalTemplatesData.data)) {
             templates = globalTemplatesData.data;
         } else if (globalTemplatesData.data && typeof globalTemplatesData.data === "object" && "data" in globalTemplatesData.data) {
-            templates = (globalTemplatesData.data as any).data || [];
+            templates = (globalTemplatesData.data as { data: PracticeTemplate[] }).data || [];
         }
 
         // Filter only global templates (practise_id === null) that have items and convert
         return templates
-            .filter((template: any) => {
+            .filter((template: PracticeTemplate) => {
                 // Only show templates that have items (cells or gosts)
                 const hasCells = template.cells && Array.isArray(template.cells) && template.cells.length > 0;
-                const hasGosts = template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0;
+                const hasGosts = (template as PracticeTemplate & { gosts?: TemplateGost[] }).gosts && Array.isArray((template as PracticeTemplate & { gosts?: TemplateGost[] }).gosts) && (template as PracticeTemplate & { gosts?: TemplateGost[] }).gosts!.length > 0;
                 return template.practise_id === null && (hasCells || hasGosts);
             })
-            .map((template: any) => {
+            .map((template: PracticeTemplate & { cells?: TemplateCell[]; gosts?: TemplateGost[] }) => {
                 // Extract ghost items with image URLs - prefer cells, fallback to gosts
                 const ghostItems: GhostItemInfo[] = [];
 
                 if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
                     // Sort by row_index and column_index to maintain order
-                    const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                    const sortedCells = [...template.cells].sort((a: TemplateCell, b: TemplateCell) => {
                         if (a.row_index !== b.row_index) return a.row_index - b.row_index;
                         return a.column_index - b.column_index;
                     });
                     ghostItems.push(
-                        ...sortedCells.map((cell: any) => ({
+                        ...sortedCells.map((cell: TemplateCell) => ({
                             gostId: String(cell.gost.id),
                             // gost_image.url for overlay center
                             imageUrl: cell.gost.gost_image?.url || null,
@@ -126,21 +126,24 @@ export default function TemplateSelectScreen() {
                             description: cell.gost.description || null,
                         })),
                     );
-                } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
-                    // Use gosts array if cells are empty
-                    ghostItems.push(
-                        ...template.gosts.map((gost: any) => ({
-                            gostId: String(gost.id),
-                            // gost_image.url for overlay center
-                            imageUrl: gost.gost_image?.url || null,
-                            // image.url for sample modal
-                            sampleImageUrl: gost.image?.url || null,
-                            // icon.url for thumbnails
-                            iconUrl: gost.icon?.url || null,
-                            name: gost.name,
-                            description: gost.description || null,
-                        })),
-                    );
+                } else {
+                    const templateGosts = template.gosts as TemplateGost[] | undefined;
+                    if (templateGosts && Array.isArray(templateGosts) && templateGosts.length > 0) {
+                        // Use gosts array if cells are empty
+                        ghostItems.push(
+                            ...templateGosts.map((gost: TemplateGost) => ({
+                                gostId: String(gost.id),
+                                // gost_image.url for overlay center
+                                imageUrl: gost.gost_image || null,
+                                // image.url for sample modal
+                                sampleImageUrl: gost.image || null,
+                                // icon.url for thumbnails
+                                iconUrl: gost.icon || null,
+                                name: gost.name,
+                                description: gost.description || null,
+                            })),
+                        );
+                    }
                 }
 
                 const itemCount = ghostItems.length;
@@ -163,24 +166,24 @@ export default function TemplateSelectScreen() {
 
         // Filter only practice templates (practise_id !== null, matches selected practice, and has items)
         return practiceTemplatesData.data
-            .filter((template: any) => {
+            .filter((template: PracticeTemplate & { cells?: TemplateCell[]; gosts?: TemplateGost[] }) => {
                 // Only show templates that belong to selected practice and have items
                 const hasCells = template.cells && Array.isArray(template.cells) && template.cells.length > 0;
                 const hasGosts = template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0;
                 return template.practise_id !== null && template.practise_id === selectedPractice?.id && (hasCells || hasGosts);
             })
-            .map((template: any) => {
+            .map((template: PracticeTemplate & { cells?: TemplateCell[]; gosts?: TemplateGost[] }) => {
                 // Extract ghost items with image URLs - prefer cells, fallback to gosts
                 const ghostItems: GhostItemInfo[] = [];
 
                 if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
                     // Sort by row_index and column_index to maintain order
-                    const sortedCells = [...template.cells].sort((a: any, b: any) => {
+                    const sortedCells = [...template.cells].sort((a: TemplateCell, b: TemplateCell) => {
                         if (a.row_index !== b.row_index) return a.row_index - b.row_index;
                         return a.column_index - b.column_index;
                     });
                     ghostItems.push(
-                        ...sortedCells.map((cell: any) => ({
+                        ...sortedCells.map((cell: TemplateCell) => ({
                             gostId: String(cell.gost.id),
                             // gost_image.url for overlay center
                             imageUrl: cell.gost.gost_image?.url || null,
@@ -192,21 +195,24 @@ export default function TemplateSelectScreen() {
                             description: cell.gost.description || null,
                         })),
                     );
-                } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
-                    // Use gosts array if cells are empty
-                    ghostItems.push(
-                        ...template.gosts.map((gost: any) => ({
-                            gostId: String(gost.id),
-                            // gost_image.url for overlay center
-                            imageUrl: gost.gost_image?.url || null,
-                            // image.url for sample modal
-                            sampleImageUrl: gost.image?.url || null,
-                            // icon.url for thumbnails
-                            iconUrl: gost.icon?.url || null,
-                            name: gost.name,
-                            description: gost.description || null,
-                        })),
-                    );
+                } else {
+                    const templateGosts = template.gosts as TemplateGost[] | undefined;
+                    if (templateGosts && Array.isArray(templateGosts) && templateGosts.length > 0) {
+                        // Use gosts array if cells are empty
+                        ghostItems.push(
+                            ...templateGosts.map((gost: TemplateGost) => ({
+                                gostId: String(gost.id),
+                                // gost_image.url for overlay center
+                                imageUrl: gost.gost_image || null,
+                                // image.url for sample modal
+                                sampleImageUrl: gost.image || null,
+                                // icon.url for thumbnails
+                                iconUrl: gost.icon || null,
+                                name: gost.name,
+                                description: gost.description || null,
+                            })),
+                        );
+                    }
                 }
 
                 const itemCount = ghostItems.length;
@@ -243,28 +249,29 @@ export default function TemplateSelectScreen() {
                 };
                 setCustomTemplates((prev) => [templateWithPreview, ...prev]); // Add to beginning of list
             } catch (error) {
-                console.error("Error parsing new template:", error);
+                // Error parsing template - skip invalid template
             }
         }
     }, [newTemplate]);
 
     // Merge practice templates with newly created custom templates
     const allCustomTemplates = useMemo(() => {
+        if (!practiceTemplates.length && !customTemplates.length) return [];
         return [...practiceTemplates, ...customTemplates];
     }, [practiceTemplates, customTemplates]);
 
-    const handleTemplateSelect = (templateId: string) => {
+    const handleTemplateSelect = useCallback((templateId: string) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (selectedTemplate === templateId) {
             setSelectedTemplate(null);
         } else {
             setSelectedTemplate(templateId);
         }
-    };
+    }, [selectedTemplate]);
 
-    const isTemplateSelected = (templateId: string) => {
+    const isTemplateSelected = useCallback((templateId: string) => {
         return selectedTemplate === templateId;
-    };
+    }, [selectedTemplate]);
 
     const handleCreateCustomTemplate = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -305,7 +312,7 @@ export default function TemplateSelectScreen() {
         router.back();
     };
 
-    const renderTemplateItem = ({ item, index }: { item: TemplateType; index: number }) => {
+    const renderTemplateItem = useCallback(({ item, index }: { item: TemplateType; index: number }) => {
         const isSelected = isTemplateSelected(item.id);
         const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
 
@@ -339,7 +346,7 @@ export default function TemplateSelectScreen() {
                 </TouchableOpacity>
             </Animated.View>
         );
-    };
+    }, [selectedTemplate, handleTemplateSelect]);
 
     return (
         <View style={[styles.container, { paddingTop: 0 }]}>
@@ -360,8 +367,22 @@ export default function TemplateSelectScreen() {
 
             {/* Templates Grid */}
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Error State */}
+                {(isGlobalTemplatesError || isPracticeTemplatesError) && !isLoadingGlobalTemplates && !isLoadingPracticeTemplates && (
+                    <View style={styles.loadingContainer}>
+                        <ErrorState
+                            title="Failed to load templates"
+                            message={(globalTemplatesError instanceof Error ? globalTemplatesError.message : ((globalTemplatesError as unknown as { message?: string })?.message || "")) || (practiceTemplatesError instanceof Error ? practiceTemplatesError.message : ((practiceTemplatesError as unknown as { message?: string })?.message || "")) || "Failed to load templates. Please try again."}
+                            onRetry={() => {
+                                if (isGlobalTemplatesError) refetchGlobalTemplates();
+                                if (isPracticeTemplatesError) refetchPracticeTemplates();
+                            }}
+                        />
+                    </View>
+                )}
+
                 {/* Loading State */}
-                {(isLoadingGlobalTemplates || isLoadingPracticeTemplates) && (
+                {(isLoadingGlobalTemplates || isLoadingPracticeTemplates) && !isGlobalTemplatesError && !isPracticeTemplatesError && (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={MINT_COLOR} />
                         <BaseText type="Body" style={{ marginTop: 12 }} color="labels.secondary">

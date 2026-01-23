@@ -1,5 +1,5 @@
 import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetGosts } from "@/utils/hook/useGost";
@@ -25,18 +25,16 @@ export default function CreateTemplateScreen() {
     }>();
 
     const { selectedPractice } = useProfileStore();
-    const { data: gostsData, isLoading: isLoadingGosts } = useGetGosts();
+    const { data: gostsData, isLoading: isLoadingGosts, error: gostsError, isError: isGostsError, refetch: refetchGosts } = useGetGosts();
     const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const [selectedLayout, setSelectedLayout] = useState<LayoutPattern>("left-right");
 
     const { mutate: createTemplate, isPending: isCreatingTemplate } = useCreatePracticeTemplate(
         (data: PracticeTemplateResponse) => {
-            console.log("✅ Template created successfully:", data);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.back();
         },
         (error: Error) => {
-            console.error("❌ Error creating template:", error);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert("Error", error.message || "Failed to create template");
         },
@@ -104,9 +102,6 @@ export default function CreateTemplateScreen() {
     const handleLayoutSelect = (layoutId: LayoutPattern) => {
         Haptics.selectionAsync();
         setSelectedLayout(layoutId);
-        console.log("====================================");
-        console.log(layoutId);
-        console.log("====================================");
     };
 
     const handleCreateTemplate = () => {
@@ -122,7 +117,6 @@ export default function CreateTemplateScreen() {
             .map((itemId) => {
                 const gostId = parseInt(itemId, 10);
                 if (isNaN(gostId)) {
-                    console.error(`Invalid gost ID: ${itemId}`);
                     return null;
                 }
                 return gostId;
@@ -159,15 +153,6 @@ export default function CreateTemplateScreen() {
             layout_pattern: selectedLayout,
             gosts: gosts,
         };
-
-        // Log the data being sent
-        console.log("====================================");
-        console.log("📤 Creating Template with data:");
-        console.log("Practice ID:", selectedPractice.id);
-        console.log("Template Data:", JSON.stringify(templateData, null, 2));
-        console.log("Selected Items:", selectedItems);
-        console.log("Selected Layout:", selectedLayout);
-        console.log("====================================");
 
         // Validate data before sending
         if (gosts.length === 0) {
@@ -231,6 +216,14 @@ export default function CreateTemplateScreen() {
                 {isLoadingGosts ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={MINT_COLOR} />
+                    </View>
+                ) : isGostsError ? (
+                    <View style={styles.loadingContainer}>
+                        <ErrorState
+                            title="Failed to load items"
+                            message={gostsError instanceof Error ? gostsError.message : (gostsError as { message?: string })?.message || "Failed to load items. Please try again."}
+                            onRetry={refetchGosts}
+                        />
                     </View>
                 ) : (
                     <>

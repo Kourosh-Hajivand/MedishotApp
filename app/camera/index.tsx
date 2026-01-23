@@ -1,12 +1,13 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
-import { BaseButton, BaseText } from "@/components";
+import { BaseButton, BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
 import { useGetTemplateById } from "@/utils/hook/useTemplate";
+import { PracticeTemplate, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
 import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
@@ -51,10 +52,10 @@ export default function CameraScreen() {
     }>();
 
     // Get patient data from API
-    const { data: patientData, isLoading: isPatientLoading } = useGetPatientById(patientId || "");
+    const { data: patientData, isLoading: isPatientLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(patientId || "");
 
     // Get template data from API
-    const { data: templateData, isLoading: isTemplateLoading } = useGetTemplateById(templateId || "", !!templateId);
+    const { data: templateData, isLoading: isTemplateLoading, error: templateError, isError: isTemplateError, refetch: refetchTemplate } = useGetTemplateById(templateId || "", !!templateId);
 
     // Extract patient info
     const patientName = useMemo(() => {
@@ -79,18 +80,18 @@ export default function CameraScreen() {
     const ghostItemsData: GhostItemData[] = useMemo(() => {
         if (!templateData?.data) return [];
 
-        const template = templateData.data as any; // Use any to access both cells and gosts
+        const template = templateData.data as unknown as PracticeTemplate & { cells?: TemplateCell[]; gosts?: TemplateGost[] };
         const items: GhostItemData[] = [];
 
         // Prefer cells over gosts (new format)
         if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
             // Sort by row_index and column_index to maintain order
-            const sortedCells = [...template.cells].sort((a: any, b: any) => {
+            const sortedCells = [...template.cells].sort((a: TemplateCell, b: TemplateCell) => {
                 if (a.row_index !== b.row_index) return a.row_index - b.row_index;
                 return a.column_index - b.column_index;
             });
             items.push(
-                ...sortedCells.map((cell: any) => ({
+                ...sortedCells.map((cell: TemplateCell) => ({
                     gostId: String(cell.gost.id),
                     imageUrl: cell.gost.gost_image?.url || null,
                     sampleImageUrl: cell.gost.image?.url || null,
@@ -102,11 +103,11 @@ export default function CameraScreen() {
         } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
             // Fallback to gosts array (backward compatibility)
             items.push(
-                ...template.gosts.map((gost: any) => ({
+                ...template.gosts.map((gost: TemplateGost) => ({
                     gostId: String(gost.id),
-                    imageUrl: gost.gost_image?.url || null,
-                    sampleImageUrl: gost.image?.url || null,
-                    iconUrl: gost.icon?.url || null,
+                    imageUrl: gost.gost_image || null,
+                    sampleImageUrl: gost.image || null,
+                    iconUrl: gost.icon || null,
                     name: gost.name,
                     description: gost.description || null,
                 })),
@@ -128,7 +129,8 @@ export default function CameraScreen() {
     const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
 
     // Extract just IDs for backward compatibility (only for local assets)
-    const ghostItemIds: GhostItemId[] = React.useMemo(() => {
+    const ghostItemIds: GhostItemId[] = useMemo(() => {
+        if (!ghostItemsData.length) return [];
         return ghostItemsData.map((item) => item.gostId).filter(isGhostItemId);
     }, [ghostItemsData]);
 
@@ -168,18 +170,14 @@ export default function CameraScreen() {
     const { mutate: uploadToTemp } = useTempUpload(
         (response) => {
             // Response structure: {success: true, data: {filename: '...'}}
-            const responseAny = response as any;
-            const tempFilename = responseAny?.data?.filename || responseAny?.filename || responseAny?.id?.toString();
-
-            console.log("📥 [tempUpload] Response received:", response);
-            console.log("📥 [tempUpload] Extracted filename:", tempFilename);
+            const responseAny = response as { data?: { filename?: string }; filename?: string; id?: string | number };
+            const tempFilename = responseAny?.data?.filename || responseAny?.filename || (responseAny?.id ? String(responseAny.id) : undefined);
 
             if (tempFilename && uploadingPhotoIdRef.current) {
                 const photoId = uploadingPhotoIdRef.current;
 
                 // Update ref immediately (synchronous)
                 tempFilenameMapRef.current.set(photoId, tempFilename);
-                console.log(`✅ [tempUpload] Updated photo ${photoId} with filename: ${tempFilename} (ref updated)`);
 
                 // Update state (async)
                 setCapturedPhotos((prev) => {
@@ -191,12 +189,9 @@ export default function CameraScreen() {
                     });
                 });
                 uploadingPhotoIdRef.current = null; // Reset
-            } else {
-                console.warn("⚠️ [tempUpload] No tempFilename or photoId found", { tempFilename, photoId: uploadingPhotoIdRef.current });
             }
         },
         (error) => {
-            console.error("❌ [tempUpload] Error uploading photo to temp:", error);
             // Update upload status to error
             if (uploadingPhotoIdRef.current) {
                 const photoId = uploadingPhotoIdRef.current;
@@ -329,17 +324,6 @@ export default function CameraScreen() {
 
     const handleGoToReview = useCallback(
         (photos: CapturedPhoto[]) => {
-            // Log photos before sending to review
-            console.log(
-                "📤 [handleGoToReview] Sending photos to review:",
-                photos.map((p) => ({
-                    id: p.id,
-                    tempFilename: p.tempFilename,
-                    uploadStatus: p.uploadStatus,
-                    templateId: p.templateId,
-                })),
-            );
-
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             router.push({
                 pathname: "/camera/review" as any,
@@ -421,10 +405,8 @@ export default function CameraScreen() {
                             },
                         },
                     ],
-                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+                    { compress: 0.9,                     format: ImageManipulator.SaveFormat.JPEG }
                 );
-
-                console.log(`📷 [Camera] Cropped from ${originalWidth}x${originalHeight} to ${cropWidth}x${cropHeight} (3:2 ratio)`);
 
                 const finalPhotoUri = croppedPhoto.uri;
 
@@ -458,22 +440,19 @@ export default function CameraScreen() {
                     const match = /\.(\w+)$/.exec(filename);
                     const type = match ? `image/${match[1]}` : "image/jpeg";
 
-                    const file = {
+                    const file: { uri: string; type: string; name: string } = {
                         uri: finalPhotoUri,
                         type: type,
                         name: filename,
-                    } as any;
+                    };
 
                     // Update status to uploading and set ref to track this photo
                     uploadingPhotoIdRef.current = newPhoto.id;
                     setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "uploading" } : p)));
 
-                    console.log(`📤 [tempUpload] Uploading photo ${newPhoto.id} to temp-upload...`);
-
                     // Upload immediately to temp-upload
                     uploadToTemp(file);
                 } catch (error) {
-                    console.error("Error preparing photo for temp upload:", error);
                     setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "error" } : p)));
                     uploadingPhotoIdRef.current = null; // Reset on error
                 }
@@ -498,16 +477,57 @@ export default function CameraScreen() {
                 // No template - don't auto-navigate, user must click Save button
             }
         } catch (error) {
-            console.error("Error taking photo:", error);
+            // Error handled by upload status
         } finally {
             setIsCapturing(false);
         }
-    }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, handleGoToReview]);
+    }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, uploadToTemp]);
 
-    const handleClose = () => {
+    const renderThumbnailItem = useCallback(({ item: ghostItem, index }: { item: GhostItemData; index: number }) => {
+        const ghostId = ghostItem.gostId;
+        const photo = capturedPhotos.find((p) => p.templateId === ghostId);
+        const isActive = index === currentGhostIndex;
+        const isCompleted = !!photo;
+        // Use iconUrl (icon.url) for thumbnails, fallback to local icon
+        const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
+        return (
+            <TouchableOpacity
+                onPress={() => {
+                    setCurrentGhostIndex(index);
+                }}
+                style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
+            >
+                {photo ? (
+                    <>
+                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                        <View style={styles.thumbnailCheck}>
+                            <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
+                        </View>
+                    </>
+                ) : iconSource ? (
+                    <Image
+                        source={iconSource}
+                        style={styles.thumbnailIcon}
+                        contentFit="contain"
+                        onError={() => {
+                            // Icon load error - fallback handled by placeholder
+                        }}
+                    />
+                ) : (
+                    <View style={styles.thumbnailPlaceholder}>
+                        <BaseText type="Caption2" color="labels.tertiary">
+                            {index + 1}
+                        </BaseText>
+                    </View>
+                )}
+            </TouchableOpacity>
+        );
+    }, [capturedPhotos, currentGhostIndex]);
+
+    const handleClose = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.back();
-    };
+    }, []);
 
     const getFlashIcon = () => {
         const option = FLASH_OPTIONS.find((o) => o.mode === cameraState.flashMode);
@@ -533,11 +553,31 @@ export default function CameraScreen() {
         );
     }
 
+    // Error state - if patient or template not found
+    if (isPatientError || (templateId && isTemplateError)) {
+        return (
+            <View style={[styles.container, { backgroundColor: colors.system.black, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }]}>
+                <ErrorState
+                    title={isPatientError ? "Failed to load patient" : "Failed to load template"}
+                    message={isPatientError ? (patientError instanceof Error ? patientError.message : ((patientError as unknown as { message?: string })?.message || "Failed to load patient data")) : (templateError instanceof Error ? templateError.message : ((templateError as unknown as { message?: string })?.message || "Failed to load template data"))}
+                    onRetry={() => {
+                        if (isPatientError) refetchPatient();
+                        if (templateId && isTemplateError) refetchTemplate();
+                    }}
+                    icon="exclamationmark.triangle.fill"
+                />
+                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, padding: 12, backgroundColor: colors.system.blue, borderRadius: 8 }}>
+                    <BaseText color="system.white">Go Back</BaseText>
+                </TouchableOpacity>
+            </View>
+        );
+    }
+
     // Error state - if patient not found
     if (!patientData?.data) {
         return (
             <View style={[styles.container, { backgroundColor: colors.system.black, justifyContent: "center", alignItems: "center" }]}>
-                <BaseText color="labels.primary">Patient not found</BaseText>
+                <ErrorState title="Patient not found" message="The patient you're looking for doesn't exist." onRetry={() => router.back()} />
                 <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, padding: 12, backgroundColor: colors.system.blue, borderRadius: 8 }}>
                     <BaseText color="system.white">Go Back</BaseText>
                 </TouchableOpacity>
@@ -851,46 +891,7 @@ export default function CameraScreen() {
                             showsHorizontalScrollIndicator={false}
                             contentContainerStyle={styles.thumbnailsList}
                             keyExtractor={(item, index) => item.gostId || String(index)}
-                            renderItem={({ item: ghostItem, index }) => {
-                                const ghostId = ghostItem.gostId;
-                                const photo = capturedPhotos.find((p) => p.templateId === ghostId);
-                                const isActive = index === currentGhostIndex;
-                                const isCompleted = !!photo;
-                                // Use iconUrl (icon.url) for thumbnails, fallback to local icon
-                                const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
-                                return (
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setCurrentGhostIndex(index);
-                                        }}
-                                        style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
-                                    >
-                                        {photo ? (
-                                            <>
-                                                <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                                                <View style={styles.thumbnailCheck}>
-                                                    <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
-                                                </View>
-                                            </>
-                                        ) : iconSource ? (
-                                            <Image
-                                                source={iconSource}
-                                                style={styles.thumbnailIcon}
-                                                contentFit="contain"
-                                                onError={(error) => {
-                                                    console.log("Icon load error for:", ghostId, error);
-                                                }}
-                                            />
-                                        ) : (
-                                            <View style={styles.thumbnailPlaceholder}>
-                                                <BaseText type="Caption2" color="labels.tertiary">
-                                                    {index + 1}
-                                                </BaseText>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                );
-                            }}
+                            renderItem={renderThumbnailItem}
                         />
                     </View>
                 )}

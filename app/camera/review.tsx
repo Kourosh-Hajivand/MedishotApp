@@ -1,15 +1,16 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useTempUpload, useUploadPatientMedia, useUploadPatientMediaWithTemplate } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
 import { useGetTemplateById } from "@/utils/hook/useTemplate";
+import { PracticeTemplate, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
 import { CapturedPhoto } from "@/utils/types/camera.types";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,7 +27,7 @@ const ThumbnailItem: React.FC<{
     index: number;
     isActive: boolean;
     onPress: (index: number) => void;
-}> = ({ photo, index, isActive, onPress }) => {
+}> = React.memo(({ photo, index, isActive, onPress }) => {
     const borderRadius = useSharedValue(0);
 
     React.useEffect(() => {
@@ -48,7 +49,7 @@ const ThumbnailItem: React.FC<{
             </Animated.View>
         </Animated.View>
     );
-};
+});
 
 export default function ReviewScreen() {
     const insets = useSafeAreaInsets();
@@ -61,10 +62,10 @@ export default function ReviewScreen() {
     }>();
 
     // Get patient data from API
-    const { data: patientData, isLoading: isPatientLoading } = useGetPatientById(patientId || "");
+    const { data: patientData, isLoading: isPatientLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(patientId || "");
 
     // Get template data from API
-    const { data: templateData } = useGetTemplateById(templateId || "", !!templateId);
+    const { data: templateData, error: templateError, isError: isTemplateError, refetch: refetchTemplate } = useGetTemplateById(templateId || "", !!templateId);
 
     // Extract patient info
     const patientName = useMemo(() => {
@@ -94,31 +95,34 @@ export default function ReviewScreen() {
     const ghostItemsData: GhostItemData[] = useMemo(() => {
         if (!templateData?.data) return [];
 
-        const template = templateData.data as any;
+        const template = templateData.data as unknown as PracticeTemplate & { cells?: TemplateCell[]; gosts?: TemplateGost[] };
         const items: GhostItemData[] = [];
 
         if (template.cells && Array.isArray(template.cells) && template.cells.length > 0) {
-            const sortedCells = [...template.cells].sort((a: any, b: any) => {
+            const sortedCells = [...template.cells].sort((a: TemplateCell, b: TemplateCell) => {
                 if (a.row_index !== b.row_index) return a.row_index - b.row_index;
                 return a.column_index - b.column_index;
             });
             items.push(
-                ...sortedCells.map((cell: any) => ({
+                ...sortedCells.map((cell: TemplateCell) => ({
                     gostId: String(cell.gost.id),
                     imageUrl: cell.gost.gost_image?.url || null,
                     rowIndex: cell.row_index,
                     columnIndex: cell.column_index,
                 })),
             );
-        } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
-            items.push(
-                ...template.gosts.map((gost: any, index: number) => ({
-                    gostId: String(gost.id),
-                    imageUrl: gost.gost_image?.url || null,
-                    rowIndex: Math.floor(index / 2), // Assume 2 columns
-                    columnIndex: index % 2,
-                })),
-            );
+        } else {
+            const templateGosts = template.gosts as TemplateGost[] | undefined;
+            if (templateGosts && Array.isArray(templateGosts) && templateGosts.length > 0) {
+                items.push(
+                    ...templateGosts.map((gost: TemplateGost, index: number) => ({
+                        gostId: String(gost.id),
+                        imageUrl: gost.gost_image || null,
+                        rowIndex: Math.floor(index / 2), // Assume 2 columns
+                        columnIndex: index % 2,
+                    })),
+                );
+            }
         }
 
         return items;
@@ -206,11 +210,11 @@ export default function ReviewScreen() {
             try {
                 // Prepare file object for React Native FormData
                 const filename = `composite-${Date.now()}.jpg`;
-                const file = {
+                const file: { uri: string; type: string; name: string } = {
                     uri: uri,
                     type: "image/jpeg",
                     name: filename,
-                } as any;
+                };
                 
                 tempUploadComposite(file);
             } catch (error) {
@@ -354,7 +358,7 @@ export default function ReviewScreen() {
 
     const currentPhoto = allPhotos[currentIndex];
 
-    const handleThumbnailPress = (index: number) => {
+    const handleThumbnailPress = useCallback((index: number) => {
         if (index === currentIndex) return; // Don't do anything if already on this index
 
         Haptics.selectionAsync();
@@ -367,9 +371,9 @@ export default function ReviewScreen() {
         setTimeout(() => {
             setIsScrolling(false);
         }, 300);
-    };
+    }, [currentIndex, width]);
 
-    const handleRetake = () => {
+    const handleRetake = useCallback(() => {
         // Don't allow retake for composite photo
         if (currentPhoto?.isComposite) {
             return;
@@ -404,9 +408,9 @@ export default function ReviewScreen() {
                 ...(photosToKeep.length > 0 && { capturedPhotos: JSON.stringify(photosToKeep) }), // Pass remaining photos if any
             },
         });
-    };
+    }, [currentPhoto, templateId, capturedPhotos, patientId]);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         const photosToSave = capturedPhotos;
 
         if (photosToSave.length === 0) {
@@ -468,7 +472,13 @@ export default function ReviewScreen() {
                     });
 
                 // Prepare request data
-                const requestData: any = {
+                const requestData: {
+                    template_id: number;
+                    type: string;
+                    data: string;
+                    images: Array<{ gost_id: number; media: string; notes?: string }>;
+                    media?: string;
+                } = {
                     template_id: templateIdNum,
                     type: "image",
                     data: JSON.stringify({}),
@@ -529,9 +539,9 @@ export default function ReviewScreen() {
             Alert.alert("Error", "Failed to save photos. Please try again.");
             setIsSaving(false);
         }
-    };
+    }, [capturedPhotos, templateId, allPhotos, compositePhoto, uploadMediaWithTemplate, uploadMedia, patientId]);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         Alert.alert("Discard Photos?", "Are you sure you want to discard all captured photos?", [
             { text: "Cancel", style: "cancel" },
@@ -555,9 +565,9 @@ export default function ReviewScreen() {
                 },
             },
         ]);
-    };
+    }, [patientId]);
 
-    const handleScroll = (event: any) => {
+    const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
         // Don't update index if we're programmatically scrolling
         if (isScrolling) return;
 
@@ -566,9 +576,9 @@ export default function ReviewScreen() {
         if (index !== currentIndex && index >= 0 && index < allPhotos.length) {
             setCurrentIndex(index);
         }
-    };
+    }, [isScrolling, width, currentIndex, allPhotos.length]);
 
-    const renderMainImage = ({ item, index }: { item: CapturedPhoto; index: number }) => {
+    const renderMainImage = useCallback(({ item, index }: { item: CapturedPhoto; index: number }) => {
         const isCompositeLoading = item.isComposite && (!item.uri || isGeneratingComposite || item.uploadStatus === "uploading");
         
         return (
@@ -585,7 +595,7 @@ export default function ReviewScreen() {
                 ) : null}
             </View>
         );
-    };
+    }, [isGeneratingComposite]);
 
     // Helper function to get layout style with 3:2 aspect ratio
     // Uses the same logic as PreviewCanvas but scaled to 3:2 ratio with 12px padding
@@ -606,7 +616,15 @@ export default function ReviewScreen() {
         const scaleY = compositeBoxHeight / previewBoxHeight;
         
         // Scale all positions and sizes, then add padding offset
-        const scaledStyle: any = {
+        const scaledStyle: {
+            position?: "absolute";
+            left?: number;
+            right?: number;
+            top?: number;
+            bottom?: number;
+            width?: number;
+            height?: number;
+        } = {
             position: baseStyle.position || "absolute",
         };
         
@@ -641,6 +659,22 @@ export default function ReviewScreen() {
         return (
             <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
                 <ActivityIndicator size="large" color={colors.system.blue} />
+            </View>
+        );
+    }
+
+    // Error state
+    if (isPatientError || (templateId && isTemplateError)) {
+        return (
+            <View style={[styles.container, { justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }]}>
+                <ErrorState
+                    title={isPatientError ? "Failed to load patient" : "Failed to load template"}
+                    message={isPatientError ? (patientError instanceof Error ? patientError.message : ((patientError as unknown as { message?: string })?.message || "Failed to load patient data")) : (templateError instanceof Error ? templateError.message : ((templateError as unknown as { message?: string })?.message || "Failed to load template data"))}
+                    onRetry={() => {
+                        if (isPatientError) refetchPatient();
+                        if (templateId && isTemplateError) refetchTemplate();
+                    }}
+                />
             </View>
         );
     }
@@ -690,8 +724,8 @@ export default function ReviewScreen() {
                                     .filter((item): item is { ghostItem: GhostItemData; photo: CapturedPhoto } => item !== null);
 
                                 // Get layout pattern from template data
-                                const template = templateData?.data as any;
-                                const layoutPattern: LayoutPattern = template?.layout_pattern || "grid-2x2";
+                                const template = templateData?.data as unknown as PracticeTemplate;
+                                const layoutPattern: LayoutPattern = (template?.layout_pattern as LayoutPattern) || "grid-2x2";
 
                                 return itemsWithPhotos.map(({ ghostItem, photo }, index) => {
                                     // Use helper function to get layout style with 3:2 aspect ratio
