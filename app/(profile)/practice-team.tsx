@@ -9,7 +9,7 @@ import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { TransferOwnershipDto } from "@/utils/service/models/RequestModels";
 import { Button, ContextMenu, Host, Switch } from "@expo/ui/swift-ui";
 import { router, useNavigation } from "expo-router";
-import React, { useMemo, useEffect, useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -21,9 +21,7 @@ export default function PracticeTeamScreen() {
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const { data: subscriptionData } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const navigation = useNavigation();
-    console.log("practiceMembers?.data====================================");
-    console.log(practiceMembers?.data);
-    console.log("====================================");
+
 
     // Set default practice if none is selected
     useEffect(() => {
@@ -36,10 +34,10 @@ export default function PracticeTeamScreen() {
     const limits = subscriptionData?.data?.limits;
     const doctorLimit = limits?.doctor_limit ?? null;
     const staffLimit = limits?.staff_limit ?? null;
-    const remainingDoctorSlots = limits?.remaining_doctor_slots ?? null;
-    const remainingStaffSlots = limits?.remaining_staff_slots ?? null;
-    const currentDoctorCount = limits?.current_doctor_count ?? 0;
-    const currentStaffCount = limits?.current_staff_count ?? 0;
+    const remainingDoctorSlots = typeof limits?.remaining_doctor_slots === "number" ? limits.remaining_doctor_slots : null;
+    const remainingStaffSlots = typeof limits?.remaining_staff_slots === "number" ? limits.remaining_staff_slots : null;
+    const currentDoctorCount = typeof limits?.current_doctor_count === "number" ? limits.current_doctor_count : 0;
+    const currentStaffCount = typeof limits?.current_staff_count === "number" ? limits.current_staff_count : 0;
     const { mutate: transferOwnership } = useTransferOwnership(
         () => {},
         (error: Error) => {
@@ -59,7 +57,7 @@ export default function PracticeTeamScreen() {
         const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
 
         // If both doctor and staff slots are full, show upgrade alert
-        if (doctorLimit !== null && staffLimit !== null && !canAddDoctor && !canAddStaff) {
+        if (doctorLimit !== null && staffLimit !== null && remainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
             Alert.alert(
                 "Plan Limit Reached",
                 "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.",
@@ -174,15 +172,15 @@ export default function PracticeTeamScreen() {
                     </BaseText>
                     {doctorLimit !== null && (
                         <BaseText type="Caption1" weight="400" color="labels.secondary">
-                            Doctors: {currentDoctorCount} / {doctorLimit} {remainingDoctorSlots !== null && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
+                            Doctors: {String(currentDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
                         </BaseText>
                     )}
                     {staffLimit !== null && (
                         <BaseText type="Caption1" weight="400" color="labels.secondary" style={{ marginTop: 2 }}>
-                            Staff: {currentStaffCount} / {staffLimit} {remainingStaffSlots !== null && remainingStaffSlots > 0 && `(${remainingStaffSlots} remaining)`}
+                            Staff: {String(currentStaffCount)} / {String(staffLimit)} {typeof remainingStaffSlots === "number" && remainingStaffSlots > 0 && `(${remainingStaffSlots} remaining)`}
                         </BaseText>
                     )}
-                    {((doctorLimit !== null && remainingDoctorSlots === 0) || (staffLimit !== null && remainingStaffSlots === 0)) && (
+                    {((doctorLimit !== null && typeof remainingDoctorSlots === "number" && remainingDoctorSlots === 0) || (staffLimit !== null && typeof remainingStaffSlots === "number" && remainingStaffSlots === 0)) && (
                         <TouchableOpacity
                             onPress={() => router.push("/(profile)/subscription")}
                             className="mt-2 bg-system-blue rounded-lg py-2 px-3"
