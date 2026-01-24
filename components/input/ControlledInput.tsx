@@ -10,7 +10,7 @@ import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors";
 import { BaseText } from "../text/BaseText";
 
-const ControlledInputComponent = <T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, ...props }: InputProps<T> & TextInputProps, ref: React.Ref<TextInput>) => {
+const ControlledInputComponent = <T extends FieldValues>({ control, name, label, error, disabled = false, type = "text", optional, info, size = "Large", SperatedNumber, centerText, haveBorder = true, hideError = false, ...props }: InputProps<T> & TextInputProps, ref: React.Ref<TextInput>) => {
     const [showPassword, setShowPassword] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<TextInput>(null);
@@ -128,9 +128,9 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                 </TouchableOpacity>
                             </View>
 
-                            {(!!error || haveBorder) && (
+                            {(!!error || haveBorder) && !hideError && (
                                 <View style={styles.errorContainer}>
-                                    {!!error && (
+                                    {!!error && !hideError && (
                                         <BaseText color="system.red" type="Caption2">
                                             {error}
                                         </BaseText>
@@ -158,6 +158,7 @@ const styles = StyleSheet.create({
     container: {
         width: "100%",
         gap: spacing["1"],
+
     },
     inputContainer: {
         position: "relative",

@@ -2,13 +2,16 @@ import { BackButton } from "@/components/button/ui/BackButton";
 import { getPickerCallback, removePickerCallback } from "@/components/input/ControlledPickerInput";
 import { BaseText } from "@/components/text/BaseText";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect } from "react";
+import React, { useEffect, useLayoutEffect } from "react";
 import { Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SelectGenderScreen() {
     const params = useLocalSearchParams<{ callbackKey?: string; currentValue?: string }>();
     const navigation = useNavigation();
+    useEffect(() => {
+        if (__DEV__) console.log("[SelectGender]", "mount", params);
+    }, []);
     const safeAreaInsets = useSafeAreaInsets();
     // Convert lowercase value from backend to uppercase for display
     const selectedGender = params.currentValue ? params.currentValue.charAt(0).toUpperCase() + params.currentValue.slice(1).toLowerCase() : "";

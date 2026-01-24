@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Alert, ActivityIndicator, Image, Keyboard, KeyboardTypeOptions, StyleSheet, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Keyboard, KeyboardTypeOptions, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
@@ -47,8 +47,9 @@ export const CreatePracticeScreen: React.FC = () => {
     const navigation = useNavigation();
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
-    const params = useLocalSearchParams<{ token?: string; practiceType?: string }>();
+    const params = useLocalSearchParams<{ token?: string; practiceType?: string; requirePractice?: string }>();
     const practiceType = params.practiceType ? JSON.parse(params.practiceType as string) : undefined;
+    const requirePractice = params.requirePractice === "1";
 
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
@@ -209,13 +210,18 @@ export const CreatePracticeScreen: React.FC = () => {
         navigation.setOptions({
             headerRight: () => (
                 <Host style={{ width: 65, height: 35 }}>
-                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending ||isUploading}>
+                    <Button onPress={handleSubmit(onSubmit)} disabled={isPending || isUploading}>
                         Create
                     </Button>
                 </Host>
             ),
+            ...(requirePractice && {
+                headerLeft: () => null,
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+            }),
         });
-    }, [navigation, handleSubmit, onSubmit, isPending ,isUploading]);
+    }, [navigation, handleSubmit, onSubmit, isPending, isUploading, requirePractice]);
     return (
         <KeyboardAwareScrollView style={styles.scrollView} backgroundColor={colors.background} contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top }}>
             <View style={styles.avatarContainer}>

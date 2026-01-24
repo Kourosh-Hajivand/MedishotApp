@@ -2,8 +2,10 @@ import { useAuth } from "@/utils/hook/useAuth";
 import { useNetworkStatus } from "@/utils/hook/useNetworkStatus";
 import { useGetPracticeList } from "@/utils/hook/usePractice";
 import { router, useSegments } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, View } from "react-native";
+
+const LOG_TAG = "[AuthGuard]";
 
 interface AuthGuardProps {
     children: React.ReactNode;
@@ -21,6 +23,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { isOffline } = useNetworkStatus();
     const segments = useSegments();
+    const wasInAuthRef = useRef(false);
+    const skipRedirectUntilRef = useRef<number>(0);
 
     // Routes that don't require authentication
     const publicRoutes = ["welcome", "(auth)", "error", "offline"];
@@ -35,35 +39,79 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         return segments.some((segment) => segment === "(auth)");
     }, [segments]);
 
+    const isInTabs = React.useMemo(() => {
+        return segments.some((segment) => segment === "(tabs)");
+    }, [segments]);
+
+    const isInModals = React.useMemo(() => {
+        return segments.some((segment) => segment === "(modals)");
+    }, [segments]);
+
+    const skipProfileOrPracticeRedirect = isInTabs || isInModals;
+
+    // Track (auth) -> (modals) transition: when user opens select-date/select-gender from completeProfile,
+    // we briefly leave (auth) before (modals) mounts. Avoid redirecting during that gap.
+    const justLeftAuthForModals = (() => {
+        const now = Date.now();
+        if (skipRedirectUntilRef.current > now) return true;
+        const wasAuth = wasInAuthRef.current;
+        wasInAuthRef.current = isInAuthFlow;
+        if (wasAuth && !isInAuthFlow && !isInModals && isInTabs) {
+            skipRedirectUntilRef.current = now + 1200;
+            if (__DEV__) console.warn(LOG_TAG, "transition (auth)->(modals) detected, skip redirect 1.2s");
+            return true;
+        }
+        return false;
+    })();
+
+    const effectiveSkipRedirect = skipProfileOrPracticeRedirect || justLeftAuthForModals;
+
     useEffect(() => {
+        if (__DEV__) {
+            console.log(LOG_TAG, "segments", JSON.stringify(segments), "| public", isPublicRoute, "| auth", isInAuthFlow, "| tabs", isInTabs, "| modals", isInModals, "| skip", effectiveSkipRedirect);
+        }
+
         // Only check authentication and practice for protected routes
         if (isPublicRoute || isInAuthFlow) {
             return;
         }
 
+        // Never redirect when (modals) is open (e.g. select-gender, select-date). Keep them open.
+        if (isInModals) {
+            return;
+        }
+
         // If authentication check is complete and user is not authenticated, redirect to welcome
         if (isAuthenticated === false) {
+            if (__DEV__) console.warn(LOG_TAG, "redirect -> /welcome (not authenticated)");
             router.replace("/welcome");
             return;
         }
 
         // If user is authenticated, check profile and practice
         if (isAuthenticated === true) {
-            // Check if profile is complete (has first_name and last_name)
-            if (profile && (!profile.first_name || !profile.last_name)) {
+            // Profile incomplete: redirect EXCEPT when on (tabs), (modals), or (auth)->(modals) transition.
+            if (profile && (!profile.first_name || !profile.last_name) && !effectiveSkipRedirect) {
+                if (__DEV__) console.warn(LOG_TAG, "redirect -> completeProfile (profile incomplete)");
                 router.replace("/(auth)/completeProfile");
                 return;
             }
 
-            // Check if practice list is loaded and empty
+            // If practice list is loaded and empty: redirect EXCEPT when on (tabs) or (modals).
             if (!isPracticeListLoading && !isProfileLoading && profile) {
-                if (!practiceList?.data || practiceList.data.length === 0) {
+                if ((!practiceList?.data || practiceList.data.length === 0) && !effectiveSkipRedirect) {
+                    if (__DEV__) console.warn(LOG_TAG, "redirect -> select-role (no practice)");
                     router.replace("/(auth)/select-role");
                     return;
                 }
             }
         }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, segments]);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments]);
+
+    // If on (modals) (e.g. select-gender, select-date), always render children — never replace with loading/redirect.
+    if (isInModals) {
+        return <>{children}</>;
+    }
 
     // If checking authentication, show loading
     if (isAuthenticated === null && !isPublicRoute && !isInAuthFlow) {

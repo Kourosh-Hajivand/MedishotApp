@@ -3,15 +3,28 @@ import { getPickerCallback, removePickerCallback } from "@/components/input/Cont
 import { BaseText } from "@/components/text/BaseText";
 import { DateTimePicker, Host } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const YYYY_MM_DD = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDateSafe(value: string | undefined): Date {
+    if (!value || typeof value !== "string") return new Date();
+    const trimmed = value.trim();
+    if (!trimmed || !YYYY_MM_DD.test(trimmed)) return new Date();
+    const d = new Date(trimmed + "T12:00:00");
+    return Number.isNaN(d.getTime()) ? new Date() : d;
+}
 
 export default function SelectDateScreen() {
     const params = useLocalSearchParams<{ callbackKey?: string; currentValue?: string }>();
     const navigation = useNavigation();
+    useEffect(() => {
+        if (__DEV__) console.log("[SelectDate]", "mount", params);
+    }, []);
     const safeAreaInsets = useSafeAreaInsets();
-    const initialDate = params.currentValue ? new Date(params.currentValue + "T00:00:00") : new Date();
+    const initialDate = useMemo(() => parseDateSafe(params.currentValue), [params.currentValue]);
 
     const [selectedDate, setSelectedDate] = useState(initialDate);
 
@@ -53,6 +66,15 @@ export default function SelectDateScreen() {
         });
     }, [navigation, selectedDate]);
 
+    const isoDate = (() => {
+        try {
+            const t = selectedDate.getTime();
+            return Number.isNaN(t) ? new Date().toISOString() : selectedDate.toISOString();
+        } catch {
+            return new Date().toISOString();
+        }
+    })();
+
     return (
         <View style={[styles.container, { paddingTop: safeAreaInsets.top + 40 }]}>
             <View style={styles.content}>
@@ -62,7 +84,7 @@ export default function SelectDateScreen() {
                             setSelectedDate(date);
                         }}
                         displayedComponents="date"
-                        initialDate={selectedDate.toISOString()}
+                        initialDate={isoDate}
                         variant="wheel"
                     />
                 </Host>

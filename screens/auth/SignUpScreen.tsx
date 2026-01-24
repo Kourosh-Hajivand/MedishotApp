@@ -10,6 +10,7 @@ import { spacing } from "../../styles/spaces";
 import colors from "../../theme/colors.shared.js";
 import { SignUpFormData, signUpSchema } from "../../utils/schema";
 import { AuthWithSocial } from "./components/AuthWithSocial";
+import { PasswordStrengthChecklist } from "./components/PasswordStrengthChecklist";
 
 export const SignUpScreen: React.FC = () => {
     const {
@@ -22,7 +23,6 @@ export const SignUpScreen: React.FC = () => {
         defaultValues: {
             email: "",
             password: "",
-            confirmPassword: "",
         },
     });
     const insets = useSafeAreaInsets();
@@ -51,7 +51,6 @@ export const SignUpScreen: React.FC = () => {
     // Refs برای فیلدها
     const emailRef = useRef<TextInput>(null);
     const passwordRef = useRef<TextInput>(null);
-    const confirmPasswordRef = useRef<TextInput>(null);
 
     useEffect(() => {
         const keyboardWillShow = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (event) => {
@@ -101,8 +100,8 @@ export const SignUpScreen: React.FC = () => {
                         <View style={styles.formContainer} className="w-full mt-[40px]">
                             <View style={styles.inputContainer}>
                                     <ControlledInput control={control} name="email" label="Email" keyboardType="email-address" autoCapitalize="none" autoComplete="email" error={errors.email?.message} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => passwordRef.current?.focus()} ref={emailRef} />
-                                    <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="new-password" error={errors.password?.message} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => confirmPasswordRef.current?.focus()} ref={passwordRef} />
-                                    <ControlledInput control={control} type="password" name="confirmPassword" label="Confirm Password" secureTextEntry autoComplete="new-password" error={errors.confirmPassword?.message} returnKeyType="done" blurOnSubmit={true} onSubmitEditing={handleSubmit(onSubmit)} ref={confirmPasswordRef} />
+                                    <ControlledInput control={control} type="password" name="password" label="Password" secureTextEntry autoComplete="new-password" error={errors.password?.message} returnKeyType="done" blurOnSubmit={true} onSubmitEditing={handleSubmit(onSubmit)} ref={passwordRef} hideError />
+                                    <PasswordStrengthChecklist password={watch("password")} />
                             </View>
                             {initiateRegistrationError?.message && (
                                 <BaseText color="system.red" type="Caption2" className="mt-2">

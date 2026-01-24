@@ -44,18 +44,18 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                     // Store the onChange callback
                     pickerCallbacks[callbackKey] = onChange;
 
-                    if (type === "date") {
-                        router.push({
-                            pathname: "/(modals)/select-date",
-                            params: { callbackKey, currentValue: value || "" },
-                        });
-                    } else if (type === "gender") {
-                        // Convert lowercase value to uppercase for display in select screen
-                        const displayValue = value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : "";
-                        router.push({
-                            pathname: "/(modals)/select-gender",
-                            params: { callbackKey, currentValue: displayValue },
-                        });
+                    const path = type === "date" ? "/(modals)/select-date" : "/(modals)/select-gender";
+                    const params = type === "date" ? { callbackKey, currentValue: value || "" } : { callbackKey, currentValue: value ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : "" };
+                    if (__DEV__) console.log("[Picker]", "push", path, params);
+                    try {
+                        if (type === "date") {
+                            router.push({ pathname: "/(modals)/select-date", params });
+                        } else {
+                            router.push({ pathname: "/(modals)/select-gender", params });
+                        }
+                        if (__DEV__) console.log("[Picker]", "push done");
+                    } catch (e) {
+                        if (__DEV__) console.warn("[Picker]", "push error", e);
                     }
                 };
 

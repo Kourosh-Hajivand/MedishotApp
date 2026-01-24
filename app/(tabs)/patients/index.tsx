@@ -6,7 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
-import { useArchivePatient, useGetPatients, useGetPracticeMembers } from "@/utils/hook";
+import { useArchivePatient, useGetPatients, useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Patient } from "@/utils/service/models/ResponseModels";
@@ -27,12 +27,16 @@ const USE_MOCK_PATIENTS = false;
 
 export default function PatientsScreen() {
     const { selectedPractice, viewMode, selectedDoctor } = useProfileStore();
-    const { profile, isAuthenticated } = useAuth();
+    const { profile, isAuthenticated, isProfileLoading } = useAuth();
     const queryClient = useQueryClient();
+    const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { data: practiceMembers, error: practiceMembersError, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const insets = useSafeAreaInsets();
     const headerHeight = useHeaderHeight();
     const { q, sortBy, nameOrder } = useLocalSearchParams<{ q?: string; sortBy?: string; nameOrder?: string }>();
+
+    const hasIncompleteProfile = !!profile && (!profile.first_name || !profile.last_name) && !isProfileLoading;
+    const hasNoPractice = !practiceList?.data?.length && !isPracticeListLoading;
 
     // Get current user's role in the selected practice
     const currentUserRole = useMemo(() => {
@@ -373,6 +377,50 @@ export default function PatientsScreen() {
             data: Array.from({ length: 2 }), // 2 items per section = 10 total
         }));
     }, [isLoading]);
+
+    // Empty state when profile incomplete (modal is pushed by layout; this is the home background)
+    if (hasIncompleteProfile) {
+        return (
+            <View style={[styles.errorContainer, { paddingTop: headerHeight + spacing["5"] }]}>
+                <BaseText type="Title3" color="labels.primary" weight="600" style={{ marginBottom: spacing["2"], textAlign: "center" }}>
+                    Complete your profile
+                </BaseText>
+                <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center" }}>
+                    Complete the steps in the modal to get started.
+                </BaseText>
+                <BaseButton
+                    label="Complete profile"
+                    ButtonStyle="Filled"
+                    size="Large"
+                    rounded={true}
+                    onPress={() => router.push({ pathname: "/(auth)/completeProfile", params: { requireCompleteProfile: "1" } })}
+                    leftIcon={<IconSymbol name="person.crop.circle.badge.plus" size={20} color={colors.system.white} />}
+                />
+            </View>
+        );
+    }
+
+    // Empty state when no practice (modal is pushed by layout; this is the home background)
+    if (hasNoPractice) {
+        return (
+            <View style={[styles.errorContainer, { paddingTop: headerHeight + spacing["5"] }]}>
+                <BaseText type="Title3" color="labels.primary" weight="600" style={{ marginBottom: spacing["2"], textAlign: "center" }}>
+                    Set up your practice
+                </BaseText>
+                <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center" }}>
+                    Complete the steps in the modal to get started.
+                </BaseText>
+                <BaseButton
+                    label="Set up practice"
+                    ButtonStyle="Filled"
+                    size="Large"
+                    rounded={true}
+                    onPress={() => router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } })}
+                    leftIcon={<IconSymbol name="building.2" size={20} color={colors.system.white} />}
+                />
+            </View>
+        );
+    }
 
     // Show error state if there's an error
     if (isPatientsError || isPracticeMembersError) {

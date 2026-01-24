@@ -92,9 +92,9 @@ export default function IndexRoute() {
 
     // اگر کاربر لاگین کرده، چک می‌کنیم که profile کامل است یا نه
     if (profile) {
-        // مرحله ۱: چک کردن نام و فامیل
+        // مرحله ۱: پروفایل ناقص → خانه (tabs) باز می‌شود، مودال completeProfile روی آن push می‌شود
         if (!profile.first_name || !profile.last_name) {
-            return <Redirect href="/(auth)/completeProfile" />;
+            return <Redirect href="/(tabs)/patients" />;
         }
 
         // مرحله ۲: چک کردن practice list
@@ -106,9 +106,9 @@ export default function IndexRoute() {
             );
         }
 
-        // اگر practice list خالی است یا وجود ندارد
+        // اگر practice list خالی است یا وجود ندارد → خانه (tabs) باز می‌شود، مودال پرکتیس روی آن push می‌شود
         if (!practiceList?.data || practiceList.data.length === 0) {
-            return <Redirect href="/(auth)/select-role" />;
+            return <Redirect href="/(tabs)/patients" />;
         }
 
         // اگر همه چیز کامل است، به صفحه اصلی برو

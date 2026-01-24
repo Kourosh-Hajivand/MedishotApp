@@ -6,29 +6,48 @@ import { loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileSt
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { BlurView } from "expo-blur";
-import { router, Stack, useSegments } from "expo-router";
-import React, { useEffect, useMemo } from "react";
+import { router, Stack } from "expo-router";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, TouchableOpacity, View } from "react-native";
 
 const AnimatedBlurView = Animated.createAnimatedComponent(BlurView);
 
 export const blurValue = new Animated.Value(0);
 
+const MODAL_PUSH_DELAY_MS = 450;
+
 export default function PatientsLayout() {
-    const { logout: handleLogout, isAuthenticated, profile } = useAuth();
+    const { logout: handleLogout, isAuthenticated, profile, isProfileLoading } = useAuth();
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
-    const segments = useSegments();
+
+    const hasIncompleteProfile = !!profile && (!profile.first_name || !profile.last_name) && !isProfileLoading;
+    const hasNoPractice = !practiceList?.data?.length && !isPracticeListLoading;
+
+    const hasPushedCompleteProfileModal = useRef(false);
+    const hasPushedPracticeModal = useRef(false);
 
     useEffect(() => {
-        const isInAuthFlow = segments.some((segment) => segment === "(auth)");
+        if (!isAuthenticated || isProfileLoading) return;
+        if (!profile || (profile.first_name && profile.last_name)) return;
+        if (hasPushedCompleteProfileModal.current) return;
+        hasPushedCompleteProfileModal.current = true;
+        const id = setTimeout(() => {
+            router.push({ pathname: "/(auth)/completeProfile", params: { requireCompleteProfile: "1" } });
+        }, MODAL_PUSH_DELAY_MS);
+        return () => clearTimeout(id);
+    }, [isAuthenticated, profile, isProfileLoading]);
 
-        if (isAuthenticated === true && profile && !isPracticeListLoading && !isInAuthFlow) {
-            if (!practiceList?.data || practiceList.data.length === 0) {
-                router.replace("/(auth)/select-role");
-            }
-        }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, segments]);
+    useEffect(() => {
+        if (!isAuthenticated || !profile || isProfileLoading || hasIncompleteProfile) return;
+        if (practiceList?.data && practiceList.data.length > 0) return;
+        if (hasPushedPracticeModal.current) return;
+        hasPushedPracticeModal.current = true;
+        const id = setTimeout(() => {
+            router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } });
+        }, MODAL_PUSH_DELAY_MS);
+        return () => clearTimeout(id);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, hasIncompleteProfile]);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
 
     // Filter doctors from members
@@ -86,138 +105,120 @@ export default function PatientsLayout() {
                         headerTransparent: true,
                         // headerTransparent: false,
                         headerShadowVisible: true,
-                        headerRight: () => (
-                            <Host style={{ width: 30, height: 50 }}>
-                                <ContextMenu>
-                                    <ContextMenu.Items>
-                                        {/* Submenu 1: Sort By */}
-                                        <Submenu button={<Button systemImage="arrow.up.arrow.down">Sort By</Button>}>
-                                            <Button
-                                                systemImage="textformat.abc"
-                                                onPress={() => {
-                                                    router.setParams({ sortBy: "name" });
-                                                }}
-                                            >
-                                                Name
-                                            </Button>
-                                            <Button
-                                                systemImage="calendar"
-                                                onPress={() => {
-                                                    router.setParams({ sortBy: "date" });
-                                                }}
-                                            >
-                                                Date
-                                            </Button>
-                                        </Submenu>
-
-                                        {/* Submenu 2: Name Order */}
-                                        <Submenu button={<Button systemImage="textformat">Name Order</Button>}>
-                                            <Button
-                                                systemImage="arrow.up"
-                                                onPress={() => {
-                                                    router.setParams({ nameOrder: "asc" });
-                                                }}
-                                            >
-                                                A → Z
-                                            </Button>
-                                            <Button
-                                                systemImage="arrow.down"
-                                                onPress={() => {
-                                                    router.setParams({ nameOrder: "desc" });
-                                                }}
-                                            >
-                                                Z → A
-                                            </Button>
-                                        </Submenu>
-                                        {canSeeDoctorFilter && (
-                                            <Submenu button={<Button systemImage="line.3.horizontal.decrease">Doctor Filter</Button>}>
-                                                <Switch
-                                                    label="All"
-                                                    variant="switch"
-                                                    value={selectedDoctor === null}
-                                                    onValueChange={(value) => {
-                                                        if (value) {
-                                                            setSelectedDoctor(null);
-                                                        }
-                                                    }}
-                                                />
-                                                {doctors.length > 0 ? (
-                                                    doctors.map((doctor) => (
-                                                        <Switch
-                                                            key={String(doctor.id)}
-                                                            label={doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
-                                                            variant="switch"
-                                                            value={selectedDoctor === String(doctor.id)}
-                                                            onValueChange={(value) => {
-                                                                if (value) {
-                                                                    setSelectedDoctor(String(doctor.id));
-                                                                }
-                                                            }}
-                                                        />
-                                                    ))
-                                                ) : (
-                                                    <Button disabled>No doctors found</Button>
-                                                )}
+                        headerRight: () =>
+                            hasIncompleteProfile || hasNoPractice ? null : (
+                                <Host style={{ width: 30, height: 50 }}>
+                                    <ContextMenu>
+                                        <ContextMenu.Items>
+                                            <Submenu button={<Button systemImage="arrow.up.arrow.down">Sort By</Button>}>
+                                                <Button
+                                                    systemImage="textformat.abc"
+                                                    onPress={() => router.setParams({ sortBy: "name" })}
+                                                >
+                                                    Name
+                                                </Button>
+                                                <Button
+                                                    systemImage="calendar"
+                                                    onPress={() => router.setParams({ sortBy: "date" })}
+                                                >
+                                                    Date
+                                                </Button>
                                             </Submenu>
-                                        )}
-                                    </ContextMenu.Items>
-
-                                    <ContextMenu.Trigger>
-                                        <View>
-                                            <Host style={{ width: 35, height: 35 }}>
-                                                <Image systemName="ellipsis" />
-                                            </Host>
-                                        </View>
-                                    </ContextMenu.Trigger>
-                                </ContextMenu>
-                            </Host>
-                        ),
-                        headerLeft: () => (
-                            <Host style={{ width: headerButtonWidth }}>
-                                <ContextMenu activationMethod="longPress">
-                                    <ContextMenu.Items>
-                                        {practiceList?.data
-                                            ?.slice()
-                                            .sort((a, b) => {
-                                                const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-                                                const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-                                                return dateB - dateA;
-                                            })
-                                            .map((practice, index) => (
-                                                <Switch
-                                                    key={index}
-                                                    label={practice.name}
-                                                    variant="switch"
-                                                    value={selectedPractice?.id === practice.id}
-                                                    onValueChange={() => {
-                                                        setSelectedPractice(practice);
-                                                    }}
-                                                />
-                                            ))}
-                                        <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
-                                    </ContextMenu.Items>
-
-                                    <ContextMenu.Trigger>
-                                        <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: headerButtonWidth, backgroundColor: "white", borderRadius: 100 }} className="flex-row  bg-white items-center gap-2 overflow-hidden pr-2">
-                                            <Avatar name={selectedPractice?.name ?? ""} size={35} imageUrl={selectedPractice?.image?.url} />
-                                            <BaseText lineBreakMode="tail" numberOfLines={1} type="Body" weight="400" color="labels.secondary" className="line-clamp-1 truncate">
-                                                {selectedPractice?.name}
-                                            </BaseText>
-                                        </TouchableOpacity>
-                                    </ContextMenu.Trigger>
-                                </ContextMenu>
-                            </Host>
-                        ),
-                        headerSearchBarOptions: {
-                            placeholder: "Search patients",
-                            allowToolbarIntegration: false,
-
-                            onChangeText: (event) => {
-                                router.setParams({
-                                    q: event.nativeEvent.text,
-                                });
-                            },
-                        },
+                                            <Submenu button={<Button systemImage="textformat">Name Order</Button>}>
+                                                <Button
+                                                    systemImage="arrow.up"
+                                                    onPress={() => router.setParams({ nameOrder: "asc" })}
+                                                >
+                                                    A → Z
+                                                </Button>
+                                                <Button
+                                                    systemImage="arrow.down"
+                                                    onPress={() => router.setParams({ nameOrder: "desc" })}
+                                                >
+                                                    Z → A
+                                                </Button>
+                                            </Submenu>
+                                            {canSeeDoctorFilter && (
+                                                <Submenu button={<Button systemImage="line.3.horizontal.decrease">Doctor Filter</Button>}>
+                                                    <Switch
+                                                        label="All"
+                                                        variant="switch"
+                                                        value={selectedDoctor === null}
+                                                        onValueChange={(value) => {
+                                                            if (value) setSelectedDoctor(null);
+                                                        }}
+                                                    />
+                                                    {doctors.length > 0 ? (
+                                                        doctors.map((doctor) => (
+                                                            <Switch
+                                                                key={String(doctor.id)}
+                                                                label={doctor.first_name && doctor.last_name ? `${doctor.first_name} ${doctor.last_name}` : doctor.email}
+                                                                variant="switch"
+                                                                value={selectedDoctor === String(doctor.id)}
+                                                                onValueChange={(value) => {
+                                                                    if (value) setSelectedDoctor(String(doctor.id));
+                                                                }}
+                                                            />
+                                                        ))
+                                                    ) : (
+                                                        <Button disabled>No doctors found</Button>
+                                                    )}
+                                                </Submenu>
+                                            )}
+                                        </ContextMenu.Items>
+                                        <ContextMenu.Trigger>
+                                            <View>
+                                                <Host style={{ width: 35, height: 35 }}>
+                                                    <Image systemName="ellipsis" />
+                                                </Host>
+                                            </View>
+                                        </ContextMenu.Trigger>
+                                    </ContextMenu>
+                                </Host>
+                            ),
+                        headerLeft: () =>
+                            hasIncompleteProfile || hasNoPractice ? null : (
+                                <Host style={{ width: headerButtonWidth }}>
+                                    <ContextMenu activationMethod="longPress">
+                                        <ContextMenu.Items>
+                                            {practiceList?.data
+                                                ?.slice()
+                                                .sort((a, b) => {
+                                                    const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+                                                    const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+                                                    return dateB - dateA;
+                                                })
+                                                .map((practice, index) => (
+                                                    <Switch
+                                                        key={index}
+                                                        label={practice.name}
+                                                        variant="switch"
+                                                        value={selectedPractice?.id === practice.id}
+                                                        onValueChange={() => setSelectedPractice(practice)}
+                                                    />
+                                                ))}
+                                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
+                                        </ContextMenu.Items>
+                                        <ContextMenu.Trigger>
+                                            <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: headerButtonWidth, backgroundColor: "white", borderRadius: 100 }} className="flex-row  bg-white items-center gap-2 overflow-hidden pr-2">
+                                                <Avatar name={selectedPractice?.name ?? ""} size={35} imageUrl={selectedPractice?.image?.url} />
+                                                <BaseText lineBreakMode="tail" numberOfLines={1} type="Body" weight="400" color="labels.secondary" className="line-clamp-1 truncate">
+                                                    {selectedPractice?.name}
+                                                </BaseText>
+                                            </TouchableOpacity>
+                                        </ContextMenu.Trigger>
+                                    </ContextMenu>
+                                </Host>
+                            ),
+                        headerSearchBarOptions: hasIncompleteProfile || hasNoPractice
+                            ? undefined
+                            : {
+                                  placeholder: "Search patients",
+                                  allowToolbarIntegration: false,
+                                  onChangeText: (event) => {
+                                      router.setParams({ q: event.nativeEvent.text });
+                                  },
+                              },
                     }}
                 />
             </Stack>

@@ -34,4 +34,5 @@ export interface InputProps<T extends FieldValues> extends TextInputProps {
   SperatedNumber?: boolean;
   centerText?: boolean;
   haveBorder?: boolean;
+  hideError?: boolean;
 }

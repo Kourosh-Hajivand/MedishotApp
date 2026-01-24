@@ -48,11 +48,13 @@ export default function OTPInput({ length, value, onChange, error, disabled, aut
 
         if (cleaned.length > 1) {
             const arr = [...chars];
-            for (let i = 0; i < cleaned.length && index + i < length; i++) {
-                arr[index + i] = cleaned[i];
+            const startIndex = cleaned.length >= length ? 0 : index;
+            const len = Math.min(cleaned.length, length);
+            for (let i = 0; i < len; i++) {
+                arr[startIndex + i] = cleaned[i];
             }
             onChange(arr.join(""));
-            const last = Math.min(index + cleaned.length, length - 1);
+            const last = Math.min(startIndex + len - 1, length - 1);
             inputsRef.current[last]?.focus();
             return;
         }
@@ -161,7 +163,6 @@ function OTPBox({ index, value, filled, isFocused, error, disabled, inputRef, on
                 textContentType={Platform.OS === "ios" ? "oneTimeCode" : ("oneTimeCode" as any)}
                 autoComplete={Platform.select({ ios: "one-time-code", android: "sms-otp", default: "one-time-code" }) as any}
                 keyboardType={Platform.select({ ios: "number-pad", default: "numeric" })}
-                maxLength={1}
                 onChangeText={onChangeText}
                 onKeyPress={onKeyPress}
                 onFocus={onFocus}

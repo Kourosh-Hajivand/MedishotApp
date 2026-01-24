@@ -4,7 +4,7 @@ import { toE164 } from "@/utils/helper/phoneUtils";
 import { useUpdateProfileFull } from "@/utils/hook";
 import { UpdateProfileFullBody } from "@/utils/service/models/RequestModels";
 import { Button, Host } from "@expo/ui/swift-ui";
-import { router, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useLayoutEffect, useRef } from "react";
 import { UseFormHandleSubmit } from "react-hook-form";
 import { Alert } from "react-native";
@@ -31,6 +31,8 @@ interface MetadataObject {
 export default function CompleteProfile() {
     const formRef = useRef<ProfileFormRef | null>(null);
     const navigation = useNavigation();
+    const params = useLocalSearchParams<{ requireCompleteProfile?: string }>();
+    const requireCompleteProfile = params.requireCompleteProfile === "1";
 
     const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfileFull(
         () => {
@@ -115,8 +117,13 @@ export default function CompleteProfile() {
                     </Button>
                 </Host>
             ),
+            ...(requireCompleteProfile && {
+                headerLeft: () => null,
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+            }),
         });
-    }, [navigation, handleNext, isUpdating]);
+    }, [navigation, handleNext, isUpdating, requireCompleteProfile]);
 
     return <ProfileFormScreen mode="create" title="Complete Your Profile" subtitle="Start by completing your profile." onFormReady={handleFormReady} />;
 }

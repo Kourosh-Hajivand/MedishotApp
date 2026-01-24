@@ -102,6 +102,8 @@ const DescriptionItem: React.FC<SpecialtyItemProps> = ({ item, index, scrollX })
 
 export const SelectRoleScreen: React.FC = () => {
     const router = useRouter();
+    const params = useLocalSearchParams<{ requirePractice?: string }>();
+    const requirePractice = params.requirePractice === "1";
     const [currentIndex, setCurrentIndex] = useState(0);
     const navigation = useNavigation();
     /**
@@ -138,9 +140,10 @@ export const SelectRoleScreen: React.FC = () => {
      * Navigate forward
      */
     const handleContinue = useCallback(() => {
-        // Token دیگر لازم نیست چون از store خوانده می‌شود
-        router.push({ pathname: "/(auth)/create-practice", params: { practiceType: JSON.stringify(SPECIALTIES[currentIndex]) } });
-    }, [currentIndex, router]);
+        const pushParams: { practiceType: string; requirePractice?: string } = { practiceType: JSON.stringify(SPECIALTIES[currentIndex]) };
+        if (requirePractice) pushParams.requirePractice = "1";
+        router.push({ pathname: "/(auth)/create-practice", params: pushParams });
+    }, [currentIndex, requirePractice, router]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -149,8 +152,13 @@ export const SelectRoleScreen: React.FC = () => {
                     <Button onPress={handleContinue}>Next</Button>
                 </Host>
             ),
+            ...(requirePractice && {
+                headerLeft: () => null,
+                gestureEnabled: false,
+                fullScreenGestureEnabled: false,
+            }),
         });
-    }, [navigation, handleContinue]);
+    }, [navigation, handleContinue, requirePractice]);
 
     return (
         <SafeAreaView style={[styles.container]} className="flex-1 items-center justify-between pb-[30%]">

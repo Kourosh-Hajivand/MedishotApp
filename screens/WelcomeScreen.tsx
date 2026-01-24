@@ -1,4 +1,4 @@
-import { BottomSheetBackdrop, BottomSheetModal, BottomSheetBackdropProps } from "@gorhom/bottom-sheet";
+import { BottomSheetBackdrop, BottomSheetBackdropProps, BottomSheetModal } from "@gorhom/bottom-sheet";
 import { ResizeMode, Video } from "expo-av";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef } from "react";
