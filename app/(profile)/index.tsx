@@ -1,4 +1,5 @@
 import { BaseText } from "@/components";
+import { ErrorState } from "@/components/ErrorState";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import themeColors from "@/theme/colors";
@@ -15,7 +16,7 @@ type IconSymbolName = "person.circle.fill" | "chart.bar.xaxis" | "person.2.fill"
 export default function Index() {
     const insets = useSafeAreaInsets();
     const { profile, isAuthenticated, logout: handleLogout } = useAuth();
-    const { data: practiceList } = useGetPracticeList(isAuthenticated === true);
+    const { data: practiceList, error: practiceListError, refetch: refetchPracticeList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { setSelectedPractice, selectedPractice } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
 
@@ -114,6 +115,22 @@ export default function Index() {
     }, [currentUserRole]);
 
     const menuItems = filteredMenuItems;
+
+    // Show error state if there's an error loading practice list
+    if (practiceListError && !isPracticeListLoading) {
+        const errorMessage = practiceListError instanceof Error ? practiceListError.message : "Failed to load practices. Please try again.";
+        return (
+            <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
+                <ErrorState
+                    title="خطا در بارگذاری Practice List"
+                    message={errorMessage}
+                    onRetry={() => {
+                        refetchPracticeList();
+                    }}
+                />
+            </View>
+        );
+    }
 
     return (
         <View className="flex-1 bg-white  gap-4" style={{ paddingTop: insets.top + 110 }}>

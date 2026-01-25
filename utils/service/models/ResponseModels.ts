@@ -592,6 +592,14 @@ export interface ContractTemplateBodyItem {
     };
 }
 
+export interface ContractTemplateCategory {
+    id: number;
+    name: string;
+    icon?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface ContractTemplate {
     id: number;
     title: string;
@@ -601,6 +609,8 @@ export interface ContractTemplate {
     is_active: boolean;
     created_at: string;
     updated_at: string;
+    category?: ContractTemplateCategory;
+    category_id?: number;
 }
 
 export interface ContractTemplateListResponse {

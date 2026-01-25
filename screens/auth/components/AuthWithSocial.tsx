@@ -1,4 +1,4 @@
-import { useGoogleCallback } from "@/utils/hook";
+import { useAppleCallback, useGoogleCallback } from "@/utils/hook";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Google from "expo-auth-session/providers/google";
 import { router } from "expo-router";
@@ -29,6 +29,15 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
             Alert.alert("Error", error?.message || "Failed to sign in with Google. Please try again.");
         },
     );
+    const { mutate: appleCallback } = useAppleCallback(
+        () => {
+            router.replace("/(tabs)/patients");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to sign in with Apple. Please try again.");
+        },
+    );
+
     useEffect(() => {
         if (response?.type === "success") {
             const { authentication } = response;
@@ -41,11 +50,25 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
             });
-
-            // appleCallback(credential.identityToken || "");
+            const fullName = credential.fullName;
+            appleCallback({
+                identity_token: credential.identityToken || "",
+                user: credential.email ?? undefined,
+                full_name: fullName
+                    ? {
+                          given_name: fullName.givenName ?? undefined,
+                          family_name: fullName.familyName ?? undefined,
+                          middle_name: fullName.middleName ?? undefined,
+                          name_prefix: fullName.namePrefix ?? undefined,
+                          name_suffix: fullName.nameSuffix ?? undefined,
+                          nickname: fullName.nickname ?? undefined,
+                      }
+                    : undefined,
+            });
         } catch (e: unknown) {
-            const error = e as { code?: string };
-            if (error.code === "ERR_CANCELED") return;
+            const err = e as { code?: string };
+            if (err.code === "ERR_CANCELED") return;
+            Alert.alert("Error", (e as Error)?.message || "Failed to sign in with Apple. Please try again.");
         }
     };
 

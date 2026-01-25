@@ -1,3 +1,4 @@
+import { ErrorState } from "@/components/ErrorState";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useNetworkStatus } from "@/utils/hook/useNetworkStatus";
 import { useGetPracticeList } from "@/utils/hook/usePractice";
@@ -20,7 +21,7 @@ interface AuthGuardProps {
  */
 export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const { isAuthenticated, profile, isProfileLoading } = useAuth();
-    const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
+    const { data: practiceList, isLoading: isPracticeListLoading, error: practiceListError, refetch: refetchPracticeList } = useGetPracticeList(isAuthenticated === true);
     const { isOffline } = useNetworkStatus();
     const segments = useSegments();
     const wasInAuthRef = useRef(false);
@@ -47,6 +48,10 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         return segments.some((segment) => segment === "(modals)");
     }, [segments]);
 
+    const isOnWelcome = React.useMemo(() => segments.some((s) => s === "welcome"), [segments]);
+    const isOnLogin = React.useMemo(() => segments.some((s) => s === "login"), [segments]);
+    const isOnSignup = React.useMemo(() => segments.some((s) => s === "signup"), [segments]);
+
     const skipProfileOrPracticeRedirect = isInTabs || isInModals;
 
     // Track (auth) -> (modals) transition: when user opens select-date/select-gender from completeProfile,
@@ -71,25 +76,49 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
             console.log(LOG_TAG, "segments", JSON.stringify(segments), "| public", isPublicRoute, "| auth", isInAuthFlow, "| tabs", isInTabs, "| modals", isInModals, "| skip", effectiveSkipRedirect);
         }
 
-        // Only check authentication and practice for protected routes
-        if (isPublicRoute || isInAuthFlow) {
-            return;
-        }
-
         // Never redirect when (modals) is open (e.g. select-gender, select-date). Keep them open.
         if (isInModals) {
             return;
         }
 
-        // If authentication check is complete and user is not authenticated, redirect to welcome
-        if (isAuthenticated === false) {
+        // 1. اگر authenticated است و همه چیز کامل است → به tabs redirect کن (حتی اگر در auth باشد)
+        if (isAuthenticated === true && profile && profile.first_name && profile.last_name) {
+            if (!isPracticeListLoading && !isProfileLoading) {
+                if (practiceList?.data && practiceList.data.length > 0) {
+                    // همه چیز کامل است → به tabs redirect کن
+                    if (isInAuthFlow) {
+                        if (__DEV__) console.warn(LOG_TAG, "redirect -> /(tabs)/patients (authenticated with complete profile and practice, leaving auth)");
+                        router.replace("/(tabs)/patients");
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 2. اگر authenticated است اما در welcome/login/signup است → به tabs redirect کن
+        if (isAuthenticated === true && (isOnWelcome || isOnLogin || isOnSignup)) {
+            if (__DEV__) console.warn(LOG_TAG, "redirect -> /(tabs)/patients (authenticated on welcome/login/signup)");
+            router.replace("/(tabs)/patients");
+            return;
+        }
+
+        // 3. اگر authenticated نیست و در auth نیست → به welcome redirect کن
+        if (isAuthenticated === false && !isInAuthFlow && !isPublicRoute) {
             if (__DEV__) console.warn(LOG_TAG, "redirect -> /welcome (not authenticated)");
             router.replace("/welcome");
             return;
         }
 
-        // If user is authenticated, check profile and practice
-        if (isAuthenticated === true) {
+        // 4. برای protected routes (غیر از auth و public)
+        if (isPublicRoute || isInAuthFlow) {
+            // در auth flow، فقط چک می‌کنیم که آیا باید redirect شود (بالا انجام شد)
+            return;
+        }
+
+        // 5. برای protected routes: چک profile و practice
+        // IMPORTANT: When in (tabs)/patients, let patients/_layout.tsx handle modal navigation
+        // Don't redirect here - it causes navigation conflicts
+        if (isAuthenticated === true && !isInTabs) {
             // Profile incomplete: redirect EXCEPT when on (tabs), (modals), or (auth)->(modals) transition.
             if (profile && (!profile.first_name || !profile.last_name) && !effectiveSkipRedirect) {
                 if (__DEV__) console.warn(LOG_TAG, "redirect -> completeProfile (profile incomplete)");
@@ -97,7 +126,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 return;
             }
 
-            // If practice list is loaded and empty: redirect EXCEPT when on (tabs) or (modals).
+            // Practice list empty: redirect EXCEPT when on (tabs) or (modals).
+            // When in tabs, patients/_layout.tsx will handle opening the modal
             if (!isPracticeListLoading && !isProfileLoading && profile) {
                 if ((!practiceList?.data || practiceList.data.length === 0) && !effectiveSkipRedirect) {
                     if (__DEV__) console.warn(LOG_TAG, "redirect -> select-role (no practice)");
@@ -106,7 +136,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 }
             }
         }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments]);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments, isOnWelcome, isOnLogin, isOnSignup, isInModals, isInTabs]);
 
     // If on (modals) (e.g. select-gender, select-date), always render children — never replace with loading/redirect.
     if (isInModals) {
@@ -119,6 +149,22 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
                 <ActivityIndicator size="large" color="#007AFF" />
             </View>
+        );
+    }
+
+    // If there's an error loading practice list, show error state
+    // BUT: Don't show error in tabs - let patients/_layout.tsx handle it
+    // This allows modals to still open from tabs even if practice list has error
+    if (isAuthenticated === true && practiceListError && !isPublicRoute && !isInAuthFlow && !isPracticeListLoading && !isInTabs) {
+        const errorMessage = practiceListError instanceof Error ? practiceListError.message : "Failed to load practices. Please try again.";
+        return (
+            <ErrorState
+                title="خطا در بارگذاری Practice List"
+                message={errorMessage}
+                onRetry={() => {
+                    refetchPracticeList();
+                }}
+            />
         );
     }
 

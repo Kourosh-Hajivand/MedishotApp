@@ -5,7 +5,6 @@ import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, Trans
 import { ApiResponse, Member, PatientContractListResponse, PatientsCountResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
-    baseUrl,
     practises: {
         list,
         create,
@@ -45,11 +44,18 @@ export const PracticeService = {
     // Get list of practices
     getPracticeList: async (): Promise<PracticeListResponse> => {
         try {
-            const response: AxiosResponse<PracticeListResponse> = await axiosInstance.get(baseUrl + list());
+            const response: AxiosResponse<PracticeListResponse> = await axiosInstance.get(list());
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
-                throw new Error(error.response.data.message || "Failed to get practice list");
+                const endpoint = error.config?.url || "practises";
+                const status = error.response.status;
+                const serverMessage = error.response.data?.message || error.response.data?.exception || "Unknown error";
+                throw new Error(`[Practice List API] ${endpoint} - Status ${status}: ${serverMessage}`);
+            }
+            if (axios.isAxiosError(error)) {
+                const endpoint = error.config?.url || "practises";
+                throw new Error(`[Practice List API] ${endpoint} - Network error: ${error.message}`);
             }
             throw error;
         }
@@ -58,7 +64,7 @@ export const PracticeService = {
     // Create a new practice
     createPractice: async (data: CreatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + create(), data, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(create(), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -73,7 +79,7 @@ export const PracticeService = {
     // Get practice by ID
     getPracticeById: async (practiceId: number): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.get(baseUrl + getById(practiceId));
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.get(getById(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -86,7 +92,7 @@ export const PracticeService = {
     // Update practice
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(baseUrl + update(practiceId), data, {
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(update(practiceId), data, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -101,7 +107,7 @@ export const PracticeService = {
     // Delete practice
     deletePractice: async (practiceId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deletePractice(practiceId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(deletePractice(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -120,7 +126,7 @@ export const PracticeService = {
             if (params?.role) {
                 queryParams.append("role", params.role);
             }
-            const url = baseUrl + getMembers(practiceId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const url = getMembers(practiceId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
             const response: AxiosResponse<PracticeMembersResponse | Member[]> = await axiosInstance.get(url);
 
             // Handle both array response and wrapped response
@@ -145,7 +151,7 @@ export const PracticeService = {
     // Add member to practice
     addMember: async (practiceId: number, data: AddMemberDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + addMember(practiceId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(addMember(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -158,7 +164,7 @@ export const PracticeService = {
     // Update member role
     updateMemberRole: async (practiceId: number, memberId: string | number, data: UpdateMemberRoleDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + updateMemberRole(practiceId, memberId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(updateMemberRole(practiceId, memberId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -199,7 +205,7 @@ export const PracticeService = {
                 }
             }
 
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + updateMember(practiceId, memberId), formData, {
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(updateMember(practiceId, memberId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -214,7 +220,7 @@ export const PracticeService = {
     // Remove member from practice
     removeMember: async (practiceId: number, memberId: string | number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + removeMember(practiceId, memberId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(removeMember(practiceId, memberId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -227,7 +233,7 @@ export const PracticeService = {
     // Leave practice
     leavePractice: async (practiceId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.post(baseUrl + leave(practiceId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.post(leave(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -240,7 +246,7 @@ export const PracticeService = {
     // Transfer ownership
     transferOwnership: async (practiceId: number, data: TransferOwnershipDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + transferOwnership(practiceId), data);
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(transferOwnership(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -255,7 +261,7 @@ export const PracticeService = {
     // Get recently uploaded photos for a practice
     getRecentlyPhotos: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
         try {
-            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getRecentlyPhotos(practiseId));
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(getRecentlyPhotos(practiseId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -268,7 +274,7 @@ export const PracticeService = {
     // Get patient count statistics
     getPatientsCount: async (practiseId: string | number, type: string): Promise<PatientsCountResponse> => {
         try {
-            const response: AxiosResponse<PatientsCountResponse> = await axiosInstance.get(baseUrl + getPatientsCount(practiseId, type));
+            const response: AxiosResponse<PatientsCountResponse> = await axiosInstance.get(getPatientsCount(practiseId, type));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -281,7 +287,7 @@ export const PracticeService = {
     // Get archived media for a practice
     getArchivedMedia: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
         try {
-            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getArchivedMedia(practiseId));
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(getArchivedMedia(practiseId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -294,7 +300,7 @@ export const PracticeService = {
     // Get practice albums
     getAlbums: async (practiseId: string | number): Promise<RecentlyPhotosResponse> => {
         try {
-            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(baseUrl + getAlbums(practiseId));
+            const response: AxiosResponse<RecentlyPhotosResponse> = await axiosInstance.get(getAlbums(practiseId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -307,7 +313,7 @@ export const PracticeService = {
     // Get specific practice member details
     getMember: async (practiceId: number, memberId: string): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.get(baseUrl + getMember(practiceId, memberId));
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.get(getMember(practiceId, memberId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -322,7 +328,7 @@ export const PracticeService = {
     // Get practice tags
     getTags: async (practiceId: number): Promise<PracticeTagsResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagsResponse> = await axiosInstance.get(baseUrl + getTags(practiceId));
+            const response: AxiosResponse<PracticeTagsResponse> = await axiosInstance.get(getTags(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -335,7 +341,7 @@ export const PracticeService = {
     // Create practice tag
     createTag: async (practiceId: number, data: CreateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + createTag(practiceId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(createTag(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -348,7 +354,7 @@ export const PracticeService = {
     // Get practice tag
     getTag: async (practiceId: number, tagId: number): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.get(baseUrl + getTag(practiceId, tagId));
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.get(getTag(practiceId, tagId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -361,7 +367,7 @@ export const PracticeService = {
     // Update practice tag
     updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(baseUrl + updateTag(practiceId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(updateTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -374,7 +380,7 @@ export const PracticeService = {
     // Delete practice tag
     deleteTag: async (practiceId: number, tagId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTag(practiceId, tagId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(deleteTag(practiceId, tagId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -389,7 +395,7 @@ export const PracticeService = {
     // Get practice templates
     getTemplates: async (practiceId: number): Promise<PracticeTemplatesResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplatesResponse> = await axiosInstance.get(baseUrl + getTemplates(practiceId));
+            const response: AxiosResponse<PracticeTemplatesResponse> = await axiosInstance.get(getTemplates(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -402,7 +408,7 @@ export const PracticeService = {
     // Create practice template
     createTemplate: async (practiceId: number, data: CreateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + createTemplate(practiceId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(createTemplate(practiceId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -415,7 +421,7 @@ export const PracticeService = {
     // Get practice template
     getTemplate: async (practiceId: number, templateId: number): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.get(baseUrl + getTemplate(practiceId, templateId));
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.get(getTemplate(practiceId, templateId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -428,7 +434,7 @@ export const PracticeService = {
     // Update practice template
     updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(baseUrl + updateTemplate(practiceId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -441,7 +447,7 @@ export const PracticeService = {
     // Delete practice template
     deleteTemplate: async (practiceId: number, templateId: number): Promise<ApiResponse<string>> => {
         try {
-            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(baseUrl + deleteTemplate(practiceId, templateId));
+            const response: AxiosResponse<ApiResponse<string>> = await axiosInstance.delete(deleteTemplate(practiceId, templateId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -456,7 +462,7 @@ export const PracticeService = {
     // Get latest contracts for a practice
     getLatestContracts: async (practiceId: number): Promise<PatientContractListResponse> => {
         try {
-            const response: AxiosResponse<PatientContractListResponse> = await axiosInstance.get(baseUrl + getLatestContracts(practiceId));
+            const response: AxiosResponse<PatientContractListResponse> = await axiosInstance.get(getLatestContracts(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -471,7 +477,7 @@ export const PracticeService = {
     // Get practice activity log
     getActivities: async (practiceId: number): Promise<PracticeActivitiesResponse> => {
         try {
-            const response: AxiosResponse<PracticeActivitiesResponse> = await axiosInstance.get(baseUrl + getActivities(practiceId));
+            const response: AxiosResponse<PracticeActivitiesResponse> = await axiosInstance.get(getActivities(practiceId));
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

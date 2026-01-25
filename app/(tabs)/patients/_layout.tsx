@@ -1,4 +1,4 @@
-import { BaseText } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
 import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
@@ -18,10 +18,12 @@ const MODAL_PUSH_DELAY_MS = 450;
 
 export default function PatientsLayout() {
     const { logout: handleLogout, isAuthenticated, profile, isProfileLoading } = useAuth();
-    const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
+    const { data: practiceList, isLoading: isPracticeListLoading, error: practiceListError, refetch: refetchPracticeList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
 
     const hasIncompleteProfile = !!profile && (!profile.first_name || !profile.last_name) && !isProfileLoading;
+    // Consider practice list empty if: no data and not loading
+    // If there's an error, we'll still allow modal navigation (user can create practice)
     const hasNoPractice = !practiceList?.data?.length && !isPracticeListLoading;
 
     const hasPushedCompleteProfileModal = useRef(false);
@@ -40,7 +42,11 @@ export default function PatientsLayout() {
 
     useEffect(() => {
         if (!isAuthenticated || !profile || isProfileLoading || hasIncompleteProfile) return;
+        // Don't push modal if practice list is still loading or if we already have practices
+        if (isPracticeListLoading) return;
         if (practiceList?.data && practiceList.data.length > 0) return;
+        // Even if there's an error, we should still allow user to create practice
+        // But we'll show the error state separately
         if (hasPushedPracticeModal.current) return;
         hasPushedPracticeModal.current = true;
         const id = setTimeout(() => {
@@ -93,6 +99,34 @@ export default function PatientsLayout() {
             }
         }
     }, [practiceList?.data?.length, isAuthenticated, isLoaded, selectedPractice?.id]);
+
+    // Show error state if practice list fails
+    // Show blocking error only if user has practices (meaning error is about loading, not about having none)
+    // If no practices, allow modal to open (user can create practice)
+    const shouldShowError = practiceListError && !isPracticeListLoading && !hasIncompleteProfile && profile && profile.first_name && profile.last_name;
+    const hasPractices = practiceList?.data && practiceList.data.length > 0;
+    const shouldShowBlockingError = shouldShowError && hasPractices;
+
+    // If there's an error and user has practices, show blocking error state
+    if (shouldShowBlockingError) {
+        const errorMessage = practiceListError instanceof Error ? practiceListError.message : "Failed to load practices. Please try again.";
+        // Ensure service name is in the message
+        const displayMessage = errorMessage.includes("[Practice List API]") 
+            ? errorMessage 
+            : `[Practice List API] ${errorMessage}`;
+
+        return (
+            <BottomSheetModalProvider>
+                <ErrorState
+                    title="خطا در بارگذاری Practice List"
+                    message={displayMessage}
+                    onRetry={() => {
+                        refetchPracticeList();
+                    }}
+                />
+            </BottomSheetModalProvider>
+        );
+    }
 
     return (
         <BottomSheetModalProvider>
