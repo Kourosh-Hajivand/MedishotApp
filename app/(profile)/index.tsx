@@ -101,7 +101,7 @@ export default function Index() {
         const userRole = currentUserRole;
 
         // staff (admin) can see: Personal Profile, Practice Team, Notification, Archive
-        if (userRole === "admin") {
+        if (userRole === "staff") {
             return allMenuItems.filter((item) => item.lable === "Personal Profile" || item.lable === "Practice Team" || item.lable === "Notification" || item.lable === "Archive");
         }
 

@@ -1,14 +1,111 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { runOnJS, useSharedValue } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { ImageViewerModal } from "./ImageViewerModal";
+
+// Separate component for image item to properly use hooks
+const GalleryImageItem: React.FC<{
+    uri: string;
+    index: number;
+    itemWidth: number;
+    gap: number;
+    numColumns: number;
+    menuItems: Array<{ icon: SymbolViewProps["name"]; label: string; onPress?: (uri: string) => void; role?: ButtonRole }>;
+    onImagePress: (uri: string) => void;
+    imageUrlToBookmarkMap?: Map<string, boolean>;
+    isLoading: boolean;
+    onLoadStart: () => void;
+    onLoad: () => void;
+    onError: () => void;
+}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, isLoading, onLoadStart, onLoad, onError }) => {
+    // Use local shared values for opacity animation per image
+    const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
+    const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacityShared.value,
+    }));
+
+    const imageOpacityAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacityShared.value,
+    }));
+
+    const handleImageLoadStart = () => {
+        imageOpacityShared.value = 0;
+        skeletonOpacityShared.value = 1;
+        onLoadStart();
+    };
+
+    const handleImageLoad = () => {
+        skeletonOpacityShared.value = withTiming(0, { duration: 300 });
+        imageOpacityShared.value = withTiming(1, { duration: 300 });
+        onLoad();
+    };
+
+    const handleImageError = () => {
+        skeletonOpacityShared.value = withTiming(0, { duration: 300 });
+        imageOpacityShared.value = withTiming(1, { duration: 300 });
+        onError();
+    };
+
+    return (
+        <Host style={{ flex: 1 }}>
+            <ContextMenu activationMethod="longPress">
+                <ContextMenu.Items>
+                    {menuItems.map((menu, menuIndex) => (
+                        <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
+                            {menu.label}
+                        </Button>
+                    ))}
+                </ContextMenu.Items>
+
+                <ContextMenu.Trigger>
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => onImagePress(uri)}
+                        style={{
+                            width: itemWidth,
+                            height: itemWidth,
+                            marginRight: index < numColumns - 1 ? gap : 0,
+                            position: "relative",
+                            overflow: "hidden",
+                        }}
+                    >
+                        <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
+                            <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
+                        </Animated.View>
+                        <Animated.View style={imageOpacityAnimatedStyle}>
+                            <Image
+                                source={{ uri }}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                }}
+                                contentFit="cover"
+                                onLoadStart={handleImageLoadStart}
+                                onLoad={handleImageLoad}
+                                onError={handleImageError}
+                            />
+                        </Animated.View>
+                        {imageUrlToBookmarkMap?.get(uri) && (
+                            <View style={styles.bookmarkIcon}>
+                                <IconSymbol name="bookmark.fill" size={16} color={colors.primary as any} />
+                            </View>
+                        )}
+                    </TouchableOpacity>
+                </ContextMenu.Trigger>
+            </ContextMenu>
+        </Host>
+    );
+};
 
 interface MenuItem {
     icon: SymbolViewProps["name"];
@@ -108,6 +205,12 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [viewerImagesList, setViewerImagesList] = useState<string[]>([]);
     const scale = useSharedValue(1);
+    // Track loading state for each image in gallery
+    const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
+    // Animated opacity values for smooth transitions - use a single shared value approach
+    // Instead of per-image shared values, we'll use animated styles with conditional rendering
+    const defaultImageOpacity = useSharedValue(0);
+    const defaultSkeletonOpacity = useSharedValue(1);
 
     // Fetch patient data if patientId is provided (for ImageViewerModal)
     // Note: ImageViewerModal will fetch patient data itself using patientId
@@ -215,50 +318,52 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         const gap = 0.5;
         const totalGap = (numColumns - 1) * gap;
         const itemWidth = (width - totalGap) / numColumns;
+        const isLoading = imageLoadingStates.get(uri) ?? true; // Default to loading
+
+        const handleImageLoadStart = () => {
+            setImageLoadingStates((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(uri, true);
+                return newMap;
+            });
+        };
+
+        const handleImageLoad = () => {
+            setImageLoadingStates((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(uri, false);
+                return newMap;
+            });
+        };
+
+        const handleImageError = () => {
+            setImageLoadingStates((prev) => {
+                const newMap = new Map(prev);
+                newMap.set(uri, false);
+                return newMap;
+            });
+        };
 
         return (
-            <Host key={`${uri}-${index}`} style={{ flex: 1 }}>
-                <ContextMenu activationMethod="longPress">
-                    <ContextMenu.Items>
-                        {menuItems.map((menu, menuIndex) => (
-                            <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
-                                {menu.label}
-                            </Button>
-                        ))}
-                    </ContextMenu.Items>
-
-                    <ContextMenu.Trigger>
-                        <TouchableOpacity
-                            activeOpacity={0.9}
-                            onPress={() => handleImagePress(uri)}
-                            style={{
-                                width: itemWidth,
-                                height: itemWidth,
-                                marginRight: index < numColumns - 1 ? gap : 0,
-                            }}
-                        >
-                            <Image
-                                source={{ uri }}
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                }}
-                                contentFit="cover"
-                            />
-                            {imageUrlToBookmarkMap?.get(uri) && (
-                                <View style={styles.bookmarkIcon}>
-                                    <IconSymbol name="heart.fill" size={16} color={colors.system.white} />
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    </ContextMenu.Trigger>
-                </ContextMenu>
-            </Host>
+            <GalleryImageItem
+                uri={uri}
+                index={index}
+                itemWidth={itemWidth}
+                gap={gap}
+                numColumns={numColumns}
+                menuItems={menuItems}
+                onImagePress={handleImagePress}
+                imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                isLoading={isLoading}
+                onLoadStart={handleImageLoadStart}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+            />
         );
     };
 
     const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
-        return <View style={styles.rowContainer}>{item.items.map((uri, itemIndex) => renderImageItem(uri, itemIndex))}</View>;
+        return <View style={styles.rowContainer}>{item.items.map((uri, itemIndex) => <React.Fragment key={`row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>)}</View>;
     };
 
     const renderSectionHeader = ({ section }: { section: { title: string; data: ImageRow[] } }) => {
@@ -360,6 +465,15 @@ const styles = StyleSheet.create({
         left: 8,
         width: 24,
         height: 24,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    skeletonContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         justifyContent: "center",
         alignItems: "center",
     },

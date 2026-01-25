@@ -1,4 +1,5 @@
 import { ImageEditorModal } from "@/components/ImageEditor";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useBookmarkMedia, useDeletePatientMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
@@ -84,7 +85,103 @@ interface ThumbnailItemProps {
     currentIndexShared: ReturnType<typeof useSharedValue<number>>; // Shared value for worklet access
 }
 
-const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive, onPress, scrollProgress, currentIndexShared }) => {
+// Separate component for image item to properly use hooks
+interface ImageViewerItemProps {
+    item: string;
+    index: number;
+    imageSize: { width: number; height: number };
+    gestures: ReturnType<typeof Gesture.Simultaneous> | ReturnType<typeof Gesture.Tap>;
+    isCurrentImage: boolean;
+    imageAnimatedStyle: ReturnType<typeof useAnimatedStyle>;
+    isLoading: boolean;
+    onLoadStart: () => void;
+    onLoad: (e: any) => void;
+    onError: () => void;
+}
+
+const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSize, gestures, isCurrentImage, imageAnimatedStyle, isLoading, onLoadStart, onLoad, onError }) => {
+    // Create shared values for this component (proper hooks usage)
+    const imageOpacity = useSharedValue(isLoading ? 0 : 1);
+    const skeletonOpacity = useSharedValue(isLoading ? 1 : 0);
+    const hasLoadedRef = React.useRef(false); // Track if image has been loaded at least once
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacity.value,
+    }));
+
+    const imageOpacityAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacity.value,
+    }));
+
+    // Update shared values when loading state changes (only if not already loaded)
+    React.useEffect(() => {
+        if (isLoading && !hasLoadedRef.current) {
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    }, [isLoading]);
+
+    // Handlers that update shared values
+    const handleLoadStart = () => {
+        // Only show skeleton if image hasn't been loaded before
+        if (!hasLoadedRef.current) {
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+        onLoadStart();
+    };
+
+    const handleLoad = (e: any) => {
+        hasLoadedRef.current = true; // Mark as loaded
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+        onLoad(e);
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true; // Mark as loaded (even on error)
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+        onError();
+    };
+
+    return (
+        <View style={styles.imageWrapper}>
+            <GestureDetector gesture={gestures as any}>
+                <Animated.View style={[styles.imageContainer, isCurrentImage ? imageAnimatedStyle : null] as any}>
+                    {(skeletonOpacity?.value ?? (isLoading ? 1 : 0)) > 0 && (
+                        <Animated.View style={[styles.skeletonContainer, { width: imageSize.width || width, height: imageSize.height || height }, skeletonAnimatedStyle]}>
+                            <ImageSkeleton width={imageSize.width || width} height={imageSize.height || height} borderRadius={0} variant="rectangular" />
+                        </Animated.View>
+                    )}
+                    <Animated.View style={imageOpacityAnimatedStyle}>
+                        <Image
+                            source={{ uri: item }}
+                            style={[
+                                styles.image,
+                                imageSize.width > 0 && {
+                                    width: imageSize.width,
+                                    height: imageSize.height,
+                                },
+                            ]}
+                            contentFit="contain"
+                            onLoadStart={handleLoadStart}
+                            onLoad={handleLoad}
+                            onError={handleError}
+                        />
+                    </Animated.View>
+                </Animated.View>
+            </GestureDetector>
+        </View>
+    );
+};
+
+const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoadStart?: () => void; onLoad?: () => void; onError?: () => void }> = ({ imageUri, index, isActive, onPress, scrollProgress, currentIndexShared, isLoading = true, onLoadStart, onLoad, onError }) => {
+    // Create shared values for this component (proper hooks usage)
+    const thumbnailOpacity = useSharedValue(isLoading ? 0 : 1);
+    const thumbnailSkeletonOpacity = useSharedValue(isLoading ? 1 : 0);
+    const hasLoadedRef = React.useRef(false); // Track if thumbnail has been loaded at least once
+
     const animatedThumbnailStyle = useAnimatedStyle(() => {
         // Calculate active progress based on current index and scroll progress
         const currentIdx = currentIndexShared.value;
@@ -118,16 +215,78 @@ const ThumbnailItem: React.FC<ThumbnailItemProps> = ({ imageUri, index, isActive
         };
     });
 
+    const skeletonOpacityStyle = useAnimatedStyle(() => ({
+        opacity: thumbnailSkeletonOpacity.value,
+    }));
+
+    const imageOpacityStyle = useAnimatedStyle(() => ({
+        opacity: thumbnailOpacity.value,
+    }));
+
+    // Update shared values when loading state changes (only if not already loaded)
+    React.useEffect(() => {
+        if (isLoading && !hasLoadedRef.current) {
+            thumbnailOpacity.value = 0;
+            thumbnailSkeletonOpacity.value = 1;
+        }
+    }, [isLoading]);
+
+    // Handlers that update shared values
+    const handleLoadStart = () => {
+        // Only show skeleton if thumbnail hasn't been loaded before
+        if (!hasLoadedRef.current) {
+            thumbnailOpacity.value = 0;
+            thumbnailSkeletonOpacity.value = 1;
+        }
+        onLoadStart?.();
+    };
+
+    const handleLoad = () => {
+        hasLoadedRef.current = true; // Mark as loaded
+        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 });
+        thumbnailOpacity.value = withTiming(1, { duration: 300 });
+        onLoad?.();
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true; // Mark as loaded (even on error)
+        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 });
+        thumbnailOpacity.value = withTiming(1, { duration: 300 });
+        onError?.();
+    };
+
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
             <Animated.View style={[styles.thumbnail, animatedThumbnailStyle]}>
-                <Image source={{ uri: imageUri }} style={styles.thumbnailImage} contentFit="cover" />
+                {thumbnailSkeletonOpacity.value > 0 && (
+                    <Animated.View style={[styles.thumbnailSkeletonContainer, skeletonOpacityStyle]}>
+                        <ImageSkeleton width={40} height={40} borderRadius={6} variant="rounded" />
+                    </Animated.View>
+                )}
+                <Animated.View style={imageOpacityStyle}>
+                    <Image source={{ uri: imageUri }} style={styles.thumbnailImage} contentFit="cover" onLoadStart={handleLoadStart} onLoad={handleLoad} onError={handleError} />
+                </Animated.View>
             </Animated.View>
         </TouchableOpacity>
     );
 };
 
-export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, images, initialIndex, onClose, mediaData, imageUrlToMediaIdMap, imageUrlToBookmarkMap, imageUrlToCreatedAtMap, patientId, imageUrlToPatientIdMap, imageUrlToTakerMap, actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true }, rawMediaData, description = "taker" }) => {
+export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
+    visible,
+    images,
+    initialIndex,
+    onClose,
+    mediaData,
+    imageUrlToMediaIdMap,
+    imageUrlToBookmarkMap,
+    imageUrlToCreatedAtMap,
+    patientId,
+    imageUrlToPatientIdMap,
+    imageUrlToTakerMap,
+    actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
+    rawMediaData,
+    description = "taker",
+}) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
 
     // Build maps from mediaData if provided, otherwise use legacy maps
@@ -186,6 +345,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     const [imageEditorVisible, setImageEditorVisible] = useState(false);
     const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
     const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
+    // Track loading state for each image
+    const [imageLoadingStates, setImageLoadingStates] = useState<Map<number, boolean>>(new Map());
+    // Track loading state for thumbnail images
+    const [thumbnailLoadingStates, setThumbnailLoadingStates] = useState<Map<string, boolean>>(new Map());
+    // Animated opacity values for smooth transitions
+    const imageOpacitiesRef = useRef<Map<number, ReturnType<typeof useSharedValue<number>>>>(new Map());
+    const skeletonOpacitiesRef = useRef<Map<number, ReturnType<typeof useSharedValue<number>>>>(new Map());
+    const thumbnailOpacitiesRef = useRef<Map<string, ReturnType<typeof useSharedValue<number>>>>(new Map());
+    const thumbnailSkeletonOpacitiesRef = useRef<Map<string, ReturnType<typeof useSharedValue<number>>>>(new Map());
 
     // Shared values for zoom and pan (only for current image)
     const scale = useSharedValue(1);
@@ -449,6 +617,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         translateY.value = withTiming(0, { duration: 250 });
         setIsZoomed(false);
 
+        // Mark new current image as loading when switching
+        setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            if (!newMap.has(currentIndex)) {
+                newMap.set(currentIndex, true);
+            }
+            return newMap;
+        });
+
         // Scroll thumbnail to center current image - iOS Photos-like smooth behavior
         // Always keep the selected image centered in thumbnail bar
         setTimeout(() => {
@@ -464,7 +641,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         }
         const offsetX = event.nativeEvent.contentOffset.x;
         const currentPage = offsetX / width;
-        
+
         // Clamp currentPage to valid range
         const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
         const index = Math.round(clampedPage);
@@ -550,22 +727,22 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         if (isProgrammaticScroll.current || isHandlingScrollEnd.current) {
             return;
         }
-        
+
         const offsetX = event.nativeEvent.contentOffset.x;
         const currentPage = offsetX / width;
-        
+
         // Clamp to valid range
         const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
-        
+
         // Calculate progress relative to current index
         // Positive = swiping right (next image), Negative = swiping left (previous image)
         const progress = clampedPage - currentIndex;
-        
+
         // iOS Photos-like threshold: if less than 30% swiped, snap back to current image
         // If more than 30%, snap to next/previous image
-        const SNAP_THRESHOLD = 0.3;
+        const SNAP_THRESHOLD = 0.1; // 15% threshold for professional slider behavior
         let targetIndex: number;
-        
+
         // Determine target index based on swipe direction and progress
         if (progress < -SNAP_THRESHOLD && currentIndex > 0) {
             // Swiping left (to previous image) - more than threshold swiped
@@ -577,13 +754,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
             // Less than threshold swiped - snap back to current image
             targetIndex = currentIndex;
         }
-        
+
         // Ensure targetIndex is valid
         targetIndex = Math.max(0, Math.min(targetIndex, imagesList.length - 1));
-        
+
         // Reset scroll progress with smooth animation
         scrollProgress.value = withTiming(0, { duration: 300 });
-        
+
         // Only update if target is different from current
         if (targetIndex !== currentIndex) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -615,17 +792,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         if (isProgrammaticScroll.current || isHandlingScrollEnd.current) {
             return;
         }
-        
+
         const offsetX = event.nativeEvent.contentOffset.x;
         const currentPage = offsetX / width;
-        
+
         // Clamp to valid range
         const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
         const index = Math.round(clampedPage);
-        
+
         // Ensure index is valid
         const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
-        
+
         scrollProgress.value = withTiming(0, { duration: 200 }); // Smoothly reset progress
 
         if (validIndex !== currentIndex) {
@@ -722,6 +899,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         }
     }, [imageUrlToBookmarkMap, visible]);
 
+    // Initialize loading states when modal opens or images change
+    React.useEffect(() => {
+        if (visible) {
+            const initialLoadingStates = new Map<number, boolean>();
+            const initialThumbnailLoadingStates = new Map<string, boolean>();
+            imagesList.forEach((imageUri, index) => {
+                initialLoadingStates.set(index, true);
+                initialThumbnailLoadingStates.set(imageUri, true);
+            });
+            setImageLoadingStates(initialLoadingStates);
+            setThumbnailLoadingStates(initialThumbnailLoadingStates);
+        }
+    }, [visible, imagesList.length]);
+
     const handleBookmarkPress = () => {
         const currentImageUri = imagesList[currentIndex];
         const mediaId = imageUrlToMediaIdMapInternal.get(currentImageUri);
@@ -799,6 +990,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
     };
 
     const handleImageLoad = (index: number, event: any) => {
+        // Mark image as loaded
+        setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(index, false);
+            return newMap;
+        });
+
         let imgWidth = 0;
         let imgHeight = 0;
 
@@ -833,6 +1031,24 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                 [index]: { width: width, height: height },
             }));
         }
+    };
+
+    const handleImageLoadStart = (index: number) => {
+        // Mark image as loading
+        setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(index, true);
+            return newMap;
+        });
+    };
+
+    const handleImageError = (index: number) => {
+        // Mark image as not loading (even if error, stop showing skeleton)
+        setImageLoadingStates((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(index, false);
+            return newMap;
+        });
     };
 
     const createGestures = (index: number) => {
@@ -955,27 +1171,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
         const imageSize = imageSizes[index] || { width: width, height: height };
         const gestures = createGestures(index);
         const isCurrentImage = index === currentIndex;
+        const isLoading = imageLoadingStates.get(index) ?? true; // Default to loading
 
-        return (
-            <View style={styles.imageWrapper}>
-                <GestureDetector gesture={gestures}>
-                    <Animated.View style={[styles.imageContainer, isCurrentImage && imageAnimatedStyle]}>
-                        <Image
-                            source={{ uri: item }}
-                            style={[
-                                styles.image,
-                                imageSize.width > 0 && {
-                                    width: imageSize.width,
-                                    height: imageSize.height,
-                                },
-                            ]}
-                            contentFit="contain"
-                            onLoad={(e) => handleImageLoad(index, e)}
-                        />
-                    </Animated.View>
-                </GestureDetector>
-            </View>
-        );
+        return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
     };
 
     const headerOpacity = useSharedValue(1);
@@ -1027,7 +1225,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                         alignment="center"
                                         modifiers={[
                                             padding({ all: 4 }),
-                                            frame({ width: (description === "taker" && currentTaker) ? 200 : 150 }),
+                                            frame({ width: description === "taker" && currentTaker ? 200 : 150 }),
                                             glassEffect({
                                                 glass: {
                                                     variant: "regular",
@@ -1117,27 +1315,53 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({ visible, ima
                                 snapToInterval={undefined}
                                 pagingEnabled={false}
                             >
-                                {imagesList.map((imageUri, index) => (
-                                    <ThumbnailItem
-                                        key={index}
-                                        imageUri={imageUri}
-                                        index={index}
-                                        isActive={index === currentIndex}
-                                        currentIndexShared={currentIndexShared}
-                                        scrollProgress={scrollProgress}
-                                        onPress={() => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            scrollProgress.value = 0;
-                                            isProgrammaticScroll.current = true;
-                                            setCurrentIndex(index);
-                                            flatListRef.current?.scrollToIndex({ index, animated: true });
-                                            // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
-                                            setTimeout(() => {
-                                                isProgrammaticScroll.current = false;
-                                            }, 500);
-                                        }}
-                                    />
-                                ))}
+                                {imagesList.map((imageUri, index) => {
+                                    const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
+
+                                    return (
+                                        <ThumbnailItem
+                                            key={index}
+                                            imageUri={imageUri}
+                                            index={index}
+                                            isActive={index === currentIndex}
+                                            currentIndexShared={currentIndexShared}
+                                            scrollProgress={scrollProgress}
+                                            isLoading={isThumbnailLoading}
+                                            onLoadStart={() => {
+                                                setThumbnailLoadingStates((prev) => {
+                                                    const newMap = new Map(prev);
+                                                    newMap.set(imageUri, true);
+                                                    return newMap;
+                                                });
+                                            }}
+                                            onLoad={() => {
+                                                setThumbnailLoadingStates((prev) => {
+                                                    const newMap = new Map(prev);
+                                                    newMap.set(imageUri, false);
+                                                    return newMap;
+                                                });
+                                            }}
+                                            onError={() => {
+                                                setThumbnailLoadingStates((prev) => {
+                                                    const newMap = new Map(prev);
+                                                    newMap.set(imageUri, false);
+                                                    return newMap;
+                                                });
+                                            }}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                scrollProgress.value = 0;
+                                                isProgrammaticScroll.current = true;
+                                                setCurrentIndex(index);
+                                                flatListRef.current?.scrollToIndex({ index, animated: true });
+                                                // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
+                                                setTimeout(() => {
+                                                    isProgrammaticScroll.current = false;
+                                                }, 500);
+                                            }}
+                                        />
+                                    );
+                                })}
                             </ScrollView>
                         )}
 
@@ -1280,6 +1504,19 @@ const styles = StyleSheet.create({
         maxWidth: width,
         maxHeight: height,
     },
+    imageLoading: {
+        opacity: 0,
+    },
+    skeletonContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: colors.system.black,
+    },
     bottomBar: {
         position: "absolute",
         bottom: 0,
@@ -1305,6 +1542,18 @@ const styles = StyleSheet.create({
     thumbnailImage: {
         width: "100%",
         height: "100%",
+    },
+    thumbnailImageLoading: {
+        opacity: 0,
+    },
+    thumbnailSkeletonContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
     },
     actionButtonsContainer: {
         alignItems: "center",
