@@ -1,4 +1,5 @@
 import { BaseText, ErrorState } from "@/components";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetPracticeTemplates } from "@/utils/hook/usePractice";
@@ -10,13 +11,85 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { FadeInDown, Layout } from "react-native-reanimated";
+import Animated, { FadeInDown, Layout, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutPattern } from "./_components/create-template/types";
 import { getItemLayoutStyle } from "./_components/create-template/utils";
 
 const { width } = Dimensions.get("window");
 const TEMPLATE_SIZE = (width - 60) / 2;
+
+// Separate component for template preview image item with loading skeleton
+const TemplatePreviewImageItem: React.FC<{
+    ghostItem: GhostItemInfo;
+    layoutStyle: any;
+    index: number;
+    templateSize: number;
+}> = ({ ghostItem, layoutStyle, index, templateSize }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [itemDimensions, setItemDimensions] = useState({ width: 50, height: 50 });
+    const hasLoadedRef = React.useRef(false);
+    const imageOpacity = useSharedValue(0);
+    const skeletonOpacity = useSharedValue(1);
+
+    const imageAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacity.value,
+    }));
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacity.value,
+    }));
+
+    const handleLoad = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLoadStart = () => {
+        if (!hasLoadedRef.current) {
+            setIsLoading(true);
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLayout = (event: any) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        if (w > 0 && h > 0) {
+            setItemDimensions({ width: w, height: h });
+        }
+    };
+
+    if (!ghostItem.imageUrl) {
+        return (
+            <Animated.View style={[styles.templatePreviewImageContainer, layoutStyle]}>
+                <IconSymbol name="photo" size={32} color={colors.labels.secondary} />
+            </Animated.View>
+        );
+    }
+
+    return (
+        <Animated.View style={[styles.templatePreviewImageContainer, layoutStyle]} onLayout={handleLayout}>
+            {(isLoading || skeletonOpacity.value > 0) && (
+                <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
+                    <ImageSkeleton width={itemDimensions.width} height={itemDimensions.height} borderRadius={0} variant="rectangular" />
+                </Animated.View>
+            )}
+            <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle]}>
+                <Image source={{ uri: ghostItem.imageUrl }} style={styles.templatePreviewImage} contentFit="contain" onLoadStart={handleLoadStart} onLoad={handleLoad} onError={handleError} />
+            </Animated.View>
+        </Animated.View>
+    );
+};
 
 // Helper function to select layout pattern based on item count if not provided
 const getDefaultLayoutPattern = (itemCount: number): LayoutPattern => {
@@ -131,17 +204,49 @@ export default function TemplateSelectScreen() {
                     if (templateGosts && Array.isArray(templateGosts) && templateGosts.length > 0) {
                         // Use gosts array if cells are empty
                         ghostItems.push(
-                            ...templateGosts.map((gost: TemplateGost) => ({
-                                gostId: String(gost.id),
-                                // gost_image.url for overlay center
-                                imageUrl: gost.gost_image || null,
-                                // image.url for sample modal
-                                sampleImageUrl: gost.image || null,
-                                // icon.url for thumbnails
-                                iconUrl: gost.icon || null,
-                                name: gost.name,
-                                description: gost.description || null,
-                            })),
+                            ...templateGosts.map((gost: TemplateGost) => {
+                                // Handle gost_image - can be object with url or string
+                                let gostImageUrl: string | null = null;
+                                if (gost.gost_image) {
+                                    if (typeof gost.gost_image === "string") {
+                                        gostImageUrl = gost.gost_image;
+                                    } else if (typeof gost.gost_image === "object" && "url" in gost.gost_image) {
+                                        gostImageUrl = (gost.gost_image as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                // Handle image - can be object with url or string
+                                let imageUrl: string | null = null;
+                                if (gost.image) {
+                                    if (typeof gost.image === "string") {
+                                        imageUrl = gost.image;
+                                    } else if (typeof gost.image === "object" && "url" in gost.image) {
+                                        imageUrl = (gost.image as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                // Handle icon - can be object with url or string
+                                let iconUrl: string | null = null;
+                                if (gost.icon) {
+                                    if (typeof gost.icon === "string") {
+                                        iconUrl = gost.icon;
+                                    } else if (typeof gost.icon === "object" && "url" in gost.icon) {
+                                        iconUrl = (gost.icon as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                return {
+                                    gostId: String(gost.id),
+                                    // gost_image.url for overlay center
+                                    imageUrl: gostImageUrl,
+                                    // image.url for sample modal
+                                    sampleImageUrl: imageUrl,
+                                    // icon.url for thumbnails
+                                    iconUrl: iconUrl,
+                                    name: gost.name,
+                                    description: gost.description || null,
+                                };
+                            }),
                         );
                     }
                 }
@@ -200,17 +305,49 @@ export default function TemplateSelectScreen() {
                     if (templateGosts && Array.isArray(templateGosts) && templateGosts.length > 0) {
                         // Use gosts array if cells are empty
                         ghostItems.push(
-                            ...templateGosts.map((gost: TemplateGost) => ({
-                                gostId: String(gost.id),
-                                // gost_image.url for overlay center
-                                imageUrl: gost.gost_image || null,
-                                // image.url for sample modal
-                                sampleImageUrl: gost.image || null,
-                                // icon.url for thumbnails
-                                iconUrl: gost.icon || null,
-                                name: gost.name,
-                                description: gost.description || null,
-                            })),
+                            ...templateGosts.map((gost: TemplateGost) => {
+                                // Handle gost_image - can be object with url or string
+                                let gostImageUrl: string | null = null;
+                                if (gost.gost_image) {
+                                    if (typeof gost.gost_image === "string") {
+                                        gostImageUrl = gost.gost_image;
+                                    } else if (typeof gost.gost_image === "object" && "url" in gost.gost_image) {
+                                        gostImageUrl = (gost.gost_image as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                // Handle image - can be object with url or string
+                                let imageUrl: string | null = null;
+                                if (gost.image) {
+                                    if (typeof gost.image === "string") {
+                                        imageUrl = gost.image;
+                                    } else if (typeof gost.image === "object" && "url" in gost.image) {
+                                        imageUrl = (gost.image as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                // Handle icon - can be object with url or string
+                                let iconUrl: string | null = null;
+                                if (gost.icon) {
+                                    if (typeof gost.icon === "string") {
+                                        iconUrl = gost.icon;
+                                    } else if (typeof gost.icon === "object" && "url" in gost.icon) {
+                                        iconUrl = (gost.icon as { url?: string }).url || null;
+                                    }
+                                }
+                                
+                                return {
+                                    gostId: String(gost.id),
+                                    // gost_image.url for overlay center
+                                    imageUrl: gostImageUrl,
+                                    // image.url for sample modal
+                                    sampleImageUrl: imageUrl,
+                                    // icon.url for thumbnails
+                                    iconUrl: iconUrl,
+                                    name: gost.name,
+                                    description: gost.description || null,
+                                };
+                            }),
                         );
                     }
                 }
@@ -326,11 +463,7 @@ export default function TemplateSelectScreen() {
                                 ? // Show actual ghost items if available
                                   item.ghostItems.map((ghostItem: GhostItemInfo, idx: number) => {
                                       const layoutStyle = getItemLayoutStyle(idx, item.ghostItems.length, layoutPattern, TEMPLATE_SIZE);
-                                      return (
-                                          <Animated.View key={idx} style={[styles.templatePreviewImageContainer, layoutStyle]}>
-                                              {ghostItem.imageUrl ? <Image source={{ uri: ghostItem.imageUrl }} style={styles.templatePreviewImage} contentFit="contain" /> : <IconSymbol name="photo" size={32} color={colors.labels.secondary} />}
-                                          </Animated.View>
-                                      );
+                                      return <TemplatePreviewImageItem key={idx} ghostItem={ghostItem} layoutStyle={layoutStyle} index={idx} templateSize={TEMPLATE_SIZE} />;
                                   })
                                 : // Show placeholder images for practice templates that don't have ghostItems in list response
                                   Array.from({ length: item.previewCount }).map((_, idx: number) => {
@@ -381,16 +514,6 @@ export default function TemplateSelectScreen() {
                     </View>
                 )}
 
-                {/* Loading State */}
-                {(isLoadingGlobalTemplates || isLoadingPracticeTemplates) && !isGlobalTemplatesError && !isPracticeTemplatesError && (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={MINT_COLOR} />
-                        <BaseText type="Body" style={{ marginTop: 12 }} color="labels.secondary">
-                            Loading templates...
-                        </BaseText>
-                    </View>
-                )}
-
                 {/* Custom Templates Section */}
                 {!isLoadingPracticeTemplates && allCustomTemplates.length > 0 && (
                     <>
@@ -415,6 +538,38 @@ export default function TemplateSelectScreen() {
                                             <React.Fragment key={item.id}>{renderTemplateItem({ item, index: rowIndex * 2 + itemIndex })}</React.Fragment>
                                         ))}
                                         {row.length === 1 && <View style={styles.templateCard} />}
+                                    </View>
+                                ))}
+                        </View>
+                    </>
+                )}
+
+                {/* Loading State for Ready Templates */}
+                {isLoadingGlobalTemplates && !isGlobalTemplatesError && (
+                    <>
+                        <View style={styles.sectionHeader}>
+                            <BaseText type="Headline" weight={600} color="labels.primary">
+                                Ready Templates
+                            </BaseText>
+                        </View>
+                        <View style={styles.templatesGrid}>
+                            {[1, 2, 3, 4]
+                                .reduce((rows: number[][], item, index) => {
+                                    if (index % 2 === 0) {
+                                        rows.push([item]);
+                                    } else {
+                                        rows[rows.length - 1].push(item);
+                                    }
+                                    return rows;
+                                }, [])
+                                .map((row, rowIndex) => (
+                                    <View key={`skeleton-row-${rowIndex}`} style={styles.templateRow}>
+                                        {row.map((i) => (
+                                            <View key={i} style={styles.skeletonCardContainer}>
+                                                <ImageSkeleton width={TEMPLATE_SIZE} height={TEMPLATE_SIZE} borderRadius={16} variant="rectangular" />
+                                            </View>
+                                        ))}
+                                        {row.length === 1 && <View style={styles.skeletonCardContainer} />}
                                     </View>
                                 ))}
                         </View>
@@ -586,9 +741,13 @@ const styles = StyleSheet.create({
     },
     loadingContainer: {
         flex: 1,
-        justifyContent: "center",
+        paddingVertical: 0,
+    },
+    skeletonCardContainer: {
+        width: TEMPLATE_SIZE,
+        height: TEMPLATE_SIZE,
         alignItems: "center",
-        paddingVertical: 60,
+        justifyContent: "center",
     },
     emptyContainer: {
         flex: 1,

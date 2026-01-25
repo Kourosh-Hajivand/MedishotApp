@@ -1,5 +1,6 @@
 import { GHOST_ASSETS } from "@/assets/gost/ghostAssets";
 import { BaseText, ErrorState } from "@/components";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useGetGosts } from "@/utils/hook/useGost";
@@ -10,13 +11,15 @@ import { PracticeTemplateResponse } from "@/utils/service/models/ResponseModels"
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LAYOUT_PATTERNS_2_ITEMS, LAYOUT_PATTERNS_3_ITEMS, LAYOUT_PATTERNS_4_ITEMS, LAYOUT_PATTERNS_5_ITEMS, LAYOUT_PATTERNS_6_ITEMS, LAYOUT_PATTERNS_7_ITEMS, LAYOUT_PATTERNS_8_ITEMS, LAYOUT_PATTERNS_9_ITEMS, MINT_COLOR } from "./_components/create-template/constants";
 import { LayoutPatternSelector } from "./_components/create-template/LayoutPatternSelector";
 import { PreviewCanvas } from "./_components/create-template/PreviewCanvas";
 import { TemplateItemList } from "./_components/create-template/TemplateItemList";
 import { LayoutPattern, TemplateItem } from "./_components/create-template/types";
+
+const { width } = Dimensions.get("window");
 
 export default function CreateTemplateScreen() {
     const insets = useSafeAreaInsets();
@@ -202,6 +205,15 @@ export default function CreateTemplateScreen() {
                     Custom Templates
                 </BaseText>
 
+                {/* Test Button - Uncomment when needed */}
+                {/* <TouchableOpacity
+                    onPress={() => {
+                        router.push("/camera/test-skeletons" as any);
+                    }}
+                    style={styles.testButton}
+                >
+                    <IconSymbol name="square.grid.2x2" size={20} color={colors.labels.secondary} />
+                </TouchableOpacity> */}
                 <View style={{ width: 36 }} />
             </View>
 
@@ -215,15 +227,26 @@ export default function CreateTemplateScreen() {
 
                 {isLoadingGosts ? (
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="large" color={MINT_COLOR} />
+                        {/* Skeleton for preview canvas */}
+                        <View style={styles.skeletonPreviewContainer}>
+                            <View style={styles.skeletonPreviewBox}>
+                                <ImageSkeleton width={width - 40} height={(width - 40) * 0.92} borderRadius={16} variant="rectangular" />
+                            </View>
+                        </View>
+                        {/* Skeleton for items list */}
+                        <View style={styles.skeletonItemsContainer}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.skeletonScrollContent}>
+                                {[1, 2, 3, 4, 5, 6].map((i) => (
+                                    <View key={i} style={styles.skeletonItemCard}>
+                                        <ImageSkeleton width={102} height={102} borderRadius={16} variant="rectangular" />
+                                    </View>
+                                ))}
+                            </ScrollView>
+                        </View>
                     </View>
                 ) : isGostsError ? (
                     <View style={styles.loadingContainer}>
-                        <ErrorState
-                            title="Failed to load items"
-                            message={gostsError instanceof Error ? gostsError.message : (gostsError as { message?: string })?.message || "Failed to load items. Please try again."}
-                            onRetry={refetchGosts}
-                        />
+                        <ErrorState title="Failed to load items" message={gostsError instanceof Error ? gostsError.message : (gostsError as { message?: string })?.message || "Failed to load items. Please try again."} onRetry={refetchGosts} />
                     </View>
                 ) : (
                     <>
@@ -277,6 +300,14 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    testButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: colors.system.gray6,
+        justifyContent: "center",
+        alignItems: "center",
+    },
     content: {
         flex: 1,
     },
@@ -313,8 +344,28 @@ const styles = StyleSheet.create({
     },
     loadingContainer: {
         flex: 1,
-        justifyContent: "center",
         alignItems: "center",
         minHeight: 200,
+    },
+    skeletonPreviewContainer: {
+        alignItems: "center",
+        marginBottom: 44,
+    },
+    skeletonPreviewBox: {
+        width: width - 40,
+        height: (width - 40) * 0.92,
+        borderRadius: 16,
+        overflow: "hidden",
+    },
+    skeletonItemsContainer: {
+        marginBottom: 24,
+    },
+    skeletonScrollContent: {
+        paddingHorizontal: 0,
+        gap: 18,
+    },
+    skeletonItemCard: {
+        width: 102,
+        height: 102,
     },
 });

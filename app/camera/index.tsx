@@ -1,6 +1,7 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
 import { BaseButton, BaseText, ErrorState } from "@/components";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
@@ -33,6 +34,164 @@ const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
 ];
 
 const GHOST_ITEMS_MAP = GHOST_ASSETS;
+
+// Type definition for ghost item data
+type GhostItemData = {
+    gostId: string;
+    imageUrl?: string | null; // gost_image.url - for overlay center
+    sampleImageUrl?: string | null; // image.url - for sample modal
+    iconUrl?: string | null; // icon.url - for thumbnails
+    name?: string;
+    description?: string | null;
+};
+
+// Separate component for ghost overlay with loading skeleton
+const GhostOverlay: React.FC<{
+    ghostImageSource: { uri: string } | any;
+}> = ({ ghostImageSource }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [overlayDimensions, setOverlayDimensions] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
+    const hasLoadedRef = React.useRef(false);
+    const imageOpacity = useSharedValue(0);
+    const skeletonOpacity = useSharedValue(1);
+
+    const imageAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacity.value,
+    }));
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacity.value,
+    }));
+
+    const handleLoad = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLoadStart = () => {
+        if (!hasLoadedRef.current) {
+            setIsLoading(true);
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLayout = (event: any) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        if (w > 0 && h > 0) {
+            setOverlayDimensions({ width: w, height: h });
+        }
+    };
+
+    return (
+        <View style={[styles.ghostOverlay, StyleSheet.absoluteFill]} onLayout={handleLayout}>
+            {(isLoading || skeletonOpacity.value > 0) && (
+                <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
+                    <ImageSkeleton width={overlayDimensions.width} height={overlayDimensions.height} borderRadius={0} variant="rectangular" />
+                </Animated.View>
+            )}
+            <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle]}>
+                <Image source={ghostImageSource} style={styles.ghostImage} contentFit="contain" onLoadStart={handleLoadStart} onLoad={handleLoad} onError={handleError} />
+            </Animated.View>
+        </View>
+    );
+};
+
+// Separate component for thumbnail icon with loading skeleton
+const ThumbnailIconItem: React.FC<{
+    ghostItem: GhostItemData;
+    index: number;
+    isActive: boolean;
+    isCompleted: boolean;
+    photo: CapturedPhoto | undefined;
+    onPress: () => void;
+}> = ({ ghostItem, index, isActive, isCompleted, photo, onPress }) => {
+    const ghostId = ghostItem.gostId;
+    const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
+    const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
+
+    const [isLoading, setIsLoading] = useState(true);
+    const [iconDimensions, setIconDimensions] = useState({ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE });
+    const hasLoadedRef = React.useRef(false);
+    const imageOpacity = useSharedValue(0);
+    const skeletonOpacity = useSharedValue(1);
+
+    const imageAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacity.value,
+    }));
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacity.value,
+    }));
+
+    const handleLoad = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLoadStart = () => {
+        if (!hasLoadedRef.current) {
+            setIsLoading(true);
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLayout = (event: any) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        if (w > 0 && h > 0) {
+            setIconDimensions({ width: w, height: h });
+        }
+    };
+
+    return (
+        <TouchableOpacity onPress={onPress} style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}>
+            {photo ? (
+                <>
+                    <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
+                    <View style={styles.thumbnailCheck}>
+                        <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
+                    </View>
+                </>
+            ) : iconSource ? (
+                <View style={styles.thumbnailIconContainer} onLayout={handleLayout}>
+                    {(isLoading || skeletonOpacity.value > 0) && (
+                        <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
+                            <ImageSkeleton width={iconDimensions.width} height={iconDimensions.height} borderRadius={8} variant="rectangular" />
+                        </Animated.View>
+                    )}
+                    <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle]}>
+                        <Image source={iconSource} style={styles.thumbnailIcon} contentFit="contain" onLoadStart={handleLoadStart} onLoad={handleLoad} onError={handleError} />
+                    </Animated.View>
+                </View>
+            ) : (
+                <View style={styles.thumbnailPlaceholder}>
+                    <BaseText type="Caption2" color="labels.tertiary">
+                        {index + 1}
+                    </BaseText>
+                </View>
+            )}
+        </TouchableOpacity>
+    );
+};
 
 export default function CameraScreen() {
     const insets = useSafeAreaInsets();
@@ -103,28 +262,51 @@ export default function CameraScreen() {
         } else if (template.gosts && Array.isArray(template.gosts) && template.gosts.length > 0) {
             // Fallback to gosts array (backward compatibility)
             items.push(
-                ...template.gosts.map((gost: TemplateGost) => ({
-                    gostId: String(gost.id),
-                    imageUrl: gost.gost_image || null,
-                    sampleImageUrl: gost.image || null,
-                    iconUrl: gost.icon || null,
-                    name: gost.name,
-                    description: gost.description || null,
-                })),
+                ...template.gosts.map((gost: TemplateGost) => {
+                    // Handle gost_image - can be object with url or string
+                    let gostImageUrl: string | null = null;
+                    if (gost.gost_image) {
+                        if (typeof gost.gost_image === "string") {
+                            gostImageUrl = gost.gost_image;
+                        } else if (typeof gost.gost_image === "object" && "url" in gost.gost_image) {
+                            gostImageUrl = (gost.gost_image as { url?: string }).url || null;
+                        }
+                    }
+
+                    // Handle image - can be object with url or string
+                    let imageUrl: string | null = null;
+                    if (gost.image) {
+                        if (typeof gost.image === "string") {
+                            imageUrl = gost.image;
+                        } else if (typeof gost.image === "object" && "url" in gost.image) {
+                            imageUrl = (gost.image as { url?: string }).url || null;
+                        }
+                    }
+
+                    // Handle icon - can be object with url or string
+                    let iconUrl: string | null = null;
+                    if (gost.icon) {
+                        if (typeof gost.icon === "string") {
+                            iconUrl = gost.icon;
+                        } else if (typeof gost.icon === "object" && "url" in gost.icon) {
+                            iconUrl = (gost.icon as { url?: string }).url || null;
+                        }
+                    }
+
+                    return {
+                        gostId: String(gost.id),
+                        imageUrl: gostImageUrl,
+                        sampleImageUrl: imageUrl,
+                        iconUrl: iconUrl,
+                        name: gost.name,
+                        description: gost.description || null,
+                    };
+                }),
             );
         }
 
         return items;
     }, [templateData]);
-
-    type GhostItemData = {
-        gostId: string;
-        imageUrl?: string | null; // gost_image.url - for overlay center
-        sampleImageUrl?: string | null; // image.url - for sample modal
-        iconUrl?: string | null; // icon.url - for thumbnails
-        name?: string;
-        description?: string | null;
-    };
 
     const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
 
@@ -483,46 +665,28 @@ export default function CameraScreen() {
         }
     }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, uploadToTemp]);
 
-    const renderThumbnailItem = useCallback(({ item: ghostItem, index }: { item: GhostItemData; index: number }) => {
-        const ghostId = ghostItem.gostId;
-        const photo = capturedPhotos.find((p) => p.templateId === ghostId);
-        const isActive = index === currentGhostIndex;
-        const isCompleted = !!photo;
-        // Use iconUrl (icon.url) for thumbnails, fallback to local icon
-        const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
-        return (
-            <TouchableOpacity
-                onPress={() => {
-                    setCurrentGhostIndex(index);
-                }}
-                style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}
-            >
-                {photo ? (
-                    <>
-                        <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
-                        <View style={styles.thumbnailCheck}>
-                            <IconSymbol name="checkmark.circle.fill" size={16} color={MINT_COLOR} />
-                        </View>
-                    </>
-                ) : iconSource ? (
-                    <Image
-                        source={iconSource}
-                        style={styles.thumbnailIcon}
-                        contentFit="contain"
-                        onError={() => {
-                            // Icon load error - fallback handled by placeholder
-                        }}
-                    />
-                ) : (
-                    <View style={styles.thumbnailPlaceholder}>
-                        <BaseText type="Caption2" color="labels.tertiary">
-                            {index + 1}
-                        </BaseText>
-                    </View>
-                )}
-            </TouchableOpacity>
-        );
-    }, [capturedPhotos, currentGhostIndex]);
+    const renderThumbnailItem = useCallback(
+        ({ item: ghostItem, index }: { item: GhostItemData; index: number }) => {
+            const ghostId = ghostItem.gostId;
+            const photo = capturedPhotos.find((p) => p.templateId === ghostId);
+            const isActive = index === currentGhostIndex;
+            const isCompleted = !!photo;
+
+            return (
+                <ThumbnailIconItem
+                    ghostItem={ghostItem}
+                    index={index}
+                    isActive={isActive}
+                    isCompleted={isCompleted}
+                    photo={photo}
+                    onPress={() => {
+                        setCurrentGhostIndex(index);
+                    }}
+                />
+            );
+        },
+        [capturedPhotos, currentGhostIndex],
+    );
 
     const handleClose = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -702,11 +866,7 @@ export default function CameraScreen() {
                         )}
 
                         {/* Ghost Overlay */}
-                        {currentGhostImage && (
-                            <View style={[styles.ghostOverlay, StyleSheet.absoluteFill]}>
-                                <Image source={currentGhostImage} style={styles.ghostImage} contentFit="contain" />
-                            </View>
-                        )}
+                        {currentGhostImage && <GhostOverlay ghostImageSource={currentGhostImage} />}
                     </>
                 )}
             </View>
@@ -1209,6 +1369,11 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         overflow: "hidden",
+    },
+    thumbnailIconContainer: {
+        width: "100%",
+        height: "100%",
+        position: "relative",
     },
     thumbnailIcon: {
         width: "100%",

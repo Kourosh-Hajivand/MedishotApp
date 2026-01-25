@@ -1,7 +1,9 @@
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { Image } from "expo-image";
-import React from "react";
+import React, { useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MINT_COLOR } from "./constants";
 import { TemplateItem } from "./types";
 
@@ -12,6 +14,94 @@ interface TemplateItemListProps {
     maxSelection?: number;
 }
 
+// Separate component for template item to properly use hooks
+const TemplateItemCard: React.FC<{
+    item: TemplateItem;
+    isSelected: boolean;
+    isDisabled: boolean;
+    onToggle: () => void;
+}> = ({ item, isSelected, isDisabled, onToggle }) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [imageContainerDimensions, setImageContainerDimensions] = useState({ width: 87, height: 87 }); // 85% of 102
+    const hasLoadedRef = React.useRef(false); // Track if image has been loaded at least once
+    const imageOpacity = useSharedValue(0);
+    const skeletonOpacity = useSharedValue(1);
+
+    const imageAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: imageOpacity.value,
+    }));
+
+    const skeletonAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: skeletonOpacity.value,
+    }));
+
+    const handleLoad = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleLoadStart = () => {
+        // Only show skeleton if image hasn't been loaded before
+        if (!hasLoadedRef.current) {
+            setIsLoading(true);
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    };
+
+    const handleError = () => {
+        hasLoadedRef.current = true;
+        setIsLoading(false);
+        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        imageOpacity.value = withTiming(1, { duration: 300 });
+    };
+
+    const handleImageContainerLayout = (event: any) => {
+        const { width: w, height: h } = event.nativeEvent.layout;
+        if (w > 0 && h > 0) {
+            setImageContainerDimensions({ width: w, height: h });
+        }
+    };
+
+    // Check if image is from asset (not URL) - assets load immediately
+    const isAssetImage = typeof item.image !== "string";
+    
+    // For asset images, start with skeleton visible
+    React.useEffect(() => {
+        if (isAssetImage && !hasLoadedRef.current) {
+            // Asset images might load immediately, so we show skeleton initially
+            imageOpacity.value = 0;
+            skeletonOpacity.value = 1;
+        }
+    }, [isAssetImage]);
+
+    return (
+        <TouchableOpacity style={[styles.card, isSelected && styles.cardSelected]} onPress={onToggle} activeOpacity={0.8} disabled={isDisabled}>
+            <View style={[styles.itemContainer, isSelected && styles.itemContainerSelected, isDisabled && styles.itemContainerDisabled]}>
+                <View style={styles.imageContainer} onLayout={handleImageContainerLayout}>
+                    {(isLoading || skeletonOpacity.value > 0) && (
+                        <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
+                            <ImageSkeleton width={imageContainerDimensions.width} height={imageContainerDimensions.height} borderRadius={0} variant="rectangular" />
+                        </Animated.View>
+                    )}
+                    <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle]}>
+                        <Image
+                            source={typeof item.image === "string" ? { uri: item.image } : item.image}
+                            style={[styles.image, isDisabled && styles.imageDisabled]}
+                            contentFit="contain"
+                            onLoadStart={handleLoadStart}
+                            onLoad={handleLoad}
+                            onError={handleError}
+                        />
+                    </Animated.View>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+};
+
 export const TemplateItemList: React.FC<TemplateItemListProps> = ({ items, selectedItems, onToggle, maxSelection = 9 }) => {
     return (
         <View style={styles.container}>
@@ -19,15 +109,7 @@ export const TemplateItemList: React.FC<TemplateItemListProps> = ({ items, selec
                 {items.map((item) => {
                     const isSelected = selectedItems.includes(item.id);
                     const isDisabled = !isSelected && selectedItems.length >= maxSelection;
-                    return (
-                        <TouchableOpacity key={item.id} style={[styles.card, isSelected && styles.cardSelected]} onPress={() => onToggle(item.id)} activeOpacity={0.8} disabled={isDisabled}>
-                            <View style={[styles.itemContainer, isSelected && styles.itemContainerSelected, isDisabled && styles.itemContainerDisabled]}>
-                                <View style={styles.imageContainer}>
-                                    <Image source={typeof item.image === "string" ? { uri: item.image } : item.image} style={[styles.image, isDisabled && styles.imageDisabled]} contentFit="contain" />
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-                    );
+                    return <TemplateItemCard key={item.id} item={item} isSelected={isSelected} isDisabled={isDisabled} onToggle={() => onToggle(item.id)} />;
                 })}
             </ScrollView>
         </View>
