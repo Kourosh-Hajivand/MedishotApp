@@ -87,17 +87,21 @@ export const AlbumScreen: React.FC = () => {
                     // Type guard: check if mediaItem has template property
                     // PatientMedia can have template in data field or as extended property
                     const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
-                    
+
                     // Add all media items (both template and non-template) to rawMediaData
                     // This ensures taker and created_at are available for all media items
                     const rawItem: RawMediaDataItem = {
                         id: mediaItem.id,
-                        template: mediaWithTemplate.template ? {
-                            id: (mediaWithTemplate.template as { id?: number | string }).id || mediaItem.id,
-                        } as { id: number | string; [key: string]: any } : null,
-                        original_media: mediaWithTemplate.original_media ? {
-                            url: mediaWithTemplate.original_media.url,
-                        } : null,
+                        template: mediaWithTemplate.template
+                            ? ({
+                                  id: (mediaWithTemplate.template as { id?: number | string }).id || mediaItem.id,
+                              } as { id: number | string; [key: string]: any })
+                            : null,
+                        original_media: mediaWithTemplate.original_media
+                            ? {
+                                  url: mediaWithTemplate.original_media.url,
+                              }
+                            : null,
                         taker: mediaWithTemplate.taker || null,
                         created_at: mediaWithTemplate.created_at ? mediaWithTemplate.created_at : undefined,
                         images: mediaWithTemplate.images ? (mediaWithTemplate.images as any[]) : undefined,
@@ -135,7 +139,7 @@ export const AlbumScreen: React.FC = () => {
                 // Type guard: check if mediaItem has template property
                 // PatientMedia can have template in data field or as extended property
                 const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
-                const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === 'object' && 'template' in mediaWithTemplate.data);
+                const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === "object" && "template" in mediaWithTemplate.data);
 
                 // If media has a template, only show original_media in gallery (not individual images)
                 if (hasTemplate && mediaItem.original_media?.url) {
@@ -156,7 +160,7 @@ export const AlbumScreen: React.FC = () => {
                     }
                 } else if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
                     // For non-template media, show all images
-                    mediaWithTemplate.images.forEach((imageItem: typeof mediaWithTemplate.images[0]) => {
+                    mediaWithTemplate.images.forEach((imageItem: (typeof mediaWithTemplate.images)[0]) => {
                         const imageGostId = imageItem?.gost?.id;
                         if (imageGostId && imageItem?.image && gostMap.has(imageGostId)) {
                             // Add the image Media object
@@ -523,7 +527,7 @@ export const AlbumScreen: React.FC = () => {
                             </LinearGradient>
                         </Animated.View>
                     ) : (
-                        <View className="px-5">
+                        <View className="px-5 pt-12">
                             <View className="bg-[#5856D6] p-5 rounded-2xl ">
                                 <View className="w-full  items-center gap-4 flex-row">
                                     <View style={styles.cardImagesContainer}>

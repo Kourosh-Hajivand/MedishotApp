@@ -74,6 +74,8 @@ interface ImageViewerModalProps {
     rawMediaData?: RawMediaData[];
     // Display description option: "Date" to show when photo was taken, "taker" to show who took it
     description?: "Date" | "taker";
+    // Callback for restore action (for archived media)
+    onRestore?: (imageUri: string) => void;
 }
 
 interface ThumbnailItemProps {
@@ -286,8 +288,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
     rawMediaData,
     description = "taker",
+    onRestore,
 }) => {
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false } = actions;
 
     // Build maps from mediaData if provided, otherwise use legacy maps
     const { imageUrlToMediaIdMapInternal, imageUrlToBookmarkMapInternal, imageUrlToCreatedAtMapInternal, imagesList } = React.useMemo(() => {
@@ -966,6 +969,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         ]);
     };
 
+    const handleRestorePress = () => {
+        const currentImageUri = imagesList[currentIndex];
+        if (onRestore) {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onRestore(currentImageUri);
+        }
+    };
+
     const handleSharePress = async () => {
         const currentImageUri = imagesList[currentIndex];
         try {
@@ -1427,6 +1438,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                             ]}
                                         >
                                             <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="archivebox" variant="plain" role="destructive" controlSize="large" onPress={handleArchivePress} />
+                                        </HStack>
+                                    )}
+                                    {showRestore && <Spacer />}
+                                    {showRestore && (
+                                        <HStack
+                                            alignment="center"
+                                            modifiers={[
+                                                padding({ all: 0 }),
+                                                frame({ width: 48, height: 48 }),
+                                                glassEffect({
+                                                    glass: {
+                                                        variant: "regular",
+                                                    },
+                                                }),
+                                            ]}
+                                        >
+                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="arrow.uturn.backward" variant="plain" controlSize="large" onPress={handleRestorePress} />
                                         </HStack>
                                     )}
                                 </HStack>

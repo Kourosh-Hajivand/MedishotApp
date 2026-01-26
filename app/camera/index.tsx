@@ -1,8 +1,8 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
 import { BaseButton, BaseText, ErrorState } from "@/components";
-import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import Avatar from "@/components/avatar";
+import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook/useMedia";
@@ -15,9 +15,11 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
 import { router, useLocalSearchParams } from "expo-router";
+import { DeviceMotion } from "expo-sensors";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -326,6 +328,69 @@ export default function CameraScreen() {
         zoomLevel: 0,
     });
 
+    // Level indicator state (horizon line)
+    const [levelAngle, setLevelAngle] = useState(0);
+    const LEVEL_THRESHOLD = 2; // Degrees - consider level if within 2 degrees
+
+    // Zoom state
+    const baseZoom = useSharedValue(0);
+    const pinchScale = useSharedValue(1);
+    const savedZoom = useSharedValue(0);
+    const MIN_ZOOM = 0;
+    const MAX_ZOOM = 1; // expo-camera zoom is 0-1
+
+    // Focus point state
+    const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
+    const focusPointOpacity = useSharedValue(0);
+    const levelLineOpacity = useSharedValue(1); // Start visible
+
+    // Helper function to update zoom (must be called from JS thread)
+    const updateZoom = useCallback((zoom: number) => {
+        setCameraState((prev) => ({ ...prev, zoomLevel: zoom }));
+    }, []);
+
+    // Pinch gesture for zoom
+    const pinchGesture = Gesture.Pinch()
+        .onStart(() => {
+            savedZoom.value = baseZoom.value;
+        })
+        .onUpdate((e) => {
+            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, savedZoom.value * e.scale));
+            baseZoom.value = newZoom;
+            runOnJS(updateZoom)(newZoom);
+        })
+        .onEnd(() => {
+            // Clamp final zoom value
+            const finalZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, baseZoom.value));
+            baseZoom.value = finalZoom;
+            runOnJS(updateZoom)(finalZoom);
+        });
+
+    // Tap gesture for focus
+    const tapGesture = Gesture.Tap().onEnd((e) => {
+        // Calculate focus point relative to camera view
+        const focusX = e.x;
+        const focusY = e.y;
+
+        // Update focus point on JS thread
+        runOnJS(setFocusPoint)({ x: focusX, y: focusY });
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+
+        // Animate focus indicator
+        focusPointOpacity.value = withSequence(withTiming(1, { duration: 200 }), withTiming(0, { duration: 800 }));
+    });
+
+    // Combined gesture - pinch and tap
+    const combinedGesture = Gesture.Race(pinchGesture, tapGesture);
+
+    const focusIndicatorStyle = useAnimatedStyle(() => ({
+        opacity: focusPointOpacity.value,
+    }));
+
+    const levelLineAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: levelLineOpacity.value,
+    }));
+
     const [isCapturing, setIsCapturing] = useState(false);
     // Initialize capturedPhotos from params if coming from retake, otherwise empty
     const [capturedPhotos, setCapturedPhotos] = useState<CapturedPhoto[]>(() => {
@@ -394,6 +459,66 @@ export default function CameraScreen() {
     useEffect(() => {
         currentGhostIndexRef.current = currentGhostIndex;
     }, [currentGhostIndex]);
+
+    // Device motion listener for level detection
+    useEffect(() => {
+        let subscription: { remove: () => void } | null = null;
+
+        const startDeviceMotion = async () => {
+            try {
+                const isAvailable = await DeviceMotion.isAvailableAsync();
+                if (!isAvailable) {
+                    console.log("DeviceMotion not available");
+                    return;
+                }
+
+                // Set update interval to 100ms for smooth updates
+                DeviceMotion.setUpdateInterval(100);
+
+                subscription = DeviceMotion.addListener((deviceMotionData) => {
+                    if (!deviceMotionData.rotation) {
+                        return;
+                    }
+
+                    // Use beta (pitch) for portrait mode level detection
+                    // Beta represents rotation around X-axis (forward/backward tilt)
+                    const beta = deviceMotionData.rotation.beta;
+
+                    // Convert radians to degrees
+                    const angleDegrees = (beta * 180) / Math.PI;
+
+                    // Clamp angle to reasonable range (-45 to +45 degrees)
+                    const clampedAngle = Math.max(-45, Math.min(45, angleDegrees));
+
+                    setLevelAngle(clampedAngle);
+                });
+            } catch (error) {
+                console.log("DeviceMotion error:", error);
+            }
+        };
+
+        startDeviceMotion();
+
+        return () => {
+            if (subscription) {
+                subscription.remove();
+            }
+        };
+    }, []);
+
+    // Update level line opacity based on level angle
+    // Show when not level, fade out when level (centered)
+    useEffect(() => {
+        const isLevel = Math.abs(levelAngle) < LEVEL_THRESHOLD;
+
+        if (isLevel) {
+            // Device is level - fade out smoothly
+            levelLineOpacity.value = withTiming(0, { duration: 500 });
+        } else {
+            // Device is not level - show line
+            levelLineOpacity.value = withTiming(1, { duration: 300 });
+        }
+    }, [levelAngle, levelLineOpacity]);
 
     // Navigate to specific ghost item when retaking a photo
     // Note: The photo is already removed in review.tsx before navigation, so we just need to navigate
@@ -587,7 +712,7 @@ export default function CameraScreen() {
                             },
                         },
                     ],
-                    { compress: 0.9,                     format: ImageManipulator.SaveFormat.JPEG }
+                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
                 );
 
                 const finalPhotoUri = croppedPhoto.uri;
@@ -723,7 +848,15 @@ export default function CameraScreen() {
             <View style={[styles.container, { backgroundColor: colors.system.black, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }]}>
                 <ErrorState
                     title={isPatientError ? "Failed to load patient" : "Failed to load template"}
-                    message={isPatientError ? (patientError instanceof Error ? patientError.message : ((patientError as unknown as { message?: string })?.message || "Failed to load patient data")) : (templateError instanceof Error ? templateError.message : ((templateError as unknown as { message?: string })?.message || "Failed to load template data"))}
+                    message={
+                        isPatientError
+                            ? patientError instanceof Error
+                                ? patientError.message
+                                : (patientError as unknown as { message?: string })?.message || "Failed to load patient data"
+                            : templateError instanceof Error
+                              ? templateError.message
+                              : (templateError as unknown as { message?: string })?.message || "Failed to load template data"
+                    }
                     onRetry={() => {
                         if (isPatientError) refetchPatient();
                         if (templateId && isTemplateError) refetchTemplate();
@@ -781,15 +914,15 @@ export default function CameraScreen() {
     const headerHeight = insets.top + 64; // Header: insets.top + 8 (paddingTop) + 44 (button height) + 12 (paddingBottom)
     const bottomHeight = (hasGhostItems ? 172 : 108) + insets.bottom;
     const availableHeight = SCREEN_HEIGHT - headerHeight - bottomHeight;
-    
+
     // 3:2 viewport - fit within available space while maintaining ratio
     // Calculate max viewport that fits: either full width with calculated height, or full height with calculated width
     const maxViewportHeightByWidth = SCREEN_WIDTH * ASPECT_RATIO; // Height if we use full width
     const maxViewportWidthByHeight = availableHeight / ASPECT_RATIO; // Width if we use full height
-    
+
     let viewportWidth: number;
     let viewportHeight: number;
-    
+
     if (maxViewportHeightByWidth <= availableHeight) {
         // Full width fits, use it
         viewportWidth = SCREEN_WIDTH;
@@ -799,7 +932,7 @@ export default function CameraScreen() {
         viewportHeight = availableHeight;
         viewportWidth = maxViewportWidthByHeight;
     }
-    
+
     // Center the viewport
     const viewportTop = headerHeight + (availableHeight - viewportHeight) / 2;
     const viewportLeft = (SCREEN_WIDTH - viewportWidth) / 2;
@@ -808,7 +941,28 @@ export default function CameraScreen() {
     return (
         <View style={styles.container}>
             {/* Camera View - Full screen behind everything */}
-            <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={0} />
+            <GestureDetector gesture={combinedGesture}>
+                <View style={StyleSheet.absoluteFill}>
+                    <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={cameraState.zoomLevel} />
+                    {/* Focus indicator */}
+                    {focusPoint && (
+                        <Animated.View
+                            style={[
+                                styles.focusIndicator,
+                                {
+                                    left: focusPoint.x - 50,
+                                    top: focusPoint.y - 50,
+                                },
+                                focusIndicatorStyle,
+                            ]}
+                            pointerEvents="none"
+                        >
+                            <View style={styles.focusIndicatorOuter} />
+                            <View style={styles.focusIndicatorInner} />
+                        </Animated.View>
+                    )}
+                </View>
+            </GestureDetector>
 
             {/* Top Mask - Covers area above viewport */}
             <View style={[styles.viewportMask, { top: 0, left: 0, right: 0, height: viewportTop }]} />
@@ -817,14 +971,10 @@ export default function CameraScreen() {
             <View style={[styles.viewportMask, { bottom: 0, left: 0, right: 0, height: viewportBottom }]} />
 
             {/* Left Mask - Covers area to the left of viewport (when viewport is narrower than screen) */}
-            {viewportLeft > 0 && (
-                <View style={[styles.viewportMask, { top: viewportTop, left: 0, width: viewportLeft, height: viewportHeight }]} />
-            )}
+            {viewportLeft > 0 && <View style={[styles.viewportMask, { top: viewportTop, left: 0, width: viewportLeft, height: viewportHeight }]} />}
 
             {/* Right Mask - Covers area to the right of viewport (when viewport is narrower than screen) */}
-            {viewportLeft > 0 && (
-                <View style={[styles.viewportMask, { top: viewportTop, right: 0, width: viewportLeft, height: viewportHeight }]} />
-            )}
+            {viewportLeft > 0 && <View style={[styles.viewportMask, { top: viewportTop, right: 0, width: viewportLeft, height: viewportHeight }]} />}
 
             {/* 3:2 Viewport Container */}
             <View
@@ -848,21 +998,36 @@ export default function CameraScreen() {
                 ) : (
                     <>
                         {/* Development Overlay - Border to show 3:2 capture area */}
-                        {__DEV__ && (
-                            <View
-                                style={[StyleSheet.absoluteFill, { borderWidth: 2, borderColor: "rgba(0,199,190,0.8)", borderStyle: "dashed" }]}
-                                pointerEvents="none"
-                            />
-                        )}
+                        {__DEV__ && <View style={[StyleSheet.absoluteFill, { borderWidth: 2, borderColor: "rgba(0,199,190,0.8)", borderStyle: "dashed" }]} pointerEvents="none" />}
 
-                        {/* Grid Overlay */}
+                        {/* Grid Overlay - iOS style */}
                         {cameraState.isGridEnabled && (
-                            <View style={[styles.gridContainer, StyleSheet.absoluteFill]}>
+                            <View style={[styles.gridContainer, StyleSheet.absoluteFill]} pointerEvents="none">
+                                {/* Vertical lines - Rule of Thirds */}
                                 <View style={[styles.gridLine, styles.gridVertical, { left: "33.33%" }]} />
                                 <View style={[styles.gridLine, styles.gridVertical, { left: "66.66%" }]} />
+                                {/* Horizontal lines - Rule of Thirds */}
                                 <View style={[styles.gridLine, styles.gridHorizontal, { top: "33.33%" }]} />
                                 <View style={[styles.gridLine, styles.gridHorizontal, { top: "66.66%" }]} />
                             </View>
+                        )}
+
+                        {/* Level Indicator (Horizon Line) - iOS style - Only show when grid is enabled, fades out when level */}
+                        {cameraState.isGridEnabled && (
+                            <Animated.View style={[styles.levelContainer, StyleSheet.absoluteFill, levelLineAnimatedStyle]} pointerEvents="none">
+                                {/* Level line - horizontal line in center for alignment */}
+                                <Animated.View
+                                    style={[
+                                        styles.levelLine,
+                                        {
+                                            top: "50%",
+                                            transform: [{ rotate: `${levelAngle}deg` }],
+                                        },
+                                    ]}
+                                />
+                                {/* Center dot - intersection point */}
+                                <View style={styles.levelCenterDot} />
+                            </Animated.View>
                         )}
 
                         {/* Ghost Overlay */}
@@ -1045,14 +1210,7 @@ export default function CameraScreen() {
                 {/* Ghost item thumbnails - only show when has ghost items */}
                 {hasGhostItems && (
                     <View style={styles.thumbnailsContainer}>
-                        <FlatList
-                            data={ghostItemsData}
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.thumbnailsList}
-                            keyExtractor={(item, index) => item.gostId || String(index)}
-                            renderItem={renderThumbnailItem}
-                        />
+                        <FlatList data={ghostItemsData} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailsList} keyExtractor={(item, index) => item.gostId || String(index)} renderItem={renderThumbnailItem} />
                     </View>
                 )}
 
@@ -1226,6 +1384,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         alignItems: "center",
+        zIndex: 20, // Above grid lines
         justifyContent: "center",
         paddingHorizontal: 20,
     },
@@ -1471,7 +1630,12 @@ const styles = StyleSheet.create({
     },
     gridLine: {
         position: "absolute",
-        backgroundColor: "rgba(255,255,255,0.3)",
+        backgroundColor: "rgba(255,255,255,0.25)",
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 0.5,
+        elevation: 1,
     },
     gridVertical: {
         width: 1,
@@ -1482,6 +1646,66 @@ const styles = StyleSheet.create({
         height: 1,
         left: 0,
         right: 0,
+    },
+    levelContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    levelLine: {
+        position: "absolute",
+        left: "15%",
+        right: "15%",
+        height: 1,
+        backgroundColor: "rgba(255,255,255,0.4)",
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 0.5,
+        elevation: 1,
+    },
+    levelCenterDot: {
+        position: "absolute",
+        top: "50%",
+        left: "50%",
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: "rgba(255,255,255,0.5)",
+        marginLeft: -1.5,
+        marginTop: -1.5,
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.1,
+        shadowRadius: 0.5,
+        elevation: 1,
+    },
+    focusIndicator: {
+        position: "absolute",
+        width: 100,
+        height: 100,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    focusIndicatorOuter: {
+        position: "absolute",
+        width: 80,
+        height: 80,
+        borderWidth: 2,
+        borderColor: colors.system.yellow,
+        borderRadius: 4,
+    },
+    focusIndicatorInner: {
+        position: "absolute",
+        width: 20,
+        height: 20,
+        borderWidth: 2,
+        borderColor: colors.system.yellow,
+        borderRadius: 2,
     },
     guideModalContainer: {
         flex: 1,

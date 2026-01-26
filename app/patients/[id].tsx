@@ -108,17 +108,23 @@ export default function PatientDetailsScreen() {
         patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
             const mediaId = media.id; // patient_media_id
 
-            // Type guard: check if it's PatientMediaWithTemplate
-            const isTemplateMedia = 'template' in media && 'images' in media;
+            // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
+            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
             
-            if (isTemplateMedia && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: only add original_media to map (for list display)
-                // All template images will be accessible in modal via rawMediaData
+            if (isTemplateMedia && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: add original_media to map if exists, otherwise add all images
                 const templateMedia = media as PatientMediaWithTemplate;
                 if (templateMedia.original_media?.url) {
                     map.set(templateMedia.original_media.url, mediaId);
+                } else if (Array.isArray(templateMedia.images)) {
+                    // If no original_media, add all individual images to map
+                    templateMedia.images.forEach((imageItem: any) => {
+                        if (imageItem.image?.url) {
+                            map.set(imageItem.image.url, mediaId);
+                        }
+                    });
                 }
-            } else if (!isTemplateMedia) {
+            } else {
                 // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
                 if (patientMedia.original_media?.url) {
@@ -138,18 +144,24 @@ export default function PatientDetailsScreen() {
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
 
         patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
-            // Type guard: check if it's PatientMediaWithTemplate
-            const isTemplateMedia = 'template' in media && 'images' in media;
-            const isBookmarked = !isTemplateMedia ? (media as PatientMedia).is_bookmarked ?? false : false;
+            // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
+            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
+            const isBookmarked = (media as any).is_bookmarked ?? false;
 
-            if (isTemplateMedia && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: only add original_media to bookmark map (for list display)
-                // All template images will be accessible in modal via rawMediaData
+            if (isTemplateMedia && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: add original_media to bookmark map if exists, otherwise add all images
                 const templateMedia = media as PatientMediaWithTemplate;
                 if (templateMedia.original_media?.url) {
                     map.set(templateMedia.original_media.url, isBookmarked);
+                } else if (Array.isArray(templateMedia.images)) {
+                    // If no original_media, add all individual images to bookmark map
+                    templateMedia.images.forEach((imageItem: any) => {
+                        if (imageItem.image?.url) {
+                            map.set(imageItem.image.url, isBookmarked);
+                        }
+                    });
                 }
-            } else if (!isTemplateMedia) {
+            } else {
                 // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
                 if (patientMedia.original_media?.url) {
@@ -189,13 +201,22 @@ export default function PatientDetailsScreen() {
 
             const dateImages = imagesByDate.get(dateKey)!;
 
-            // Type guard: check if it's PatientMediaWithTemplate
-            if ('template' in media && 'images' in media && media.template && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: only show original_media in list (composite image)
-                // All template images will be shown in modal when clicking on original_media
+            // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
+            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
+            
+            if (isTemplateMedia && Array.isArray(media.images)) {
+                // PatientMediaWithTemplate: show original_media if exists, otherwise show individual images
                 const templateMedia = media as PatientMediaWithTemplate;
                 if (templateMedia.original_media?.url) {
                     dateImages.push({ url: templateMedia.original_media.url, timestamp });
+                } else if (Array.isArray(templateMedia.images)) {
+                    // If no original_media, show all individual images
+                    templateMedia.images.forEach((imageItem: any) => {
+                        if (imageItem.image?.url) {
+                            const imgTimestamp = imageItem.created_at ? new Date(imageItem.created_at).getTime() : timestamp;
+                            dateImages.push({ url: imageItem.image.url, timestamp: imgTimestamp });
+                        }
+                    });
                 }
             } else {
                 // PatientMedia: use original_media or media

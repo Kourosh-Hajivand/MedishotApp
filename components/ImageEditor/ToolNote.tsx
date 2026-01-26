@@ -27,9 +27,12 @@ const PickerItem: React.FC<{
     onTextChange: (id: string, text: string) => void;
     onDelete: (id: string) => void;
     onPress: (id: string) => void;
-}> = ({ note, index, isCenter, onTextChange, onDelete, onPress }) => {
+    onSwipeStateChange?: (id: string, isSwiped: boolean) => void;
+    shouldClose?: boolean;
+}> = ({ note, index, isCenter, onTextChange, onDelete, onPress, onSwipeStateChange, shouldClose }) => {
     const translateX = useSharedValue(0);
-    const deleteOpacity = useSharedValue(0);
+    const deleteOpacity = useSharedValue(0); // Hidden by default, will show when swiped
+    const isSwipedOpen = useSharedValue(false);
 
     const panGesture = Gesture.Pan()
         .activeOffsetX([-10, 10])
@@ -38,17 +41,39 @@ const PickerItem: React.FC<{
             runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
         })
         .onUpdate((event) => {
+            // Allow both left and right swipe
             if (event.translationX < 0) {
-                translateX.value = Math.max(event.translationX, -80);
+                // Swiping left (reveal delete)
+                const maxSwipe = -100; // Increased from -80 for better visibility
+                translateX.value = Math.max(event.translationX, maxSwipe);
+                // Gradually increase delete button opacity as user swipes
+                const progress = Math.abs(event.translationX) / Math.abs(maxSwipe);
+                deleteOpacity.value = Math.min(progress, 1); // From 0 to 1.0
+            } else if (event.translationX > 0 && isSwipedOpen.value) {
+                // Swiping right (close if already swiped)
+                translateX.value = Math.min(event.translationX, 0);
+                // Decrease opacity as swiping back
+                const progress = 1 - event.translationX / 100;
+                deleteOpacity.value = Math.max(0, 1 - progress);
             }
         })
         .onEnd(() => {
-            if (translateX.value < -40) {
-                translateX.value = withTiming(-80, { duration: 200 });
+            if (translateX.value < -50) {
+                // Swipe left enough - open delete (reduced threshold from -40 to -50)
+                translateX.value = withTiming(-100, { duration: 200 }); // Increased from -80 to -100
                 deleteOpacity.value = withTiming(1, { duration: 150 });
+                isSwipedOpen.value = true;
+                if (onSwipeStateChange) {
+                    runOnJS(onSwipeStateChange)(note.id, true);
+                }
             } else {
+                // Not enough swipe or swiping right - close
                 translateX.value = withTiming(0, { duration: 200 });
                 deleteOpacity.value = withTiming(0, { duration: 150 });
+                isSwipedOpen.value = false;
+                if (onSwipeStateChange) {
+                    runOnJS(onSwipeStateChange)(note.id, false);
+                }
             }
         });
 
@@ -63,7 +88,26 @@ const PickerItem: React.FC<{
     const handleDelete = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         onDelete(note.id);
+        // Reset swipe state after delete
+        translateX.value = withTiming(0, { duration: 200 });
+        deleteOpacity.value = withTiming(0, { duration: 150 });
+        isSwipedOpen.value = false;
+        if (onSwipeStateChange) {
+            onSwipeStateChange(note.id, false);
+        }
     };
+
+    // Close swipe when parent requests it
+    useEffect(() => {
+        if (shouldClose) {
+            translateX.value = withTiming(0, { duration: 200 });
+            deleteOpacity.value = withTiming(0, { duration: 150 });
+            isSwipedOpen.value = false;
+            if (onSwipeStateChange) {
+                runOnJS(onSwipeStateChange)(note.id, false);
+            }
+        }
+    }, [shouldClose, note.id, onSwipeStateChange]);
 
     // Scale/opacity based on center state
     const scale = isCenter ? 1 : 0.9;
@@ -71,9 +115,34 @@ const PickerItem: React.FC<{
 
     return (
         <View style={styles.pickerItemWrapper}>
+            {/* Delete Button - Behind the note item */}
+            <Animated.View style={[styles.deleteButton, deleteStyle]}>
+                <Pressable onPress={handleDelete} style={styles.deleteButtonInner}>
+                    <BaseText type="Subhead" color="system.white">
+                        Delete
+                    </BaseText>
+                </Pressable>
+            </Animated.View>
+
+            {/* Note Item - On top */}
             <GestureDetector gesture={panGesture}>
                 <Animated.View style={[styles.noteItemContainer, isCenter && styles.noteItemContainerActive, { transform: [{ scale }], opacity }, animatedStyle]}>
-                    <Pressable style={styles.itemPressable} onPress={() => onPress(note.id)}>
+                    <Pressable
+                        style={styles.itemPressable}
+                        onPress={() => {
+                            // Close swipe if item is swiped when pressing
+                            if (isSwipedOpen.value) {
+                                translateX.value = withTiming(0, { duration: 200 });
+                                deleteOpacity.value = withTiming(0, { duration: 150 });
+                                isSwipedOpen.value = false;
+                                if (onSwipeStateChange) {
+                                    onSwipeStateChange(note.id, false);
+                                }
+                            } else {
+                                onPress(note.id);
+                            }
+                        }}
+                    >
                         <View style={[styles.noteNumberBadge, isCenter && styles.noteNumberBadgeActive]}>
                             <BaseText type="Body" color={isCenter ? "system.white" : "labels.secondary"} style={isCenter ? { fontWeight: "700" } : undefined}>
                                 {index + 1}
@@ -85,15 +154,6 @@ const PickerItem: React.FC<{
                     </Pressable>
                 </Animated.View>
             </GestureDetector>
-
-            {/* Delete Button */}
-            <Animated.View style={[styles.deleteButton, deleteStyle]}>
-                <Pressable onPress={handleDelete} style={styles.deleteButtonInner}>
-                    <BaseText type="Subhead" color="system.white">
-                        Delete
-                    </BaseText>
-                </Pressable>
-            </Animated.View>
         </View>
     );
 };
@@ -160,6 +220,8 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
     const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
     const isScrolling = useRef(false);
     const lastHapticIndex = useRef(-1);
+    const swipedNoteIdRef = useRef<string | null>(null);
+    const [closeSwipeForId, setCloseSwipeForId] = useState<string | null>(null);
 
     const activeNoteId = propActiveNoteId ?? null;
     const setActiveNoteId = onActiveNoteChange ?? (() => {});
@@ -206,10 +268,29 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
     );
 
     const handleItemPress = (id: string) => {
+        // Close any other swiped item first
+        if (swipedNoteIdRef.current && swipedNoteIdRef.current !== id) {
+            setCloseSwipeForId(swipedNoteIdRef.current);
+            swipedNoteIdRef.current = null;
+        }
         setActiveNoteId(id);
         setEditingNoteId(id);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     };
+
+    const handleSwipeStateChange = useCallback((id: string, isSwiped: boolean) => {
+        if (isSwiped) {
+            // Close any previously swiped item
+            if (swipedNoteIdRef.current && swipedNoteIdRef.current !== id) {
+                setCloseSwipeForId(swipedNoteIdRef.current);
+            }
+            swipedNoteIdRef.current = id;
+        } else {
+            if (swipedNoteIdRef.current === id) {
+                swipedNoteIdRef.current = null;
+            }
+        }
+    }, []);
 
     const handleCloseEdit = () => {
         setEditingNoteId(null);
@@ -218,6 +299,11 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
 
     const handleScrollBegin = () => {
         isScrolling.current = true;
+        // Close any swiped items when scrolling starts
+        if (swipedNoteIdRef.current) {
+            setCloseSwipeForId(swipedNoteIdRef.current);
+            swipedNoteIdRef.current = null;
+        }
     };
 
     const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -280,7 +366,7 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
                         nestedScrollEnabled
                     >
                         {propNotes.map((note, index) => (
-                            <PickerItem key={note.id} note={note} index={index} isCenter={index === centerIndex} onTextChange={handleTextChange} onDelete={handleDelete} onPress={handleItemPress} />
+                            <PickerItem key={note.id} note={note} index={index} isCenter={index === centerIndex} onTextChange={handleTextChange} onDelete={handleDelete} onPress={handleItemPress} onSwipeStateChange={handleSwipeStateChange} shouldClose={closeSwipeForId === note.id} />
                         ))}
                     </ScrollView>
 
@@ -400,6 +486,7 @@ const styles = StyleSheet.create({
         height: 44,
         borderWidth: 2,
         borderColor: "transparent",
+        zIndex: 1, // On top of delete button
     },
     noteItemContainerActive: {
         backgroundColor: "rgba(0, 122, 255, 0.1)",
@@ -435,6 +522,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         backgroundColor: colors.system.red,
         borderRadius: 22,
+        zIndex: 0, // Behind the note item
     },
     deleteButtonInner: {
         alignItems: "center",

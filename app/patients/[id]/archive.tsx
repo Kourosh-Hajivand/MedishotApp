@@ -92,9 +92,7 @@ export default function PatientArchiveScreen() {
         const sections = Array.from(imagesByDate.entries())
             .map(([date, { images, sectionTimestamp }]) => {
                 // Sort images within section by timestamp (newest first)
-                const sortedImages = [...images]
-                    .sort((a, b) => b.timestamp - a.timestamp)
-                    .map((item) => item.url);
+                const sortedImages = [...images].sort((a, b) => b.timestamp - a.timestamp).map((item) => item.url);
                 return {
                     title: date,
                     data: sortedImages,
@@ -117,6 +115,17 @@ export default function PatientArchiveScreen() {
             const patientMediaId = media.id; // This is the patient_media_id needed for restore
             const isBookmarked = media.is_bookmarked ?? false;
 
+            // If media has a template and original_media, add it first (this is what shows in gallery)
+            if (media.template && media.original_media?.url) {
+                const createdAt = media.created_at || media.updated_at;
+                items.push({
+                    url: media.original_media.url,
+                    mediaId: patientMediaId,
+                    isBookmarked,
+                    createdAt,
+                });
+            }
+
             // Extract image URLs from media.images array
             if (media.images && Array.isArray(media.images)) {
                 media.images.forEach((imageItem: any) => {
@@ -134,7 +143,8 @@ export default function PatientArchiveScreen() {
                 });
             }
             // Fallback to old structure for backward compatibility
-            else {
+            else if (!media.template) {
+                // Only process if no template (template case already handled above)
                 let imageUrl: string | undefined;
                 if (media.url) {
                     imageUrl = media.url;
@@ -168,11 +178,7 @@ export default function PatientArchiveScreen() {
                     <ActivityIndicator size="large" color="#007AFF" />
                 </View>
             ) : isError ? (
-                <ErrorState 
-                    message={(error as any)?.message || "Failed to load archived photos"} 
-                    onRetry={refetch} 
-                    title="Failed to load archived photos"
-                />
+                <ErrorState message={(error as any)?.message || "Failed to load archived photos"} onRetry={refetch} title="Failed to load archived photos" />
             ) : hasPhotos ? (
                 <GalleryWithMenu
                     menuItems={[
@@ -197,7 +203,8 @@ export default function PatientArchiveScreen() {
                         {
                             icon: "arrow.uturn.backward",
                             label: "Restore",
-                            role: "default",
+                            role: "destructive",
+
                             onPress: async (imageUri: string) => {
                                 const mediaItem = mediaData.find((item) => item.url === imageUri);
                                 const mediaId = mediaItem?.mediaId;
@@ -213,7 +220,8 @@ export default function PatientArchiveScreen() {
                                     },
                                     {
                                         text: "Restore",
-                                        style: "default",
+                                        style: "destructive",
+
                                         onPress: () => {
                                             restoreMediaMutation.mutate(mediaId);
                                         },
@@ -231,8 +239,33 @@ export default function PatientArchiveScreen() {
                         showEdit: false,
                         showArchive: false,
                         showShare: true,
+                        showRestore: true,
+                    }}
+                    onRestore={async (imageUri: string) => {
+                        const mediaItem = mediaData.find((item) => item.url === imageUri);
+                        const mediaId = mediaItem?.mediaId;
+                        if (!mediaId) {
+                            Alert.alert("Error", "Media ID not found");
+                            return;
+                        }
+
+                        Alert.alert("Restore Media", "Are you sure you want to restore this media?", [
+                            {
+                                text: "Cancel",
+                                style: "cancel",
+                            },
+                            {
+                                text: "Restore",
+                                style: "destructive",
+
+                                onPress: () => {
+                                    restoreMediaMutation.mutate(mediaId);
+                                },
+                            },
+                        ]);
                     }}
                     initialColumns={2}
+                    description="Date"
                     minColumns={2}
                     maxColumns={6}
                 />

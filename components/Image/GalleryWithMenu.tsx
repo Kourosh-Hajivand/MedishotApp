@@ -97,7 +97,7 @@ const GalleryImageItem: React.FC<{
                         </Animated.View>
                         {imageUrlToBookmarkMap?.get(uri) && (
                             <View style={styles.bookmarkIcon}>
-                                <IconSymbol name="bookmark.fill" size={16} color={colors.primary as any} />
+                                <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                             </View>
                         )}
                     </TouchableOpacity>
@@ -128,6 +128,7 @@ export interface ViewerActionsConfig {
     showEdit?: boolean;
     showArchive?: boolean;
     showShare?: boolean;
+    showRestore?: boolean;
 }
 
 interface MediaItem {
@@ -178,6 +179,8 @@ interface GalleryWithMenuProps {
     rawMediaData?: RawMediaData[];
     // Display description option for ImageViewerModal: "Date" to show when photo was taken, "taker" to show who took it
     description?: "Date" | "taker";
+    // Callback for restore action (for archived media)
+    onRestore?: (imageUri: string) => void;
 }
 
 const { width } = Dimensions.get("window");
@@ -198,6 +201,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
     rawMediaData,
     description = "taker",
+    onRestore,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
@@ -420,7 +424,9 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                     showEdit,
                     showArchive,
                     showShare,
+                    showRestore: !!onRestore,
                 }}
+                onRestore={onRestore}
             />
         </GestureHandlerRootView>
     );
@@ -467,6 +473,11 @@ const styles = StyleSheet.create({
         height: 24,
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        elevation: 2,
     },
     skeletonContainer: {
         position: "absolute",

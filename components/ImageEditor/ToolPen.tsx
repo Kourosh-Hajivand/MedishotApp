@@ -11,10 +11,11 @@ const PEN_COLORS = [
     { id: "red", color: "#FF3B30" },
     { id: "blue", color: "#007AFF" },
     { id: "green", color: "#34C759" },
-    { id: "mint", color: "#00C7BE" },
     { id: "pink", color: "#FF2D55" },
     { id: "yellow", color: "#FFCC00" },
     { id: "orange", color: "#FF9500" },
+    { id: "black", color: "#000000" },
+    { id: "white", color: "#FFFFFF" },
 ];
 
 // سایزهای استروک
@@ -113,10 +114,14 @@ const ColorSwatch: React.FC<{
         scale.value = withTiming(1, { duration: 150, easing: Easing.out(Easing.cubic) });
     };
 
+    // Special handling for white color - need border to be visible
+    const isWhite = color === "#FFFFFF";
+    const borderStyle = isWhite ? { borderWidth: 1.5, borderColor: "rgba(0, 0, 0, 0.2)" } : {};
+
     return (
         <View style={styles.swatchContainer}>
             <Pressable onPress={onPress} onPressIn={handlePressIn} onPressOut={handlePressOut}>
-                <Animated.View style={[styles.colorSwatch, { backgroundColor: color }, animatedStyle]} />
+                <Animated.View style={[styles.colorSwatch, { backgroundColor: color }, borderStyle, animatedStyle]} />
             </Pressable>
             {isSelected && <View style={[styles.selectionIndicator, { backgroundColor: color }]} />}
         </View>
@@ -264,27 +269,31 @@ const styles = StyleSheet.create({
         paddingLeft: 16,
         flexDirection: "row",
         alignItems: "center",
-        gap: 10,
+        gap: 8,
+        flex: 1,
+        flexWrap: "wrap",
     },
     swatchContainer: {
         alignItems: "center",
         justifyContent: "center",
-        width: 32,
-        height: 40,
+        width: 28,
+        height: 36,
         position: "relative",
     },
     colorSwatch: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: "rgba(0, 0, 0, 0.1)",
     },
     selectionIndicator: {
         position: "absolute",
-        bottom: -4,
-        width: 14,
-        height: 3.5,
-        borderTopLeftRadius: 10,
-        borderTopRightRadius: 10,
+        bottom: -3,
+        width: 12,
+        height: 3,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
     },
     penMarkerWrapper: {
         position: "relative",
