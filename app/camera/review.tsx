@@ -15,8 +15,8 @@ import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet,
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
+import { CompositeLayout, CompositeLayoutTestModal, GhostItemData } from "./_components/composite-layout";
 import { LayoutPattern } from "./_components/create-template/types";
-import { getItemLayoutStyle } from "./_components/create-template/utils";
 
 const { width, height } = Dimensions.get("window");
 const MINT_COLOR = "#00c7be";
@@ -85,13 +85,6 @@ export default function ReviewScreen() {
     const capturedPhotos: CapturedPhoto[] = photos ? JSON.parse(photos) : [];
 
     // Extract ghost items from template
-    type GhostItemData = {
-        gostId: string;
-        imageUrl?: string | null;
-        rowIndex?: number;
-        columnIndex?: number;
-    };
-
     const ghostItemsData: GhostItemData[] = useMemo(() => {
         if (!templateData?.data) return [];
 
@@ -134,8 +127,15 @@ export default function ReviewScreen() {
     const [compositePhoto, setCompositePhoto] = useState<CapturedPhoto | null>(null);
     const [isGeneratingComposite, setIsGeneratingComposite] = useState(false);
     const [compositeLayoutReady, setCompositeLayoutReady] = useState(false);
-    
+    const [showTestModal, setShowTestModal] = useState(false);
+
     const compositeViewRef = useRef<ViewShot>(null);
+
+    // Get layout pattern from template data
+    const layoutPattern: LayoutPattern = useMemo(() => {
+        const template = templateData?.data as unknown as PracticeTemplate;
+        return (template?.layout_pattern as LayoutPattern) || "grid-2x2";
+    }, [templateData]);
 
     // Ref to track upload progress for photos without template
     const uploadProgressRef = useRef({ count: 0, total: 0 });
@@ -143,7 +143,7 @@ export default function ReviewScreen() {
     // Reset composite photo when capturedPhotos change (e.g., after retake)
     React.useEffect(() => {
         const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
-        
+
         if (hasTemplate && compositePhoto) {
             // Check if any template photo has changed by comparing timestamps
             // If a photo was retaken, its timestamp will be newer
@@ -152,7 +152,7 @@ export default function ReviewScreen() {
                 // If composite was generated before this photo, we need to regenerate
                 return photo.timestamp > compositePhoto.timestamp;
             });
-            
+
             if (hasNewerPhoto) {
                 setCompositePhoto(null);
                 setIsGeneratingComposite(false);
@@ -165,7 +165,7 @@ export default function ReviewScreen() {
     React.useEffect(() => {
         const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
         const allPhotosLoaded = capturedPhotos.every((p) => p.templateId === "no-template" || p.uri);
-        
+
         if (hasTemplate && ghostItemsData.length > 0 && capturedPhotos.length > 0 && !compositePhoto && !isGeneratingComposite && compositeLayoutReady && allPhotosLoaded) {
             generateCompositePhoto();
         }
@@ -215,7 +215,7 @@ export default function ReviewScreen() {
                     type: "image/jpeg",
                     name: filename,
                 };
-                
+
                 tempUploadComposite(file);
             } catch (error) {
                 // Still allow saving without composite media field
@@ -236,11 +236,11 @@ export default function ReviewScreen() {
         (data) => {
             // Extract filename from TempUploadResponse
             const filename = data?.filename;
-            
+
             if (!filename) {
                 return;
             }
-            
+
             // Update composite photo with tempFilename using functional update
             setCompositePhoto((prev) => {
                 if (prev) {
@@ -325,7 +325,7 @@ export default function ReviewScreen() {
     const allPhotos = useMemo(() => {
         const photos = [...capturedPhotos];
         const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
-        
+
         if (hasTemplate) {
             if (compositePhoto) {
                 photos.unshift(compositePhoto);
@@ -358,20 +358,23 @@ export default function ReviewScreen() {
 
     const currentPhoto = allPhotos[currentIndex];
 
-    const handleThumbnailPress = useCallback((index: number) => {
-        if (index === currentIndex) return; // Don't do anything if already on this index
+    const handleThumbnailPress = useCallback(
+        (index: number) => {
+            if (index === currentIndex) return; // Don't do anything if already on this index
 
-        Haptics.selectionAsync();
-        setIsScrolling(true);
-        setCurrentIndex(index);
-        // Use scrollToOffset for smoother scrolling without jump
-        flatListRef.current?.scrollToOffset({ offset: index * width, animated: true });
+            Haptics.selectionAsync();
+            setIsScrolling(true);
+            setCurrentIndex(index);
+            // Use scrollToOffset for smoother scrolling without jump
+            flatListRef.current?.scrollToOffset({ offset: index * width, animated: true });
 
-        // Reset scrolling flag after animation completes
-        setTimeout(() => {
-            setIsScrolling(false);
-        }, 300);
-    }, [currentIndex, width]);
+            // Reset scrolling flag after animation completes
+            setTimeout(() => {
+                setIsScrolling(false);
+            }, 300);
+        },
+        [currentIndex, width],
+    );
 
     const handleRetake = useCallback(() => {
         // Don't allow retake for composite photo
@@ -427,13 +430,13 @@ export default function ReviewScreen() {
 
         // Check if composite photo is ready (for template uploads)
         const hasTemplate = templateId && photosToSave.some((p) => p.templateId !== "no-template");
-        
+
         // Find composite photo from allPhotos (more reliable than state)
         const compositeFromAllPhotos = allPhotos.find((p) => p.isComposite);
-        
+
         // Use compositeFromAllPhotos if available, otherwise fall back to state
         const finalCompositePhoto = compositeFromAllPhotos || compositePhoto;
-        
+
         if (hasTemplate && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
             Alert.alert("Please wait", "Composite image is still being generated. Please wait a moment.");
             return;
@@ -567,88 +570,41 @@ export default function ReviewScreen() {
         ]);
     }, [patientId]);
 
-    const handleScroll = useCallback((event: { nativeEvent: { contentOffset: { x: number } } }) => {
-        // Don't update index if we're programmatically scrolling
-        if (isScrolling) return;
+    const handleScroll = useCallback(
+        (event: { nativeEvent: { contentOffset: { x: number } } }) => {
+            // Don't update index if we're programmatically scrolling
+            if (isScrolling) return;
 
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offsetX / width);
-        if (index !== currentIndex && index >= 0 && index < allPhotos.length) {
-            setCurrentIndex(index);
-        }
-    }, [isScrolling, width, currentIndex, allPhotos.length]);
+            const offsetX = event.nativeEvent.contentOffset.x;
+            const index = Math.round(offsetX / width);
+            if (index !== currentIndex && index >= 0 && index < allPhotos.length) {
+                setCurrentIndex(index);
+            }
+        },
+        [isScrolling, width, currentIndex, allPhotos.length],
+    );
 
-    const renderMainImage = useCallback(({ item, index }: { item: CapturedPhoto; index: number }) => {
-        const isCompositeLoading = item.isComposite && (!item.uri || isGeneratingComposite || item.uploadStatus === "uploading");
-        
-        return (
-            <View style={styles.mainImageContainer}>
-                {isCompositeLoading ? (
-                    <View style={[styles.mainImage, { justifyContent: "center", alignItems: "center", backgroundColor: colors.system.white }]}>
-                        <ActivityIndicator size="large" color={colors.system.blue} />
-                        <BaseText type="Body" weight={400} color="labels.secondary" style={{ marginTop: 16 }}>
-                            Generating composite image...
-                        </BaseText>
-                    </View>
-                ) : item.uri ? (
-                    <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />
-                ) : null}
-            </View>
-        );
-    }, [isGeneratingComposite]);
+    const renderMainImage = useCallback(
+        ({ item, index }: { item: CapturedPhoto; index: number }) => {
+            const isCompositeLoading = item.isComposite && (!item.uri || isGeneratingComposite || item.uploadStatus === "uploading");
 
-    // Helper function to get layout style with 3:2 aspect ratio
-    // Uses the same logic as PreviewCanvas but scaled to 3:2 ratio with 12px padding
-    const getCompositeLayoutStyle = (index: number, total: number, layoutPattern: LayoutPattern) => {
-        // PreviewCanvas uses: width - 40, height: (width - 40) * 0.92
-        // We want: width - 24 (12px padding each side), height: width * (3/2) - 24 (12px padding top/bottom)
-        const padding = 12;
-        const previewBoxWidth = width - 40;
-        const previewBoxHeight = previewBoxWidth * 0.92;
-        const compositeBoxWidth = width - padding * 2; // Account for padding
-        const compositeBoxHeight = width * (3 / 2) - padding * 2; // Account for padding
-        
-        // Get base layout style using PreviewCanvas dimensions (same as PreviewCanvas)
-        const baseStyle = getItemLayoutStyle(index, total, layoutPattern);
-        
-        // Calculate scale factors
-        const scaleX = compositeBoxWidth / previewBoxWidth;
-        const scaleY = compositeBoxHeight / previewBoxHeight;
-        
-        // Scale all positions and sizes, then add padding offset
-        const scaledStyle: {
-            position?: "absolute";
-            left?: number;
-            right?: number;
-            top?: number;
-            bottom?: number;
-            width?: number;
-            height?: number;
-        } = {
-            position: baseStyle.position || "absolute",
-        };
-        
-        if (baseStyle.left !== undefined) {
-            scaledStyle.left = padding + baseStyle.left * scaleX;
-        }
-        if (baseStyle.right !== undefined) {
-            scaledStyle.right = padding + baseStyle.right * scaleX;
-        }
-        if (baseStyle.top !== undefined) {
-            scaledStyle.top = padding + baseStyle.top * scaleY;
-        }
-        if (baseStyle.bottom !== undefined) {
-            scaledStyle.bottom = padding + baseStyle.bottom * scaleY;
-        }
-        if (baseStyle.width !== undefined) {
-            scaledStyle.width = baseStyle.width * scaleX;
-        }
-        if (baseStyle.height !== undefined) {
-            scaledStyle.height = baseStyle.height * scaleY;
-        }
-        
-        return scaledStyle;
-    };
+            return (
+                <View style={styles.mainImageContainer}>
+                    {isCompositeLoading ? (
+                        <View style={[styles.mainImage, { justifyContent: "center", alignItems: "center", backgroundColor: colors.system.white }]}>
+                            <ActivityIndicator size="large" color={colors.system.blue} />
+                            <BaseText type="Body" weight={400} color="labels.secondary" style={{ marginTop: 16 }}>
+                                Generating composite image...
+                            </BaseText>
+                        </View>
+                    ) : item.uri ? (
+                        <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />
+                    ) : null}
+                </View>
+            );
+        },
+        [isGeneratingComposite],
+    );
 
     // Check if we need to wait for composite photo
     const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
@@ -669,7 +625,15 @@ export default function ReviewScreen() {
             <View style={[styles.container, { justifyContent: "center", alignItems: "center", paddingHorizontal: 20 }]}>
                 <ErrorState
                     title={isPatientError ? "Failed to load patient" : "Failed to load template"}
-                    message={isPatientError ? (patientError instanceof Error ? patientError.message : ((patientError as unknown as { message?: string })?.message || "Failed to load patient data")) : (templateError instanceof Error ? templateError.message : ((templateError as unknown as { message?: string })?.message || "Failed to load template data"))}
+                    message={
+                        isPatientError
+                            ? patientError instanceof Error
+                                ? patientError.message
+                                : (patientError as unknown as { message?: string })?.message || "Failed to load patient data"
+                            : templateError instanceof Error
+                              ? templateError.message
+                              : (templateError as unknown as { message?: string })?.message || "Failed to load template data"
+                    }
                     onRetry={() => {
                         if (isPatientError) refetchPatient();
                         if (templateId && isTemplateError) refetchTemplate();
@@ -705,48 +669,23 @@ export default function ReviewScreen() {
             {/* Composite Photo Generator (Hidden) */}
             {templateId && ghostItemsData.length > 0 && capturedPhotos.length > 0 && (
                 <View style={styles.hiddenCompositeContainer}>
-                    <ViewShot
+                    <CompositeLayout
                         ref={compositeViewRef}
-                        style={styles.compositeViewShot}
-                        options={{ format: "jpg", quality: 0.95 }}
-                        onLayout={() => {
+                        ghostItems={ghostItemsData}
+                        photos={capturedPhotos.map((photo) => ({
+                            id: photo.id,
+                            uri: photo.uri,
+                            templateId: photo.templateId || "",
+                        }))}
+                        layoutPattern={layoutPattern}
+                        containerWidth={width}
+                        padding={5}
+                        gap={5}
+                        showDebugLabels={false}
+                        onLayoutReady={() => {
                             setCompositeLayoutReady(true);
                         }}
-                    >
-                        <View style={styles.compositeContainer}>
-                            {(() => {
-                                // Filter to only include ghost items that have photos
-                                const itemsWithPhotos = ghostItemsData
-                                    .map((ghostItem) => {
-                                        const photo = capturedPhotos.find((p) => p.templateId === ghostItem.gostId);
-                                        return photo ? { ghostItem, photo } : null;
-                                    })
-                                    .filter((item): item is { ghostItem: GhostItemData; photo: CapturedPhoto } => item !== null);
-
-                                // Get layout pattern from template data
-                                const template = templateData?.data as unknown as PracticeTemplate;
-                                const layoutPattern: LayoutPattern = (template?.layout_pattern as LayoutPattern) || "grid-2x2";
-
-                                return itemsWithPhotos.map(({ ghostItem, photo }, index) => {
-                                    // Use helper function to get layout style with 3:2 aspect ratio
-                                    // Index is based on filtered array (only items with photos)
-                                    const layoutStyle = getCompositeLayoutStyle(index, itemsWithPhotos.length, layoutPattern);
-
-                                    return (
-                                        <View
-                                            key={ghostItem.gostId}
-                                            style={[
-                                                styles.compositeCell,
-                                                layoutStyle,
-                                            ]}
-                                        >
-                                            <Image source={{ uri: photo.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
-                                        </View>
-                                    );
-                                });
-                            })()}
-                        </View>
-                    </ViewShot>
+                    />
                 </View>
             )}
 
@@ -800,31 +739,36 @@ export default function ReviewScreen() {
             <View style={styles.thumbnailsSection}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailsScroll}>
                     {allPhotos.map((photo, index) => (
-                        <ThumbnailItem
-                            key={photo.id}
-                            photo={photo}
-                            index={index}
-                            isActive={index === currentIndex}
-                            onPress={handleThumbnailPress}
-                        />
+                        <ThumbnailItem key={photo.id} photo={photo} index={index} isActive={index === currentIndex} onPress={handleThumbnailPress} />
                     ))}
                 </ScrollView>
             </View>
 
             {/* Footer */}
             <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-                <TouchableOpacity style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={handleSave} activeOpacity={0.8} disabled={isSaving || capturedPhotos.length === 0}>
-                    {isSaving ? (
-                        <BaseText type="Body" weight={600} color="system.white">
-                            Saving...
+                <View style={styles.footerButtons}>
+                    <TouchableOpacity style={[styles.saveButton, isSaving && styles.saveButtonDisabled]} onPress={handleSave} activeOpacity={0.8} disabled={isSaving || capturedPhotos.length === 0}>
+                        {isSaving ? (
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Saving...
+                            </BaseText>
+                        ) : (
+                            <BaseText type="Body" weight={600} color="system.white">
+                                Save to gallery
+                            </BaseText>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.testButton} onPress={() => setShowTestModal(true)} activeOpacity={0.8}>
+                        <IconSymbol name="grid" size={18} color={colors.system.blue} />
+                        <BaseText type="Body" weight={600} color="system.blue" style={{ marginLeft: 6 }}>
+                            Test Layout
                         </BaseText>
-                    ) : (
-                        <BaseText type="Body" weight={600} color="system.white">
-                            Save to gallery
-                        </BaseText>
-                    )}
-                </TouchableOpacity>
+                    </TouchableOpacity>
+                </View>
             </View>
+
+            {/* Test Modal */}
+            <CompositeLayoutTestModal visible={showTestModal} onClose={() => setShowTestModal(false)} />
         </View>
     );
 }
@@ -936,11 +880,17 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: colors.border,
     },
+    footerButtons: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
     footerInfo: {
         alignItems: "center",
         marginBottom: 12,
     },
     saveButton: {
+        flex: 1,
         backgroundColor: MINT_COLOR,
         paddingVertical: 16,
         borderRadius: 14,
@@ -950,30 +900,33 @@ const styles = StyleSheet.create({
     saveButtonDisabled: {
         backgroundColor: colors.system.gray3,
     },
+    testButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderRadius: 14,
+        borderWidth: 1.5,
+        borderColor: colors.system.blue,
+        backgroundColor: colors.system.white,
+        shadowColor: colors.system.blue,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+    },
     hiddenCompositeContainer: {
         position: "absolute",
         left: -width * 2, // Move off screen but keep it renderable
         top: 0,
         width: width,
-        height: width * (3 / 2), // 3:2 aspect ratio
+        height: width, // 1:1 aspect ratio
         zIndex: -1,
     },
     compositeViewShot: {
         width: width,
-        height: width * (3 / 2), // 3:2 aspect ratio
-        backgroundColor: colors.system.white,
-    },
-    compositeContainer: {
-        width: width,
-        height: width * (3 / 2), // 3:2 aspect ratio
-        backgroundColor: colors.system.white,
-        position: "relative",
-        padding: 12, // 12px padding from all sides
-    },
-    compositeCell: {
-        position: "absolute",
-        borderRadius: 8,
-        overflow: "hidden",
+        height: width, // 1:1 aspect ratio
         backgroundColor: colors.system.white,
     },
 });
