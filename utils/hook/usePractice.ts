@@ -41,7 +41,16 @@ export const useGetPracticeById = (practiceId: number, enabled: boolean = true):
             const currentPractice = selectedPractice;
 
             // Check if data has actually changed (simple comparison by checking if any key is different)
-            const hasChanged = !currentPractice || currentPractice.name !== fetchedPractice.name || JSON.stringify(currentPractice.metadata) !== JSON.stringify(fetchedPractice.metadata) || currentPractice.image?.url !== fetchedPractice.image?.url || currentPractice.role !== fetchedPractice.role;
+            // Include counts (patients_count, consents_count, taken_images_count) in comparison
+            const hasChanged =
+                !currentPractice ||
+                currentPractice.name !== fetchedPractice.name ||
+                JSON.stringify(currentPractice.metadata) !== JSON.stringify(fetchedPractice.metadata) ||
+                currentPractice.image?.url !== fetchedPractice.image?.url ||
+                currentPractice.role !== fetchedPractice.role ||
+                currentPractice.patients_count !== fetchedPractice.patients_count ||
+                currentPractice.consents_count !== fetchedPractice.consents_count ||
+                currentPractice.taken_images_count !== fetchedPractice.taken_images_count;
 
             if (hasChanged) {
                 // Update store directly without triggering another API call

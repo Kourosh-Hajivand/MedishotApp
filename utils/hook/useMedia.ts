@@ -38,6 +38,13 @@ export const useUploadPatientMedia = (onSuccess?: (data: PatientMediaUploadRespo
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],
             });
+            // Invalidate practice queries to update counts (taken_images_count)
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById", selectedPractice.id] });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById"] });
+            }
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -183,6 +190,13 @@ export const useUploadPatientMediaWithTemplate = (onSuccess?: (data: PatientMedi
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],
             });
+            // Invalidate practice queries to update counts (taken_images_count)
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById", selectedPractice.id] });
+            } else {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById"] });
+            }
             onSuccess?.(data);
         },
         onError: (error) => {

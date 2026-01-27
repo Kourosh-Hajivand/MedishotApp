@@ -4,8 +4,10 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import { colors } from "@/theme/colors";
 import { formatDate } from "@/utils/helper/dateUtils";
+import { useGetPracticeById } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import React, { useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import React, { useCallback, useRef, useState } from "react";
 import { Animated, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivitiesTab, OverviewTab, TeamTab } from "./_components";
@@ -13,12 +15,22 @@ import { ActivitiesTab, OverviewTab, TeamTab } from "./_components";
 export default function PracticeOverviewScreen() {
     const insets = useSafeAreaInsets();
     const { selectedPractice } = useProfileStore();
+    const { refetch: refetchPractice } = useGetPracticeById(selectedPractice?.id ?? 0, !!selectedPractice?.id);
     const [isExpanded, setIsExpanded] = useState(true);
     const tabs = ["Overview", "Team", "Activities"];
     const screenWidth = Dimensions.get("window").width;
     const tabWidth = (screenWidth - 32) / tabs.length;
     const translateX = useRef(new Animated.Value(0)).current;
     const [activeTab, setActiveTab] = useState(0);
+
+    // Refetch practice data when screen comes into focus to update counts
+    useFocusEffect(
+        useCallback(() => {
+            if (selectedPractice?.id) {
+                refetchPractice();
+            }
+        }, [selectedPractice?.id, refetchPractice]),
+    );
 
     const handleTabPress = (index: number) => {
         setActiveTab(index);

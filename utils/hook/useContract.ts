@@ -3,6 +3,7 @@ import { CreateContractDto } from "@/utils/service/models/RequestModels";
 import { ContractTemplateDetailResponse, ContractTemplateListResponse, CreateContractResponse, PatientContractDetailResponse, PatientContractListResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
+import { useProfileStore } from "./useProfileStore";
 
 // ============= Query Hooks (GET) =============
 
@@ -46,6 +47,7 @@ export const useGetContract = (contractId: string | number, enabled: boolean = t
 
 export const useCreateContract = (onSuccess?: (data: CreateContractResponse) => void, onError?: (error: Error) => void): UseMutationResult<CreateContractResponse, Error, { patientId: string | number; data: CreateContractDto }> => {
     const queryClient = useQueryClient();
+    const { selectedPractice } = useProfileStore();
 
     return useMutation({
         mutationFn: ({ patientId, data }: { patientId: string | number; data: CreateContractDto }) => ContractService.createContract(patientId, data),
@@ -57,6 +59,14 @@ export const useCreateContract = (onSuccess?: (data: CreateContractResponse) => 
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],
             });
+            // Invalidate practice queries to update counts (consents_count)
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById", selectedPractice.id] });
+            } else {
+                // If practiceId is not available, invalidate all practice queries
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeById"] });
+            }
             onSuccess?.(data);
         },
         onError: (error) => {

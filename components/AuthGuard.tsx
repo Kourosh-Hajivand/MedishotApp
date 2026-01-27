@@ -51,6 +51,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     const isOnWelcome = React.useMemo(() => segments.some((s) => s === "welcome"), [segments]);
     const isOnLogin = React.useMemo(() => segments.some((s) => s === "login"), [segments]);
     const isOnSignup = React.useMemo(() => segments.some((s) => s === "signup"), [segments]);
+    const isOnSelectRole = React.useMemo(() => segments.some((s) => s === "select-role"), [segments]);
+    const isOnCreatePractice = React.useMemo(() => segments.some((s) => s === "create-practice"), [segments]);
 
     const skipProfileOrPracticeRedirect = isInTabs || isInModals;
 
@@ -82,11 +84,13 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         }
 
         // 1. اگر authenticated است و همه چیز کامل است → به tabs redirect کن (حتی اگر در auth باشد)
+        // اما اجازه بده به select-role و create-practice برود (برای ایجاد practice جدید)
         if (isAuthenticated === true && profile && profile.first_name && profile.last_name) {
             if (!isPracticeListLoading && !isProfileLoading) {
                 if (practiceList?.data && practiceList.data.length > 0) {
                     // همه چیز کامل است → به tabs redirect کن
-                    if (isInAuthFlow) {
+                    // اما اگر در select-role یا create-practice است، اجازه بده بماند (برای ایجاد practice جدید)
+                    if (isInAuthFlow && !isOnSelectRole && !isOnCreatePractice) {
                         if (__DEV__) console.warn(LOG_TAG, "redirect -> /(tabs)/patients (authenticated with complete profile and practice, leaving auth)");
                         router.replace("/(tabs)/patients");
                         return;
@@ -136,7 +140,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
                 }
             }
         }
-    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments, isOnWelcome, isOnLogin, isOnSignup, isInModals, isInTabs]);
+    }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments, isOnWelcome, isOnLogin, isOnSignup, isInModals, isInTabs, isOnSelectRole, isOnCreatePractice]);
 
     // If on (modals) (e.g. select-gender, select-date), always render children — never replace with loading/redirect.
     if (isInModals) {

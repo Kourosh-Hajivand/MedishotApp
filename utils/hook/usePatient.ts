@@ -64,6 +64,9 @@ export const useCreatePatient = (practiseId: string | number, onSuccess?: (data:
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientActivities"],
             });
+            // Invalidate practice queries to update counts (patients_count)
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeById", practiseId] });
             onSuccess?.(data);
         },
         onError: (error) => {
