@@ -20,16 +20,36 @@ interface FilteredImageProps {
     style?: any;
     adjustments: AdjustChange | null;
     contentFit?: ImageContentFit;
+    onLoad?: (event: { width: number; height: number }) => void;
 }
 
-export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adjustments, contentFit = "contain" }) => {
+export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adjustments, contentFit = "contain", onLoad }) => {
     // For now, use overlay approach (current implementation)
     // TODO: Consider using react-native-image-filter-kit for better performance
     // or WebView with CSS filters for more accurate results
 
+    const handleLoad = (event: any) => {
+        if (onLoad) {
+            let imgWidth = 0;
+            let imgHeight = 0;
+
+            if (event?.source?.width && event?.source?.height) {
+                imgWidth = event.source.width;
+                imgHeight = event.source.height;
+            } else if (event?.nativeEvent?.source?.width && event?.nativeEvent?.source?.height) {
+                imgWidth = event.nativeEvent.source.width;
+                imgHeight = event.nativeEvent.source.height;
+            }
+
+            if (imgWidth && imgHeight) {
+                onLoad({ width: imgWidth, height: imgHeight });
+            }
+        }
+    };
+
     return (
         <View style={[styles.container, style]}>
-            <Image source={source} style={StyleSheet.absoluteFill} contentFit={contentFit} />
+            <Image source={source} style={StyleSheet.absoluteFill} contentFit={contentFit} onLoad={handleLoad} />
             {adjustments && (
                 <>
                     {/* Brightness */}

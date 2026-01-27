@@ -13,23 +13,15 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Image as RNImage, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
-// 3:2 aspect ratio – fit within canvas (full width × 55% height)
-const ASPECT_RATIO = 3 / 2; // width / height
+// Canvas constraints
 const CANVAS_MAX_WIDTH = SCREEN_WIDTH;
 const CANVAS_MAX_HEIGHT = SCREEN_HEIGHT * 0.55;
-
-let canvasWidth = CANVAS_MAX_WIDTH;
-let canvasHeight = CANVAS_MAX_WIDTH / ASPECT_RATIO;
-if (canvasHeight > CANVAS_MAX_HEIGHT) {
-    canvasHeight = CANVAS_MAX_HEIGHT;
-    canvasWidth = CANVAS_MAX_HEIGHT * ASPECT_RATIO;
-}
 
 // Constants
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
@@ -161,6 +153,8 @@ export default function ImageEditorScreen() {
     const [notes, setNotes] = useState<Note[]>([]);
     const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
     const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
+    const [imageWrapperLayout, setImageWrapperLayout] = useState({ width: 0, height: 0 });
+    const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
     const hasRequestedRef = useRef(false);
 
     const scale = useSharedValue(1);
@@ -452,11 +446,40 @@ export default function ImageEditorScreen() {
         setDisplayedImageUri(uri ?? null);
         setOriginalImageUri(uri ?? null);
         setAdjustmentValues(null);
+        setImageAspectRatio(null); // Reset aspect ratio when URI changes
         // Set initial tool if provided
         if (initialTool) {
             setActiveTool(initialTool);
         }
     }, [uri, initialTool]);
+
+    // Get image dimensions and calculate aspect ratio (fallback if onLoad doesn't fire)
+    useEffect(() => {
+        if (!uri) {
+            setImageAspectRatio(null);
+            return;
+        }
+
+        // Only use Image.getSize as fallback if aspectRatio is still null after a delay
+        const timeoutId = setTimeout(() => {
+            if (imageAspectRatio === null) {
+                RNImage.getSize(
+                    uri,
+                    (width, height) => {
+                        const ratio = width / height;
+                        setImageAspectRatio(ratio);
+                    },
+                    (error) => {
+                        console.error("Error loading image dimensions:", error);
+                        // Fallback to 3:2 if error
+                        setImageAspectRatio(3 / 2);
+                    },
+                );
+            }
+        }, 100); // Small delay to let onLoad fire first
+
+        return () => clearTimeout(timeoutId);
+    }, [uri, imageAspectRatio]);
 
     useEffect(() => {
         if (!magicSelection) return;
@@ -529,6 +552,33 @@ export default function ImageEditorScreen() {
         router.back();
     }, []);
 
+    // Calculate dynamic image container style based on aspect ratio
+    // Use actual imageWrapper height to fill available space, with smart fallback
+    const dynamicImageContainerStyle = useMemo(() => {
+        const aspectRatio = imageAspectRatio ?? 3 / 2; // Fallback to 3:2 if not loaded yet
+        
+        // Use actual wrapper dimensions if available, otherwise use screen dimensions
+        const availableHeight = imageWrapperLayout.height > 0 ? imageWrapperLayout.height : CANVAS_MAX_HEIGHT;
+        const availableWidth = imageWrapperLayout.width > 0 ? imageWrapperLayout.width : CANVAS_MAX_WIDTH;
+
+        // Calculate size to maximize while preserving aspect ratio
+        // First, try to fill the height
+        let containerHeight = availableHeight;
+        let containerWidth = containerHeight * aspectRatio;
+
+        // If width exceeds available width, use width constraint instead
+        if (containerWidth > availableWidth) {
+            containerWidth = availableWidth;
+            containerHeight = containerWidth / aspectRatio;
+        }
+
+        return {
+            width: containerWidth,
+            aspectRatio: aspectRatio,
+            alignSelf: "center" as const,
+        };
+    }, [imageAspectRatio, imageWrapperLayout]);
+
     return (
         <SafeAreaView style={styles.container}>
             <Modal visible={isLoading} transparent animationType="fade">
@@ -570,15 +620,30 @@ export default function ImageEditorScreen() {
 
             <View style={styles.canvasContainer}>
                 <GestureDetector gesture={composedGesture}>
-                    <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
+                    <Animated.View 
+                        style={[styles.imageWrapper, animatedImageStyle]}
+                        onLayout={(event) => {
+                            const { width, height } = event.nativeEvent.layout;
+                            setImageWrapperLayout({ width, height });
+                        }}
+                    >
                         <View
-                            style={styles.imageContainer}
+                            style={[styles.imageContainer, dynamicImageContainerStyle]}
                             onLayout={(event) => {
                                 const { width, height, x, y } = event.nativeEvent.layout;
                                 setImageContainerLayout({ width, height, x, y });
                             }}
                         >
-                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} style={styles.image} adjustments={adjustmentValues} contentFit="contain" />
+                            <FilteredImage 
+                                source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} 
+                                style={styles.image} 
+                                adjustments={adjustmentValues} 
+                                contentFit="contain"
+                                onLoad={(event) => {
+                                    const ratio = event.width / event.height;
+                                    setImageAspectRatio(ratio);
+                                }}
+                            />
 
                             {/* Note Markers Overlay */}
                             {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
@@ -623,13 +688,11 @@ const styles = StyleSheet.create({
     },
     imageWrapper: {
         width: SCREEN_WIDTH,
-        minHeight: CANVAS_MAX_HEIGHT,
+        height: "100%",
         justifyContent: "center",
         alignItems: "center",
     },
     imageContainer: {
-        width: canvasWidth,
-        aspectRatio: 3 / 2,
         position: "relative",
     },
     image: {

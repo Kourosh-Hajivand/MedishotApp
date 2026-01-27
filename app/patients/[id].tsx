@@ -109,8 +109,8 @@ export default function PatientDetailsScreen() {
             const mediaId = media.id; // patient_media_id
 
             // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
-            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
-            
+            const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
+
             if (isTemplateMedia && Array.isArray(media.images)) {
                 // PatientMediaWithTemplate: add original_media to map if exists, otherwise add all images
                 const templateMedia = media as PatientMediaWithTemplate;
@@ -145,7 +145,7 @@ export default function PatientDetailsScreen() {
 
         patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
             // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
-            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
+            const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
             const isBookmarked = (media as any).is_bookmarked ?? false;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
@@ -202,8 +202,8 @@ export default function PatientDetailsScreen() {
             const dateImages = imagesByDate.get(dateKey)!;
 
             // Type guard: check if it's PatientMediaWithTemplate (template must be truthy, not just exist)
-            const isTemplateMedia = 'template' in media && 'images' in media && media.template !== null && media.template !== undefined;
-            
+            const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
+
             if (isTemplateMedia && Array.isArray(media.images)) {
                 // PatientMediaWithTemplate: show original_media if exists, otherwise show individual images
                 const templateMedia = media as PatientMediaWithTemplate;
@@ -234,9 +234,7 @@ export default function PatientDetailsScreen() {
         const sections = Array.from(imagesByDate.entries())
             .map(([date, imageItems]) => {
                 // Sort images within section by timestamp (newest first)
-                const sortedImages = [...imageItems]
-                    .sort((a, b) => b.timestamp - a.timestamp)
-                    .map((item) => item.url);
+                const sortedImages = [...imageItems].sort((a, b) => b.timestamp - a.timestamp).map((item) => item.url);
                 return {
                     title: date,
                     data: sortedImages,
@@ -252,7 +250,6 @@ export default function PatientDetailsScreen() {
         return sections;
     }, [patientMediaData?.data]);
 
-
     // Archive media mutation
     const { mutate: archiveMedia, isPending: isArchiving } = useDeletePatientMedia(
         () => {
@@ -263,66 +260,78 @@ export default function PatientDetailsScreen() {
         },
     );
 
-    const handleArchiveImage = useCallback((imageUri: string) => {
-        const mediaId = imageUrlToMediaIdMap.get(imageUri);
-        if (!mediaId) {
-            Alert.alert("Error", "Could not find media ID for this image");
-            return;
-        }
+    const handleArchiveImage = useCallback(
+        (imageUri: string) => {
+            const mediaId = imageUrlToMediaIdMap.get(imageUri);
+            if (!mediaId) {
+                Alert.alert("Error", "Could not find media ID for this image");
+                return;
+            }
 
-        Alert.alert("Archive Image", "Are you sure you want to archive this image?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Archive",
-                style: "destructive",
-                onPress: () => {
-                    archiveMedia({ patientId: id, mediaId });           
+            Alert.alert("Archive Image", "Are you sure you want to archive this image?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Archive",
+                    style: "destructive",
+                    onPress: () => {
+                        archiveMedia({ patientId: id, mediaId });
+                    },
                 },
-            },
-        ]);
-    }, [imageUrlToMediaIdMap, id, archiveMedia]);
+            ]);
+        },
+        [imageUrlToMediaIdMap, id, archiveMedia],
+    );
 
     const screenWidth = Dimensions.get("window").width;
     const screenHeight = Dimensions.get("window").height;
     const tabWidth = useMemo(() => (screenWidth - 32) / tabs.length, [screenWidth]);
     const translateX = useRef(new Animated.Value(0)).current;
 
-    const handleTabPress = useCallback((index: number) => {
-        setActiveTab(index);
-        Animated.spring(translateX, { toValue: index * tabWidth, useNativeDriver: true, speed: 20 }).start();
-    }, [tabWidth, translateX]);
+    const handleTabPress = useCallback(
+        (index: number) => {
+            setActiveTab(index);
+            Animated.spring(translateX, { toValue: index * tabWidth, useNativeDriver: true, speed: 20 }).start();
+        },
+        [tabWidth, translateX],
+    );
 
-    const handleCall = useCallback(async (index?: number) => {
-        const numbers = patient?.data?.numbers;
-        if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
+    const handleCall = useCallback(
+        async (index?: number) => {
+            const numbers = patient?.data?.numbers;
+            if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
 
-        const phoneIndex = index !== undefined ? index : 0;
-        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
-        if (!phoneNumber) return Alert.alert("Error", "No phone number found");
+            const phoneIndex = index !== undefined ? index : 0;
+            const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
+            if (!phoneNumber) return Alert.alert("Error", "No phone number found");
 
-        const url = `tel:${phoneNumber}`;
-        try {
-            (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot make phone call");
-        } catch {
-            Alert.alert("Error", "Error making phone call");
-        }
-    }, [patient?.data?.numbers]);
+            const url = `tel:${phoneNumber}`;
+            try {
+                (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot make phone call");
+            } catch {
+                Alert.alert("Error", "Error making phone call");
+            }
+        },
+        [patient?.data?.numbers],
+    );
 
-    const handleMessage = useCallback(async (index?: number) => {
-        const numbers = patient?.data?.numbers;
-        if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
+    const handleMessage = useCallback(
+        async (index?: number) => {
+            const numbers = patient?.data?.numbers;
+            if (!numbers || numbers.length === 0) return Alert.alert("Error", "No phone number found");
 
-        const phoneIndex = index !== undefined ? index : 0;
-        const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
-        if (!phoneNumber) return Alert.alert("Error", "No phone number found");
+            const phoneIndex = index !== undefined ? index : 0;
+            const phoneNumber = typeof numbers[phoneIndex] === "string" ? numbers[phoneIndex] : numbers[phoneIndex]?.value;
+            if (!phoneNumber) return Alert.alert("Error", "No phone number found");
 
-        const url = `sms:${phoneNumber}`;
-        try {
-            (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot send message");
-        } catch {
-            Alert.alert("Error", "Error sending message");
-        }
-    }, [patient?.data?.numbers]);
+            const url = `sms:${phoneNumber}`;
+            try {
+                (await Linking.canOpenURL(url)) ? Linking.openURL(url) : Alert.alert("Error", "Cannot send message");
+            } catch {
+                Alert.alert("Error", "Error sending message");
+            }
+        },
+        [patient?.data?.numbers],
+    );
 
     // Handle action parameter
     useEffect(() => {
@@ -444,27 +453,30 @@ export default function PatientDetailsScreen() {
 
     const SNAP_THRESHOLD = scrollStart + 50;
 
-    const handleSnapScroll = useCallback((event: { nativeEvent: { contentOffset: { y: number } } }) => {
-        const y = event.nativeEvent.contentOffset.y;
+    const handleSnapScroll = useCallback(
+        (event: { nativeEvent: { contentOffset: { y: number } } }) => {
+            const y = event.nativeEvent.contentOffset.y;
 
-        if (y > scrollStart && y < SNAP_THRESHOLD) {
-            // اگر نصفه اسکرول کرده، برگرد بالا
-            Animated.spring(scrollY, {
-                toValue: scrollStart,
-                useNativeDriver: false,
-                speed: 8,
-                bounciness: 0,
-            }).start();
-        } else if (y >= SNAP_THRESHOLD && y < animationEnd) {
-            // اگر بیشتر از نصفه رفته، بره بالا کامل
-            Animated.spring(scrollY, {
-                toValue: animationEnd,
-                useNativeDriver: false,
-                speed: 8,
-                bounciness: 0,
-            }).start();
-        }
-    }, [scrollY, scrollStart, SNAP_THRESHOLD, animationEnd]);
+            if (y > scrollStart && y < SNAP_THRESHOLD) {
+                // اگر نصفه اسکرول کرده، برگرد بالا
+                Animated.spring(scrollY, {
+                    toValue: scrollStart,
+                    useNativeDriver: false,
+                    speed: 8,
+                    bounciness: 0,
+                }).start();
+            } else if (y >= SNAP_THRESHOLD && y < animationEnd) {
+                // اگر بیشتر از نصفه رفته، بره بالا کامل
+                Animated.spring(scrollY, {
+                    toValue: animationEnd,
+                    useNativeDriver: false,
+                    speed: 8,
+                    bounciness: 0,
+                }).start();
+            }
+        },
+        [scrollY, scrollStart, SNAP_THRESHOLD, animationEnd],
+    );
     useEffect(() => {
         const sub = scrollY.addListener(({ value }) => blurValue.setValue(value));
         return () => scrollY.removeListener(sub);
@@ -484,284 +496,318 @@ export default function PatientDetailsScreen() {
             if (id) {
                 refetchPatientMedia();
             }
-        }, [id, refetchPatientMedia])
+        }, [id, refetchPatientMedia]),
     );
 
     // Define DATA and renderRow hooks before any early returns
     const DATA: { key: RowKind }[] = useMemo(() => [{ key: "header" }, { key: "tabs" }, { key: "content" }], []);
-    const renderRow = useCallback(({ item }: { item: { key: RowKind } }) => {
-        if (item.key === "header") {
-            return (
-                <>
-                    <View className="items-center justify-center mb-6">
-                        <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], opacity: avatarOpacity, alignItems: "center" }}>
-                            <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing color={patient?.data?.doctor?.color} imageUrl={patient?.data?.profile_image?.url} />
-                        </Animated.View>
+    const renderRow = useCallback(
+        ({ item }: { item: { key: RowKind } }) => {
+            if (item.key === "header") {
+                return (
+                    <>
+                        <View className="items-center justify-center mb-6">
+                            <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], opacity: avatarOpacity, alignItems: "center" }}>
+                                <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing color={patient?.data?.doctor?.color} imageUrl={patient?.data?.profile_image?.url} />
+                            </Animated.View>
 
-                        <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
-                            <BaseText type="Title1" weight={600} color="labels.primary">
-                                {patient?.data?.first_name} {patient?.data?.last_name}
-                                {patientAge !== null && (
-                                    <BaseText type="Body" weight={600} color="labels.primary">
-                                        {" "}
-                                        ({patientAge}y)
-                                    </BaseText>
-                                )}
-                            </BaseText>
-                            <BaseText type="Callout" weight={400} color="labels.secondary">
-                                last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
-                            </BaseText>
-                        </Animated.View>
-                    </View>
-
-                    <View className="gap-5 px-5 mb-6">
-                        <View className="w-full h-[76px] bg-white rounded-xl flex-row">
-                            <TouchableOpacity
-                                className="flex-1 items-center justify-center gap-2 border-r border-border"
-                                onPress={() => {
-                                    router.push({
-                                        pathname: "/camera" as any,
-                                        params: {
-                                            patientId: id,
-                                            patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,
-                                            patientAvatar: patient?.data?.profile_image?.url || "",
-                                            doctorName: `Dr. ${patient?.data?.doctor?.first_name || ""} ${patient?.data?.doctor?.last_name || ""}`,
-                                            doctorColor: patient?.data?.doctor?.color || "",
-                                        },
-                                    });
-                                }}
-                            >
-                                <IconSymbol name="camera" color={colors.system.blue} size={26} />
-                                <BaseText type="Footnote" color="labels.primary">
-                                    Take photo
+                            <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
+                                <BaseText type="Title1" weight={600} color="labels.primary">
+                                    {patient?.data?.first_name} {patient?.data?.last_name}
+                                    {patientAge !== null && (
+                                        <BaseText type="Body" weight={600} color="labels.primary">
+                                            {" "}
+                                            ({patientAge}y)
+                                        </BaseText>
+                                    )}
                                 </BaseText>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                className="flex-1 items-center justify-center gap-2 border-r border-border"
-                                onPress={() => {
-                                    router.push({
-                                        pathname: "/(modals)/select-contract",
-                                        params: {
-                                            patientId: id,
-                                        },
-                                    });
-                                }}
-                            >
-                                <IconSymbol name="checklist" color={colors.system.blue} size={26} />
-                                <BaseText type="Footnote" color="labels.primary">
-                                    Fill consent
+                                <BaseText type="Callout" weight={400} color="labels.secondary">
+                                    last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
                                 </BaseText>
-                            </TouchableOpacity>
-                            <TouchableOpacity className="flex-1 items-center justify-center gap-2" onPress={scanDocument}>
-                                <IconSymbol name="person.text.rectangle" color={colors.system.blue} size={26} />
-                                <BaseText type="Footnote" color="labels.primary">
-                                    Add ID
-                                </BaseText>
-                            </TouchableOpacity>
+                            </Animated.View>
                         </View>
 
-                        <View className="bg-white py-2 px-4 rounded-xl">
-                            {!!patient?.data?.numbers?.length && (
-                                <View className="flex-row items-center justify-between pb-2 border-b border-border">
-                                    <View>
-                                        <BaseText type="Subhead" color="labels.secondary">
-                                            Phone
-                                        </BaseText>
-                                        <BaseText type="Subhead" color="labels.primary">
-                                            {e164ToDisplay(patient?.data?.numbers?.[0]?.value) || patient?.data?.numbers?.[0]?.value}
-                                        </BaseText>
-                                    </View>
-                                    <View className="flex-row gap-3">
-                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleMessage()} />
-                                        <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleCall()} />
-                                    </View>
-                                </View>
-                            )}
-
-                            <View className={`flex-row ${patient?.data?.numbers?.length ? "pt-2" : ""}`}>
-                                <View className="flex-1 border-r border-border">
-                                    <BaseText type="Subhead" color="labels.secondary">
-                                        assigned to:
-                                    </BaseText>
-                                    <BaseText type="Subhead" color="labels.primary">
-                                        Dr.{patient?.data?.doctor?.first_name} {patient?.data?.doctor?.last_name}
-                                    </BaseText>
-                                </View>
-                                <View className="flex-1 pl-3">
-                                    <BaseText type="Subhead" color="labels.secondary">
-                                        chart number:
-                                    </BaseText>
-                                    <BaseText type="Subhead" color="labels.primary">
-                                        #{patient?.data?.chart_number}
-                                    </BaseText>
-                                </View>
-                            </View>
-                        </View>
-
-                        <TouchableOpacity
-                            className="bg-white py-2 px-4 rounded-xl"
-                            onPress={() => {
-                                router.push({
-                                    pathname: "/(modals)/patient-details",
-                                    params: { id },
-                                });
-                            }}
-                        >
-                            <View className="flex-row items-center justify-between">
-                                <BaseText type="Body" color="labels.primary">
-                                    Patient Details
-                                </BaseText>
-                                <IconSymbol name="chevron.right" color={colors.system.gray} size={16} />
-                            </View>
-                        </TouchableOpacity>
-                    </View>
-                </>
-            );
-        } else if (item.key === "tabs") {
-            return (
-                <View className="bg-white border-t  border-t-white" style={{ borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 100 }}>
-                    <View className="px-5">
-                        <View className="flex-row relative">
-                            {tabs.map((tab, i) => (
-                                <TouchableOpacity key={tab} onPress={() => handleTabPress(i)} className="flex-1 items-center justify-center py-3">
-                                    <BaseText type="Subhead" weight={activeTab === i ? 600 : 400} color={activeTab === i ? "system.blue" : "labels.secondary"}>
-                                        {tab}
+                        <View className="gap-5 px-5 mb-6">
+                            <View className="w-full h-[76px] bg-white rounded-xl flex-row">
+                                <TouchableOpacity
+                                    className="flex-1 items-center justify-center gap-2 border-r border-border"
+                                    onPress={() => {
+                                        router.push({
+                                            pathname: "/camera" as any,
+                                            params: {
+                                                patientId: id,
+                                                patientName: `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`,
+                                                patientAvatar: patient?.data?.profile_image?.url || "",
+                                                doctorName: `Dr. ${patient?.data?.doctor?.first_name || ""} ${patient?.data?.doctor?.last_name || ""}`,
+                                                doctorColor: patient?.data?.doctor?.color || "",
+                                            },
+                                        });
+                                    }}
+                                >
+                                    <IconSymbol name="camera" color={colors.system.blue} size={26} />
+                                    <BaseText type="Footnote" color="labels.primary">
+                                        Take photo
                                     </BaseText>
                                 </TouchableOpacity>
-                            ))}
-                            <Animated.View
-                                style={{
-                                    position: "absolute",
-                                    bottom: 0,
-                                    height: 3,
-                                    width: tabWidth,
-                                    backgroundColor: colors.system.blue,
-                                    transform: [{ translateX }],
-                                    borderTopLeftRadius: 3,
-                                    borderTopRightRadius: 3,
+                                <TouchableOpacity
+                                    className="flex-1 items-center justify-center gap-2 border-r border-border"
+                                    onPress={() => {
+                                        router.push({
+                                            pathname: "/(modals)/select-contract",
+                                            params: {
+                                                patientId: id,
+                                            },
+                                        });
+                                    }}
+                                >
+                                    <IconSymbol name="checklist" color={colors.system.blue} size={26} />
+                                    <BaseText type="Footnote" color="labels.primary">
+                                        Fill consent
+                                    </BaseText>
+                                </TouchableOpacity>
+                                <TouchableOpacity className="flex-1 items-center justify-center gap-2" onPress={scanDocument}>
+                                    <IconSymbol name="person.text.rectangle" color={colors.system.blue} size={26} />
+                                    <BaseText type="Footnote" color="labels.primary">
+                                        Add ID
+                                    </BaseText>
+                                </TouchableOpacity>
+                            </View>
+
+                            <View className="bg-white py-2 px-4 rounded-xl">
+                                {!!patient?.data?.numbers?.length && (
+                                    <View className="flex-row items-center justify-between pb-2 border-b border-border">
+                                        <View>
+                                            <BaseText type="Subhead" color="labels.secondary">
+                                                Phone
+                                            </BaseText>
+                                            <BaseText type="Subhead" color="labels.primary">
+                                                {e164ToDisplay(patient?.data?.numbers?.[0]?.value) || patient?.data?.numbers?.[0]?.value}
+                                            </BaseText>
+                                        </View>
+                                        <View className="flex-row gap-3">
+                                            <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="message.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleMessage()} />
+                                            <BaseButton ButtonStyle="Tinted" noText leftIcon={<IconSymbol name="phone.fill" color={colors.system.blue} size={16} />} style={{ width: 30, height: 30 }} onPress={() => handleCall()} />
+                                        </View>
+                                    </View>
+                                )}
+
+                                <View className={`flex-row ${patient?.data?.numbers?.length ? "pt-2" : ""}`}>
+                                    <View className="flex-1 border-r border-border">
+                                        <BaseText type="Subhead" color="labels.secondary">
+                                            assigned to:
+                                        </BaseText>
+                                        <BaseText type="Subhead" color="labels.primary">
+                                            Dr.{patient?.data?.doctor?.first_name} {patient?.data?.doctor?.last_name}
+                                        </BaseText>
+                                    </View>
+                                    <View className="flex-1 pl-3">
+                                        <BaseText type="Subhead" color="labels.secondary">
+                                            chart number:
+                                        </BaseText>
+                                        <BaseText type="Subhead" color="labels.primary">
+                                            #{patient?.data?.chart_number}
+                                        </BaseText>
+                                    </View>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity
+                                className="bg-white py-2 px-4 rounded-xl"
+                                onPress={() => {
+                                    router.push({
+                                        pathname: "/(modals)/patient-details",
+                                        params: { id },
+                                    });
                                 }}
-                            />
+                            >
+                                <View className="flex-row items-center justify-between">
+                                    <BaseText type="Body" color="labels.primary">
+                                        Patient Details
+                                    </BaseText>
+                                    <IconSymbol name="chevron.right" color={colors.system.gray} size={16} />
+                                </View>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                );
+            } else if (item.key === "tabs") {
+                return (
+                    <View className="bg-white border-t  border-t-white" style={{ borderBottomWidth: 1, borderBottomColor: colors.border, zIndex: 100 }}>
+                        <View className="px-5">
+                            <View className="flex-row relative">
+                                {tabs.map((tab, i) => (
+                                    <TouchableOpacity key={tab} onPress={() => handleTabPress(i)} className="flex-1 items-center justify-center py-3">
+                                        <BaseText type="Subhead" weight={activeTab === i ? 600 : 400} color={activeTab === i ? "system.blue" : "labels.secondary"}>
+                                            {tab}
+                                        </BaseText>
+                                    </TouchableOpacity>
+                                ))}
+                                <Animated.View
+                                    style={{
+                                        position: "absolute",
+                                        bottom: 0,
+                                        height: 3,
+                                        width: tabWidth,
+                                        backgroundColor: colors.system.blue,
+                                        transform: [{ translateX }],
+                                        borderTopLeftRadius: 3,
+                                        borderTopRightRadius: 3,
+                                    }}
+                                />
+                            </View>
                         </View>
                     </View>
-                </View>
-            );
-        }
+                );
+            }
 
-        if (item.key === "content") {
-            return (
-            <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
-                {activeTab === 0 && (
-                    isPatientMediaError ? (
-                        <ErrorState 
-                            message={patientMediaError instanceof Error ? patientMediaError.message : (patientMediaError as { message?: string })?.message || "Failed to load media"} 
-                            onRetry={refetchPatientMedia} 
-                            title="Failed to load media"
-                        />
-                    ) : (
-                    <GalleryWithMenu
-                        menuItems={[
-                            {
-                                icon: "sparkles",
-                                label: "Use Magic",
+            if (item.key === "content") {
+                return (
+                    <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
+                        {activeTab === 0 &&
+                            (isPatientMediaError ? (
+                                <ErrorState message={patientMediaError instanceof Error ? patientMediaError.message : (patientMediaError as { message?: string })?.message || "Failed to load media"} onRetry={refetchPatientMedia} title="Failed to load media" />
+                            ) : (
+                                <GalleryWithMenu
+                                    menuItems={[
+                                        {
+                                            icon: "sparkles",
+                                            label: "Use Magic",
 
-                                onPress: (imageUri) => {
-                                    setImageEditorUri(imageUri);
-                                    setImageEditorTool("Magic");
-                                    setImageEditorVisible(true);
-                                },
-                            },
-                            {
-                                icon: "slider.horizontal.3",
-                                label: "Adjustment",
-                                onPress: (imageUri) => {
-                                    setImageEditorUri(imageUri);
-                                    setImageEditorTool("Adjust");
-                                    setImageEditorVisible(true);
-                                },
-                            },
-                            {
-                                icon: "square.and.arrow.up",
-                                label: "Share",
-                                role: "default",
-                                onPress: async (imageUri: string) => {
-                                    try {
-                                        const patientName = `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`.trim();
-                                        const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${imageUri}`;
+                                            onPress: (imageUri) => {
+                                                setImageEditorUri(imageUri);
+                                                setImageEditorTool("Magic");
+                                                setImageEditorVisible(true);
+                                            },
+                                        },
+                                        {
+                                            icon: "slider.horizontal.3",
+                                            label: "Adjustment",
+                                            onPress: (imageUri) => {
+                                                setImageEditorUri(imageUri);
+                                                setImageEditorTool("Adjust");
+                                                setImageEditorVisible(true);
+                                            },
+                                        },
+                                        {
+                                            icon: "square.and.arrow.up",
+                                            label: "Share",
+                                            role: "default",
+                                            onPress: async (imageUri: string) => {
+                                                try {
+                                                    const patientName = `${patient?.data?.first_name || ""} ${patient?.data?.last_name || ""}`.trim();
+                                                    const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${imageUri}`;
 
-                                        // Share with both image and message containing the link
-                                        // The message includes the link so users can copy it
-                                        await Share.share({
-                                            message: message,
-                                            url: imageUri,
-                                        });
-                                    } catch (error: unknown) {
-                                        // If user cancels, don't show error
-                                        const errorMessage = error instanceof Error ? error.message : (error as { message?: string })?.message;
-                                        if (errorMessage !== "User did not share") {
-                                            Alert.alert("Error", "Failed to share image");
-                                        }
-                                    }
-                                },
-                            },
-                            {
-                                icon: "archivebox",
-                                label: "Archive Image",
-                                role: "destructive",
-                                onPress: handleArchiveImage,
-                            },
-                        ]}
-                        actions={{
-                            showBookmark: true,
-                            showEdit: true,
-                            showArchive: true,
-                            showShare: true,
-                        }}
-                        sections={groupedPatientImages}
-                        imageUrlToMediaIdMap={imageUrlToMediaIdMap}
-                        imageUrlToBookmarkMap={imageUrlToBookmarkMap}
-                        patientId={id}
-                        rawMediaData={patientMediaData?.data}
-                        description="Date"
-                    />
-                    )
-                )}
-                {activeTab === 0 && (
-                    <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[8], paddingBottom: safe.bottom + spacing[4] }}>
-                        <TouchableOpacity
-                            className="bg-system-gray6 py-3 px-4 rounded-xl flex-row items-center justify-between"
-                            onPress={() => {
-                                router.push(`/patients/${id}/archive`);
-                            }}
-                        >
-                            <View className="flex-row items-center gap-2">
-                                <IconSymbol name="tray" color={colors.system.gray2} size={24} />
-                                <BaseText type="Body" color="labels.primary">
-                                    Archived Photos
-                                </BaseText>
+                                                    // Share with both image and message containing the link
+                                                    // The message includes the link so users can copy it
+                                                    await Share.share({
+                                                        message: message,
+                                                        url: imageUri,
+                                                    });
+                                                } catch (error: unknown) {
+                                                    // If user cancels, don't show error
+                                                    const errorMessage = error instanceof Error ? error.message : (error as { message?: string })?.message;
+                                                    if (errorMessage !== "User did not share") {
+                                                        Alert.alert("Error", "Failed to share image");
+                                                    }
+                                                }
+                                            },
+                                        },
+                                        {
+                                            icon: "archivebox",
+                                            label: "Archive Image",
+                                            role: "destructive",
+                                            onPress: handleArchiveImage,
+                                        },
+                                    ]}
+                                    actions={{
+                                        showBookmark: true,
+                                        showEdit: true,
+                                        showArchive: true,
+                                        showShare: true,
+                                    }}
+                                    sections={groupedPatientImages}
+                                    imageUrlToMediaIdMap={imageUrlToMediaIdMap}
+                                    imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                                    patientId={id}
+                                    rawMediaData={patientMediaData?.data}
+                                    description="Date"
+                                />
+                            ))}
+                        {activeTab === 0 && (
+                            <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[8], paddingBottom: safe.bottom + spacing[4] }}>
+                                <TouchableOpacity
+                                    className="bg-system-gray6 py-3 px-4 rounded-xl flex-row items-center justify-between"
+                                    onPress={() => {
+                                        router.push(`/patients/${id}/archive`);
+                                    }}
+                                >
+                                    <View className="flex-row items-center gap-2">
+                                        <IconSymbol name="tray" color={colors.system.gray2} size={24} />
+                                        <BaseText type="Body" color="labels.primary">
+                                            Archived Photos
+                                        </BaseText>
+                                    </View>
+                                    <IconSymbol name="chevron.right" color={colors.system.gray2} size={16} />
+                                </TouchableOpacity>
                             </View>
-                            <IconSymbol name="chevron.right" color={colors.system.gray2} size={16} />
-                        </TouchableOpacity>
+                        )}
+                        {activeTab === 1 && <ConsentTabContent patientId={id} />}
+                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} />}
+                        {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
                     </View>
-                )}
-                {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} />}
-                {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
-            </View>
-        );
-        }
-        return null as any;
-    }, [activeTab, patient, patientAge, id, headerHeight, safe, tabs, tabWidth, translateX, handleTabPress, handleCall, handleMessage, scanDocument, groupedPatientImages, imageUrlToMediaIdMap, imageUrlToBookmarkMap, patientMediaData?.data, isPatientMediaError, patientMediaError, refetchPatientMedia, documentsData?.data, isLoadingDocuments, documentsError, isDocumentsError, refetchDocuments, activitiesData?.data, isLoadingActivities, activitiesError, isActivitiesError, refetchActivities, screenHeight, handleArchiveImage, setImageEditorUri, setImageEditorTool, setImageEditorVisible]);
+                );
+            }
+            return null as any;
+        },
+        [
+            activeTab,
+            patient,
+            patientAge,
+            id,
+            headerHeight,
+            safe,
+            tabs,
+            tabWidth,
+            translateX,
+            handleTabPress,
+            handleCall,
+            handleMessage,
+            scanDocument,
+            groupedPatientImages,
+            imageUrlToMediaIdMap,
+            imageUrlToBookmarkMap,
+            patientMediaData?.data,
+            isPatientMediaError,
+            patientMediaError,
+            refetchPatientMedia,
+            documentsData?.data,
+            isLoadingDocuments,
+            documentsError,
+            isDocumentsError,
+            refetchDocuments,
+            activitiesData?.data,
+            isLoadingActivities,
+            activitiesError,
+            isActivitiesError,
+            refetchActivities,
+            screenHeight,
+            handleArchiveImage,
+            setImageEditorUri,
+            setImageEditorTool,
+            setImageEditorVisible,
+        ],
+    );
 
     // Show error state if there's an error with patient data
     if (isPatientError) {
         const errorMessage = (patientError as any)?.message || "Failed to load patient data. Please try again.";
         return (
             <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
-                <ScrollView 
+                <ScrollView
                     style={{ flex: 1 }}
-                    contentContainerStyle={{ 
+                    contentContainerStyle={{
                         paddingTop: headerHeight,
-                        paddingBottom: safe.bottom + spacing["4"] 
+                        paddingBottom: safe.bottom + spacing["4"],
                     }}
                     showsVerticalScrollIndicator={false}
                 >
@@ -774,11 +820,11 @@ export default function PatientDetailsScreen() {
     if (isLoading) {
         return (
             <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
-                <ScrollView 
+                <ScrollView
                     style={{ flex: 1 }}
-                    contentContainerStyle={{ 
+                    contentContainerStyle={{
                         paddingTop: headerHeight,
-                        paddingBottom: safe.bottom + spacing["4"] 
+                        paddingBottom: safe.bottom + spacing["4"],
                     }}
                     showsVerticalScrollIndicator={false}
                 >
@@ -787,7 +833,6 @@ export default function PatientDetailsScreen() {
             </View>
         );
     }
-
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>

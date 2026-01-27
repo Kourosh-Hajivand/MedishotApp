@@ -12,12 +12,14 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Dimensions, Image as RNImage, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { Note } from "./ToolNote";
 
 const { width, height } = Dimensions.get("window");
+const CANVAS_MAX_WIDTH = width;
+const CANVAS_MAX_HEIGHT = height * 0.55;
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
 
 // Note Marker Component - Draggable & Tappable
@@ -160,6 +162,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [notes, setNotes] = useState<Note[]>([]);
     const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
     const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
+    const [imageWrapperLayout, setImageWrapperLayout] = useState({ width: 0, height: 0 });
+    const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
     const hasRequestedRef = useRef(false);
 
     // Pen tool states
@@ -423,12 +427,41 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             setDisplayedImageUri(uri ?? null);
             setOriginalImageUri(uri ?? null);
             setAdjustmentValues(null);
+            setImageAspectRatio(null); // Reset aspect ratio when URI changes
             // Set initial tool if provided
             if (initialTool) {
                 setActiveTool(initialTool);
             }
         }
     }, [uri, initialTool, visible]);
+
+    // Get image dimensions and calculate aspect ratio (fallback if onLoad doesn't fire)
+    useEffect(() => {
+        if (!uri || !visible) {
+            setImageAspectRatio(null);
+            return;
+        }
+
+        // Only use Image.getSize as fallback if aspectRatio is still null after a delay
+        const timeoutId = setTimeout(() => {
+            if (imageAspectRatio === null) {
+                RNImage.getSize(
+                    uri,
+                    (width, height) => {
+                        const ratio = width / height;
+                        setImageAspectRatio(ratio);
+                    },
+                    (error) => {
+                        console.error("Error loading image dimensions:", error);
+                        // Fallback to 3:2 if error
+                        setImageAspectRatio(3 / 2);
+                    },
+                );
+            }
+        }, 100); // Small delay to let onLoad fire first
+
+        return () => clearTimeout(timeoutId);
+    }, [uri, visible, imageAspectRatio]);
 
     useEffect(() => {
         if (!magicSelection) return;
@@ -498,6 +531,33 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
         processImage();
     }, [uri, activeTool, visible]);
+
+    // Calculate dynamic image container style based on aspect ratio
+    // Use actual imageWrapper height to fill available space, with smart fallback
+    const dynamicImageContainerStyle = useMemo(() => {
+        const aspectRatio = imageAspectRatio ?? 3 / 2; // Fallback to 3:2 if not loaded yet
+        
+        // Use actual wrapper dimensions if available, otherwise use screen dimensions
+        const availableHeight = imageWrapperLayout.height > 0 ? imageWrapperLayout.height : CANVAS_MAX_HEIGHT;
+        const availableWidth = imageWrapperLayout.width > 0 ? imageWrapperLayout.width : CANVAS_MAX_WIDTH;
+
+        // Calculate size to maximize while preserving aspect ratio
+        // First, try to fill the height
+        let containerHeight = availableHeight;
+        let containerWidth = containerHeight * aspectRatio;
+
+        // If width exceeds available width, use width constraint instead
+        if (containerWidth > availableWidth) {
+            containerWidth = availableWidth;
+            containerHeight = containerWidth / aspectRatio;
+        }
+
+        return {
+            width: containerWidth,
+            aspectRatio: aspectRatio,
+            alignSelf: "center" as const,
+        };
+    }, [imageAspectRatio, imageWrapperLayout]);
 
     const renderActiveToolPanel = () => {
         const imageUri = uri || "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900";
@@ -578,16 +638,30 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
                 <Animated.View style={styles.canvasContainer} layout={LinearTransition.duration(250)}>
                     <GestureDetector gesture={composedGesture}>
-                        <Animated.View style={[styles.imageWrapper, animatedImageStyle]}>
+                        <Animated.View 
+                            style={[styles.imageWrapper, animatedImageStyle]}
+                            onLayout={(event) => {
+                                const { width, height } = event.nativeEvent.layout;
+                                setImageWrapperLayout({ width, height });
+                            }}
+                        >
                             <View
-                                style={styles.imageContainer}
+                                style={[styles.imageContainer, dynamicImageContainerStyle]}
                                 onLayout={(event) => {
                                     const { width, height, x, y } = event.nativeEvent.layout;
 
                                     setImageContainerLayout({ width, height, x, y });
                                 }}
                             >
-                                <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={styles.image} adjustments={adjustmentValues} />
+                                <FilteredImage 
+                                    source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} 
+                                    style={styles.image} 
+                                    adjustments={adjustmentValues}
+                                    onLoad={(event) => {
+                                        const ratio = event.width / event.height;
+                                        setImageAspectRatio(ratio);
+                                    }}
+                                />
 
                                 {/* Drawing Canvas for Pen Tool */}
                                 <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
@@ -638,13 +712,11 @@ const styles = StyleSheet.create({
     },
     imageWrapper: {
         width: width,
-        height: height * 0.55,
+        height: "100%",
         justifyContent: "center",
         alignItems: "center",
     },
     imageContainer: {
-        width: "100%",
-        height: "100%",
         position: "relative",
     },
     image: {

@@ -1,11 +1,11 @@
 import { BaseText } from "@/components";
-import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -255,7 +255,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
             // Only process media with template
             if (media.template && media.original_media?.url) {
                 const allImages: string[] = [media.original_media.url]; // Start with original_media
-                
+
                 // Add all template images
                 if (media.images && Array.isArray(media.images)) {
                     media.images.forEach((img: any) => {
@@ -264,7 +264,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                         }
                     });
                 }
-                
+
                 map.set(media.original_media.url, allImages);
             }
         });
@@ -295,11 +295,11 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
 
     const handleImagePress = (uri: string) => {
         if (onImagePress) onImagePress(uri);
-        
+
         // Check if this is original_media of a template - if so, use expanded images
         const expandedImages = originalMediaToAllImagesMap?.get(uri);
         const imagesToShow = expandedImages || allImages;
-        
+
         // Find the index of the clicked image in the imagesToShow array
         const index = imagesToShow.indexOf(uri);
         if (index !== -1) {
@@ -309,7 +309,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
             setViewerVisible(true);
         }
     };
-    
+
     // Get images to show in viewer (use viewerImagesList if set, otherwise allImages)
     const viewerImages = useMemo(() => {
         if (viewerImagesList.length > 0) {
@@ -348,26 +348,17 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
             });
         };
 
-        return (
-            <GalleryImageItem
-                uri={uri}
-                index={index}
-                itemWidth={itemWidth}
-                gap={gap}
-                numColumns={numColumns}
-                menuItems={menuItems}
-                onImagePress={handleImagePress}
-                imageUrlToBookmarkMap={imageUrlToBookmarkMap}
-                isLoading={isLoading}
-                onLoadStart={handleImageLoadStart}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-            />
-        );
+        return <GalleryImageItem uri={uri} index={index} itemWidth={itemWidth} gap={gap} numColumns={numColumns} menuItems={menuItems} onImagePress={handleImagePress} imageUrlToBookmarkMap={imageUrlToBookmarkMap} isLoading={isLoading} onLoadStart={handleImageLoadStart} onLoad={handleImageLoad} onError={handleImageError} />;
     };
 
     const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
-        return <View style={styles.rowContainer}>{item.items.map((uri, itemIndex) => <React.Fragment key={`row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>)}</View>;
+        return (
+            <View style={styles.rowContainer}>
+                {item.items.map((uri, itemIndex) => (
+                    <React.Fragment key={`row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>
+                ))}
+            </View>
+        );
     };
 
     const renderSectionHeader = ({ section }: { section: { title: string; data: ImageRow[] } }) => {
