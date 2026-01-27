@@ -70,13 +70,13 @@ interface AdjustmentOption {
 }
 
 const ADJUSTMENT_OPTIONS: AdjustmentOption[] = [
-    { id: "exposure", name: "EXPOSURE", icon: "sun.max.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
+    { id: "exposure", name: "EXPOSURE", icon: "camera.aperture", value: 0, min: -100, max: 100, defaultValue: 0 },
     { id: "brightness", name: "BRIGHTNESS", icon: "sun.max.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
     { id: "contrast", name: "CONTRAST", icon: "circle.lefthalf.filled", value: 0, min: -100, max: 100, defaultValue: 0 },
-    { id: "saturation", name: "SATURATION", icon: "circle.lefthalf.filled", value: 0, min: -100, max: 100, defaultValue: 0 },
+    { id: "saturation", name: "SATURATION", icon: "paintpalette.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
     { id: "warmth", name: "WARMTH", icon: "thermometer.sun.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
-    { id: "highlights", name: "HIGHLIGHTS", icon: "circle.lefthalf.filled", value: 0, min: -100, max: 100, defaultValue: 0 },
-    { id: "shadows", name: "SHADOWS", icon: "circle.lefthalf.filled", value: 0, min: -100, max: 100, defaultValue: 0 },
+    { id: "highlights", name: "HIGHLIGHTS", icon: "sun.max.circle.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
+    { id: "shadows", name: "SHADOWS", icon: "moon.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
 ];
 
 export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel }) => {

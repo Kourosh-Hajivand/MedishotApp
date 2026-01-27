@@ -14,13 +14,283 @@ import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, Image as RNImage, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { Note } from "./ToolNote";
 
 const { width, height } = Dimensions.get("window");
 const CANVAS_MAX_WIDTH = width;
 const CANVAS_MAX_HEIGHT = height * 0.55;
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+
+// Debug Overlay Component
+type DebugOverlayProps = {
+    visible: boolean;
+    touchPosition: { x: number; y: number } | null;
+    notePositions: Array<{ id: string; x: number; y: number; containerWidth: number; containerHeight: number }>;
+    magnifierPosition: { x: number; y: number } | null;
+    containerLayout: { x: number; y: number; width: number; height: number };
+};
+
+const DebugOverlay: React.FC<DebugOverlayProps> = ({ visible, touchPosition, notePositions, magnifierPosition, containerLayout }) => {
+    if (!visible) return null;
+
+    return (
+        <View
+            style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                pointerEvents: "none",
+                zIndex: 2000,
+            }}
+        >
+            {/* Touch Position (Blue) */}
+            {touchPosition && (
+                <>
+                    <View
+                        style={{
+                            position: "absolute",
+                            left: touchPosition.x - 10,
+                            top: touchPosition.y - 10,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: "#0066FF",
+                            borderWidth: 2,
+                            borderColor: "#FFFFFF",
+                        }}
+                    />
+                    <View
+                        style={{
+                            position: "absolute",
+                            left: touchPosition.x + 15,
+                            top: touchPosition.y - 10,
+                            backgroundColor: "rgba(0, 0, 0, 0.7)",
+                            padding: 4,
+                            borderRadius: 4,
+                        }}
+                    >
+                        <BaseText type="Caption2" color="system.white" style={{ fontSize: 10 }}>
+                            Touch: ({Math.round(touchPosition.x)}, {Math.round(touchPosition.y)})
+                        </BaseText>
+                    </View>
+                </>
+            )}
+
+            {/* Note Positions (Green) */}
+            {notePositions.map((note) => {
+                const noteX = note.x * note.containerWidth + containerLayout.x;
+                const noteY = note.y * note.containerHeight + containerLayout.y;
+                return (
+                    <React.Fragment key={note.id}>
+                        <View
+                            style={{
+                                position: "absolute",
+                                left: noteX - 10,
+                                top: noteY - 10,
+                                width: 20,
+                                height: 20,
+                                borderRadius: 10,
+                                backgroundColor: "#00FF00",
+                                borderWidth: 2,
+                                borderColor: "#FFFFFF",
+                            }}
+                        />
+                        <View
+                            style={{
+                                position: "absolute",
+                                left: noteX + 15,
+                                top: noteY - 10,
+                                backgroundColor: "rgba(0, 0, 0, 0.7)",
+                                padding: 4,
+                                borderRadius: 4,
+                            }}
+                        >
+                            <BaseText type="Caption2" color="system.white" style={{ fontSize: 10 }}>
+                                Note: ({Math.round(noteX)}, {Math.round(noteY)})
+                            </BaseText>
+                        </View>
+                        {/* Line from touch to note */}
+                        {touchPosition && (
+                            <View
+                                style={{
+                                    position: "absolute",
+                                    left: Math.min(touchPosition.x, noteX),
+                                    top: Math.min(touchPosition.y, noteY),
+                                    width: Math.abs(touchPosition.x - noteX),
+                                    height: Math.abs(touchPosition.y - noteY),
+                                    borderWidth: 1,
+                                    borderColor: "#00FF00",
+                                    borderStyle: "dashed",
+                                }}
+                            />
+                        )}
+                    </React.Fragment>
+                );
+            })}
+
+            {/* Magnifier Position (Red) */}
+            {magnifierPosition && (
+                <>
+                    <View
+                        style={{
+                            position: "absolute",
+                            left: magnifierPosition.x + containerLayout.x - 10,
+                            top: magnifierPosition.y + containerLayout.y - 10,
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: "#FF0000",
+                            borderWidth: 2,
+                            borderColor: "#FFFFFF",
+                        }}
+                    />
+                    <View
+                        style={{
+                            position: "absolute",
+                            left: magnifierPosition.x + containerLayout.x + 15,
+                            top: magnifierPosition.y + containerLayout.y - 10,
+                            backgroundColor: "rgba(0, 0, 0, 0.7)",
+                            padding: 4,
+                            borderRadius: 4,
+                        }}
+                    >
+                        <BaseText type="Caption2" color="system.white" style={{ fontSize: 10 }}>
+                            Magnifier: ({Math.round(magnifierPosition.x + containerLayout.x)}, {Math.round(magnifierPosition.y + containerLayout.y)})
+                        </BaseText>
+                    </View>
+                </>
+            )}
+
+            {/* Container Layout Info */}
+            <View
+                style={{
+                    position: "absolute",
+                    top: 100,
+                    left: 20,
+                    backgroundColor: "rgba(0, 0, 0, 0.8)",
+                    padding: 8,
+                    borderRadius: 8,
+                }}
+            >
+                <BaseText type="Caption2" color="system.white" style={{ fontSize: 10 }}>
+                    Container: x={Math.round(containerLayout.x)}, y={Math.round(containerLayout.y)}
+                </BaseText>
+                <BaseText type="Caption2" color="system.white" style={{ fontSize: 10 }}>
+                    Size: {Math.round(containerLayout.width)} x {Math.round(containerLayout.height)}
+                </BaseText>
+            </View>
+        </View>
+    );
+};
+
+// Note Magnifier Component
+type NoteMagnifierProps = {
+    visible: boolean;
+    x: number;
+    y: number;
+    imageUri: string;
+    containerX: number;
+    containerY: number;
+    containerWidth: number;
+    containerHeight: number;
+};
+
+const NoteMagnifier: React.FC<NoteMagnifierProps> = ({ visible, x, y, imageUri, containerX, containerY, containerWidth, containerHeight }) => {
+    const opacity = useSharedValue(0);
+    const scale = useSharedValue(0.8);
+
+    React.useEffect(() => {
+        if (visible) {
+            opacity.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+            scale.value = withTiming(1, { duration: 200, easing: Easing.out(Easing.ease) });
+        } else {
+            opacity.value = withTiming(0, { duration: 200, easing: Easing.out(Easing.ease) });
+            scale.value = withTiming(0.8, { duration: 200, easing: Easing.out(Easing.ease) });
+        }
+    }, [visible]);
+
+    const magnifierStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+        transform: [{ scale: scale.value }],
+    }));
+
+    if (!visible) return null;
+
+    const MAGNIFIER_SIZE = 100;
+    const MAGNIFIER_RADIUS = MAGNIFIER_SIZE / 2;
+    const MAGNIFIER_OFFSET = 120; // Distance above finger
+
+    // Calculate position relative to screen
+    const screenX = containerX + x;
+    const screenY = containerY + y - MAGNIFIER_OFFSET - MAGNIFIER_RADIUS;
+
+    // Calculate image position in magnifier (center the touched point exactly)
+    // x and y are relative to container, so we need to center that point in magnifier
+    // For 2.5x zoom, the point (x, y) should be at the center of magnifier
+    // The zoomed image is at position (imageX - MAGNIFIER_RADIUS, imageY - MAGNIFIER_RADIUS)
+    // The point (x, y) in the zoomed image is at (x * zoomFactor, y * zoomFactor)
+    // For this point to be at magnifier center (MAGNIFIER_RADIUS, MAGNIFIER_RADIUS):
+    // imageX - MAGNIFIER_RADIUS + x * zoomFactor = MAGNIFIER_RADIUS
+    // imageX = 2 * MAGNIFIER_RADIUS - x * zoomFactor
+    const zoomFactor = 2.5;
+    const imageX = 2 * MAGNIFIER_RADIUS - x * zoomFactor;
+    const imageY = 2 * MAGNIFIER_RADIUS - y * zoomFactor;
+
+    return (
+        <Animated.View
+            style={[
+                {
+                    position: "absolute",
+                    left: screenX - MAGNIFIER_RADIUS,
+                    top: screenY,
+                    width: MAGNIFIER_SIZE,
+                    height: MAGNIFIER_SIZE,
+                    borderRadius: MAGNIFIER_RADIUS,
+                    backgroundColor: colors.system.white,
+                    borderWidth: 3,
+                    borderColor: "#FFCC00",
+                    shadowColor: colors.system.black,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 12,
+                    overflow: "hidden",
+                    zIndex: 1000,
+                },
+                magnifierStyle,
+            ]}
+        >
+            <View
+                style={{
+                    position: "absolute",
+                    left: imageX - MAGNIFIER_RADIUS,
+                    top: imageY - MAGNIFIER_RADIUS,
+                    width: containerWidth * zoomFactor,
+                    height: containerHeight * zoomFactor,
+                }}
+            >
+                <Image source={{ uri: imageUri }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+            </View>
+            {/* Center indicator - small circle with yellow border (should match the red dot) */}
+            <View
+                style={{
+                    position: "absolute",
+                    left: MAGNIFIER_RADIUS - 4,
+                    top: MAGNIFIER_RADIUS - 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: "#FFCC00",
+                    backgroundColor: "transparent",
+                    zIndex: 1002,
+                }}
+            />
+        </Animated.View>
+    );
+};
 
 // Note Marker Component - Draggable & Tappable
 const NoteMarker: React.FC<{
@@ -31,7 +301,10 @@ const NoteMarker: React.FC<{
     isActive: boolean;
     onMove: (id: string, x: number, y: number) => void;
     onSelect: (id: string) => void;
-}> = ({ note, index, containerWidth, containerHeight, isActive, onMove, onSelect }) => {
+    onDragStart?: (id: string, x: number, y: number) => void;
+    onDragUpdate?: (id: string, x: number, y: number) => void;
+    onDragEnd?: (id: string) => void;
+}> = ({ note, index, containerWidth, containerHeight, isActive, onMove, onSelect, onDragStart, onDragUpdate, onDragEnd }) => {
     const markerScale = useSharedValue(0);
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
@@ -68,20 +341,39 @@ const NoteMarker: React.FC<{
             markerScale.value = withSpring(1.2, { damping: 15, stiffness: 200 });
             runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
             runOnJS(onSelect)(note.id); // Select on drag start
+            if (onDragStart) {
+                const startX = note.x * containerWidth;
+                const startY = note.y * containerHeight;
+                runOnJS(onDragStart)(note.id, startX, startY);
+            }
         })
         .onUpdate((event) => {
-            translateX.value = event.translationX;
-            translateY.value = event.translationY;
+            // Calculate new position and clamp to container bounds
+            const currentX = note.x * containerWidth + event.translationX;
+            const currentY = note.y * containerHeight + event.translationY;
+
+            // Clamp to container bounds
+            const clampedX = Math.max(0, Math.min(currentX, containerWidth));
+            const clampedY = Math.max(0, Math.min(currentY, containerHeight));
+
+            // Set translation values based on clamped position
+            translateX.value = clampedX - note.x * containerWidth;
+            translateY.value = clampedY - note.y * containerHeight;
+
+            // Update magnifier position
+            if (onDragUpdate) {
+                runOnJS(onDragUpdate)(note.id, clampedX, clampedY);
+            }
         })
         .onEnd(() => {
             isDragging.value = false;
             markerScale.value = withSpring(1, { damping: 15, stiffness: 200 });
 
-            // Calculate new position as percentage
+            // Calculate new position as percentage (already clamped in onUpdate)
             const currentX = note.x * containerWidth + translateX.value;
             const currentY = note.y * containerHeight + translateY.value;
 
-            // Clamp to container bounds
+            // Clamp to container bounds (double check)
             const clampedX = Math.max(0, Math.min(currentX, containerWidth));
             const clampedY = Math.max(0, Math.min(currentY, containerHeight));
 
@@ -91,6 +383,10 @@ const NoteMarker: React.FC<{
             // Don't reset translation here - let useEffect handle it after state updates
             runOnJS(onMove)(note.id, newX, newY);
             runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
+
+            if (onDragEnd) {
+                runOnJS(onDragEnd)(note.id);
+            }
         });
 
     // Combine tap and pan - pan takes priority if dragging
@@ -164,6 +460,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [imageContainerLayout, setImageContainerLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
     const [imageWrapperLayout, setImageWrapperLayout] = useState({ width: 0, height: 0 });
     const [imageAspectRatio, setImageAspectRatio] = useState<number | null>(null);
+    const [magnifierState, setMagnifierState] = useState<{ visible: boolean; x: number; y: number; noteId: string | null }>({
+        visible: false,
+        x: 0,
+        y: 0,
+        noteId: null,
+    });
+    const [debugMode, setDebugMode] = useState(false);
+    const [debugTouchPosition, setDebugTouchPosition] = useState<{ x: number; y: number } | null>(null);
     const hasRequestedRef = useRef(false);
 
     // Pen tool states
@@ -200,20 +504,51 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         setNotes((prevNotes) => prevNotes.map((note) => (note.id === id ? { ...note, x: newX, y: newY } : note)));
     };
 
+    // Magnifier callbacks
+    const handleDragStart = (id: string, x: number, y: number) => {
+        setMagnifierState({ visible: true, x, y, noteId: id });
+    };
+
+    const handleDragUpdate = (id: string, x: number, y: number) => {
+        setMagnifierState((prev) => (prev.noteId === id ? { ...prev, x, y } : prev));
+    };
+
+    const handleDragEnd = (id: string) => {
+        setMagnifierState((prev) => (prev.noteId === id ? { ...prev, visible: false, noteId: null } : prev));
+    };
+
     // Add note callback - uses functional update to get latest notes
     const addNoteCallback = (locationX: number, locationY: number) => {
-        const { width, height } = imageContainerLayout;
+        const { width, height, x, y } = imageContainerLayout;
         if (width === 0 || height === 0) return;
 
-        const x = locationX / width;
-        const y = locationY / height;
+        // Check if touch is within container bounds
+        // locationX and locationY are relative to imageWrapper
+        // imageContainer is at position (x, y) relative to imageWrapper
+        if (locationX < x || locationX > x + width || locationY < y || locationY > y + height) {
+            // Touch is outside container, don't add note
+            return;
+        }
+
+        // Store touch position for debug
+        if (debugMode) {
+            setDebugTouchPosition({ x: locationX, y: locationY });
+        }
+
+        // Adjust touch position relative to container (subtract container offset)
+        const adjustedX = locationX - x;
+        const adjustedY = locationY - y;
+
+        // Normalize to 0-1 range
+        const normalizedX = adjustedX / width;
+        const normalizedY = adjustedY / height;
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
         const newNote: Note = {
             id: Date.now().toString(),
-            x,
-            y,
+            x: normalizedX,
+            y: normalizedY,
             text: "",
         };
 
@@ -246,7 +581,15 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 runOnJS(addNoteCallback)(event.x, event.y);
             });
 
-        return Gesture.Exclusive(tap, pinch);
+        const doubleTap = Gesture.Tap()
+            .numberOfTaps(2)
+            .onEnd(() => {
+                runOnJS(() => {
+                    setDebugMode((prev) => !prev);
+                })();
+            });
+
+        return Gesture.Exclusive(tap, pinch, doubleTap);
     }, [activeTool, imageContainerLayout, scale]);
 
     const animatedImageStyle = useAnimatedStyle(() => ({
@@ -667,10 +1010,56 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                 <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
 
                                 {/* Note Markers */}
-                                {activeTool === "Note" && notes.map((note, index) => <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} isActive={activeNoteId === note.id} onMove={handleMoveNote} onSelect={setActiveNoteId} />)}
+                                {activeTool === "Note" &&
+                                    notes.map((note, index) => (
+                                        <NoteMarker
+                                            key={note.id}
+                                            note={note}
+                                            index={index}
+                                            containerWidth={imageContainerLayout.width}
+                                            containerHeight={imageContainerLayout.height}
+                                            isActive={activeNoteId === note.id}
+                                            onMove={handleMoveNote}
+                                            onSelect={setActiveNoteId}
+                                            onDragStart={handleDragStart}
+                                            onDragUpdate={handleDragUpdate}
+                                            onDragEnd={handleDragEnd}
+                                        />
+                                    ))}
                             </View>
                         </Animated.View>
                     </GestureDetector>
+                    
+                    {/* Magnifier - rendered at canvasContainer level to appear above everything */}
+                    {activeTool === "Note" && magnifierState.visible && (
+                        <NoteMagnifier
+                            visible={magnifierState.visible}
+                            x={magnifierState.x}
+                            y={magnifierState.y}
+                            imageUri={displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900"}
+                            containerX={imageContainerLayout.x}
+                            containerY={imageContainerLayout.y}
+                            containerWidth={imageContainerLayout.width}
+                            containerHeight={imageContainerLayout.height}
+                        />
+                    )}
+
+                    {/* Debug Overlay */}
+                    {debugMode && (
+                        <DebugOverlay
+                            visible={debugMode}
+                            touchPosition={debugTouchPosition}
+                            notePositions={notes.map((note) => ({
+                                id: note.id,
+                                x: note.x,
+                                y: note.y,
+                                containerWidth: imageContainerLayout.width,
+                                containerHeight: imageContainerLayout.height,
+                            }))}
+                            magnifierPosition={magnifierState.visible ? { x: magnifierState.x, y: magnifierState.y } : null}
+                            containerLayout={imageContainerLayout}
+                        />
+                    )}
                 </Animated.View>
 
                 <Animated.View key={activeTool} className="w-full" entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} layout={LinearTransition.duration(250)}>
