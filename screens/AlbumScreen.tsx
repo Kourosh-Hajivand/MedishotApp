@@ -114,11 +114,12 @@ export const AlbumScreen: React.FC = () => {
     }, [albums]);
 
     // Extract unique gosts and group photos by gost, also extract patientId
-    const { gostsWithPhotos, extractedPatientId } = useMemo(() => {
-        if (!albums || albums.length === 0) return { gostsWithPhotos: [], extractedPatientId: null };
+    const { gostsWithPhotos, extractedPatientId, allOnlyPhotos } = useMemo(() => {
+        if (!albums || albums.length === 0) return { gostsWithPhotos: [], extractedPatientId: null, allOnlyPhotos: [] };
 
         const gostMap = new Map<number, { gost: Gost; photos: Media[] }>();
         let patientId: number | null = null;
+        const allOnlyPhotosMap = new Map<string, Media>(); // Use Map to prevent duplicates (key: id-url)
 
         // First, collect all unique gosts from albums
         albums.forEach((album) => {
@@ -141,23 +142,67 @@ export const AlbumScreen: React.FC = () => {
                 const mediaWithTemplate = mediaItem as PatientMedia & Partial<PatientMediaWithTemplate>;
                 const hasTemplate = mediaWithTemplate.template || (mediaWithTemplate.data && typeof mediaWithTemplate.data === "object" && "template" in mediaWithTemplate.data);
 
-                // If media has a template, only show original_media in gallery (not individual images)
+                // If media has a template, show composite in "All" tab and individual images in gost tabs
                 if (hasTemplate && mediaItem.original_media?.url) {
-                    // Find the gost_id from template images to determine which gost this belongs to
-                    // PatientMediaWithTemplate has images array with gost_id
-                    if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images) && mediaWithTemplate.images.length > 0) {
-                        const firstImage = mediaWithTemplate.images[0];
-                        const firstImageGostId = firstImage?.gost?.id;
-                        if (firstImageGostId && gostMap.has(firstImageGostId)) {
-                            const mediaObj: Media = {
-                                id: mediaItem.id,
-                                url: mediaItem.original_media.url,
-                                created_at: mediaItem.created_at || "",
-                                updated_at: mediaItem.created_at || "",
-                            };
-                            gostMap.get(firstImageGostId)!.photos.push(mediaObj);
-                        }
+                    // Add composite (original_media) to allOnlyPhotos (will appear only in "All" tab)
+                    const compositeMediaObj: Media = {
+                        id: mediaItem.id,
+                        url: mediaItem.original_media.url,
+                        created_at: mediaItem.created_at || "",
+                        updated_at: mediaItem.created_at || "",
+                    };
+                    const compositeUniqueKey = `${compositeMediaObj.id}-${compositeMediaObj.url}`;
+                    if (!allOnlyPhotosMap.has(compositeUniqueKey)) {
+                        allOnlyPhotosMap.set(compositeUniqueKey, compositeMediaObj);
                     }
+
+                    // Add individual images to their respective gosts (will appear in gost tabs)
+                    if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images) && mediaWithTemplate.images.length > 0) {
+                        mediaWithTemplate.images.forEach((imageItem) => {
+                            const imageGostId = imageItem?.gost?.id;
+                            if (imageGostId && imageItem?.image && gostMap.has(imageGostId)) {
+                                const imageUrl = typeof imageItem.image === "string" ? imageItem.image : (imageItem.image?.url || null);
+
+                                if (imageUrl) {
+                                    const imageMediaObj: Media = {
+                                        id: imageItem.id || Date.now(),
+                                        url: imageUrl,
+                                        created_at: imageItem.created_at || mediaItem.created_at || "",
+                                        updated_at: imageItem.updated_at || mediaItem.created_at || "",
+                                    };
+
+                                    // Prevent duplicate in each gost
+                                    const gostPhotos = gostMap.get(imageGostId)!.photos;
+                                    const isDuplicate = gostPhotos.some((photo) => photo.id === imageMediaObj.id && photo.url === imageMediaObj.url);
+                                    if (!isDuplicate) {
+                                        gostPhotos.push(imageMediaObj);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                } else if (hasTemplate && !mediaItem.original_media?.url && mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
+                    // Template media without original_media: add individual images to allOnlyPhotos (will appear only in "All" tab)
+                    mediaWithTemplate.images.forEach((imageItem: (typeof mediaWithTemplate.images)[0]) => {
+                        if (imageItem?.image) {
+                            const imageUrl = typeof imageItem.image === "string" ? imageItem.image : (imageItem.image?.url || null);
+
+                            if (imageUrl) {
+                                const mediaObj: Media = {
+                                    id: imageItem.id || Date.now(),
+                                    url: imageUrl,
+                                    created_at: imageItem.created_at || mediaItem.created_at || "",
+                                    updated_at: imageItem.updated_at || mediaItem.created_at || "",
+                                };
+
+                                // Add to allOnlyPhotos (will appear only in "All" tab)
+                                const uniqueKey = `${mediaObj.id}-${mediaObj.url}`;
+                                if (!allOnlyPhotosMap.has(uniqueKey)) {
+                                    allOnlyPhotosMap.set(uniqueKey, mediaObj);
+                                }
+                            }
+                        }
+                    });
                 } else if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
                     // For non-template media, show all images
                     mediaWithTemplate.images.forEach((imageItem: (typeof mediaWithTemplate.images)[0]) => {
@@ -187,6 +232,7 @@ export const AlbumScreen: React.FC = () => {
                 return a.gost.name.localeCompare(b.gost.name);
             }),
             extractedPatientId: patientId,
+            allOnlyPhotos: Array.from(allOnlyPhotosMap.values()),
         };
     }, [albums]);
 
@@ -198,19 +244,28 @@ export const AlbumScreen: React.FC = () => {
         }
     }, [gostsWithPhotos, selectedGostId]);
 
-    // Get all photos from all gosts, sorted by created_at (newest first)
+    // Get all photos for "All" tab, sorted by created_at (newest first)
+    // Use Map to prevent duplicates (key: mediaId-url)
+    // In "All" tab: show composite if exists, otherwise show individual images
     const allPhotos = useMemo(() => {
-        const all: Media[] = [];
-        gostsWithPhotos.forEach(({ photos }) => {
-            all.push(...photos);
+        const uniquePhotosMap = new Map<string, Media>();
+
+        // Add all-only photos (composite for template with original_media, individual images for template without original_media)
+        allOnlyPhotos.forEach((photo) => {
+            const uniqueKey = `${photo.id}-${photo.url}`;
+            if (!uniquePhotosMap.has(uniqueKey)) {
+                uniquePhotosMap.set(uniqueKey, photo);
+            }
         });
-        // Sort by created_at (newest first)
+
+        // Convert Map to array and sort by created_at (newest first)
+        const all = Array.from(uniquePhotosMap.values());
         return all.sort((a, b) => {
             const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
             const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
             return dateB - dateA;
         });
-    }, [gostsWithPhotos]);
+    }, [gostsWithPhotos, allOnlyPhotos]);
 
     // Get photos for selected gost (null = "All"), sorted by created_at (newest first)
     const photos = useMemo(() => {
