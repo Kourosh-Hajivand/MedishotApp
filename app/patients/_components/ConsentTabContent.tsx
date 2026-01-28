@@ -31,7 +31,8 @@ export const ConsentTabContent = React.memo(({ patientId }: { patientId: string 
 
     if (contracts.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center">
+            <View className="flex-1 items-center justify-center gap-3">
+                <IconSymbol name="checklist" color={colors.labels.tertiary} size={48} />
                 <BaseText type="Body" color="labels.secondary" className="text-center">
                     No contracts signed yet
                 </BaseText>
