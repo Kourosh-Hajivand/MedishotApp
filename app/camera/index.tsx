@@ -644,6 +644,41 @@ export default function CameraScreen() {
         [patientId, templateId],
     );
 
+    // Auto-navigate to review for non-template photos OR template with single ghost after successful upload
+    useEffect(() => {
+        // For non-template photos OR template with single ghost
+        const isSingleGhostTemplate = hasGhostItems && ghostItemsData.length === 1;
+        if ((!hasGhostItems || isSingleGhostTemplate) && capturedPhotos.length > 0) {
+            // Check if all photos are uploaded
+            const relevantPhotos = isSingleGhostTemplate
+                ? capturedPhotos.filter((p) => p.templateId !== "no-template")
+                : capturedPhotos.filter((p) => p.templateId === "no-template");
+
+            const allUploaded =
+                relevantPhotos.length > 0 &&
+                relevantPhotos.every((p) => {
+                    return p.tempFilename || tempFilenameMapRef.current.has(p.id);
+                });
+
+            // Only navigate if we have at least one photo and all are uploaded
+            if (allUploaded && relevantPhotos.length > 0) {
+                // Small delay to ensure state is updated
+                const timeoutId = setTimeout(() => {
+                    const finalPhotos = capturedPhotos.map((p) => {
+                        const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                        if (tempFilenameFromRef && !p.tempFilename) {
+                            return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                        }
+                        return p;
+                    });
+                    handleGoToReview(finalPhotos);
+                }, 200);
+
+                return () => clearTimeout(timeoutId);
+            }
+        }
+    }, [capturedPhotos, hasGhostItems, ghostItemsData.length, handleGoToReview]);
+
     // Handle retake - remove photo for current ghost and allow retaking
     const handleRetake = useCallback(() => {
         if (!currentGhostData) return;
@@ -1086,64 +1121,52 @@ export default function CameraScreen() {
                 </View>
 
                 <View style={styles.headerRight}>
-                    {/* Save Button - Only enable when conditions are met */}
-                    {(() => {
-                        // Check if any photo is currently uploading
-                        const isUploading = capturedPhotos.some((p) => p.uploadStatus === "uploading");
+                    {/* Save Button - Only show for template photos with more than one ghost (single ghost templates auto-navigate) */}
+                    {hasGhostItems && ghostItemsData.length > 1 &&
+                        (() => {
+                            // Check if any photo is currently uploading
+                            const isUploading = capturedPhotos.some((p) => p.uploadStatus === "uploading");
 
-                        // Check if save button should be enabled
-                        let canSave = false;
-
-                        if (!hasGhostItems) {
-                            // No template: need at least one photo uploaded
-                            const noTemplatePhotos = capturedPhotos.filter((p) => p.templateId === "no-template");
-                            canSave =
-                                noTemplatePhotos.length > 0 &&
-                                noTemplatePhotos.every((p) => {
-                                    // Check state first, then ref
-                                    return p.tempFilename || tempFilenameMapRef.current.has(p.id);
-                                });
-                        } else {
+                            // Check if save button should be enabled
                             // With template: need all photos captured and uploaded
                             const allCaptured = capturedPhotos.length === ghostItemsData.length;
                             const allUploaded = capturedPhotos.every((p) => {
                                 // Check state first, then ref
                                 return p.tempFilename || tempFilenameMapRef.current.has(p.id);
                             });
-                            canSave = allCaptured && allUploaded;
-                        }
+                            const canSave = allCaptured && allUploaded;
 
-                        const isDisabled = !canSave || isUploading;
+                            const isDisabled = !canSave || isUploading;
 
-                        return (
-                            <TouchableOpacity
-                                style={[styles.saveButtonHeader, isDisabled && styles.saveButtonHeaderDisabled]}
-                                onPress={() => {
-                                    if (canSave && !isUploading) {
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        // Merge tempFilename from ref into photos before going to review
-                                        const finalPhotos = capturedPhotos.map((p) => {
-                                            const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
-                                            if (tempFilenameFromRef && !p.tempFilename) {
-                                                return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
-                                            }
-                                            return p;
-                                        });
-                                        handleGoToReview(finalPhotos);
-                                    }
-                                }}
-                                disabled={isDisabled}
-                            >
-                                {isUploading ? (
-                                    <ActivityIndicator size="small" color={colors.system.gray} />
-                                ) : (
-                                    <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
-                                        Save
-                                    </BaseText>
-                                )}
-                            </TouchableOpacity>
-                        );
-                    })()}
+                            return (
+                                <TouchableOpacity
+                                    style={[styles.saveButtonHeader, isDisabled && styles.saveButtonHeaderDisabled]}
+                                    onPress={() => {
+                                        if (canSave && !isUploading) {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            // Merge tempFilename from ref into photos before going to review
+                                            const finalPhotos = capturedPhotos.map((p) => {
+                                                const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                                if (tempFilenameFromRef && !p.tempFilename) {
+                                                    return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                                }
+                                                return p;
+                                            });
+                                            handleGoToReview(finalPhotos);
+                                        }
+                                    }}
+                                    disabled={isDisabled}
+                                >
+                                    {isUploading ? (
+                                        <ActivityIndicator size="small" color={colors.system.gray} />
+                                    ) : (
+                                        <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
+                                            Save
+                                        </BaseText>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })()}
                 </View>
             </View>
 

@@ -161,12 +161,14 @@ export default function ReviewScreen() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [capturedPhotos]);
 
-    // Generate composite photo when template photos are available
+    // Generate composite photo when template photos are available (only for templates with more than one ghost)
     React.useEffect(() => {
         const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
         const allPhotosLoaded = capturedPhotos.every((p) => p.templateId === "no-template" || p.uri);
+        // Only generate composite if template has more than one ghost
+        const shouldGenerateComposite = hasTemplate && ghostItemsData.length > 1;
 
-        if (hasTemplate && ghostItemsData.length > 0 && capturedPhotos.length > 0 && !compositePhoto && !isGeneratingComposite && compositeLayoutReady && allPhotosLoaded) {
+        if (shouldGenerateComposite && capturedPhotos.length > 0 && !compositePhoto && !isGeneratingComposite && compositeLayoutReady && allPhotosLoaded) {
             generateCompositePhoto();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -428,8 +430,9 @@ export default function ReviewScreen() {
             return;
         }
 
-        // Check if composite photo is ready (for template uploads)
+        // Check if composite photo is ready (for template uploads with more than one ghost)
         const hasTemplate = templateId && photosToSave.some((p) => p.templateId !== "no-template");
+        const needsComposite = hasTemplate && ghostItemsData.length > 1;
 
         // Find composite photo from allPhotos (more reliable than state)
         const compositeFromAllPhotos = allPhotos.find((p) => p.isComposite);
@@ -437,7 +440,8 @@ export default function ReviewScreen() {
         // Use compositeFromAllPhotos if available, otherwise fall back to state
         const finalCompositePhoto = compositeFromAllPhotos || compositePhoto;
 
-        if (hasTemplate && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
+        // Only check composite for templates with more than one ghost
+        if (needsComposite && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
             Alert.alert("Please wait", "Composite image is still being generated. Please wait a moment.");
             return;
         }
@@ -488,14 +492,17 @@ export default function ReviewScreen() {
                     images: images,
                 };
 
-                // Add composite photo media if available (required for template uploads)
-                if (finalCompositePhoto?.tempFilename) {
-                    requestData.media = finalCompositePhoto.tempFilename;
-                } else {
-                    Alert.alert("Error", "Composite image is not ready yet. Please wait.");
-                    setIsSaving(false);
-                    return;
+                // Add composite photo media if available (required for template uploads with more than one ghost)
+                if (ghostItemsData.length > 1) {
+                    if (finalCompositePhoto?.tempFilename) {
+                        requestData.media = finalCompositePhoto.tempFilename;
+                    } else {
+                        Alert.alert("Error", "Composite image is not ready yet. Please wait.");
+                        setIsSaving(false);
+                        return;
+                    }
                 }
+                // For single ghost templates, no composite is needed
 
                 // Call API
                 uploadMediaWithTemplate({
@@ -606,9 +613,10 @@ export default function ReviewScreen() {
         [isGeneratingComposite],
     );
 
-    // Check if we need to wait for composite photo
+    // Check if we need to wait for composite photo (only for templates with more than one ghost)
     const hasTemplate = templateId && capturedPhotos.some((p) => p.templateId !== "no-template");
-    const isCompositeGenerating = hasTemplate && (isGeneratingComposite || (compositePhoto && compositePhoto.uploadStatus === "uploading"));
+    const needsComposite = hasTemplate && ghostItemsData.length > 1;
+    const isCompositeGenerating = needsComposite && (isGeneratingComposite || (compositePhoto && compositePhoto.uploadStatus === "uploading"));
 
     // Loading state
     if (isPatientLoading) {
