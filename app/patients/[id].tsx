@@ -521,9 +521,12 @@ export default function PatientDetailsScreen() {
                                         </BaseText>
                                     )}
                                 </BaseText>
-                                <BaseText type="Callout" weight={400} color="labels.secondary">
-                                    last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
-                                </BaseText>
+                                <View className="flex-row items-center justify-center gap-0.5 mt-1">
+                                    {patient?.data?.gender && <IconSymbol name={patient.data.gender === "female" ? "figure.stand.dress" : patient.data.gender === "male" ? "figure.stand" : "person.fill"} size={14} color={colors.labels.secondary} />}
+                                    <BaseText type="Callout" weight={400} color="labels.secondary">
+                                        last update: {patient?.data?.updated_at ? getRelativeTime(patient.data.updated_at) : ""}
+                                    </BaseText>
+                                </View>
                             </Animated.View>
                         </View>
 

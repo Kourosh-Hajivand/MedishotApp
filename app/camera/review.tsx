@@ -766,12 +766,12 @@ export default function ReviewScreen() {
                             </BaseText>
                         )}
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.testButton} onPress={() => setShowTestModal(true)} activeOpacity={0.8}>
+                    {/* <TouchableOpacity style={styles.testButton} onPress={() => setShowTestModal(true)} activeOpacity={0.8}>
                         <IconSymbol name="grid" size={18} color={colors.system.blue} />
                         <BaseText type="Body" weight={600} color="system.blue" style={{ marginLeft: 6 }}>
                             Test Layout
                         </BaseText>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
             </View>
 

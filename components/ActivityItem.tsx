@@ -10,9 +10,10 @@ import { StyleSheet, View } from "react-native";
 interface ActivityItemProps {
     activity: ActivityLog;
     showBorder?: boolean;
+    showDateHeader?: boolean;
 }
 
-export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder = true }) => {
+export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder = true, showDateHeader = true }) => {
     const getActivityIcon = (event?: string | null): string => {
         // Map event types to appropriate icons
         if (!event) return "circle.fill";
@@ -105,7 +106,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
 
     return (
         <View>
-            {formattedDate && (
+            {formattedDate && showDateHeader && (
                 <LinearGradient colors={["rgba(255, 255, 255, 0.08)", "rgba(120, 120, 128, 0.08)"]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ paddingHorizontal: 16, paddingVertical: 4, zIndex: 0 }} className="w-full">
                     <BaseText type="Footnote" weight="600" color="labels.tertiary">
                         {formattedDate}
