@@ -41,7 +41,7 @@ export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
     }, [selectedColor, selectedStyle]);
 
     return (
-        <View className="gap-4 pb-2">
+        <View className="gap-4 pb-2 pt-4">
             <View className="flex-row items-center justify-center gap-5">
                 {styleOptions.map((item) => (
                     <TouchableOpacity onPress={() => setSelectedStyle(item)} key={item.title} style={{ borderColor: selectedStyle.title === item.title ? colors.labels.primary : "#D1D1D6" }} className="items-center justify-center gap-2 w-[52px] h-[52px] border border-[#D1D1D6] rounded-full">

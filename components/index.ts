@@ -19,5 +19,7 @@ export { BaseText } from "./text/BaseText";
 export { PracticeDocumentHeader, PracticeDocumentFooter } from "./practice";
 export type { PracticeSettings } from "./practice";
 export { ActivityItem } from "./ActivityItem";
+export { ActivitiesList } from "./ActivitiesList";
+export type { ActivitiesListProps, ActivitySection } from "./ActivitiesList";
 export { ErrorState } from "./ErrorState";
 export { Skeleton, AvatarSkeleton, PatientSkeleton, PatientListSkeleton, ImageSkeleton, PatientDetailSkeleton } from "./skeleton";

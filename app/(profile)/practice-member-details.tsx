@@ -1,7 +1,6 @@
-import { ActivityItem, BaseText } from "@/components";
+import { ActivitiesList, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { AvatarSkeleton, Skeleton } from "@/components/skeleton";
-import { ActivitySkeleton } from "@/components/skeleton/ActivitySkeleton";
 import { useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import { Button, Host, Picker } from "@expo/ui/swift-ui";
@@ -34,19 +33,7 @@ const MemberActivities = ({ memberData, isLoading }: { memberData?: MemberData; 
                     Recent Activities
                 </BaseText>
             </View>
-            {isLoading || !memberData ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                    <ActivitySkeleton key={`skeleton-${index}`} showDate={index === 0} showBorder={index < 4} />
-                ))
-            ) : memberData.activities && memberData.activities.length > 0 ? (
-                memberData.activities.map((activity, index) => <ActivityItem key={index} activity={activity as ActivityLog} showBorder={false} />)
-            ) : (
-                <View className="items-center py-8">
-                    <BaseText type="Body" weight={400} color="labels.secondary">
-                        No recent activities
-                    </BaseText>
-                </View>
-            )}
+            <ActivitiesList activities={(memberData?.activities ?? []) as ActivityLog[]} isLoading={isLoading || !memberData} emptyTitle="No recent activities" emptyDescription="" variant="flat" />
         </View>
     );
 };
@@ -157,9 +144,11 @@ export default function PracticeMemberDetailsScreen() {
             },
         ]);
     };
+    const isOwner = memberData?.data?.role === "owner";
+
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerRight: () => (
+            headerRight: isOwner ? () => null : () => (
                 <Host style={{ width: 90, height: 35 }}>
                     <Button disabled={isLoading} variant="bordered" role="destructive" onPress={handleRemoveMember}>
                         Remove
@@ -167,7 +156,7 @@ export default function PracticeMemberDetailsScreen() {
                 </Host>
             ),
         });
-    }, [navigation, memberData, handleRemoveMember]);
+    }, [navigation, memberData, handleRemoveMember, isOwner]);
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + 60 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             <View className="gap-3">
@@ -193,8 +182,8 @@ export default function PracticeMemberDetailsScreen() {
                     </View>
                 )}
                 <View className="pt-2 border-t border-system-gray5 ">
-                    <View className="px-4">
-                        <Host style={{ width: "100%", height: 38 }}>
+                    <View className="px-4 pt-4">
+                        <Host matchContents style={{ flex: 1 }}>
                             <Picker
                                 label="Picker Type"
                                 options={typeButton}

@@ -10,7 +10,7 @@ interface ActivitySkeletonProps {
 
 export const ActivitySkeleton: React.FC<ActivitySkeletonProps> = ({ showDate = false, showBorder = true }) => {
     return (
-        <View>
+        <View style={{ width: "100%" }}>
             {showDate && (
                 <View style={styles.dateContainer}>
                     <Skeleton width={100} height={14} borderRadius={4} />

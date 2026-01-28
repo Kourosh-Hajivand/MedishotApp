@@ -193,68 +193,70 @@ export default function PracticeTeamScreen() {
                 </View>
             )}
             <View className="pt-0 border-t border-system-gray5">
-                {practiceMembers?.data?.map((member, index) => (
-                    <Host key={`member-${member.id}`} style={{ width: "100%", height: 68 }}>
-                        <ContextMenu activationMethod="longPress">
-                            <ContextMenu.Items>
-                                {/* {member.role !== "owner" && (
-                                    <Button systemImage="person.crop.circle.badge.plus" onPress={() => handleTransferOwnership(selectedPractice?.id ?? 0, member.id)}>
-                                        Transfer Ownership
-                                    </Button>
-                                )} */}
-                                <Button
-                                    systemImage="pencil.and.scribble"
-                                    onPress={() =>
-                                        router.push({
-                                            pathname: "/(modals)/add-practice-member",
-                                            params: {
-                                                practiceId: selectedPractice?.id,
-                                                mode: "edit",
-                                                member: JSON.stringify(member),
-                                            },
-                                        })
-                                    }
-                                >
-                                    Update Member Role
-                                </Button>
-                                <Button systemImage="trash" role="destructive" onPress={() => handleRemoveMember(selectedPractice?.id ?? 0, member.id)}>
-                                    Remove
-                                </Button>
-                            </ContextMenu.Items>
-
-                            <ContextMenu.Trigger>
-                                <TouchableOpacity
-                                    disabled={member.status !== "active"}
-                                    className={`flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60 ${index !== (practiceMembers?.data?.length ?? 0) - 1 ? "pb-2 border-b border-system-gray5" : ""}`}
-                                    onPress={() => {
-                                        if (member.status === "active") {
-                                            router.push({
-                                                pathname: "/practice-member-details",
-                                                params: {
-                                                    practiceId: selectedPractice?.id,
-                                                    memberId: member.id,
-                                                },
-                                            });
-                                        }
-                                    }}
-                                >
-                                    <View className="flex-row items-center gap-2">
-                                        <Avatar size={54} imageUrl={member.image?.url} rounded={99} name={member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email} color={member.color} haveRing />
-                                        <View>
-                                            <BaseText type="Callout" weight="500" color="system.black">
-                                                {member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email}
-                                            </BaseText>
-                                            <BaseText type="Footnote" weight="400" color="labels.secondary" className="capitalize">
-                                                {member.role}
-                                            </BaseText>
-                                        </View>
-                                    </View>
-                                    <IconSymbol name="chevron.right" size={14} color={themeColors.labels.secondary} />
-                                </TouchableOpacity>
-                            </ContextMenu.Trigger>
-                        </ContextMenu>
-                    </Host>
-                ))}
+                {practiceMembers?.data?.map((member, index) => {
+                    const isOwner = member.role === "owner";
+                    const rowContent = (
+                        <TouchableOpacity
+                            disabled={member.status !== "active"}
+                            className={`flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60 ${index !== (practiceMembers?.data?.length ?? 0) - 1 ? "pb-2 border-b border-system-gray5" : ""}`}
+                            onPress={() => {
+                                if (member.status === "active") {
+                                    router.push({
+                                        pathname: "/practice-member-details",
+                                        params: {
+                                            practiceId: selectedPractice?.id,
+                                            memberId: member.id,
+                                        },
+                                    });
+                                }
+                            }}
+                        >
+                            <View className="flex-row items-center gap-2">
+                                <Avatar size={54} imageUrl={member.image?.url} rounded={99} name={member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email} color={member.color} haveRing />
+                                <View>
+                                    <BaseText type="Callout" weight="500" color="system.black">
+                                        {member.first_name && member.last_name ? `${member.first_name} ${member.last_name}` : member.email}
+                                    </BaseText>
+                                    <BaseText type="Footnote" weight="400" color="labels.secondary" className="capitalize">
+                                        {member.role}
+                                    </BaseText>
+                                </View>
+                            </View>
+                            <IconSymbol name="chevron.right" size={14} color={themeColors.labels.secondary} />
+                        </TouchableOpacity>
+                    );
+                    return (
+                        <Host key={`member-${member.id}`} style={{ width: "100%", height: 68 }}>
+                            {isOwner ? (
+                                rowContent
+                            ) : (
+                                <ContextMenu activationMethod="longPress">
+                                    <ContextMenu.Items>
+                                        <Button
+                                            systemImage="pencil.and.scribble"
+                                            onPress={() =>
+                                                router.push({
+                                                    pathname: "/(modals)/add-practice-member",
+                                                    params: {
+                                                        practiceId: selectedPractice?.id,
+                                                        mode: "edit",
+                                                        member: JSON.stringify(member),
+                                                    },
+                                                })
+                                            }
+                                        >
+                                            Update Member Role
+                                        </Button>
+                                        <Button systemImage="trash" role="destructive" onPress={() => handleRemoveMember(selectedPractice?.id ?? 0, member.id)}>
+                                            Remove
+                                        </Button>
+                                    </ContextMenu.Items>
+                                    <ContextMenu.Trigger>{rowContent}</ContextMenu.Trigger>
+                                </ContextMenu>
+                            )}
+                        </Host>
+                    );
+                })}
             </View>
         </ScrollView>
     );
