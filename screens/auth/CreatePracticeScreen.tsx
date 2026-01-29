@@ -27,14 +27,12 @@ const schema = z.object({
     phoneNumber: z.string().refine(
         (val) => {
             if (!val || val.length === 0) return true; // Optional field
-            // Accept E.164 format (+1XXXXXXXXXX) or validate as E.164
             const digits = val.replace(/\D/g, "");
             return digits.length === 10 || (val.startsWith("+1") && val.length === 12);
         },
-        {
-            message: "Phone number must be 10 digits",
-        },
+        { message: "Phone number must be 10 digits" },
     ),
+    email: z.string().min(1, "Email is required").email("Invalid email"),
     specialty: z.string().min(1, "Required"),
     street: z.string().optional(),
     address: z.string().min(1, "Address is required"),
@@ -58,6 +56,7 @@ export const CreatePracticeScreen: React.FC = () => {
     const practiceNameRef = useRef<TextInput>(null);
     const websiteRef = useRef<TextInput>(null);
     const phoneNumberRef = useRef<TextInput>(null);
+    const emailRef = useRef<TextInput>(null);
     const zipCodeRef = useRef<TextInput>(null);
     const streetRef = useRef<TextInput>(null);
     const addressRef = useRef<TextInput>(null);
@@ -74,6 +73,7 @@ export const CreatePracticeScreen: React.FC = () => {
             practiceName: "",
             website: "",
             phoneNumber: "",
+            email: "",
             specialty: practiceType?.title || "",
             street: "",
             address: "",
@@ -180,6 +180,7 @@ export const CreatePracticeScreen: React.FC = () => {
                     street: data.street || "",
                     address: data.address,
                     zipcode: Number(data.zipCode),
+                    ...(data.email ? { email: data.email } : {}),
                     print_settings: {
                         avatar: "profile_picture",
                         practiceName: true,
@@ -200,6 +201,7 @@ export const CreatePracticeScreen: React.FC = () => {
                 }),
                 type: practiceType.id,
                 ...(uploadedFilename ? { image: uploadedFilename } : {}),
+                ...(data.email ? { email: data.email } : {}),
             };
 
             createPractice(createData);
@@ -246,13 +248,14 @@ export const CreatePracticeScreen: React.FC = () => {
                 {[
                     { name: "practiceName", label: "Practice Name", ref: practiceNameRef, returnKeyType: "next" as const, onSubmitEditing: () => websiteRef.current?.focus() },
                     { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => phoneNumberRef.current?.focus() },
-                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
+                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true, ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => emailRef.current?.focus() },
+                    { name: "email", label: "Email", keyboardType: "email-address", ref: emailRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
                     { name: "specialty", label: "Specialty", disabled: true },
                     { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", ref: zipCodeRef, returnKeyType: "next" as const, onSubmitEditing: () => streetRef.current?.focus() },
-                    { name: "street", label: "Street", ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
+                    { name: "street", label: "Street", optional: true, ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
                     { name: "address", label: "City, State", ref: addressRef, returnKeyType: "done" as const, onSubmitEditing: () => Keyboard.dismiss() },
                 ].map((f, i) => (
-                    <View key={f.name} style={[styles.formRow, i === 6 ? { borderBottomWidth: 0 } : {}]}>
+                    <View key={f.name} style={[styles.formRow, i === 7 ? { borderBottomWidth: 0 } : {}]}>
                         <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                             {f.label}
                         </BaseText>

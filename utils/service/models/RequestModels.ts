@@ -81,15 +81,17 @@ export interface PracticeMetadata {
 
 export interface CreatePracticeDto {
     name: string;
-    type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology";
+    type: "Aesthetic Medicine" | "Dermatology" | "Dentistry" | "Orthodontics" | "Cosmetic Surgery" | "General Practice" | "Endocrinology" | "Gynecology" | "Neurology" | "Oncology" | "Plastic Surgery" | "Urology" | number;
     image?: File | string;
     metadata?: string; // JSON string
+    email?: string;
 }
 
 export interface UpdatePracticeDto {
     name: string;
     image?: File | string;
     metadata?: string; // JSON string
+    email?: string;
 }
 
 export interface AddMemberDto {

@@ -38,7 +38,7 @@ const schema = z.object({
     address: z.string().optional(),
     zipCode: z.string().optional(),
     street: z.string().optional(),
-    email: z.string().email().optional().or(z.literal("")),
+    email: z.string().min(1, "Email is required").email("Invalid email"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -208,10 +208,10 @@ export default function EditPracticeScreen() {
                     address: data.address || "",
                     zipcode: data.zipCode ? Number(data.zipCode) : undefined,
                     email: data.email || "",
-                    // Preserve existing settings
                     print_settings: metadata?.print_settings,
                     notification_settings: metadata?.notification_settings,
                 }),
+                ...(data.email ? { email: data.email } : {}),
                 ...(localImageUri && currentUploadedFilename && { image: currentUploadedFilename }),
             };
 
@@ -286,7 +286,7 @@ export default function EditPracticeScreen() {
                     { name: "practiceName", label: "Practice Name" },
                     { name: "website", label: "Website", optional: true },
                     { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true },
-                    { name: "email", label: "Email", keyboardType: "email-address", optional: true },
+                    { name: "email", label: "Email", keyboardType: "email-address" },
                     { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", optional: true },
                     { name: "street", label: "Street", optional: true },
                     { name: "address", label: "Address", optional: true },

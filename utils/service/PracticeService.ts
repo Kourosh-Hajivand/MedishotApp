@@ -64,7 +64,19 @@ export const PracticeService = {
     // Create a new practice
     createPractice: async (data: CreatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(create(), data, {
+            const formData = new FormData();
+            formData.append("name", data.name);
+            formData.append("type", String(data.type));
+            if (data.metadata) formData.append("metadata", data.metadata);
+            if (data.email) formData.append("email", data.email);
+            if (data.image != null) {
+                if (typeof data.image === "string") {
+                    formData.append("image", data.image);
+                } else {
+                    formData.append("image", data.image);
+                }
+            }
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(create(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -89,10 +101,21 @@ export const PracticeService = {
         }
     },
 
-    // Update practice
+    // Update practice (POST practises/{id}/update)
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
-            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(update(practiceId), data, {
+            const formData = new FormData();
+            formData.append("name", data.name);
+            if (data.metadata) formData.append("metadata", data.metadata);
+            if (data.email) formData.append("email", data.email);
+            if (data.image != null) {
+                if (typeof data.image === "string") {
+                    formData.append("image", data.image);
+                } else {
+                    formData.append("image", data.image);
+                }
+            }
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(update(practiceId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;

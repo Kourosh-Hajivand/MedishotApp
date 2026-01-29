@@ -111,9 +111,7 @@ export default function PatientsLayout() {
     if (shouldShowBlockingError) {
         const errorMessage = practiceListError instanceof Error ? practiceListError.message : "Failed to load practices. Please try again.";
         // Ensure service name is in the message
-        const displayMessage = errorMessage.includes("[Practice List API]") 
-            ? errorMessage 
-            : `[Practice List API] ${errorMessage}`;
+        const displayMessage = errorMessage.includes("[Practice List API]") ? errorMessage : `[Practice List API] ${errorMessage}`;
 
         return (
             <BottomSheetModalProvider>
@@ -140,35 +138,29 @@ export default function PatientsLayout() {
                         // headerTransparent: false,
                         headerShadowVisible: true,
                         headerRight: () =>
-                            hasIncompleteProfile || hasNoPractice ? null : (
+                            hasIncompleteProfile || hasNoPractice ? (
+                                <Host style={{ width: 120, height: 35 }}>
+                                    <Button systemImage="rectangle.portrait.and.arrow.right" role="destructive" onPress={handleLogout}>
+                                        Logout
+                                    </Button>
+                                </Host>
+                            ) : (
                                 <Host style={{ width: 30, height: 50 }}>
                                     <ContextMenu>
                                         <ContextMenu.Items>
                                             <Submenu button={<Button systemImage="arrow.up.arrow.down">Sort By</Button>}>
-                                                <Button
-                                                    systemImage="textformat.abc"
-                                                    onPress={() => router.setParams({ sortBy: "name" })}
-                                                >
+                                                <Button systemImage="textformat.abc" onPress={() => router.setParams({ sortBy: "name" })}>
                                                     Name
                                                 </Button>
-                                                <Button
-                                                    systemImage="calendar"
-                                                    onPress={() => router.setParams({ sortBy: "date" })}
-                                                >
+                                                <Button systemImage="calendar" onPress={() => router.setParams({ sortBy: "date" })}>
                                                     Date
                                                 </Button>
                                             </Submenu>
                                             <Submenu button={<Button systemImage="textformat">Name Order</Button>}>
-                                                <Button
-                                                    systemImage="arrow.up"
-                                                    onPress={() => router.setParams({ nameOrder: "asc" })}
-                                                >
+                                                <Button systemImage="arrow.up" onPress={() => router.setParams({ nameOrder: "asc" })}>
                                                     A → Z
                                                 </Button>
-                                                <Button
-                                                    systemImage="arrow.down"
-                                                    onPress={() => router.setParams({ nameOrder: "desc" })}
-                                                >
+                                                <Button systemImage="arrow.down" onPress={() => router.setParams({ nameOrder: "desc" })}>
                                                     Z → A
                                                 </Button>
                                             </Submenu>
@@ -223,15 +215,11 @@ export default function PatientsLayout() {
                                                     return dateB - dateA;
                                                 })
                                                 .map((practice, index) => (
-                                                    <Switch
-                                                        key={index}
-                                                        label={practice.name}
-                                                        variant="switch"
-                                                        value={selectedPractice?.id === practice.id}
-                                                        onValueChange={() => setSelectedPractice(practice)}
-                                                    />
+                                                    <Switch key={index} label={practice.name} variant="switch" value={selectedPractice?.id === practice.id} onValueChange={() => setSelectedPractice(practice)} />
                                                 ))}
-                                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
+                                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>
+                                                Create a Practice
+                                            </Button>
                                         </ContextMenu.Items>
                                         <ContextMenu.Trigger>
                                             <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: headerButtonWidth, backgroundColor: "white", borderRadius: 100 }} className="flex-row  bg-white items-center gap-2 overflow-hidden pr-2">
@@ -244,15 +232,16 @@ export default function PatientsLayout() {
                                     </ContextMenu>
                                 </Host>
                             ),
-                        headerSearchBarOptions: hasIncompleteProfile || hasNoPractice
-                            ? undefined
-                            : {
-                                  placeholder: "Search patients",
-                                  allowToolbarIntegration: false,
-                                  onChangeText: (event) => {
-                                      router.setParams({ q: event.nativeEvent.text });
+                        headerSearchBarOptions:
+                            hasIncompleteProfile || hasNoPractice
+                                ? undefined
+                                : {
+                                      placeholder: "Search patients",
+                                      allowToolbarIntegration: false,
+                                      onChangeText: (event) => {
+                                          router.setParams({ q: event.nativeEvent.text });
+                                      },
                                   },
-                              },
                     }}
                 />
             </Stack>
