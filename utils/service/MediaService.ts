@@ -115,7 +115,7 @@ const MediaService = {
             const response: AxiosResponse<any> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
-            
+
             // Response structure: {success: true, message: null, data: {filename: '...'}}
             // Extract the inner data object (TempUploadResponse)
             const tempUploadResponse: TempUploadResponse = response.data?.data || response.data;
