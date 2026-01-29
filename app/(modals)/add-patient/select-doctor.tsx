@@ -96,8 +96,8 @@ export default function SelectDoctorScreen() {
             }
         }
 
-        // Navigate to add-patient form with doctor_id and full doctor object
-        router.push({
+        // Navigate to add-patient form with doctor_id and full doctor object (replace so Back from form goes to Patients tab)
+        router.replace({
             pathname: "/(modals)/add-patient/form",
             params: {
                 doctor_id: numericId,

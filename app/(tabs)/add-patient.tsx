@@ -2,12 +2,13 @@ import { getPatientLimitFromPlan } from "@/utils/helper/subscriptionLimits";
 import { useGetPatients, useGetPracticeMembers, useGetSubscriptionStatus } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { router } from "expo-router";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert, View } from "react-native";
 
 export default function AddPatientRedirect() {
+    const isFocused = useIsFocused();
     const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
     const { data: practiceMembers, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
@@ -62,29 +63,31 @@ export default function AddPatientRedirect() {
         }
     }, [currentUserRole, availableDoctors]);
 
-    useFocusEffect(
-        useCallback(() => {
-            if (isPracticeMembersError) {
-                router.replace("/(tabs)/patients");
-                return;
-            }
-            if (!currentUserRole || !availableDoctors || hasNavigatedRef.current) return;
-            if (isSubscriptionLoading) return;
-            if (needFallbackCount && isPatientsLoading) return;
-
-            hasNavigatedRef.current = true;
+    // When tab is focused and data is ready, either open add-patient modal or redirect to patients (limit/error)
+    useEffect(() => {
+        if (!isFocused || hasNavigatedRef.current) return;
+        if (isPracticeMembersError) {
             router.replace("/(tabs)/patients");
+            return;
+        }
+        if (!currentUserRole || !availableDoctors) return;
+        if (isSubscriptionLoading) return;
+        if (needFallbackCount && isPatientsLoading) return;
 
-            if (isPatientLimitReached) {
-                setTimeout(() => {
-                    Alert.alert("Plan Limit Reached", "You have reached the maximum number of patients allowed in your current plan. Please upgrade your plan to add more patients.", [
-                        { text: "Cancel", style: "cancel", onPress: () => router.back() },
-                        { text: "Upgrade Plan", onPress: () => router.push("/(profile)/subscription") },
-                    ]);
-                }, 400);
-            }
-        }, [isPracticeMembersError, currentUserRole, availableDoctors, isSubscriptionLoading, needFallbackCount, isPatientsLoading, isPatientLimitReached]),
-    );
+        hasNavigatedRef.current = true;
+
+        if (isPatientLimitReached) {
+            router.replace("/(tabs)/patients");
+            setTimeout(() => {
+                Alert.alert("Plan Limit Reached", "You have reached the maximum number of patients allowed in your current plan. Please upgrade your plan to add more patients.", [
+                    { text: "Cancel", style: "cancel", onPress: () => router.back() },
+                    { text: "Upgrade Plan", onPress: () => router.push("/(profile)/subscription") },
+                ]);
+            }, 400);
+        } else {
+            navigateToModal();
+        }
+    }, [isFocused, isPracticeMembersError, currentUserRole, availableDoctors, isSubscriptionLoading, needFallbackCount, isPatientsLoading, isPatientLimitReached, navigateToModal]);
 
     // Reset navigation flag when screen loses focus
     useFocusEffect(
