@@ -1,9 +1,10 @@
 import { BaseText } from "@/components";
-import { AdjustChange, DrawingCanvas, ImageChange, MagicChange, PenChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
+import { AdjustChange, DrawingCanvas, EditorState, ImageChange, MagicChange, PenChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
+import { useEditPatientMedia, useTempUpload } from "@/utils/hook/useMedia";
 import { Button, Host, Text } from "@expo/ui/swift-ui";
 import axios from "axios";
 import { BlurView } from "expo-blur";
@@ -11,10 +12,11 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, Image as RNImage, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, Dimensions, Modal, Image as RNImage, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing, FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import ViewShot, { captureRef } from "react-native-view-shot";
 import { Note } from "./ToolNote";
 
 const { width, height } = Dimensions.get("window");
@@ -437,10 +439,14 @@ interface ImageEditorModalProps {
     visible: boolean;
     uri?: string;
     initialTool?: string;
+    mediaId?: number | string;
+    patientId?: number | string;
+    initialEditorState?: EditorState | null;
     onClose: () => void;
+    onSaveSuccess?: () => void;
 }
 
-export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, initialTool, onClose }) => {
+export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, initialTool, mediaId, patientId, initialEditorState, onClose, onSaveSuccess }) => {
     const [activeTool, setActiveTool] = useState(initialTool || "Magic");
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
@@ -468,7 +474,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     });
     const [debugMode, setDebugMode] = useState(false);
     const [debugTouchPosition, setDebugTouchPosition] = useState<{ x: number; y: number } | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     const hasRequestedRef = useRef(false);
+    const exportViewRef = useRef<ViewShot | null>(null);
 
     // Pen tool states
     const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
@@ -496,6 +504,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         setPenHistoryIndex(newIndex);
         setPenStrokes(penStrokesHistory[newIndex]);
     };
+
+    const { mutateAsync: tempUploadAsync } = useTempUpload();
+    const { mutateAsync: editPatientMediaAsync } = useEditPatientMedia();
 
     const scale = useSharedValue(1);
 
@@ -769,14 +780,36 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             hasRequestedRef.current = false;
             setDisplayedImageUri(uri ?? null);
             setOriginalImageUri(uri ?? null);
-            setAdjustmentValues(null);
-            setImageAspectRatio(null); // Reset aspect ratio when URI changes
-            // Set initial tool if provided
-            if (initialTool) {
-                setActiveTool(initialTool);
+            setImageAspectRatio(null);
+            if (!initialEditorState) {
+                setAdjustmentValues(null);
+                setNotes([]);
+                setPenStrokes([]);
+                setPenStrokesHistory([[]]);
+                setPenHistoryIndex(0);
+                setMagicSelection(null);
             }
+            if (initialTool) setActiveTool(initialTool);
         }
-    }, [uri, initialTool, visible]);
+    }, [uri, initialTool, visible, initialEditorState]);
+
+    useEffect(() => {
+        if (!visible || !initialEditorState) return;
+        if (initialEditorState.adjustments != null) setAdjustmentValues(initialEditorState.adjustments);
+        if (initialEditorState.notes?.length) setNotes(initialEditorState.notes as Note[]);
+        if (initialEditorState.penStrokes?.length) {
+            setPenStrokes(initialEditorState.penStrokes as Stroke[]);
+            setPenStrokesHistory([[], initialEditorState.penStrokes as Stroke[]]);
+            setPenHistoryIndex(1);
+        }
+        if (initialEditorState.magic) {
+            setMagicSelection({
+                ...initialEditorState.magic,
+                colorTitle: "",
+                styleTitle: "",
+            });
+        }
+    }, [visible, initialEditorState]);
 
     // Get image dimensions and calculate aspect ratio (fallback if onLoad doesn't fire)
     useEffect(() => {
@@ -875,11 +908,61 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         processImage();
     }, [uri, activeTool, visible]);
 
+    const handleDone = useCallback(async () => {
+        if (!mediaId) {
+            onClose();
+            return;
+        }
+        const w = imageContainerLayout.width;
+        const h = imageContainerLayout.height;
+        if (!exportViewRef.current || w <= 0 || h <= 0) {
+            Alert.alert("Error", "Image layout not ready. Please try again.");
+            return;
+        }
+        setIsSaving(true);
+        try {
+            const uriOut = await captureRef(exportViewRef.current, {
+                format: "jpg",
+                quality: 0.95,
+                result: "tmpfile",
+            });
+            const file = { uri: uriOut, type: "image/jpeg", name: `edit-${Date.now()}.jpg` };
+            const uploadRes = await tempUploadAsync(file);
+            const filename = uploadRes?.filename;
+            if (!filename) throw new Error("Temp upload did not return filename");
+
+            const apiNotes = notes.filter((n) => n.text.trim()).map((n) => ({ text: n.text.trim(), x: n.x * w, y: n.y * h }));
+            const editor: EditorState = {
+                adjustments: adjustmentValues ?? undefined,
+                notes: notes.length ? notes : undefined,
+                penStrokes: penStrokes.length ? penStrokes : undefined,
+                magic: magicSelection ? { modeKey: magicSelection.modeKey, resultType: magicSelection.resultType } : undefined,
+            };
+            const payload = {
+                mediaId,
+                data: {
+                    media: filename,
+                    notes: apiNotes.length ? apiNotes : undefined,
+                    data: JSON.stringify({ editor }),
+                },
+            };
+            console.log("📤 [ImageEditor] ارسال به بک‌اند:", JSON.stringify(payload, null, 2));
+            await editPatientMediaAsync(payload);
+            onSaveSuccess?.();
+            onClose();
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : "Failed to save edits.";
+            Alert.alert("Error", msg);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [mediaId, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
+
     // Calculate dynamic image container style based on aspect ratio
     // Use actual imageWrapper height to fill available space, with smart fallback
     const dynamicImageContainerStyle = useMemo(() => {
         const aspectRatio = imageAspectRatio ?? 3 / 2; // Fallback to 3:2 if not loaded yet
-        
+
         // Use actual wrapper dimensions if available, otherwise use screen dimensions
         const availableHeight = imageWrapperLayout.height > 0 ? imageWrapperLayout.height : CANVAS_MAX_HEIGHT;
         const availableWidth = imageWrapperLayout.width > 0 ? imageWrapperLayout.width : CANVAS_MAX_WIDTH;
@@ -953,9 +1036,30 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     </View>
                 </Modal>
 
+                {/* Hidden Export View for capture (image + adjust + pen only; no notes) */}
+                {imageContainerLayout.width > 0 && imageContainerLayout.height > 0 && (
+                    <ViewShot
+                        ref={exportViewRef}
+                        style={{
+                            position: "absolute",
+                            left: -9999,
+                            width: imageContainerLayout.width,
+                            height: imageContainerLayout.height,
+                            opacity: 0,
+                            overflow: "hidden",
+                            pointerEvents: "none",
+                        }}
+                    >
+                        <View style={{ width: imageContainerLayout.width, height: imageContainerLayout.height, position: "relative" }}>
+                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={StyleSheet.absoluteFill} adjustments={adjustmentValues} />
+                            <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={() => {}} enabled={false} />
+                        </View>
+                    </ViewShot>
+                )}
+
                 <View style={styles.header}>
                     <Host style={{ width: 78, height: 40 }}>
-                        <Button variant="bordered" color="#787880" onPress={onClose}>
+                        <Button variant="bordered" color="#787880" onPress={onClose} disabled={isSaving}>
                             <Text color="black">Cancel</Text>
                         </Button>
                     </Host>
@@ -973,15 +1077,15 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     )}
 
                     <Host style={{ width: 65, height: 40 }}>
-                        <Button variant="glassProminent" color="#FFCC00" onPress={onClose}>
-                            <Text color="black">Done</Text>
+                        <Button variant="glassProminent" color="#FFCC00" onPress={handleDone} disabled={isSaving}>
+                            <Text color="black">{isSaving ? "Saving…" : "Done"}</Text>
                         </Button>
                     </Host>
                 </View>
 
                 <Animated.View style={styles.canvasContainer} layout={LinearTransition.duration(250)}>
                     <GestureDetector gesture={composedGesture}>
-                        <Animated.View 
+                        <Animated.View
                             style={[styles.imageWrapper, animatedImageStyle]}
                             onLayout={(event) => {
                                 const { width, height } = event.nativeEvent.layout;
@@ -996,9 +1100,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                     setImageContainerLayout({ width, height, x, y });
                                 }}
                             >
-                                <FilteredImage 
-                                    source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} 
-                                    style={styles.image} 
+                                <FilteredImage
+                                    source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }}
+                                    style={styles.image}
                                     adjustments={adjustmentValues}
                                     onLoad={(event) => {
                                         const ratio = event.width / event.height;
@@ -1029,7 +1133,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                             </View>
                         </Animated.View>
                     </GestureDetector>
-                    
+
                     {/* Magnifier - rendered at canvasContainer level to appear above everything */}
                     {activeTool === "Note" && magnifierState.visible && (
                         <NoteMagnifier

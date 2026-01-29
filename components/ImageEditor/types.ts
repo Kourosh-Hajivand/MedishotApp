@@ -71,3 +71,11 @@ export interface ImageEditorToolProps {
         text: string;
     }>;
 }
+
+/** Persisted editor state for save/restore (data.editor). */
+export interface EditorState {
+    adjustments?: AdjustChange | null;
+    notes?: Array<{ id: string; x: number; y: number; text: string }>;
+    penStrokes?: Array<{ id: string; path: Array<{ x: number; y: number }>; color: string; width: number }>;
+    magic?: { modeKey: string; resultType: "orig" | "pred" };
+}

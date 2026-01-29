@@ -260,8 +260,16 @@ export interface UploadPatientMediaRequest {
     data: Record<string, any>;
 }
 
+export interface EditPatientMediaNote {
+    text: string;
+    x: number;
+    y: number;
+}
+
 export interface EditPatientMediaRequest {
     media: File | string; // File or Livewire temp filename
+    notes?: EditPatientMediaNote[];
+    data?: string; // JSON string, e.g. { editor: { adjustments, notes, penStrokes, magic } }
 }
 
 export interface TempUploadRequest {

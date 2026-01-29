@@ -160,6 +160,12 @@ const MediaService = {
         try {
             const formData = new FormData();
             formData.append("media", payload.media);
+            if (payload.notes != null && payload.notes.length > 0) {
+                formData.append("notes", JSON.stringify(payload.notes));
+            }
+            if (payload.data != null && payload.data !== "") {
+                formData.append("data", typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data));
+            }
 
             const response: AxiosResponse<PatientMediaEditResponse> = await axiosInstance.post(baseUrl + editMedia(mediaId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
