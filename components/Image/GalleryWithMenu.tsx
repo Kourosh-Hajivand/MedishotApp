@@ -5,7 +5,7 @@ import colors from "@/theme/colors";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -29,6 +29,17 @@ const GalleryImageItem: React.FC<{
     // Use local shared values for opacity animation per image
     const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
+
+    // Sync animation state when cell is recycled with new uri/isLoading
+    useEffect(() => {
+        if (isLoading) {
+            skeletonOpacityShared.value = 1;
+            imageOpacityShared.value = 0;
+        } else {
+            skeletonOpacityShared.value = 0;
+            imageOpacityShared.value = 1;
+        }
+    }, [uri, isLoading, skeletonOpacityShared, imageOpacityShared]);
 
     const skeletonAnimatedStyle = useAnimatedStyle(() => ({
         opacity: skeletonOpacityShared.value,
@@ -57,7 +68,7 @@ const GalleryImageItem: React.FC<{
     };
 
     return (
-        <Host style={{ flex: 1 }}>
+        <Host style={{ flex: 1, height: itemWidth }}>
             <ContextMenu activationMethod="longPress">
                 <ContextMenu.Items>
                     {menuItems.map((menu, menuIndex) => (
@@ -121,6 +132,7 @@ interface ImageSection {
 
 interface ImageRow {
     items: string[];
+    sectionKey: string;
 }
 
 export interface ViewerActionsConfig {
@@ -232,11 +244,13 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
 
     // Transform sections data into rows for multi-column layout
     const sectionsWithRows = useMemo(() => {
-        return imageSections.map((section) => {
+        return imageSections.map((section, sectionIndex) => {
+            const sectionKey = section.title ? section.title : `section-${sectionIndex}`;
             const rows: ImageRow[] = [];
             for (let i = 0; i < section.data.length; i += numColumns) {
                 rows.push({
                     items: section.data.slice(i, i + numColumns),
+                    sectionKey,
                 });
             }
             return {
@@ -245,6 +259,13 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
             };
         });
     }, [imageSections, numColumns]);
+
+    const layoutValues = useMemo(() => {
+        const gap = 1;
+        const totalGap = (numColumns - 1) * gap;
+        const itemWidth = (width - totalGap) / numColumns;
+        return { gap, itemWidth };
+    }, [numColumns, width]);
 
     // Create a map from original_media URL to all images (original_media + template images) for viewer
     const originalMediaToAllImagesMap = useMemo(() => {
@@ -319,9 +340,6 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     }, [viewerImagesList, allImages]);
 
     const renderImageItem = (uri: string, index: number) => {
-        const gap = 0.5;
-        const totalGap = (numColumns - 1) * gap;
-        const itemWidth = (width - totalGap) / numColumns;
         const isLoading = imageLoadingStates.get(uri) ?? true; // Default to loading
 
         const handleImageLoadStart = () => {
@@ -348,14 +366,29 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
             });
         };
 
-        return <GalleryImageItem uri={uri} index={index} itemWidth={itemWidth} gap={gap} numColumns={numColumns} menuItems={menuItems} onImagePress={handleImagePress} imageUrlToBookmarkMap={imageUrlToBookmarkMap} isLoading={isLoading} onLoadStart={handleImageLoadStart} onLoad={handleImageLoad} onError={handleImageError} />;
+        return (
+            <GalleryImageItem
+                uri={uri}
+                index={index}
+                itemWidth={layoutValues.itemWidth}
+                gap={layoutValues.gap}
+                numColumns={numColumns}
+                menuItems={menuItems}
+                onImagePress={handleImagePress}
+                imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                isLoading={isLoading}
+                onLoadStart={handleImageLoadStart}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+            />
+        );
     };
 
     const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
         return (
             <View style={styles.rowContainer}>
                 {item.items.map((uri, itemIndex) => (
-                    <React.Fragment key={`row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>
+                    <React.Fragment key={`${item.sectionKey}-row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>
                 ))}
             </View>
         );
@@ -391,7 +424,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
-                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item, index) => `row-${index}`} stickySectionHeadersEnabled={false} contentContainerStyle={styles.sectionListContent} />
+                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item, index) => `${item.sectionKey}-row-${index}`} stickySectionHeadersEnabled={false} removeClippedSubviews={false} contentContainerStyle={styles.sectionListContent} />
                 </Animated.View>
             </GestureDetector>
 
