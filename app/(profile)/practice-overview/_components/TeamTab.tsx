@@ -3,12 +3,12 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { colors } from "@/theme/colors";
 import { formatDate, getRelativeTime } from "@/utils/helper/dateUtils";
-import { useGetPracticeMembers } from "@/utils/hook/usePractice";
+import { useGetPracticeMembers, useGetSubscriptionStatus } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Member } from "@/utils/service/models/ResponseModels";
 import { router } from "expo-router";
 import React from "react";
-import { TouchableOpacity, View } from "react-native";
+import { Alert, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface TeamTabProps {
@@ -17,7 +17,31 @@ interface TeamTabProps {
 
 export function TeamTab({ practiceId }: TeamTabProps) {
     const { selectedPractice } = useProfileStore();
-    const { data: practiceMembers } = useGetPracticeMembers(practiceId ?? selectedPractice?.id ?? 0, !!practiceId || !!selectedPractice?.id);
+    const pid = practiceId ?? selectedPractice?.id ?? 0;
+    const { data: practiceMembers } = useGetPracticeMembers(pid, !!practiceId || !!selectedPractice?.id);
+    const { data: subscriptionData } = useGetSubscriptionStatus(pid, !!pid);
+
+    const limits = subscriptionData?.data?.limits;
+    const doctorLimit = limits?.doctor_limit ?? null;
+    const staffLimit = limits?.staff_limit ?? null;
+    const remainingDoctorSlots = typeof limits?.remaining_doctor_slots === "number" ? limits.remaining_doctor_slots : null;
+    const remainingStaffSlots = typeof limits?.remaining_staff_slots === "number" ? limits.remaining_staff_slots : null;
+    const canAddDoctor = doctorLimit === null || (remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+    const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
+
+    const handleAddMember = () => {
+        if (doctorLimit !== null && staffLimit !== null && remainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
+            Alert.alert("Plan Limit Reached", "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.", [
+                { text: "Cancel", style: "cancel" },
+                { text: "Upgrade Plan", onPress: () => router.push("/(profile)/subscription") },
+            ]);
+            return;
+        }
+        router.push({
+            pathname: "/(modals)/add-practice-member",
+            params: { practiceId: selectedPractice?.id },
+        });
+    };
 
     // Calculate enhanced pictures count from activities
     const getEnhancedPicturesCount = (member: Member): number => {
@@ -128,17 +152,7 @@ export function TeamTab({ practiceId }: TeamTabProps) {
                 );
             })}
 
-            <BaseButton
-                onPress={() => {
-                    router.push({
-                        pathname: "/(modals)/add-practice-member",
-                        params: { practiceId: selectedPractice?.id },
-                    });
-                }}
-                label="Member"
-                ButtonStyle="Tinted"
-                leftIcon={<IconSymbol name="plus" size={15} color={colors.system.blue} />}
-            />
+            <BaseButton onPress={handleAddMember} label="Member" ButtonStyle="Tinted" leftIcon={<IconSymbol name="plus" size={15} color={colors.system.blue} />} />
         </View>
     );
 }

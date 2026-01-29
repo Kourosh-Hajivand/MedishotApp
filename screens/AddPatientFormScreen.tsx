@@ -36,18 +36,25 @@ export const AddPatientFormScreen: React.FC = () => {
             });
 
             if (scannedImages && scannedImages.length > 0) {
-                // Only take the first image (ensure only 1 image is used)
                 const imagePath = scannedImages[0];
                 setScannedImage(imagePath);
 
                 const path = imagePath.replace("file://", "");
-
                 const lines = await TextRecognition.recognize(path);
                 const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
                 setExtractedText(fullText);
-                // Parse the extracted data
                 const parsed = parseUSIDCardData(fullText, imagePath);
                 setParsedData(parsed);
+
+                const routeParams: RouteParams = {
+                    ...parsed,
+                    scannedImageUri: imagePath,
+                };
+                if (params.doctor_id) routeParams.doctor_id = params.doctor_id;
+                router.push({
+                    pathname: "/(modals)/add-patient/photo",
+                    params: routeParams,
+                });
             }
         } catch (error) {
             // Error handled silently
@@ -68,37 +75,6 @@ export const AddPatientFormScreen: React.FC = () => {
         [key: string]: string | undefined;
     }
 
-    const handleContinue = () => {
-        if (parsedData && scannedImage) {
-            // Encode the parsed data and image as base64 or pass as params
-            const routeParams: RouteParams = {
-                ...parsedData,
-                scannedImageUri: scannedImage,
-            };
-
-            // Pass doctor_id if provided
-            if (params.doctor_id) {
-                routeParams.doctor_id = params.doctor_id;
-            }
-
-            // Navigate to photo screen with parsed data
-            router.push({
-                pathname: "/(modals)/add-patient/photo",
-                params: routeParams,
-            });
-        } else {
-            // If no scan, go to photo screen normally
-            const routeParams: RouteParams = {};
-            if (params.doctor_id) {
-                routeParams.doctor_id = params.doctor_id;
-            }
-            router.push({
-                pathname: "/(modals)/add-patient/photo",
-                params: routeParams,
-            });
-        }
-    };
-
     return (
         <SafeAreaView className="flex-1 items-center justify-center  gap-24 ">
             <View className=" items-center gap-10">
@@ -116,7 +92,6 @@ export const AddPatientFormScreen: React.FC = () => {
 
             <View className="w-full gap-4 px-10">
                 <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
-                {parsedData && scannedImage && <BaseButton label="Continue with Scanned Data" size="Large" rounded ButtonStyle="Filled" onPress={handleContinue} />}
                 <BaseButton
                     label="Skip"
                     size="Large"

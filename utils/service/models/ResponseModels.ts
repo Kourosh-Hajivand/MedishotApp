@@ -543,6 +543,12 @@ export interface SubscriptionStatus {
         current_doctor_count?: number;
         doctor_limit?: number;
         remaining_doctor_slots?: number;
+        staff_limit?: number;
+        remaining_staff_slots?: number;
+        current_staff_count?: number;
+        patient_limit?: number | null;
+        remaining_patient_slots?: number | null;
+        current_patient_count?: number;
         [key: string]: unknown;
     };
 

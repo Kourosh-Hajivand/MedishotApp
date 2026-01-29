@@ -6,7 +6,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors.shared";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
-import { useArchivePatient, useGetPatients, useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
+import { getPatientLimitFromPlan } from "@/utils/helper/subscriptionLimits";
+import { useArchivePatient, useGetPatients, useGetPracticeList, useGetPracticeMembers, useGetSubscriptionStatus } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Patient } from "@/utils/service/models/ResponseModels";
@@ -31,7 +32,18 @@ export default function PatientsScreen() {
     const queryClient = useQueryClient();
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
     const { data: practiceMembers, error: practiceMembersError, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: subscriptionData } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const needFallbackCount = !!subscriptionData && subscriptionData?.data?.limits?.current_patient_count === undefined;
+    const { data: allPatientsForLimit } = useGetPatients(selectedPractice?.id);
     const insets = useSafeAreaInsets();
+
+    const limits = subscriptionData?.data?.limits;
+    const patientLimit = useMemo(() => getPatientLimitFromPlan(subscriptionData), [subscriptionData]);
+    const currentPatientCount =
+        typeof limits?.current_patient_count === "number" ? limits.current_patient_count : (needFallbackCount ? allPatientsForLimit?.data?.length ?? 0 : 0);
+    const remainingPatientSlots =
+        typeof limits?.remaining_patient_slots === "number" ? limits.remaining_patient_slots : patientLimit != null ? Math.max(0, patientLimit - currentPatientCount) : null;
+    const isPatientLimitReached = patientLimit != null && ((remainingPatientSlots !== null && remainingPatientSlots === 0) || (remainingPatientSlots == null && currentPatientCount >= patientLimit));
     const headerHeight = useHeaderHeight();
     const { q, sortBy, nameOrder } = useLocalSearchParams<{ q?: string; sortBy?: string; nameOrder?: string }>();
 
@@ -165,7 +177,7 @@ export default function PatientsScreen() {
 
         if (sortBy === "date") {
             // When sorting by date, use a single section with all patients
-            return { "All": currentPatients };
+            return { All: currentPatients };
         } else {
             // When sorting by name, group by first letter
             return currentPatients.reduce(
@@ -213,7 +225,7 @@ export default function PatientsScreen() {
 
     const sections = useMemo(() => {
         const keys = Object.keys(filteredGroupedPatients);
-        
+
         // If sorting by date, return single section
         if (sortBy === "date") {
             return keys.map((key) => ({
@@ -221,7 +233,7 @@ export default function PatientsScreen() {
                 data: filteredGroupedPatients[key],
             }));
         }
-        
+
         // Otherwise, sort alphabetically
         const hashSection = keys.find((key) => key === "#");
         const otherKeys = keys.filter((key) => key !== "#").sort();
@@ -262,7 +274,7 @@ export default function PatientsScreen() {
         // Calculate offset for the first item of the target section
         let offset = 0;
         for (let i = 0; i < sectionIndex; i++) {
-            offset += SECTION_HEADER_HEIGHT + (sections[i].data.length * ITEM_HEIGHT);
+            offset += SECTION_HEADER_HEIGHT + sections[i].data.length * ITEM_HEIGHT;
         }
         // Add section header height for the target section
         offset += SECTION_HEADER_HEIGHT;
@@ -277,21 +289,21 @@ export default function PatientsScreen() {
                 (scrollViewRef.current as any)?.scrollTo({
                     y: finalOffset,
                     animated,
+                });
+            } catch (e) {
+                // Fallback to scrollToLocation
+                try {
+                    scrollViewRef.current?.scrollToLocation({
+                        sectionIndex,
+                        itemIndex: 0,
+                        animated,
+                        viewPosition: 0,
+                        viewOffset: stickyHeaderHeight,
                     });
-                } catch (e) {
-                    // Fallback to scrollToLocation
-                    try {
-                        scrollViewRef.current?.scrollToLocation({
-                            sectionIndex,
-                            itemIndex: 0,
-                            animated,
-                            viewPosition: 0,
-                            viewOffset: stickyHeaderHeight,
-                        });
-                    } catch (e2) {
-                        // Silent fallback - navigation failed
-                    }
+                } catch (e2) {
+                    // Silent fallback - navigation failed
                 }
+            }
         }, 100);
     };
 
@@ -388,14 +400,7 @@ export default function PatientsScreen() {
                 <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center" }}>
                     Complete the steps in the modal to get started.
                 </BaseText>
-                <BaseButton
-                    label="Complete profile"
-                    ButtonStyle="Filled"
-                    size="Large"
-                    rounded={true}
-                    onPress={() => router.push({ pathname: "/(auth)/completeProfile", params: { requireCompleteProfile: "1" } })}
-                    leftIcon={<IconSymbol name="person.crop.circle.badge.plus" size={20} color={colors.system.white} />}
-                />
+                <BaseButton label="Complete profile" ButtonStyle="Filled" size="Large" rounded={true} onPress={() => router.push({ pathname: "/(auth)/completeProfile", params: { requireCompleteProfile: "1" } })} leftIcon={<IconSymbol name="person.crop.circle.badge.plus" size={20} color={colors.system.white} />} />
             </View>
         );
     }
@@ -410,14 +415,7 @@ export default function PatientsScreen() {
                 <BaseText type="Footnote" color="labels.secondary" style={{ marginBottom: spacing["4"], textAlign: "center" }}>
                     Complete the steps in the modal to get started.
                 </BaseText>
-                <BaseButton
-                    label="Set up practice"
-                    ButtonStyle="Filled"
-                    size="Large"
-                    rounded={true}
-                    onPress={() => router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } })}
-                    leftIcon={<IconSymbol name="building.2" size={20} color={colors.system.white} />}
-                />
+                <BaseButton label="Set up practice" ButtonStyle="Filled" size="Large" rounded={true} onPress={() => router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } })} leftIcon={<IconSymbol name="building.2" size={20} color={colors.system.white} />} />
             </View>
         );
     }
@@ -459,9 +457,7 @@ export default function PatientsScreen() {
                     showsVerticalScrollIndicator={false}
                     contentInsetAdjustmentBehavior="automatic"
                     contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white" }}
-                    renderItem={({ index }) => (
-                        <PatientSkeleton haveRing={index % 3 === 0} />
-                    )}
+                    renderItem={({ index }) => <PatientSkeleton haveRing={index % 3 === 0} />}
                     renderSectionHeader={({ section: { title } }) => (
                         <View style={styles.sectionHeader} className="px-4">
                             <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
@@ -689,9 +685,14 @@ export default function PatientsScreen() {
                                         size="Medium"
                                         rounded={true}
                                         onPress={() => {
-                                            // If user is staff (admin) or owner, check if there's only one doctor
+                                            if (isPatientLimitReached) {
+                                                Alert.alert("Plan Limit Reached", "You have reached the maximum number of patients allowed in your current plan. Please upgrade your plan to add more patients.", [
+                                                    { text: "Cancel", style: "cancel" },
+                                                    { text: "Upgrade Plan", onPress: () => router.push("/(profile)/subscription") },
+                                                ]);
+                                                return;
+                                            }
                                             if (currentUserRole === "staff" || currentUserRole === "owner") {
-                                                // If there's only one doctor, go directly to add patient with that doctor
                                                 if (availableDoctors.length === 1) {
                                                     const singleDoctor = availableDoctors[0];
                                                     const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
@@ -703,11 +704,9 @@ export default function PatientsScreen() {
                                                         },
                                                     });
                                                 } else {
-                                                    // Multiple doctors, show selection modal
                                                     router.push("/(modals)/add-patient/select-doctor");
                                                 }
                                             } else {
-                                                // Otherwise, go directly to add patient
                                                 router.push("/(modals)/add-patient/form");
                                             }
                                         }}
@@ -730,12 +729,7 @@ export default function PatientsScreen() {
                                 const isActive = isDragging && activeLetter === letter;
                                 return (
                                     <View key={letter} style={[styles.alphabetItem, isActive && styles.activeAlphabetItem]}>
-                                        <BaseText
-                                            type="Caption1"
-                                            color="system.blue"
-                                            weight={600}
-                                           
-                                        >
+                                        <BaseText type="Caption1" color="system.blue" weight={600}>
                                             {letter}
                                         </BaseText>
                                     </View>

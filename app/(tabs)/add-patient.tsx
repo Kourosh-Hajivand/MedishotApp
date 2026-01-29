@@ -1,16 +1,26 @@
-import { useGetPracticeMembers } from "@/utils/hook";
+import { getPatientLimitFromPlan } from "@/utils/helper/subscriptionLimits";
+import { useGetPatients, useGetPracticeMembers, useGetSubscriptionStatus } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { useFocusEffect } from "@react-navigation/native";
 import { router } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
-import { View } from "react-native";
+import { Alert, View } from "react-native";
 
 export default function AddPatientRedirect() {
     const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
-    const { data: practiceMembers, error: practiceMembersError, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: practiceMembers, isError: isPracticeMembersError } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: subscriptionData, isLoading: isSubscriptionLoading } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
+    const needFallbackCount = !!subscriptionData && subscriptionData?.data?.limits?.current_patient_count === undefined;
+    const { data: patientsData, isLoading: isPatientsLoading } = useGetPatients(selectedPractice?.id);
     const hasNavigatedRef = useRef(false);
+
+    const limits = subscriptionData?.data?.limits;
+    const patientLimit = useMemo(() => getPatientLimitFromPlan(subscriptionData), [subscriptionData]);
+    const currentPatientCount = typeof limits?.current_patient_count === "number" ? limits.current_patient_count : needFallbackCount ? (patientsData?.data?.length ?? 0) : 0;
+    const remainingPatientSlots = typeof limits?.remaining_patient_slots === "number" ? limits.remaining_patient_slots : patientLimit != null ? Math.max(0, patientLimit - currentPatientCount) : null;
+    const isPatientLimitReached = patientLimit != null && ((remainingPatientSlots !== null && remainingPatientSlots === 0) || (remainingPatientSlots == null && currentPatientCount >= patientLimit));
 
     // Get current user's role in the selected practice
     const currentUserRole = useMemo(() => {
@@ -29,52 +39,52 @@ export default function AddPatientRedirect() {
         return practiceMembers.data.filter((member) => member.role === "doctor" || member.role === "owner");
     }, [practiceMembers?.data]);
 
-    // Navigate to patients tab first, then open modal
-    useFocusEffect(() => {
-        // Don't navigate if there's an error
-        if (isPracticeMembersError) {
-            router.replace("/(tabs)/patients");
-            return;
+    const navigateToModal = useCallback(() => {
+        if (!currentUserRole || !availableDoctors) return;
+        if (currentUserRole === "doctor") {
+            router.push("/(modals)/add-patient/form");
+        } else if (currentUserRole === "staff" || currentUserRole === "owner") {
+            if (availableDoctors.length === 1) {
+                const singleDoctor = availableDoctors[0];
+                const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
+                router.push({
+                    pathname: "/(modals)/add-patient/form",
+                    params: {
+                        doctor_id: doctorIdParam,
+                        doctor: JSON.stringify(singleDoctor),
+                    },
+                });
+            } else {
+                router.push("/(modals)/add-patient/select-doctor");
+            }
+        } else {
+            router.push("/(modals)/add-patient/form");
         }
+    }, [currentUserRole, availableDoctors]);
 
-        if (currentUserRole && availableDoctors && !hasNavigatedRef.current) {
-            // First navigate to patients tab
-            router.replace("/(tabs)/patients");
+    useFocusEffect(
+        useCallback(() => {
+            if (isPracticeMembersError) {
+                router.replace("/(tabs)/patients");
+                return;
+            }
+            if (!currentUserRole || !availableDoctors || hasNavigatedRef.current) return;
+            if (isSubscriptionLoading) return;
+            if (needFallbackCount && isPatientsLoading) return;
+
             hasNavigatedRef.current = true;
+            router.replace("/(tabs)/patients");
 
-            // Then open modal based on user role
-            const navigateToModal = () => {
-                // If user is doctor, go directly to photo (no need to select doctor)
-                if (currentUserRole === "doctor") {
-                    router.push("/(modals)/add-patient/form");
-                } else if (currentUserRole === "staff" || currentUserRole === "owner") {
-                    // If there's only one doctor, go directly to photo with that doctor
-                    if (availableDoctors.length === 1) {
-                        const singleDoctor = availableDoctors[0];
-                        const doctorIdParam = typeof singleDoctor.id === "number" ? String(singleDoctor.id) : singleDoctor.id.includes(":") ? singleDoctor.id.split(":")[1] : singleDoctor.id;
-                        router.push({
-                            pathname: "/(modals)/add-patient/form",
-                            params: {
-                                doctor_id: doctorIdParam,
-                                doctor: JSON.stringify(singleDoctor),
-                            },
-                        });
-                    } else {
-                        // If user is staff (admin) or owner with multiple doctors, show doctor selection modal
-                        router.push("/(modals)/add-patient/select-doctor");
-                    }
-                } else {
-                    // Otherwise, go directly to add patient photo
-                    router.push("/(modals)/add-patient/form");
-                }
-            };
-
-            // Use requestAnimationFrame to ensure navigation completes before opening modal
-            requestAnimationFrame(() => {
-                requestAnimationFrame(navigateToModal);
-            });
-        }
-    });
+            if (isPatientLimitReached) {
+                setTimeout(() => {
+                    Alert.alert("Plan Limit Reached", "You have reached the maximum number of patients allowed in your current plan. Please upgrade your plan to add more patients.", [
+                        { text: "Cancel", style: "cancel", onPress: () => router.back() },
+                        { text: "Upgrade Plan", onPress: () => router.push("/(profile)/subscription") },
+                    ]);
+                }, 400);
+            }
+        }, [isPracticeMembersError, currentUserRole, availableDoctors, isSubscriptionLoading, needFallbackCount, isPatientsLoading, isPatientLimitReached]),
+    );
 
     // Reset navigation flag when screen loses focus
     useFocusEffect(

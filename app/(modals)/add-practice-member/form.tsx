@@ -5,14 +5,14 @@ import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { spacing } from "@/styles/spaces";
 import themeColors, { colors } from "@/theme/colors";
-import { useAddMember, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
+import { useAddMember, useGetSubscriptionStatus, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
 import { AddMemberDto, UpdateMemberRoleDto } from "@/utils/service/models/RequestModels";
 import { TempUploadResponse } from "@/utils/service/models/ResponseModels";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -137,11 +137,31 @@ export default function AddPracticeMemberForm() {
         },
     );
 
+    const { data: subscriptionData } = useGetSubscriptionStatus(Number(practiceId || 0), !!practiceId);
+    const limits = subscriptionData?.data?.limits;
+    const doctorLimit = limits?.doctor_limit ?? null;
+    const staffLimit = limits?.staff_limit ?? null;
+    const remainingDoctorSlots = typeof limits?.remaining_doctor_slots === "number" ? limits.remaining_doctor_slots : null;
+    const remainingStaffSlots = typeof limits?.remaining_staff_slots === "number" ? limits.remaining_staff_slots : null;
+
+    const canAddDoctor = doctorLimit === null || (remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+    const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
+
+    const filteredRoleOptions = useMemo(() => {
+        if (!canAddDoctor && !canAddStaff) return roleOptions;
+        if (canAddDoctor && !canAddStaff) return roleOptions.filter((o) => o.value === "doctor");
+        if (!canAddDoctor && canAddStaff) return roleOptions.filter((o) => o.value === "staff");
+        return roleOptions;
+    }, [canAddDoctor, canAddStaff]);
+
+    const effectiveDefaultRole = (filteredRoleOptions[0]?.value ?? "staff") as "staff" | "doctor";
+
     const {
         control,
         handleSubmit,
         formState: { errors },
         setValue,
+        getValues,
         reset,
     } = useForm<AddMemberFormData>({
         resolver: zodResolver(
@@ -166,26 +186,21 @@ export default function AddPracticeMemberForm() {
 
     // Set form values when member data is available (edit mode)
     React.useEffect(() => {
-        if (isEditMode && memberData) {
+        if (isEditMode && memberData && filteredRoleOptions.length > 0) {
+            const memberRole = (memberData.role === "member" ? "staff" : memberData.role === "doctor" ? "doctor" : "staff") as "staff" | "doctor";
+            const effectiveRole = filteredRoleOptions.some((o) => o.value === memberRole) ? memberRole : effectiveDefaultRole;
             reset({
                 first_name: memberData.first_name || "",
                 last_name: memberData.last_name || "",
                 email: memberData.email || "",
                 birth_date: memberData.birth_date || "",
-                // Keep gender in lowercase for form (backend format)
                 gender: memberData.gender ? memberData.gender.toLowerCase() : "",
-                role: memberData.role === "member" ? "staff" : memberData.role === "doctor" ? "doctor" : "staff",
+                role: effectiveRole,
             });
-            // Set role index
-            const roleIndex = roleOptions.findIndex((option) => {
-                const memberRole = memberData.role === "member" ? "staff" : memberData.role;
-                return option.value === (memberRole || "staff");
-            });
-            if (roleIndex !== -1) {
-                setSelectedRoleIndex(roleIndex);
-            }
+            const roleIndex = filteredRoleOptions.findIndex((o) => o.value === effectiveRole);
+            setSelectedRoleIndex(roleIndex !== -1 ? roleIndex : 0);
         }
-    }, [isEditMode, memberData, reset]);
+    }, [isEditMode, memberData, reset, filteredRoleOptions, effectiveDefaultRole]);
 
     // Initialize uploadedFilename with existing image URL if in edit mode
     useEffect(() => {
@@ -263,11 +278,13 @@ export default function AddPracticeMemberForm() {
     );
 
     useEffect(() => {
-        const defaultRoleIndex = roleOptions.findIndex((option) => option.value === "staff");
-        if (defaultRoleIndex !== -1) {
-            setSelectedRoleIndex(defaultRoleIndex);
-        }
-    }, []);
+        if (isEditMode || filteredRoleOptions.length === 0) return;
+        const currentRole = getValues("role");
+        const allowed = filteredRoleOptions.some((o) => o.value === currentRole);
+        if (allowed) return;
+        setValue("role", effectiveDefaultRole, { shouldValidate: true });
+        setSelectedRoleIndex(0);
+    }, [isEditMode, filteredRoleOptions, effectiveDefaultRole, setValue, getValues]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -344,8 +361,7 @@ export default function AddPracticeMemberForm() {
                                     control={control}
                                     name="role"
                                     render={({ field: { onChange, value } }) => {
-                                        // Sync selectedRoleIndex with current value
-                                        const currentIndex = roleOptions.findIndex((opt) => opt.value === value);
+                                        const currentIndex = filteredRoleOptions.findIndex((opt) => opt.value === value);
                                         const syncIndex = currentIndex !== -1 ? currentIndex : selectedRoleIndex;
 
                                         return (
@@ -354,12 +370,12 @@ export default function AddPracticeMemberForm() {
                                                 selectedIndex={syncIndex}
                                                 variant="menu"
                                                 onOptionSelected={({ nativeEvent: { index } }) => {
-                                                    const roleValue = roleOptions[index]?.value ?? "staff";
+                                                    const roleValue = filteredRoleOptions[index]?.value ?? effectiveDefaultRole;
                                                     setSelectedRoleIndex(index);
                                                     onChange(roleValue);
                                                     setValue("role", roleValue, { shouldValidate: true });
                                                 }}
-                                                options={roleOptions.map((o) => o.label)}
+                                                options={filteredRoleOptions.map((o) => o.label)}
                                             />
                                         );
                                     }}
