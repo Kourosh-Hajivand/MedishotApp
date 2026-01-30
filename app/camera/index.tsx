@@ -1,6 +1,6 @@
 import { GHOST_ASSETS, type GhostItemId } from "@/assets/gost/ghostAssets";
 import { getGhostDescription, getGhostIcon, getGhostName, getGhostSample } from "@/assets/gost/ghostMetadata";
-import { BaseButton, BaseText, ErrorState } from "@/components";
+import { BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
@@ -10,6 +10,8 @@ import { useGetPatientById } from "@/utils/hook/usePatient";
 import { useGetTemplateById } from "@/utils/hook/useTemplate";
 import { PracticeTemplate, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
 import { CameraState, CapturedPhoto, FlashMode } from "@/utils/types/camera.types";
+import { Button, Host, HStack } from "@expo/ui/swift-ui";
+import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -678,14 +680,6 @@ export default function CameraScreen() {
         setCameraState((prev) => ({ ...prev, isGridEnabled: !prev.isGridEnabled }));
     };
 
-    const toggleCamera = () => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        setCameraState((prev) => ({
-            ...prev,
-            cameraPosition: prev.cameraPosition === "back" ? "front" : "back",
-        }));
-    };
-
     const handleSelectTemplate = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.push({
@@ -819,7 +813,7 @@ export default function CameraScreen() {
                     }
                 }
 
-                // Maximum quality: compress 1, no downscale (crop uses full-resolution dimensions)
+                // Lossless crop: PNG output (no second lossy encode; only camera capture is lossy)
                 const croppedPhoto = await ImageManipulator.manipulateAsync(
                     photo.uri,
                     [
@@ -832,7 +826,7 @@ export default function CameraScreen() {
                             },
                         },
                     ],
-                    { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
+                    { format: ImageManipulator.SaveFormat.PNG },
                 );
 
                 const finalPhotoUri = croppedPhoto.uri;
@@ -863,9 +857,9 @@ export default function CameraScreen() {
 
                 // Immediately upload ALL photos to temp-upload service
                 try {
-                    const filename = finalPhotoUri.split("/").pop() || "image.jpg";
+                    const filename = finalPhotoUri.split("/").pop() || "image.png";
                     const match = /\.(\w+)$/.exec(filename);
-                    const type = match ? `image/${match[1]}` : "image/jpeg";
+                    const type = match ? `image/${match[1]}` : "image/png";
 
                     const file: { uri: string; type: string; name: string } = {
                         uri: finalPhotoUri,
@@ -937,6 +931,13 @@ export default function CameraScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.back();
     }, []);
+
+    const isWaitingForUploadToReview = useMemo(() => {
+        const isSingleGhostTemplate = hasGhostItems && ghostItemsData.length === 1;
+        if (!(!hasGhostItems || isSingleGhostTemplate) || capturedPhotos.length === 0) return false;
+        const relevantPhotos = isSingleGhostTemplate ? capturedPhotos.filter((p) => p.templateId !== "no-template") : capturedPhotos.filter((p) => p.templateId === "no-template");
+        return relevantPhotos.length > 0 && relevantPhotos.some((p) => p.uploadStatus === "uploading");
+    }, [hasGhostItems, ghostItemsData.length, capturedPhotos]);
 
     const getFlashIcon = () => {
         const option = FLASH_OPTIONS.find((o) => o.mode === cameraState.flashMode);
@@ -1149,26 +1150,54 @@ export default function CameraScreen() {
                 <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none", zIndex: 10 }}>
                     {/* If photo is captured, only show Retake button */}
                     {hasCurrentPhoto ? (
-                        <BaseButton ButtonStyle="Gray" onPress={handleRetake} label="Retake" />
+                        <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 0 })]}>
+                                <HStack
+                                    alignment="center"
+                                    modifiers={[
+                                        padding({ all: 0 }),
+                                        frame({ width: 90, height: 44 }),
+                                        glassEffect({
+                                            glass: {
+                                                variant: "regular",
+                                            },
+                                        }),
+                                    ]}
+                                >
+                                    <Button
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+                                        }}
+                                        variant="plain"
+                                    >
+                                        Retake
+                                    </Button>
+                                </HStack>
+                            </HStack>
+                        </Host>
                     ) : (
-                        <View style={styles.bottomControlsRow}>
-                            {/* Grid Control */}
-                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
-                                <View style={styles.bottomControlButtonBg}>
-                                    <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
-                                </View>
-                            </TouchableOpacity>
-
-                            {/* Sample Button */}
-                            <BaseButton ButtonStyle="Gray" onPress={handleShowSample} label="Sample" />
-
-                            {/* Flash Control */}
-                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
-                                <View style={styles.bottomControlButtonBg}>
-                                    <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
-                                </View>
-                            </TouchableOpacity>
-                        </View>
+                        <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 30 })]}>
+                                {/* Sample Button */}
+                                <HStack
+                                    alignment="center"
+                                    modifiers={[
+                                        padding({ all: 0 }),
+                                        frame({ width: 84, height: 44 }),
+                                        glassEffect({
+                                            glass: {
+                                                variant: "regular",
+                                            },
+                                        }),
+                                    ]}
+                                >
+                                    <Button onPress={handleShowSample} variant="plain">
+                                        Sample
+                                    </Button>
+                                </HStack>
+                            </HStack>
+                        </Host>
                     )}
                 </View>
             )}
@@ -1244,51 +1273,59 @@ export default function CameraScreen() {
                 </View>
             </View>
 
-            {/* Template Badge - shows current ghost name */}
-            {/* {hasGhostItems && (
-                <View style={styles.templateBadge}>
-                    <BaseText type="Caption1" weight={600} color="system.white">
-                        {currentGhostData?.name || currentGhostItem || "Template"} ({currentGhostIndex + 1}/{ghostItemsData.length})
-                    </BaseText>
-                </View>
-            )} */}
-
             {/* Template Select Button and Camera Controls - Only show when no ghost items selected */}
             {!hasGhostItems && (
                 <View style={styles.templateButtonContainer}>
                     {/* If photo is captured, only show Retake button */}
                     {hasCurrentPhoto ? (
-                        <BaseButton
-                            ButtonStyle="Gray"
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
-                            }}
-                            label="Retake"
-                        />
+                        <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 20 })]}>
+                                <HStack
+                                    alignment="center"
+                                    modifiers={[
+                                        padding({ all: 0 }),
+                                        frame({ width: 90, height: 44 }),
+                                        glassEffect({
+                                            glass: {
+                                                variant: "regular",
+                                            },
+                                        }),
+                                    ]}
+                                >
+                                    <Button
+                                        onPress={() => {
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            setCapturedPhotos((prev) => prev.filter((p) => p.templateId !== "no-template"));
+                                        }}
+                                        variant="plain"
+                                    >
+                                        Retake
+                                    </Button>
+                                </HStack>
+                            </HStack>
+                        </Host>
                     ) : (
-                        <View style={styles.bottomControlsRow}>
-                            {/* Grid Control */}
-                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleGrid} activeOpacity={0.7}>
-                                <View style={styles.bottomControlButtonBg}>
-                                    <IconSymbol name="grid" size={22} color={cameraState.isGridEnabled ? colors.system.yellow : colors.system.white} />
-                                </View>
-                            </TouchableOpacity>
+                        <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 20 })]}>
+                                <HStack
+                                    alignment="center"
+                                    modifiers={[
+                                        padding({ all: 0 }),
 
-                            {/* Template Select Button */}
-                            <TouchableOpacity style={styles.templateButton} onPress={handleSelectTemplate} activeOpacity={0.8}>
-                                <BaseText type="Body" weight={600} color="system.white">
-                                    Select a template
-                                </BaseText>
-                            </TouchableOpacity>
-
-                            {/* Flash Control */}
-                            <TouchableOpacity style={styles.bottomControlButton} onPress={toggleFlash} activeOpacity={0.7}>
-                                <View style={styles.bottomControlButtonBg}>
-                                    <IconSymbol name={getFlashIcon() as any} size={22} color={colors.system.white} />
-                                </View>
-                            </TouchableOpacity>
-                        </View>
+                                        frame({ width: 150, height: 44 }),
+                                        glassEffect({
+                                            glass: {
+                                                variant: "regular",
+                                            },
+                                        }),
+                                    ]}
+                                >
+                                    <Button onPress={handleSelectTemplate} variant="plain">
+                                        Select a template
+                                    </Button>
+                                </HStack>
+                            </HStack>
+                        </Host>
                     )}
                 </View>
             )}
@@ -1312,44 +1349,50 @@ export default function CameraScreen() {
                 )}
 
                 <View style={styles.bottomControls}>
-                    {/* Gallery Thumbnail */}
-                    <TouchableOpacity style={styles.galleryThumbnail} activeOpacity={0.8}>
-                        {capturedPhotos.length > 0 ? <Image source={{ uri: capturedPhotos[capturedPhotos.length - 1].uri }} style={styles.galleryThumbnailImage} /> : <View style={styles.galleryThumbnailPlaceholder} />}
-                    </TouchableOpacity>
+                    {/* Grid */}
+                    <Host matchContents>
+                        <HStack
+                            alignment="center"
+                            modifiers={[
+                                padding({ all: 0 }),
+                                frame({ width: 50, height: 50 }),
+                                glassEffect({
+                                    glass: {
+                                        variant: "regular",
+                                    },
+                                }),
+                            ]}
+                        >
+                            <Button variant="plain" onPress={toggleGrid} systemImage="grid" />
+                        </HStack>
+                    </Host>
 
                     {/* Shutter Button */}
-                    <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing}>
+                    <TouchableOpacity style={styles.shutterButton} onPress={handleTakePhoto} activeOpacity={0.9} disabled={isCapturing || isWaitingForUploadToReview}>
                         <View style={styles.shutterOuter}>
-                            <View style={styles.shutterInner}>{isCapturing && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
+                            <View style={styles.shutterInner}>{(isCapturing || isWaitingForUploadToReview) && <ActivityIndicator color={colors.system.gray3} size="small" />}</View>
                         </View>
                     </TouchableOpacity>
 
-                    {/* Switch Camera */}
-                    <TouchableOpacity style={styles.switchCameraButton} onPress={toggleCamera} activeOpacity={0.7}>
-                        <IconSymbol name="arrow.triangle.2.circlepath.camera" size={28} color={colors.system.white} />
-                    </TouchableOpacity>
+                    {/* Flash */}
+                    <Host matchContents>
+                        <HStack
+                            alignment="center"
+                            modifiers={[
+                                padding({ all: 0 }),
+                                frame({ width: 50, height: 50 }),
+                                glassEffect({
+                                    glass: {
+                                        variant: "regular",
+                                    },
+                                }),
+                            ]}
+                        >
+                            <Button variant="plain" onPress={toggleFlash} systemImage={getFlashIcon() as any} />
+                        </HStack>
+                    </Host>
                 </View>
             </View>
-
-            {/* Guide Modal */}
-            {/* <Modal visible={showGuideModal} transparent animationType="fade" onRequestClose={handleCloseGuide}>
-                <View style={styles.guideModalContainer}>
-                    <View style={[styles.guideModalContent, { paddingBottom: insets.bottom }]}>
-                        <Image source={require("@/assets/gost/Guid.png")} style={styles.guideImage} contentFit="contain" />
-                        <BaseText type="Title1" weight={600} color="labels.primary" className="mt-4 text-center">
-                            {getTemplateName()}
-                        </BaseText>
-                        <BaseText type="Body" align="center" color="labels.primary" className="text-center mt-2 px-8">
-                            Place The Head Between Lines and keep eye line leveled.
-                        </BaseText>
-                        <TouchableOpacity style={styles.closeGuideButton} onPress={handleCloseGuide} activeOpacity={0.8}>
-                            <BaseText type="Body" weight={600} color="system.white">
-                                Close
-                            </BaseText>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal> */}
 
             {/* Sample Modal */}
             <Modal visible={showSampleModal} transparent animationType="fade" onRequestClose={handleCloseSample}>
@@ -1491,7 +1534,7 @@ const styles = StyleSheet.create({
         backgroundColor: "transparent",
         justifyContent: "space-between",
         width: "100%",
-        paddingHorizontal: 20,
+        paddingHorizontal: 40,
     },
     bottomControlButton: {
         width: 44,
@@ -1541,8 +1584,8 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     ghostImage: {
-        width: "100%",
-        height: "100%",
+        width: "90%",
+        height: "90%",
         opacity: 1,
     },
     capturedPhotoOverlay: {
@@ -1568,7 +1611,7 @@ const styles = StyleSheet.create({
     },
     thumbnailsContainer: {
         marginBottom: 16,
-        paddingHorizontal: 20,
+        paddingHorizontal: 30,
         flexDirection: "row",
         alignItems: "center",
         gap: 12,
@@ -1648,23 +1691,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 30,
     },
-    galleryThumbnail: {
+    bottomControlCircleButton: {
         width: 50,
         height: 50,
-        borderRadius: 8,
-        overflow: "hidden",
+        borderRadius: 25,
+        justifyContent: "center",
+        alignItems: "center",
         backgroundColor: "rgba(255,255,255,0.2)",
-    },
-    galleryThumbnailImage: {
-        width: "100%",
-        height: "100%",
-    },
-    galleryThumbnailPlaceholder: {
-        width: "100%",
-        height: "100%",
-        borderWidth: 2,
-        borderColor: "rgba(255,255,255,0.3)",
-        borderRadius: 8,
     },
     shutterButton: {
         width: 76,
@@ -1688,14 +1721,6 @@ const styles = StyleSheet.create({
         backgroundColor: colors.system.white,
         justifyContent: "center",
         alignItems: "center",
-    },
-    switchCameraButton: {
-        width: 50,
-        height: 50,
-        borderRadius: 25,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "rgba(255,255,255,0.2)",
     },
     flashOverlay: {
         ...StyleSheet.absoluteFillObject,

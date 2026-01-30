@@ -7,6 +7,8 @@ import { useGetPatientById } from "@/utils/hook/usePatient";
 import { useGetTemplateById } from "@/utils/hook/useTemplate";
 import { PracticeTemplate, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
 import { CapturedPhoto } from "@/utils/types/camera.types";
+import { Button, Host, HStack } from "@expo/ui/swift-ui";
+import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
@@ -737,13 +739,32 @@ export default function ReviewScreen() {
 
                 {/* Retake button overlay - hide for composite */}
                 {!currentPhoto?.isComposite && (
-                    <View style={styles.retakeContainer}>
-                        <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
-                            <BaseText type="Subhead" color="labels.primary">
-                                Retake
-                            </BaseText>
-                        </TouchableOpacity>
-                    </View>
+                    <Host style={{ width: "100%", position: "absolute", bottom: 10, left: 0, right: 0 }} matchContents={{ vertical: true }}>
+                        <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 20 })]}>
+                            <HStack
+                                alignment="center"
+                                modifiers={[
+                                    padding({ all: 0 }),
+                                    frame({ width: 90, height: 44 }),
+                                    glassEffect({
+                                        glass: {
+                                            variant: "regular",
+                                        },
+                                    }),
+                                ]}
+                            >
+                                <Button
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        handleRetake();
+                                    }}
+                                    variant="plain"
+                                >
+                                    Retake
+                                </Button>
+                            </HStack>
+                        </HStack>
+                    </Host>
                 )}
             </View>
 

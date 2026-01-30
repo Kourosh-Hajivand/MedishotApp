@@ -3,6 +3,7 @@ import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
+import { frame } from "@expo/ui/swift-ui/modifiers";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useMemo, useState } from "react";
@@ -68,53 +69,89 @@ const GalleryImageItem: React.FC<{
     };
 
     return (
-        <Host style={{ flex: 1, height: itemWidth }}>
-            <ContextMenu activationMethod="longPress">
-                <ContextMenu.Items>
-                    {menuItems.map((menu, menuIndex) => (
-                        <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
-                            {menu.label}
-                        </Button>
-                    ))}
-                </ContextMenu.Items>
+        <View style={{ width: itemWidth, height: itemWidth }}>
+            <Host matchContents modifiers={[frame({ width: itemWidth, height: itemWidth })]}>
+                <ContextMenu modifiers={[frame({ width: itemWidth, height: itemWidth })]} activationMethod="longPress">
+                    <ContextMenu.Items>
+                        {menuItems.map((menu, menuIndex) => (
+                            <Button key={`${menu.icon}-${menuIndex}`} systemImage={menu.icon} role={menu.role} onPress={() => menu.onPress?.(uri)}>
+                                {menu.label}
+                            </Button>
+                        ))}
+                    </ContextMenu.Items>
 
-                <ContextMenu.Trigger>
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => onImagePress(uri)}
-                        style={{
-                            width: itemWidth,
-                            height: itemWidth,
-                            marginRight: index < numColumns - 1 ? gap : 0,
-                            position: "relative",
-                            overflow: "hidden",
-                        }}
-                    >
-                        <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
-                            <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
-                        </Animated.View>
-                        <Animated.View style={imageOpacityAnimatedStyle}>
-                            <Image
-                                source={{ uri }}
-                                style={{
-                                    width: "100%",
-                                    height: "100%",
-                                }}
-                                contentFit="cover"
-                                onLoadStart={handleImageLoadStart}
-                                onLoad={handleImageLoad}
-                                onError={handleImageError}
-                            />
-                        </Animated.View>
-                        {imageUrlToBookmarkMap?.get(uri) && (
-                            <View style={styles.bookmarkIcon}>
-                                <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </ContextMenu.Trigger>
-            </ContextMenu>
-        </Host>
+                    <ContextMenu.Trigger>
+                        <TouchableOpacity
+                            activeOpacity={0.9}
+                            onPress={() => onImagePress(uri)}
+                            style={{
+                                width: itemWidth,
+                                height: itemWidth,
+                                marginRight: index < numColumns - 1 ? gap : 0,
+                                position: "relative",
+                                overflow: "hidden",
+                            }}
+                        >
+                            <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
+                                <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
+                            </Animated.View>
+                            <Animated.View style={imageOpacityAnimatedStyle}>
+                                <Image
+                                    source={{ uri }}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                    }}
+                                    contentFit="cover"
+                                    onLoadStart={handleImageLoadStart}
+                                    onLoad={handleImageLoad}
+                                    onError={handleImageError}
+                                />
+                            </Animated.View>
+                            {imageUrlToBookmarkMap?.get(uri) && (
+                                <View style={styles.bookmarkIcon}>
+                                    <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    </ContextMenu.Trigger>
+                </ContextMenu>
+            </Host>
+        </View>
+
+        // <TouchableOpacity
+        //     activeOpacity={0.9}
+        //     onPress={() => onImagePress(uri)}
+        //     style={{
+        //         width: itemWidth,
+        //         height: itemWidth,
+        //         marginRight: index < numColumns - 1 ? gap : 0,
+        //         position: "relative",
+        //         overflow: "hidden",
+        //     }}
+        // >
+        //     <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
+        //         <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
+        //     </Animated.View>
+        //     <Animated.View style={imageOpacityAnimatedStyle}>
+        //         <Image
+        //             source={{ uri }}
+        //             style={{
+        //                 width: "100%",
+        //                 height: "100%",
+        //             }}
+        //             contentFit="cover"
+        //             onLoadStart={handleImageLoadStart}
+        //             onLoad={handleImageLoad}
+        //             onError={handleImageError}
+        //         />
+        //     </Animated.View>
+        //     {imageUrlToBookmarkMap?.get(uri) && (
+        //         <View style={styles.bookmarkIcon}>
+        //             <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
+        //         </View>
+        //     )}
+        // </TouchableOpacity>
     );
 };
 
