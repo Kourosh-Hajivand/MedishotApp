@@ -16,6 +16,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
 
+// Softer pan when zoomed so image doesn't move too fast
+const PAN_SENSITIVITY = 0.7;
+
 import { ViewerActionsConfig } from "./GalleryWithMenu";
 
 interface MediaItem {
@@ -1075,14 +1078,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 savedScale.value = scale.value;
             })
             .onUpdate((e) => {
-                scale.value = Math.max(1, Math.min(4, savedScale.value * e.scale));
+                scale.value = Math.max(1, Math.min(8, savedScale.value * e.scale));
             })
             .onEnd(() => {
                 if (scale.value < 1) {
                     scale.value = withTiming(1, { duration: 200 });
                     runOnJS(setIsZoomed)(false);
-                } else if (scale.value > 4) {
-                    scale.value = withTiming(4, { duration: 200 });
+                } else if (scale.value > 8) {
+                    scale.value = withTiming(8, { duration: 200 });
                     runOnJS(setIsZoomed)(true);
                 } else {
                     runOnJS(setIsZoomed)(scale.value > 1);
@@ -1109,9 +1112,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             })
             .onUpdate((e) => {
                 if (scale.value > 1) {
-                    // When zoomed, allow panning within image bounds
-                    translateX.value = savedTranslateX.value + e.translationX;
-                    translateY.value = savedTranslateY.value + e.translationY;
+                    // When zoomed, allow panning within image bounds (softer movement)
+                    translateX.value = savedTranslateX.value + e.translationX * PAN_SENSITIVITY;
+                    translateY.value = savedTranslateY.value + e.translationY * PAN_SENSITIVITY;
                 }
                 // When not zoomed, don't interfere - let FlatList handle horizontal swipe
             })
@@ -1125,14 +1128,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
                     if (maxTranslateX > 0 && Math.abs(translateX.value) > maxTranslateX) {
                         translateX.value = withTiming(Math.sign(translateX.value) * maxTranslateX, { duration: 200 });
-                    } else if (Math.abs(translateX.value) > width / 2) {
-                        translateX.value = withTiming(0, { duration: 200 });
                     }
 
                     if (maxTranslateY > 0 && Math.abs(translateY.value) > maxTranslateY) {
                         translateY.value = withTiming(Math.sign(translateY.value) * maxTranslateY, { duration: 200 });
-                    } else if (Math.abs(translateY.value) > height / 2) {
-                        translateY.value = withTiming(0, { duration: 200 });
                     }
                 } else {
                     // When not zoomed, reset translation

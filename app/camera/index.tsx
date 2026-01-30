@@ -29,9 +29,13 @@ const MINT_COLOR = "#00c7be";
 const ASPECT_RATIO = 3 / 2; // 1.5 - Portrait mode (height = width * 1.5)
 
 // iOS: zoom level on wide lens to approximate 2x when telephoto is not available (0–1 = % of device max zoom)
-const ZOOM_FOR_2X_WIDE = 0.07;
+const ZOOM_FOR_2X_WIDE = 0.2;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// iOS back camera: only wide and telephoto; never macro/ultra-wide to avoid switching to macro
+const ALLOWED_BACK_LENSES = ["builtInWideAngleCamera", "builtInTelephotoCamera"] as const;
+
 // Shift viewport-based crop by fraction of crop height (fixes "cropped lower" in review); negative = down, positive = up
 const CROP_Y_OFFSET_UP_TEMPLATE = 0.005;
 const CROP_Y_OFFSET_UP_NO_TEMPLATE = -0.09;
@@ -377,7 +381,8 @@ export default function CameraScreen() {
                     }
                     const lenses = await getLenses.call(ref);
                     if (lenses && Array.isArray(lenses)) {
-                        if (lenses.includes("builtInTelephotoCamera")) {
+                        const allowed = lenses.filter((l: string) => (ALLOWED_BACK_LENSES as readonly string[]).includes(l));
+                        if (allowed.includes("builtInTelephotoCamera")) {
                             setSelectedLens("builtInTelephotoCamera");
                             const zoomVal = 0;
                             setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
@@ -760,6 +765,7 @@ export default function CameraScreen() {
         flashAnim.value = withSequence(withTiming(1, { duration: 50 }), withTiming(0, { duration: 150 }));
 
         try {
+            // Maximum quality: quality 1, skipProcessing false (skipProcessing true can override quality per docs)
             const photo = await cameraRef.current.takePictureAsync({
                 quality: 1,
                 skipProcessing: false,
@@ -813,6 +819,7 @@ export default function CameraScreen() {
                     }
                 }
 
+                // Maximum quality: compress 1, no downscale (crop uses full-resolution dimensions)
                 const croppedPhoto = await ImageManipulator.manipulateAsync(
                     photo.uri,
                     [
@@ -1534,9 +1541,9 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     ghostImage: {
-        width: "62%",
-        height: "62%",
-        opacity: 0.5,
+        width: "100%",
+        height: "100%",
+        opacity: 1,
     },
     capturedPhotoOverlay: {
         position: "absolute",

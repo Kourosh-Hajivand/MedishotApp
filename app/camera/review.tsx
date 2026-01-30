@@ -11,7 +11,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, FlatList, PixelRatio, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
@@ -188,10 +188,14 @@ export default function ReviewScreen() {
                 return;
             }
 
+            // Capture at 2x resolution for same/better quality as camera (width/height in pixels)
+            const pixelSize = Math.round(width * PixelRatio.get() * 2);
             const uri = await captureRef(compositeViewRef.current, {
                 format: "jpg",
                 quality: 1,
                 result: "tmpfile",
+                width: pixelSize,
+                height: pixelSize,
             });
 
             const newCompositePhoto: CapturedPhoto = {
