@@ -190,7 +190,7 @@ export default function ReviewScreen() {
 
             const uri = await captureRef(compositeViewRef.current, {
                 format: "jpg",
-                quality: 0.95,
+                quality: 1,
                 result: "tmpfile",
             });
 

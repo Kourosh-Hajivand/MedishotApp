@@ -62,11 +62,12 @@ const normalizeAddressValue = (address: string | AddressValue | { value?: string
     if (typeof address === "object") {
         const candidate = "value" in address ? address.value : address;
         if (candidate && typeof candidate === "object") {
+            const addr = candidate as AddressValue & Record<string, unknown>;
             return {
                 ...base,
-                ...candidate,
-                street1: candidate.street1 ?? candidate.street ?? base.street1,
-                street2: candidate.street2 ?? candidate.street_extra ?? "",
+                ...addr,
+                street1: addr.street1 ?? (addr.street as string) ?? base.street1,
+                street2: addr.street2 ?? (addr.street_extra as string) ?? "",
             };
         }
     }
@@ -117,6 +118,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
         gender?: string;
         idNumber?: string;
         address?: string;
+        addressStreet?: string;
+        addressCity?: string;
+        addressState?: string;
+        addressZip?: string;
         phone?: string;
         email?: string;
         scannedImageUri?: string;
@@ -375,13 +380,28 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 ]);
             }
 
-            // Set address if available
-            if (params.address) {
+            // Set address if available (structured from scan or single string)
+            const hasStructuredAddress =
+                params.addressCity != null ||
+                params.addressState != null ||
+                params.addressZip != null;
+            if (params.address || hasStructuredAddress) {
+                const street1 = params.addressStreet ?? params.address ?? "";
+                const addressValue: AddressValue = hasStructuredAddress
+                    ? {
+                          ...createEmptyAddressValue(),
+                          street1,
+                          city: params.addressCity ?? "",
+                          state: params.addressState ?? "",
+                          zip: params.addressZip ?? "",
+                          country: "United States",
+                      }
+                    : normalizeAddressValue(params.address);
                 setAddresses([
                     {
                         id: "address-0",
                         label: "Home",
-                        value: normalizeAddressValue(params.address),
+                        value: addressValue,
                     },
                 ]);
             }
@@ -389,7 +409,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
             // Mark that scanned data has been applied
             setHasAppliedScannedData(true);
         }
-    }, [params.firstName, params.lastName, params.birthDate, params.gender, params.phone, params.email, params.address, params.scannedImageUri, isEditMode, setValue, uploadIdCardImage, hasUploadedScannedImage, hasAppliedScannedData]);
+    }, [params.firstName, params.lastName, params.birthDate, params.gender, params.phone, params.email, params.address, params.addressStreet, params.addressCity, params.addressState, params.addressZip, params.scannedImageUri, isEditMode, setValue, uploadIdCardImage, hasUploadedScannedImage, hasAppliedScannedData]);
 
     useEffect(() => {
         if (patient?.data && isEditMode) {
@@ -531,14 +551,19 @@ export const AddPatientPhotoScreen: React.FC = () => {
             .filter((phone) => phone !== null) as Array<{ type: string; value: string }>;
 
         const emailAddresses = emailsRef.current
-            .filter((email) => email.value && email.value.trim() !== "")
+            .filter((email) => email.value && typeof email.value === "string" && email.value.trim() !== "")
             .map((email) => ({
                 type: email.label || "Personal",
-                value: email.value.trim(),
+                value: (email.value as string).trim(),
             }));
 
         const addressList = addressesRef.current
-            .filter((address) => address.value && (typeof address.value === "object" ? Object.values(address.value).some((val) => val && typeof val === "string" && val.trim() !== "") : typeof address.value === "string" && address.value.trim() !== ""))
+            .filter((address) => {
+                if (!address.value) return false;
+                if (typeof address.value === "object")
+                    return Object.values(address.value).some((val) => val && typeof val === "string" && (val as string).trim() !== "");
+                return typeof address.value === "string" && address.value.trim() !== "";
+            })
             .map((address) => ({
                 type: address.label,
                 value:
@@ -555,10 +580,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }));
 
         const urlLinks = urlsRef.current
-            .filter((url) => url.value && url.value.trim() !== "")
+            .filter((url) => url.value && typeof url.value === "string" && url.value.trim() !== "")
             .map((url) => ({
                 type: url.label,
-                value: url.value,
+                value: (url.value as string).trim(),
             }));
 
         const patientData: CreatePatientRequest = {

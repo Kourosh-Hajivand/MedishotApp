@@ -99,6 +99,18 @@ const IOSPhoneInputComponent = <T extends FieldValues>({ control, name, label, e
                         isInternalChangeRef.current = true;
                         lastSentValueRef.current = valueToSend;
                         onChange(valueToSend);
+
+                        // When 10 digits complete: move to next field or close keyboard
+                        if (limited.length === 10) {
+                            const submitOrBlur = () => {
+                                if (props.onSubmitEditing) {
+                                    props.onSubmitEditing({ nativeEvent: { text: valueToSend } } as any);
+                                } else {
+                                    inputRef.current?.blur();
+                                }
+                            };
+                            setTimeout(submitOrBlur, 0);
+                        }
                     };
 
                     return (

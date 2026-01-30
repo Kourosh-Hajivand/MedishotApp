@@ -17,9 +17,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import { router, useLocalSearchParams } from "expo-router";
 import { DeviceMotion } from "expo-sensors";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Modal, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { ActivityIndicator, Dimensions, FlatList, Modal, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -28,6 +27,11 @@ const MINT_COLOR = "#00c7be";
 
 // 3:2 Aspect Ratio Constant
 const ASPECT_RATIO = 3 / 2; // 1.5 - Portrait mode (height = width * 1.5)
+
+// iOS: zoom level on wide lens to approximate 2x when telephoto is not available (0–1 = % of device max zoom)
+const ZOOM_FOR_2X_WIDE = 0.07;
+// Shift viewport-based crop up by this fraction of crop height (fixes "cropped lower" in review)
+const CROP_Y_OFFSET_UP = 0.045;
 
 const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "auto", icon: "bolt.badge.automatic", label: "Auto" },
@@ -101,7 +105,7 @@ const GhostOverlay: React.FC<{
                     <ImageSkeleton width={overlayDimensions.width} height={overlayDimensions.height} borderRadius={0} variant="rectangular" />
                 </Animated.View>
             )}
-            <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle]}>
+            <Animated.View style={[StyleSheet.absoluteFill, imageAnimatedStyle, styles.ghostImageWrapper]}>
                 <Image source={ghostImageSource} style={styles.ghostImage} contentFit="contain" onLoadStart={handleLoadStart} onLoad={handleLoad} onError={handleError} />
             </Animated.View>
         </View>
@@ -328,9 +332,15 @@ export default function CameraScreen() {
         zoomLevel: 0,
     });
 
+    // iOS back camera: prefer 2x telephoto lens; else zoom wide to ~2x
+    const [selectedLens, setSelectedLens] = useState<string>("builtInWideAngleCamera");
+    const hasApplied2xRef = useRef(false);
+
     // Level indicator state (horizon line)
     const [levelAngle, setLevelAngle] = useState(0);
+    const [hasLevelSensor, setHasLevelSensor] = useState(false);
     const LEVEL_THRESHOLD = 2; // Degrees - consider level if within 2 degrees
+    const LEVEL_DISPLAY_SCALE = 0.52; // Scale line rotation so it matches perceived tilt (sensor often over-reports)
 
     // Zoom state
     const baseZoom = useSharedValue(0);
@@ -339,56 +349,58 @@ export default function CameraScreen() {
     const MIN_ZOOM = 0;
     const MAX_ZOOM = 1; // expo-camera zoom is 0-1
 
-    // Focus point state
-    const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
-    const focusPointOpacity = useSharedValue(0);
     const levelLineOpacity = useSharedValue(1); // Start visible
+    const levelAngleSv = useSharedValue(0); // Smoothed angle for animation
+    const levelIsLevelSv = useSharedValue(0); // 0 = white, 1 = yellow when level
+    const wasLevelRef = useRef(false); // Haptic only once when becoming level
+    const levelFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Helper function to update zoom (must be called from JS thread)
-    const updateZoom = useCallback((zoom: number) => {
-        setCameraState((prev) => ({ ...prev, zoomLevel: zoom }));
-    }, []);
+    // iOS back camera: use 2x telephoto if available, else zoom wide to ~2x (run once after camera ready)
+    const handleCameraReady = useCallback(() => {
+        if (Platform.OS !== "ios" || cameraState.cameraPosition !== "back") return;
+        if (hasApplied2xRef.current) return;
+        hasApplied2xRef.current = true;
 
-    // Pinch gesture for zoom
-    const pinchGesture = Gesture.Pinch()
-        .onStart(() => {
-            savedZoom.value = baseZoom.value;
-        })
-        .onUpdate((e) => {
-            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, savedZoom.value * e.scale));
-            baseZoom.value = newZoom;
-            runOnJS(updateZoom)(newZoom);
-        })
-        .onEnd(() => {
-            // Clamp final zoom value
-            const finalZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, baseZoom.value));
-            baseZoom.value = finalZoom;
-            runOnJS(updateZoom)(finalZoom);
-        });
-
-    // Tap gesture for focus
-    const tapGesture = Gesture.Tap().onEnd((e) => {
-        // Calculate focus point relative to camera view
-        const focusX = e.x;
-        const focusY = e.y;
-
-        // Update focus point on JS thread
-        runOnJS(setFocusPoint)({ x: focusX, y: focusY });
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-
-        // Animate focus indicator
-        focusPointOpacity.value = withSequence(withTiming(1, { duration: 200 }), withTiming(0, { duration: 800 }));
-    });
-
-    // Combined gesture - pinch and tap
-    const combinedGesture = Gesture.Race(pinchGesture, tapGesture);
-
-    const focusIndicatorStyle = useAnimatedStyle(() => ({
-        opacity: focusPointOpacity.value,
-    }));
+        const apply2x = async () => {
+            try {
+                const ref = cameraRef.current as { getAvailableLenses?: () => Promise<string[]>; getAvailableLensesAsync?: () => Promise<string[]> } | null;
+                const getLenses = ref?.getAvailableLenses ?? ref?.getAvailableLensesAsync;
+                if (!getLenses) return;
+                const lenses = await getLenses.call(ref);
+                if (lenses && lenses.includes("builtInTelephotoCamera")) {
+                    setSelectedLens("builtInTelephotoCamera");
+                    const zoomVal = 0;
+                    setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+                    baseZoom.value = zoomVal;
+                    savedZoom.value = zoomVal;
+                } else {
+                    setSelectedLens("builtInWideAngleCamera");
+                    const zoomVal = ZOOM_FOR_2X_WIDE;
+                    setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+                    baseZoom.value = zoomVal;
+                    savedZoom.value = zoomVal;
+                }
+            } catch {
+                setSelectedLens("builtInWideAngleCamera");
+                const zoomVal = ZOOM_FOR_2X_WIDE;
+                setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+                baseZoom.value = zoomVal;
+                savedZoom.value = zoomVal;
+            }
+        };
+        void apply2x();
+    }, [cameraState.cameraPosition]);
 
     const levelLineAnimatedStyle = useAnimatedStyle(() => ({
         opacity: levelLineOpacity.value,
+    }));
+
+    const levelLineRotationStyle = useAnimatedStyle(() => ({
+        transform: [{ rotate: `${levelAngleSv.value}deg` }],
+    }));
+
+    const levelLineColorStyle = useAnimatedStyle(() => ({
+        backgroundColor: interpolateColor(levelIsLevelSv.value, [0, 1], ["rgba(255,255,255,0.4)", "rgba(255,200,0,0.95)"]),
     }));
 
     const [isCapturing, setIsCapturing] = useState(false);
@@ -412,6 +424,8 @@ export default function CameraScreen() {
     const uploadingPhotoIdRef = useRef<string | null>(null);
     // Ref to track tempFilename synchronously (photoId -> tempFilename)
     const tempFilenameMapRef = useRef<Map<string, string>>(new Map());
+    // Viewport rect (screen coords) for mapping crop to what user sees in 3:2 frame
+    const viewportRef = useRef<{ viewportTop: number; viewportLeft: number; viewportWidth: number; viewportHeight: number } | null>(null);
 
     // Hook for immediate temp upload (for all photos)
     const { mutate: uploadToTemp } = useTempUpload(
@@ -460,6 +474,11 @@ export default function CameraScreen() {
         currentGhostIndexRef.current = currentGhostIndex;
     }, [currentGhostIndex]);
 
+    // When switching to front camera, allow 2x logic to re-run when switching back to back (iOS)
+    useEffect(() => {
+        if (cameraState.cameraPosition === "front") hasApplied2xRef.current = false;
+    }, [cameraState.cameraPosition]);
+
     // Device motion listener for level detection
     useEffect(() => {
         let subscription: { remove: () => void } | null = null;
@@ -480,16 +499,17 @@ export default function CameraScreen() {
                         return;
                     }
 
-                    // Use beta (pitch) for portrait mode level detection
-                    // Beta represents rotation around X-axis (forward/backward tilt)
-                    const beta = deviceMotionData.rotation.beta;
+                    // Use gamma (tilt left/right) for portrait mode level detection
+                    // Gamma represents rotation around Y-axis - correct for horizon line when tilting device left/right
+                    const gamma = deviceMotionData.rotation.gamma;
 
-                    // Convert radians to degrees
-                    const angleDegrees = (beta * 180) / Math.PI;
+                    // Native typically returns radians; if |value| > 4 assume degrees (no conversion)
+                    const angleDegrees = Math.abs(gamma) <= 4 ? (gamma * 180) / Math.PI : gamma;
 
                     // Clamp angle to reasonable range (-45 to +45 degrees)
                     const clampedAngle = Math.max(-45, Math.min(45, angleDegrees));
 
+                    setHasLevelSensor(true);
                     setLevelAngle(clampedAngle);
                 });
             } catch (error) {
@@ -506,19 +526,41 @@ export default function CameraScreen() {
         };
     }, []);
 
-    // Update level line opacity based on level angle
-    // Show when not level, fade out when level (centered)
+    // Level angle: scale for display so line rotation matches actual device tilt (1:1 feel)
     useEffect(() => {
-        const isLevel = Math.abs(levelAngle) < LEVEL_THRESHOLD;
+        const displayAngle = levelAngle * LEVEL_DISPLAY_SCALE;
+        levelAngleSv.value = withTiming(displayAngle, { duration: 80 });
+    }, [levelAngle]);
 
-        if (isLevel) {
-            // Device is level - fade out smoothly
-            levelLineOpacity.value = withTiming(0, { duration: 500 });
-        } else {
-            // Device is not level - show line
+    // Update level line: when level → yellow + haptic, then fade; when not level → white + visible
+    useEffect(() => {
+        if (!hasLevelSensor) {
             levelLineOpacity.value = withTiming(1, { duration: 300 });
+            levelIsLevelSv.value = withTiming(0);
+            return;
         }
-    }, [levelAngle, levelLineOpacity]);
+        const isLevel = Math.abs(levelAngle) < LEVEL_THRESHOLD;
+        if (isLevel) {
+            levelIsLevelSv.value = withTiming(1, { duration: 120 });
+            if (!wasLevelRef.current) {
+                wasLevelRef.current = true;
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                if (levelFadeTimeoutRef.current) clearTimeout(levelFadeTimeoutRef.current);
+                levelFadeTimeoutRef.current = setTimeout(() => {
+                    levelLineOpacity.value = withTiming(0, { duration: 350 });
+                    levelFadeTimeoutRef.current = null;
+                }, 280);
+            }
+        } else {
+            wasLevelRef.current = false;
+            if (levelFadeTimeoutRef.current) {
+                clearTimeout(levelFadeTimeoutRef.current);
+                levelFadeTimeoutRef.current = null;
+            }
+            levelIsLevelSv.value = withTiming(0, { duration: 120 });
+            levelLineOpacity.value = withTiming(1, { duration: 180 });
+        }
+    }, [levelAngle, hasLevelSensor]);
 
     // Navigate to specific ghost item when retaking a photo
     // Note: The photo is already removed in review.tsx before navigation, so we just need to navigate
@@ -650,9 +692,7 @@ export default function CameraScreen() {
         const isSingleGhostTemplate = hasGhostItems && ghostItemsData.length === 1;
         if ((!hasGhostItems || isSingleGhostTemplate) && capturedPhotos.length > 0) {
             // Check if all photos are uploaded
-            const relevantPhotos = isSingleGhostTemplate
-                ? capturedPhotos.filter((p) => p.templateId !== "no-template")
-                : capturedPhotos.filter((p) => p.templateId === "no-template");
+            const relevantPhotos = isSingleGhostTemplate ? capturedPhotos.filter((p) => p.templateId !== "no-template") : capturedPhotos.filter((p) => p.templateId === "no-template");
 
             const allUploaded =
                 relevantPhotos.length > 0 &&
@@ -703,38 +743,60 @@ export default function CameraScreen() {
 
         try {
             const photo = await cameraRef.current.takePictureAsync({
-                quality: 0.9,
+                quality: 1,
                 skipProcessing: false,
             });
 
             if (photo) {
-                // Crop photo to 3:2 aspect ratio (what user sees is what they get)
                 const originalWidth = photo.width;
                 const originalHeight = photo.height;
-                const targetRatio = ASPECT_RATIO; // 3:2 = 1.5
+                const viewport = viewportRef.current;
 
-                let cropWidth: number;
-                let cropHeight: number;
                 let cropX: number;
                 let cropY: number;
+                let cropWidth: number;
+                let cropHeight: number;
 
-                const currentRatio = originalHeight / originalWidth;
+                if (viewport && viewport.viewportWidth > 0 && viewport.viewportHeight > 0) {
+                    // Map viewport (screen) to image pixels assuming preview is "cover"
+                    const scale = Math.max(SCREEN_WIDTH / originalWidth, SCREEN_HEIGHT / originalHeight);
+                    const scaledWidth = originalWidth * scale;
+                    const scaledHeight = originalHeight * scale;
 
-                if (currentRatio > targetRatio) {
-                    // Image is taller than 3:2, crop top and bottom
-                    cropWidth = originalWidth;
-                    cropHeight = Math.round(originalWidth * targetRatio);
-                    cropX = 0;
-                    cropY = Math.round((originalHeight - cropHeight) / 2);
+                    const visibleX =
+                        scaledWidth > SCREEN_WIDTH ? (originalWidth - SCREEN_WIDTH / scale) / 2 : 0;
+                    const visibleWidth = scaledWidth > SCREEN_WIDTH ? SCREEN_WIDTH / scale : originalWidth;
+                    const visibleY =
+                        scaledHeight > SCREEN_HEIGHT ? (originalHeight - SCREEN_HEIGHT / scale) / 2 : 0;
+                    const visibleHeight =
+                        scaledHeight > SCREEN_HEIGHT ? SCREEN_HEIGHT / scale : originalHeight;
+
+                    cropX = visibleX + viewport.viewportLeft / scale;
+                    cropWidth = viewport.viewportWidth / scale;
+                    cropHeight = viewport.viewportHeight / scale;
+                    cropY = visibleY + viewport.viewportTop / scale - cropHeight * CROP_Y_OFFSET_UP;
+
+                    cropX = Math.max(0, Math.min(originalWidth - 1, Math.round(cropX)));
+                    cropY = Math.max(0, Math.min(originalHeight - 1, Math.round(cropY)));
+                    cropWidth = Math.max(1, Math.min(originalWidth - cropX, Math.round(cropWidth)));
+                    cropHeight = Math.max(1, Math.min(originalHeight - cropY, Math.round(cropHeight)));
                 } else {
-                    // Image is wider than 3:2, crop left and right
-                    cropHeight = originalHeight;
-                    cropWidth = Math.round(originalHeight / targetRatio);
-                    cropX = Math.round((originalWidth - cropWidth) / 2);
-                    cropY = 0;
+                    // Fallback: center crop to 3:2
+                    const targetRatio = ASPECT_RATIO;
+                    const currentRatio = originalHeight / originalWidth;
+                    if (currentRatio > targetRatio) {
+                        cropWidth = originalWidth;
+                        cropHeight = Math.round(originalWidth * targetRatio);
+                        cropX = 0;
+                        cropY = Math.round((originalHeight - cropHeight) / 2);
+                    } else {
+                        cropHeight = originalHeight;
+                        cropWidth = Math.round(originalHeight / targetRatio);
+                        cropX = Math.round((originalWidth - cropWidth) / 2);
+                        cropY = 0;
+                    }
                 }
 
-                // Crop the image to 3:2 ratio
                 const croppedPhoto = await ImageManipulator.manipulateAsync(
                     photo.uri,
                     [
@@ -747,7 +809,7 @@ export default function CameraScreen() {
                             },
                         },
                     ],
-                    { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG },
+                    { compress: 1, format: ImageManipulator.SaveFormat.JPEG },
                 );
 
                 const finalPhotoUri = croppedPhoto.uri;
@@ -973,31 +1035,14 @@ export default function CameraScreen() {
     const viewportLeft = (SCREEN_WIDTH - viewportWidth) / 2;
     const viewportBottom = SCREEN_HEIGHT - viewportTop - viewportHeight;
 
+    viewportRef.current = { viewportTop, viewportLeft, viewportWidth, viewportHeight };
+
     return (
         <View style={styles.container}>
-            {/* Camera View - Full screen behind everything */}
-            <GestureDetector gesture={combinedGesture}>
-                <View style={StyleSheet.absoluteFill}>
-                    <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={cameraState.zoomLevel} />
-                    {/* Focus indicator */}
-                    {focusPoint && (
-                        <Animated.View
-                            style={[
-                                styles.focusIndicator,
-                                {
-                                    left: focusPoint.x - 50,
-                                    top: focusPoint.y - 50,
-                                },
-                                focusIndicatorStyle,
-                            ]}
-                            pointerEvents="none"
-                        >
-                            <View style={styles.focusIndicatorOuter} />
-                            <View style={styles.focusIndicatorInner} />
-                        </Animated.View>
-                    )}
-                </View>
-            </GestureDetector>
+            {/* Camera View - Full screen behind everything; autofocus on center, no pinch */}
+            <View style={StyleSheet.absoluteFill}>
+                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing={cameraState.cameraPosition} flash={cameraState.flashMode} zoom={cameraState.zoomLevel} onCameraReady={handleCameraReady} autofocus="off" {...(Platform.OS === "ios" && { selectedLens })} />
+            </View>
 
             {/* Top Mask - Covers area above viewport */}
             <View style={[styles.viewportMask, { top: 0, left: 0, right: 0, height: viewportTop }]} />
@@ -1047,21 +1092,10 @@ export default function CameraScreen() {
                             </View>
                         )}
 
-                        {/* Level Indicator (Horizon Line) - iOS style - Only show when grid is enabled, fades out when level */}
+                        {/* Level Indicator (Horizon Line) - Only show when grid enabled; yellow + haptic when level, then fade */}
                         {cameraState.isGridEnabled && (
                             <Animated.View style={[styles.levelContainer, StyleSheet.absoluteFill, levelLineAnimatedStyle]} pointerEvents="none">
-                                {/* Level line - horizontal line in center for alignment */}
-                                <Animated.View
-                                    style={[
-                                        styles.levelLine,
-                                        {
-                                            top: "50%",
-                                            transform: [{ rotate: `${levelAngle}deg` }],
-                                        },
-                                    ]}
-                                />
-                                {/* Center dot - intersection point */}
-                                <View style={styles.levelCenterDot} />
+                                <Animated.View style={[styles.levelLine, { top: "50%" }, levelLineRotationStyle, levelLineColorStyle]} />
                             </Animated.View>
                         )}
 
@@ -1122,7 +1156,8 @@ export default function CameraScreen() {
 
                 <View style={styles.headerRight}>
                     {/* Save Button - Only show for template photos with more than one ghost (single ghost templates auto-navigate) */}
-                    {hasGhostItems && ghostItemsData.length > 1 &&
+                    {hasGhostItems &&
+                        ghostItemsData.length > 1 &&
                         (() => {
                             // Check if any photo is currently uploading
                             const isUploading = capturedPhotos.some((p) => p.uploadStatus === "uploading");
@@ -1455,14 +1490,20 @@ const styles = StyleSheet.create({
     },
     ghostOverlay: {
         position: "absolute",
+        top: 0,
         left: 0,
         right: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    ghostImageWrapper: {
         justifyContent: "center",
         alignItems: "center",
     },
     ghostImage: {
-        width: "100%",
-        height: "100%",
+        width: "62%",
+        height: "62%",
         opacity: 0.5,
     },
     capturedPhotoOverlay: {
@@ -1681,54 +1722,14 @@ const styles = StyleSheet.create({
     },
     levelLine: {
         position: "absolute",
-        left: "15%",
-        right: "15%",
+        left: "28%",
+        right: "28%",
         height: 1,
-        backgroundColor: "rgba(255,255,255,0.4)",
         shadowColor: colors.system.black,
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.1,
         shadowRadius: 0.5,
         elevation: 1,
-    },
-    levelCenterDot: {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: "rgba(255,255,255,0.5)",
-        marginLeft: -1.5,
-        marginTop: -1.5,
-        shadowColor: colors.system.black,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.1,
-        shadowRadius: 0.5,
-        elevation: 1,
-    },
-    focusIndicator: {
-        position: "absolute",
-        width: 100,
-        height: 100,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    focusIndicatorOuter: {
-        position: "absolute",
-        width: 80,
-        height: 80,
-        borderWidth: 2,
-        borderColor: colors.system.yellow,
-        borderRadius: 4,
-    },
-    focusIndicatorInner: {
-        position: "absolute",
-        width: 20,
-        height: 20,
-        borderWidth: 2,
-        borderColor: colors.system.yellow,
-        borderRadius: 2,
     },
     guideModalContainer: {
         flex: 1,

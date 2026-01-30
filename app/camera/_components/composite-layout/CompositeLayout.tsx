@@ -47,7 +47,7 @@ export const CompositeLayout = forwardRef<ViewShotType, CompositeLayoutProps>(
             <ViewShot
                 ref={ref}
                 style={[styles.compositeViewShot, { width: containerWidth, height: containerWidth }]}
-                options={{ format: "jpg", quality: 0.95 }}
+                options={{ format: "jpg", quality: 1 }}
                 onLayout={onLayoutReady}
             >
                 <View style={[styles.compositeContainer, { width: containerWidth, height: containerWidth }]}>

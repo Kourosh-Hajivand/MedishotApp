@@ -68,6 +68,10 @@ export const AddPatientFormScreen: React.FC = () => {
         gender?: string;
         idNumber?: string;
         address?: string;
+        addressStreet?: string;
+        addressCity?: string;
+        addressState?: string;
+        addressZip?: string;
         phone?: string;
         email?: string;
         scannedImageUri?: string;

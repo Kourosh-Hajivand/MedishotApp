@@ -24,16 +24,8 @@ export const PasswordStrengthChecklist: React.FC<PasswordStrengthChecklistProps>
                 const met = check(password);
                 return (
                     <View key={label} style={styles.row}>
-                        <View
-                            style={[
-                                styles.bullet,
-                                { backgroundColor: met ? colors.system.green : colors.labels.tertiary },
-                            ]}
-                        />
-                        <BaseText
-                            type="Caption2"
-                            color={met ? "system.green" : "labels.tertiary"}
-                        >
+                        <View style={[styles.bullet, { backgroundColor: met ? colors.system.green : colors.labels.tertiary }]} />
+                        <BaseText type="Subhead" color={met ? "system.green" : "labels.tertiary"}>
                             {label}
                         </BaseText>
                     </View>
@@ -47,7 +39,11 @@ const styles = StyleSheet.create({
     container: {
         gap: spacing["1"],
         width: "100%",
-
+        position: "absolute",
+        bottom: -120,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
         paddingVertical: spacing["4"],
     },
     row: {
