@@ -129,21 +129,40 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
         .filter((line) => line.length > 0);
     const text = ocrText.toLowerCase();
 
-    // --- Name: US DL often "LAST, FIRST" or labeled "LAST NAME" / "FIRST NAME" or two lines ---
-    // 1) "LAST, FIRST" pattern (assign correctly)
-    const lastFirstMatch = ocrText.match(/([A-Z][A-Za-z]+),\s*([A-Z][A-Za-z]+)/);
-    if (lastFirstMatch) {
-        data.lastName = lastFirstMatch[1].trim();
-        data.firstName = lastFirstMatch[2].trim();
+    // --- California DL: LN/FN با یا بدون فاصله (LNCARDHOLDER, FNIMA یا LN CARDHOLDER, FN IMA) ---
+    const lnNoSpace = ocrText.match(/\bLN([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);
+    if (lnNoSpace) data.lastName = lnNoSpace[1].trim();
+    const fnNoSpace = ocrText.match(/\bFN([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);
+    if (fnNoSpace) data.firstName = fnNoSpace[1].trim();
+    const lnSameLine = ocrText.match(/\bLN\s+([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);
+    if (lnSameLine && !data.lastName) data.lastName = lnSameLine[1].trim();
+    const fnSameLine = ocrText.match(/\bFN\s+([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);
+    if (fnSameLine && !data.firstName) data.firstName = fnSameLine[1].trim();
+    // LN/FN with value on next line
+    for (let i = 0; i < lines.length; i++) {
+        if (/^\s*LN\s*$/i.test(lines[i]) && lines[i + 1] && /^[A-Za-z\s\-']+$/.test(lines[i + 1])) {
+            if (!data.lastName) data.lastName = lines[i + 1].trim();
+        }
+        if (/^\s*FN\s*$/i.test(lines[i]) && lines[i + 1] && /^[A-Za-z\s\-']+$/.test(lines[i + 1])) {
+            if (!data.firstName) data.firstName = lines[i + 1].trim();
+        }
     }
 
-    // 2) Labeled lines: "LAST NAME" / "FIRST NAME" (or "NAME" with next line content)
+    // --- Name: US DL "LAST, FIRST" pattern ---
+    if (!data.firstName || !data.lastName) {
+        const lastFirstMatch = ocrText.match(/([A-Z][A-Za-z]+),\s*([A-Z][A-Za-z]+)/);
+        if (lastFirstMatch) {
+            if (!data.lastName) data.lastName = lastFirstMatch[1].trim();
+            if (!data.firstName) data.firstName = lastFirstMatch[2].trim();
+        }
+    }
+
+    // --- Labeled lines: "LAST NAME" / "FIRST NAME" (or "NAME" with next line content) ---
     if (!data.firstName || !data.lastName) {
         for (let i = 0; i < lines.length; i++) {
-            const lineLower = lines[i].toLowerCase();
             const nextLine = lines[i + 1];
             if (/(?:last\s*name|surname|family\s*name)\s*[:]?/i.test(lines[i]) && nextLine && /^[A-Za-z\s\-']+$/.test(nextLine)) {
-                data.lastName = nextLine.trim();
+                if (!data.lastName) data.lastName = nextLine.trim();
             }
             if (/(?:first\s*name|given\s*name|name)\s*[:]?/i.test(lines[i]) && nextLine && /^[A-Za-z\s\-']+$/.test(nextLine)) {
                 const content = nextLine.trim();
@@ -152,7 +171,7 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
         }
     }
 
-    // 3) "FIRST LAST" style (single line)
+    // --- "FIRST LAST" style (single line) ---
     if (!data.firstName || !data.lastName) {
         const firstLastPatterns = [
             /([A-Z][a-z]+)\s+([A-Z][a-z]+)/,
@@ -168,22 +187,33 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
         }
     }
 
-    // 4) Two-line fallback: first two non-label lines as last + first (many US DLs: line1=last, line2=first)
+    // --- Two-line fallback: first two name-like lines (US DLs: line1=last, line2=first) ---
     if ((!data.firstName || !data.lastName) && lines.length >= 2) {
-        const nameLikeLines = lines.filter((l) => /^[A-Za-z\s\-']+$/.test(l) && l.length > 1 && !/^\d/.test(l) && !/^(dob|sex|address|id|dln|dl\s*#)/i.test(l));
+        const nameLikeLines = lines.filter((l) => /^[A-Za-z\s\-']+$/.test(l) && l.length > 1 && !/^\d/.test(l) && !/^(dob|sex|address|id|dln|dl\s*#|ln|fn)$/i.test(l.trim()));
         if (nameLikeLines.length >= 2) {
             if (!data.lastName) data.lastName = nameLikeLines[0].trim();
             if (!data.firstName) data.firstName = nameLikeLines[1].trim();
         }
     }
 
-    // --- DOB: prefer match near "DOB" or "BIRTH" to avoid issue/expiry dates ---
+    // --- DOB: California DL "DOB 08/31/1977" or "DOB 08311977" (MMDDYYYY) ---
     const dobLabelPattern = /(?:dob|birth\s*date|birthday|b\.?d\.?)\s*[:]?\s*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i;
     const dobLabelMatch = text.match(dobLabelPattern);
     if (dobLabelMatch) {
         const dateParts = dobLabelMatch[1].split(/[\/\-\.]/);
         const formatted = formatParsedDate(dateParts);
         if (formatted) data.birthDate = formatted;
+    }
+    // DOB as 8 digits MMDDYYYY (e.g. 08311977) — avoid matching EXP or ISS dates by preferring line with DOB
+    if (!data.birthDate) {
+        const dobEightDigit = ocrText.match(/(?:dob|birth\s*date)\s*[:]?\s*(\d{8})/i);
+        if (dobEightDigit) {
+            const raw = dobEightDigit[1];
+            const month = raw.slice(0, 2);
+            const day = raw.slice(2, 4);
+            const year = raw.slice(4, 8);
+            data.birthDate = `${year}-${month}-${day}`;
+        }
     }
     if (!data.birthDate) {
         const genericDatePattern = /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/;
@@ -216,21 +246,27 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
         }
     }
 
-    // --- ID Number (DLN) ---
+    // --- ID Number (DL): California DL e.g. I1234568 or 11234568 ---
     const idPatterns = [
-        /(?:dln|dl\s*#|driver\s*license|license\s*#|id\s*#|id\s*number)\s*[:]?\s*([A-Z0-9]{5,})/i,
+        /(?:dln|dl\s*#?|driver\s*license|license\s*#|id\s*#|id\s*number)\s*[:]?\s*([A-Z0-9]{5,})/i,
+        /\b(DL|ID)\s*[:]?\s*([A-Z0-9]{5,})(?:\s|$|\n)/i,
+        /\b([A-Z]\d{7,})\b/,   // e.g. I1234568
         /\b([A-Z]{1,2}\d{6,})\b/,
         /\b(\d{8,})\b/,
     ];
     for (const pattern of idPatterns) {
         const match = ocrText.match(pattern);
         if (match) {
-            data.idNumber = match[1].trim();
-            break;
+            // DL/ID label pattern returns [fullMatch, "DL", value]
+            const value = match[2] !== undefined ? match[2] : match[1];
+            if (value && value.length >= 5) {
+                data.idNumber = value.trim();
+                break;
+            }
         }
     }
 
-    // --- Address: multi-line US DL (street line(s) then "CITY, ST 12345" or "CITY ST 12345") ---
+    // --- Address: California DL — street line (e.g. "2570 24TH STREET") then "CITY, ST ZIP" (e.g. "ANYTOWN, CA 95818") ---
     const twoLetterState = /\b([A-Z]{2})\b/;
     const zipPattern = /\b(\d{5})(?:-(\d{4}))?\b/;
     // Line that looks like "CITY, ST 12345" or "CITY ST 12345"
@@ -248,9 +284,10 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
             break;
         }
     }
-    // Street: line with number + text (often before city line), or "ADDRESS" labeled
+    // Street: California style "NUMBER + STREET" (e.g. 2570 24TH STREET, 123 MAIN ST)
     const streetPatterns = [
         /(?:address|addr|residence)\s*[:]?\s*([0-9]+\s+[A-Z0-9\s,.#]+(?:street|st|avenue|ave|road|rd|blvd|drive|dr|lane|ln|way|circle|cir|court|ct)[A-Z0-9\s,.]*)/i,
+        /([0-9]{2,5}\s+[A-Z0-9]+(?:TH|ST|ND|RD)?\s+(?:STREET|ST|AVENUE|AVE|ROAD|RD|BLVD|DRIVE|DR|LANE|LN)[A-Z0-9\s,.]*)/i,
         /([0-9]+\s+[A-Z0-9\s,.#]{8,})/i,
     ];
     for (const pattern of streetPatterns) {
@@ -263,6 +300,10 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
                 break;
             }
         }
+    }
+    if (!data.address && (data.addressStreet || data.addressCity)) {
+        const parts = [data.addressStreet, data.addressCity, data.addressState, data.addressZip].filter(Boolean);
+        data.address = parts.join(", ");
     }
     if (!data.address && data.addressStreet) data.address = data.addressStreet;
 
