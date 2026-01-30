@@ -11,7 +11,7 @@ import { Image } from "expo-image";
 import React, { useRef, useState } from "react";
 import { Alert, Dimensions, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
@@ -370,6 +370,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const savedTranslateY = useSharedValue(0);
     const scrollProgress = useSharedValue(0); // Progress of swipe: -1 to 1 (left to right)
     const currentIndexShared = useSharedValue(initialIndex); // Shared value for current index
+    const dismissTranslateY = useSharedValue(0); // Swipe down to dismiss (iPhone Photos style)
 
     // Get current patientId from currentIndex if imageUrlToPatientIdMap is provided
     const currentPatientId = React.useMemo(() => {
@@ -1171,6 +1172,39 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return Gesture.Simultaneous(Gesture.Simultaneous(pinchGesture, panGesture), Gesture.Exclusive(doubleTapGesture, singleTapGesture));
     };
 
+    // Swipe down to dismiss (iPhone Photos style) - only when not zoomed
+    const DISMISS_THRESHOLD = 55;
+    const DISMISS_VELOCITY = 250;
+    const dismissPanGesture = React.useMemo(
+        () =>
+            Gesture.Pan()
+                .activeOffsetY([15, 999])
+                .failOffsetX([-50, 50])
+                .onUpdate((e) => {
+                    if (scale.value <= 1 && e.translationY > 0) {
+                        dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
+                    }
+                })
+                .onEnd((e) => {
+                    const shouldDismiss = dismissTranslateY.value > DISMISS_THRESHOLD || e.velocityY > DISMISS_VELOCITY;
+                    if (shouldDismiss) {
+                        dismissTranslateY.value = withTiming(height, { duration: 150 });
+                        runOnJS(onClose)();
+                    } else {
+                        dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+                    }
+                }),
+        [onClose],
+    );
+
+    React.useEffect(() => {
+        if (visible) dismissTranslateY.value = 0;
+    }, [visible]);
+
+    const dismissAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateY: dismissTranslateY.value }],
+    }));
+
     const imageAnimatedStyle = useAnimatedStyle(() => {
         return {
             transform: [{ scale: scale.value }, { translateX: translateX.value }, { translateY: translateY.value }],
@@ -1211,8 +1245,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen">
             <GestureHandlerRootView style={styles.container}>
                 <View style={styles.container}>
-                    {/* Header */}
-                    <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
+                    <GestureDetector gesture={dismissPanGesture}>
+                        <Animated.View style={[styles.container, dismissAnimatedStyle]}>
+                            {/* Header */}
+                            <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
                         <View style={styles.actionButtonsContainer}>
                             <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                 <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
@@ -1460,6 +1496,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             </Host>
                         </View>
                     </Animated.View>
+                        </Animated.View>
+                    </GestureDetector>
                 </View>
             </GestureHandlerRootView>
 
