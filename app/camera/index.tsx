@@ -30,8 +30,11 @@ const ASPECT_RATIO = 3 / 2; // 1.5 - Portrait mode (height = width * 1.5)
 
 // iOS: zoom level on wide lens to approximate 2x when telephoto is not available (0–1 = % of device max zoom)
 const ZOOM_FOR_2X_WIDE = 0.07;
-// Shift viewport-based crop up by this fraction of crop height (fixes "cropped lower" in review)
-const CROP_Y_OFFSET_UP = 0.045;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// Shift viewport-based crop by fraction of crop height (fixes "cropped lower" in review); negative = down, positive = up
+const CROP_Y_OFFSET_UP_TEMPLATE = 0.005;
+const CROP_Y_OFFSET_UP_NO_TEMPLATE = -0.09;
 
 const FLASH_OPTIONS: { mode: FlashMode; icon: string; label: string }[] = [
     { mode: "auto", icon: "bolt.badge.automatic", label: "Auto" },
@@ -329,7 +332,7 @@ export default function CameraScreen() {
         flashMode: "auto",
         cameraPosition: "back",
         isGridEnabled: true,
-        zoomLevel: 0,
+        zoomLevel: Platform.OS === "ios" ? ZOOM_FOR_2X_WIDE : 0,
     });
 
     // iOS back camera: prefer 2x telephoto lens; else zoom wide to ~2x
@@ -343,50 +346,64 @@ export default function CameraScreen() {
     const LEVEL_DISPLAY_SCALE = 0.52; // Scale line rotation so it matches perceived tilt (sensor often over-reports)
 
     // Zoom state
-    const baseZoom = useSharedValue(0);
+    const baseZoom = useSharedValue(Platform.OS === "ios" ? ZOOM_FOR_2X_WIDE : 0);
     const pinchScale = useSharedValue(1);
-    const savedZoom = useSharedValue(0);
+    const savedZoom = useSharedValue(Platform.OS === "ios" ? ZOOM_FOR_2X_WIDE : 0);
     const MIN_ZOOM = 0;
     const MAX_ZOOM = 1; // expo-camera zoom is 0-1
 
     const levelLineOpacity = useSharedValue(1); // Start visible
     const levelAngleSv = useSharedValue(0); // Smoothed angle for animation
     const levelIsLevelSv = useSharedValue(0); // 0 = white, 1 = yellow when level
-    const wasLevelRef = useRef(false); // Haptic only once when becoming level
+    const wasLevelRef = useRef(false); // Run fade-out only once when becoming level
     const levelFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // iOS back camera: use 2x telephoto if available, else zoom wide to ~2x (run once after camera ready)
     const handleCameraReady = useCallback(() => {
         if (Platform.OS !== "ios" || cameraState.cameraPosition !== "back") return;
         if (hasApplied2xRef.current) return;
-        hasApplied2xRef.current = true;
 
         const apply2x = async () => {
-            try {
-                const ref = cameraRef.current as { getAvailableLenses?: () => Promise<string[]>; getAvailableLensesAsync?: () => Promise<string[]> } | null;
-                const getLenses = ref?.getAvailableLenses ?? ref?.getAvailableLensesAsync;
-                if (!getLenses) return;
-                const lenses = await getLenses.call(ref);
-                if (lenses && lenses.includes("builtInTelephotoCamera")) {
-                    setSelectedLens("builtInTelephotoCamera");
-                    const zoomVal = 0;
-                    setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
-                    baseZoom.value = zoomVal;
-                    savedZoom.value = zoomVal;
-                } else {
-                    setSelectedLens("builtInWideAngleCamera");
-                    const zoomVal = ZOOM_FOR_2X_WIDE;
-                    setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
-                    baseZoom.value = zoomVal;
-                    savedZoom.value = zoomVal;
+            const ref = cameraRef.current as { getAvailableLenses?: () => Promise<string[]>; getAvailableLensesAsync?: () => Promise<string[]> } | null;
+            const getLenses = ref?.getAvailableLenses ?? ref?.getAvailableLensesAsync;
+            const maxAttempts = 3;
+            const retryDelayMs = 120;
+
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    if (!ref || !getLenses) {
+                        if (attempt < maxAttempts) await delay(retryDelayMs);
+                        continue;
+                    }
+                    const lenses = await getLenses.call(ref);
+                    if (lenses && Array.isArray(lenses)) {
+                        if (lenses.includes("builtInTelephotoCamera")) {
+                            setSelectedLens("builtInTelephotoCamera");
+                            const zoomVal = 0;
+                            setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+                            baseZoom.value = zoomVal;
+                            savedZoom.value = zoomVal;
+                        } else {
+                            setSelectedLens("builtInWideAngleCamera");
+                            const zoomVal = ZOOM_FOR_2X_WIDE;
+                            setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+                            baseZoom.value = zoomVal;
+                            savedZoom.value = zoomVal;
+                        }
+                        hasApplied2xRef.current = true;
+                        return;
+                    }
+                } catch {
+                    if (attempt < maxAttempts) await delay(retryDelayMs);
                 }
-            } catch {
-                setSelectedLens("builtInWideAngleCamera");
-                const zoomVal = ZOOM_FOR_2X_WIDE;
-                setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
-                baseZoom.value = zoomVal;
-                savedZoom.value = zoomVal;
             }
+
+            setSelectedLens("builtInWideAngleCamera");
+            const zoomVal = ZOOM_FOR_2X_WIDE;
+            setCameraState((prev) => ({ ...prev, zoomLevel: zoomVal }));
+            baseZoom.value = zoomVal;
+            savedZoom.value = zoomVal;
+            hasApplied2xRef.current = true;
         };
         void apply2x();
     }, [cameraState.cameraPosition]);
@@ -426,6 +443,8 @@ export default function CameraScreen() {
     const tempFilenameMapRef = useRef<Map<string, string>>(new Map());
     // Viewport rect (screen coords) for mapping crop to what user sees in 3:2 frame
     const viewportRef = useRef<{ viewportTop: number; viewportLeft: number; viewportWidth: number; viewportHeight: number } | null>(null);
+    // Same viewport for all crops so template and non-template photos align in review (fixed layout)
+    const cropViewportRef = useRef<{ viewportTop: number; viewportLeft: number; viewportWidth: number; viewportHeight: number } | null>(null);
 
     // Hook for immediate temp upload (for all photos)
     const { mutate: uploadToTemp } = useTempUpload(
@@ -532,7 +551,7 @@ export default function CameraScreen() {
         levelAngleSv.value = withTiming(displayAngle, { duration: 80 });
     }, [levelAngle]);
 
-    // Update level line: when level → yellow + haptic, then fade; when not level → white + visible
+    // Update level line: when level → yellow, then fade; when not level → white + visible
     useEffect(() => {
         if (!hasLevelSensor) {
             levelLineOpacity.value = withTiming(1, { duration: 300 });
@@ -544,7 +563,6 @@ export default function CameraScreen() {
             levelIsLevelSv.value = withTiming(1, { duration: 120 });
             if (!wasLevelRef.current) {
                 wasLevelRef.current = true;
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 if (levelFadeTimeoutRef.current) clearTimeout(levelFadeTimeoutRef.current);
                 levelFadeTimeoutRef.current = setTimeout(() => {
                     levelLineOpacity.value = withTiming(0, { duration: 350 });
@@ -750,7 +768,7 @@ export default function CameraScreen() {
             if (photo) {
                 const originalWidth = photo.width;
                 const originalHeight = photo.height;
-                const viewport = viewportRef.current;
+                const viewport = cropViewportRef.current ?? viewportRef.current;
 
                 let cropX: number;
                 let cropY: number;
@@ -763,18 +781,16 @@ export default function CameraScreen() {
                     const scaledWidth = originalWidth * scale;
                     const scaledHeight = originalHeight * scale;
 
-                    const visibleX =
-                        scaledWidth > SCREEN_WIDTH ? (originalWidth - SCREEN_WIDTH / scale) / 2 : 0;
+                    const visibleX = scaledWidth > SCREEN_WIDTH ? (originalWidth - SCREEN_WIDTH / scale) / 2 : 0;
                     const visibleWidth = scaledWidth > SCREEN_WIDTH ? SCREEN_WIDTH / scale : originalWidth;
-                    const visibleY =
-                        scaledHeight > SCREEN_HEIGHT ? (originalHeight - SCREEN_HEIGHT / scale) / 2 : 0;
-                    const visibleHeight =
-                        scaledHeight > SCREEN_HEIGHT ? SCREEN_HEIGHT / scale : originalHeight;
+                    const visibleY = scaledHeight > SCREEN_HEIGHT ? (originalHeight - SCREEN_HEIGHT / scale) / 2 : 0;
+                    const visibleHeight = scaledHeight > SCREEN_HEIGHT ? SCREEN_HEIGHT / scale : originalHeight;
 
                     cropX = visibleX + viewport.viewportLeft / scale;
                     cropWidth = viewport.viewportWidth / scale;
                     cropHeight = viewport.viewportHeight / scale;
-                    cropY = visibleY + viewport.viewportTop / scale - cropHeight * CROP_Y_OFFSET_UP;
+                    const cropYOffset = hasGhostItems ? CROP_Y_OFFSET_UP_TEMPLATE : CROP_Y_OFFSET_UP_NO_TEMPLATE;
+                    cropY = visibleY + viewport.viewportTop / scale - cropHeight * cropYOffset;
 
                     cropX = Math.max(0, Math.min(originalWidth - 1, Math.round(cropX)));
                     cropY = Math.max(0, Math.min(originalHeight - 1, Math.round(cropY)));
@@ -1036,6 +1052,22 @@ export default function CameraScreen() {
     const viewportBottom = SCREEN_HEIGHT - viewportTop - viewportHeight;
 
     viewportRef.current = { viewportTop, viewportLeft, viewportWidth, viewportHeight };
+
+    // Fixed viewport for cropping so all photos (template + non-template) align in review
+    const bottomHeightForCrop = 172 + insets.bottom;
+    const availableHeightForCrop = SCREEN_HEIGHT - headerHeight - bottomHeightForCrop;
+    const maxViewportHeightByWidthCrop = SCREEN_WIDTH * ASPECT_RATIO;
+    const maxViewportWidthByHeightCrop = availableHeightForCrop / ASPECT_RATIO;
+    const cropViewportWidth = maxViewportHeightByWidthCrop <= availableHeightForCrop ? SCREEN_WIDTH : maxViewportWidthByHeightCrop;
+    const cropViewportHeight = maxViewportHeightByWidthCrop <= availableHeightForCrop ? maxViewportHeightByWidthCrop : availableHeightForCrop;
+    const cropViewportTop = headerHeight + (availableHeightForCrop - cropViewportHeight) / 2;
+    const cropViewportLeft = (SCREEN_WIDTH - cropViewportWidth) / 2;
+    cropViewportRef.current = {
+        viewportTop: cropViewportTop,
+        viewportLeft: cropViewportLeft,
+        viewportWidth: cropViewportWidth,
+        viewportHeight: cropViewportHeight,
+    };
 
     return (
         <View style={styles.container}>
