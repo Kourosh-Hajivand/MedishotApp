@@ -104,7 +104,6 @@ export const CreatePracticeScreen: React.FC = () => {
             setUploadedFilename(response.filename ?? null);
         },
         (error) => {
-
             setSelectedImage(null);
             setUploadedFilename(null);
         },
@@ -182,21 +181,21 @@ export const CreatePracticeScreen: React.FC = () => {
                     zipcode: Number(data.zipCode),
                     ...(data.email ? { email: data.email } : {}),
                     print_settings: {
-                        avatar: "profile_picture",
+                        avatar: "logo",
                         practiceName: true,
                         doctorName: true,
                         address: true,
                         practicePhone: true,
-                        practiceURL: false,
-                        practiceEmail: false,
-                        practiceSocialMedia: false,
+                        practiceURL: true,
+                        practiceEmail: true,
+                        practiceSocialMedia: true,
                     },
                     notification_settings: {
                         imageAdded: true,
                         notes: true,
                         imageEnhanced: true,
                         consentFilled: true,
-                        patientAdded: false,
+                        patientAdded: true,
                     },
                 }),
                 type: practiceType.id,

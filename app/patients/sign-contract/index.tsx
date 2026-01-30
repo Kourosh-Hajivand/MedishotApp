@@ -29,14 +29,14 @@ interface PracticeSettings {
 }
 
 const defaultPracticeSettings: PracticeSettings = {
-    avatar: "profile_picture",
+    avatar: "logo",
     practiceName: true,
     doctorName: true,
     address: true,
     practicePhone: true,
-    practiceURL: false,
-    practiceEmail: false,
-    practiceSocialMedia: false,
+    practiceURL: true,
+    practiceEmail: true,
+    practiceSocialMedia: true,
 };
 
 export default function SignContractScreen() {
@@ -226,7 +226,6 @@ export default function SignContractScreen() {
                 },
             };
 
-
             createContract(requestData);
         },
         [patientId, templateId, uploadedSignatureFilename, contractTemplate, radioGroupAnswers, createContract],
@@ -276,11 +275,10 @@ export default function SignContractScreen() {
     const practice = practiceData?.data;
     const template = contractTemplate?.data;
     const isDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature || isUploadingPDF || isGeneratingPDF;
-    
+
     const isLoading = isLoadingTemplate || isLoadingPatient || isLoadingPractice;
     const isError = isTemplateError || isPatientError || isPracticeError;
     const error = templateError || patientError || practiceError;
-
 
     useLayoutEffect(() => {
         if (!patient) {
@@ -335,13 +333,13 @@ export default function SignContractScreen() {
     if (isError) {
         return (
             <View className="flex-1 items-center justify-center">
-                <ErrorState 
-                    message={(error as any)?.message || "Failed to load contract data"} 
+                <ErrorState
+                    message={(error as any)?.message || "Failed to load contract data"}
                     onRetry={() => {
                         refetchTemplate();
                         refetchPatient();
                         refetchPractice();
-                    }} 
+                    }}
                     title="Failed to load contract"
                 />
             </View>

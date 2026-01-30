@@ -3,7 +3,7 @@ import Avatar from "@/components/avatar";
 import colors from "@/theme/colors";
 import { People, Practice } from "@/utils/service/models/ResponseModels";
 import React from "react";
-import { Image, StyleSheet, View, ViewStyle } from "react-native";
+import { StyleSheet, View, ViewStyle } from "react-native";
 
 export interface PracticeSettings {
     avatar: "profile_picture" | "logo";
@@ -35,11 +35,7 @@ export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({ 
     return (
         <View style={[variant === "preview" ? styles.previewHeader : styles.documentHeader, headerStyle]}>
             <View style={variant === "preview" ? styles.previewHeaderLeft : styles.documentHeaderLeft}>
-                {printSettings.avatar === "logo" && practice.image?.url ? (
-                    <Image source={{ uri: practice.image.url }} style={[variant === "preview" ? styles.previewAvatar : styles.documentAvatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]} />
-                ) : printSettings.avatar === "profile_picture" && me?.profile_photo_url ? (
-                    <Avatar name={`${me?.first_name} ${me?.last_name}`} size={avatarSize} imageUrl={me?.profile_photo_url || undefined} />
-                ) : null}
+                {printSettings.avatar === "logo" ? <Avatar name={`${practice?.name}`} size={avatarSize} imageUrl={practice?.image?.url || undefined} /> : printSettings.avatar === "profile_picture" ? <Avatar name={`${me?.first_name} ${me?.last_name}`} size={avatarSize} imageUrl={me?.profile_photo_url || undefined} /> : null}
                 <View style={variant === "preview" ? styles.previewHeaderText : styles.documentHeaderText}>
                     {printSettings.practiceName && practice.name && (
                         <BaseText type="Subhead" weight={variant === "preview" ? "600" : 600} color="labels.primary" style={variant === "preview" ? styles.previewPracticeName : styles.documentPracticeName}>

@@ -9,7 +9,7 @@ import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
-import { useDeletePatientMedia, useGetPatientMedia } from "@/utils/hook/useMedia";
+import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { PatientMedia, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -39,6 +39,7 @@ export default function PatientDetailsScreen() {
     const { selectedPractice } = useProfileStore();
     const { data: patient, isLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(id);
     const { data: patientMediaData, isLoading: isLoadingMedia, error: patientMediaError, isError: isPatientMediaError, refetch: refetchPatientMedia } = useGetPatientMedia(id, !!id);
+    const { data: archivedData, refetch: refetchTrashMedia } = useGetTrashMedia(id || "", !!id);
     const { data: activitiesData, isLoading: isLoadingActivities, error: activitiesError, isError: isActivitiesError, refetch: refetchActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const { data: documentsData, isLoading: isLoadingDocuments, error: documentsError, isError: isDocumentsError, refetch: refetchDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const headerHeight = useHeaderHeight();
@@ -254,6 +255,8 @@ export default function PatientDetailsScreen() {
     const { mutate: archiveMedia, isPending: isArchiving } = useDeletePatientMedia(
         () => {
             Alert.alert("Success", "Image archived successfully");
+            refetchPatientMedia();
+            refetchTrashMedia();
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to archive image");
@@ -736,7 +739,7 @@ export default function PatientDetailsScreen() {
                                     description="Date"
                                 />
                             ))}
-                        {activeTab === 0 && (
+                        {activeTab === 0 && (archivedData?.data?.length ?? 0) > 0 && (
                             <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[8], paddingBottom: safe.bottom + spacing[4] }}>
                                 <TouchableOpacity
                                     className="bg-system-gray6 py-3 px-4 rounded-xl flex-row items-center justify-between"
@@ -780,6 +783,7 @@ export default function PatientDetailsScreen() {
             imageUrlToMediaIdMap,
             imageUrlToBookmarkMap,
             patientMediaData?.data,
+            archivedData?.data,
             isPatientMediaError,
             patientMediaError,
             refetchPatientMedia,
