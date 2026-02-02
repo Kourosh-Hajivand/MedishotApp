@@ -39,10 +39,8 @@ export default function PatientsScreen() {
 
     const limits = subscriptionData?.data?.limits;
     const patientLimit = useMemo(() => getPatientLimitFromPlan(subscriptionData), [subscriptionData]);
-    const currentPatientCount =
-        typeof limits?.current_patient_count === "number" ? limits.current_patient_count : (needFallbackCount ? allPatientsForLimit?.data?.length ?? 0 : 0);
-    const remainingPatientSlots =
-        typeof limits?.remaining_patient_slots === "number" ? limits.remaining_patient_slots : patientLimit != null ? Math.max(0, patientLimit - currentPatientCount) : null;
+    const currentPatientCount = typeof limits?.current_patient_count === "number" ? limits.current_patient_count : needFallbackCount ? (allPatientsForLimit?.data?.length ?? 0) : 0;
+    const remainingPatientSlots = typeof limits?.remaining_patient_slots === "number" ? limits.remaining_patient_slots : patientLimit != null ? Math.max(0, patientLimit - currentPatientCount) : null;
     const isPatientLimitReached = patientLimit != null && ((remainingPatientSlots !== null && remainingPatientSlots === 0) || (remainingPatientSlots == null && currentPatientCount >= patientLimit));
     const headerHeight = useHeaderHeight();
     const { q, sortBy, nameOrder } = useLocalSearchParams<{ q?: string; sortBy?: string; nameOrder?: string }>();
