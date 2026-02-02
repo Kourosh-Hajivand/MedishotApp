@@ -132,6 +132,8 @@ export default function ReviewScreen() {
     const [showTestModal, setShowTestModal] = useState(false);
 
     const compositeViewRef = useRef<ViewShot>(null);
+    const compositeRetryCountRef = useRef(0);
+    const MAX_COMPOSITE_RETRIES = 3;
 
     // Get layout pattern from template data
     const layoutPattern: LayoutPattern = useMemo(() => {
@@ -239,19 +241,58 @@ export default function ReviewScreen() {
         }
     };
 
+    // Ref to store the mutate function for retry (to avoid circular dependency)
+    const tempUploadCompositeFnRef = useRef<((file: { uri: string; type: string; name: string }) => void) | null>(null);
+
+    // Helper function to retry composite upload
+    const retryCompositeUpload = useCallback((uri: string) => {
+        console.log(`Retrying composite upload (attempt ${compositeRetryCountRef.current + 1}/${MAX_COMPOSITE_RETRIES})`);
+        
+        setCompositePhoto((prev) => {
+            if (prev) {
+                return { ...prev, uploadStatus: "uploading" as const };
+            }
+            return prev;
+        });
+
+        const filename = `composite-${Date.now()}.jpg`;
+        const file = {
+            uri: uri,
+            type: "image/jpeg",
+            name: filename,
+        };
+        
+        // Use ref to call mutate function
+        if (tempUploadCompositeFnRef.current) {
+            tempUploadCompositeFnRef.current(file);
+        }
+    }, []);
+
     // Hook for temp upload (for composite photo)
     const { mutate: tempUploadComposite } = useTempUpload(
         (data) => {
+            // Reset retry count on success
+            compositeRetryCountRef.current = 0;
+            
             // Extract filename from TempUploadResponse
             const filename = data?.filename;
+            console.log("Composite upload success:", { filename, data });
 
             if (!filename) {
+                console.log("No filename in response, setting error status");
+                setCompositePhoto((prev) => {
+                    if (prev) {
+                        return { ...prev, uploadStatus: "error" as const };
+                    }
+                    return prev;
+                });
                 return;
             }
 
             // Update composite photo with tempFilename using functional update
             setCompositePhoto((prev) => {
                 if (prev) {
+                    console.log("Setting composite tempFilename:", filename);
                     return {
                         ...prev,
                         tempFilename: filename,
@@ -262,18 +303,41 @@ export default function ReviewScreen() {
             });
         },
         (error) => {
-            // Update status to error
-            setCompositePhoto((prev) => {
-                if (prev) {
-                    return {
-                        ...prev,
-                        uploadStatus: "error",
-                    };
-                }
-                return prev;
-            });
+            console.log("Composite upload error:", error);
+            compositeRetryCountRef.current++;
+            
+            // Retry if we haven't exceeded max retries
+            if (compositeRetryCountRef.current < MAX_COMPOSITE_RETRIES) {
+                // Get current composite photo URI for retry
+                setCompositePhoto((prev) => {
+                    if (prev && prev.uri) {
+                        // Schedule retry with delay
+                        setTimeout(() => {
+                            retryCompositeUpload(prev.uri);
+                        }, 1000 * compositeRetryCountRef.current); // Exponential backoff: 1s, 2s, 3s
+                    }
+                    return prev;
+                });
+            } else {
+                console.log("Max retries reached for composite upload");
+                // Update status to error after all retries failed
+                setCompositePhoto((prev) => {
+                    if (prev) {
+                        return {
+                            ...prev,
+                            uploadStatus: "error",
+                        };
+                    }
+                    return prev;
+                });
+            }
         },
     );
+
+    // Store mutate function in ref for retry to use
+    React.useEffect(() => {
+        tempUploadCompositeFnRef.current = tempUploadComposite;
+    }, [tempUploadComposite]);
 
     // Hooks for saving photos
     const { mutate: uploadMediaWithTemplate } = useUploadPatientMediaWithTemplate(
@@ -448,7 +512,41 @@ export default function ReviewScreen() {
 
         // Only check composite for templates with more than one ghost
         if (needsComposite && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
-            Alert.alert("Please wait", "Composite image is still being generated. Please wait a moment.");
+            console.log("Composite not ready:", {
+                exists: !!finalCompositePhoto,
+                tempFilename: finalCompositePhoto?.tempFilename,
+                uploadStatus: finalCompositePhoto?.uploadStatus,
+                uri: finalCompositePhoto?.uri ? "has uri" : "no uri",
+            });
+            
+            // More specific message based on the issue
+            if (!finalCompositePhoto) {
+                Alert.alert("Please wait", "Composite image is being generated...");
+            } else if (finalCompositePhoto.uploadStatus === "uploading") {
+                Alert.alert("Please wait", "Composite image is uploading...");
+            } else if (finalCompositePhoto.uploadStatus === "error") {
+                // Show retry option when upload failed
+                Alert.alert(
+                    "Upload Error",
+                    "Failed to upload composite image.",
+                    [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                            text: "Retry",
+                            onPress: () => {
+                                if (finalCompositePhoto.uri) {
+                                    compositeRetryCountRef.current = 0; // Reset retry count for manual retry
+                                    retryCompositeUpload(finalCompositePhoto.uri);
+                                }
+                            },
+                        },
+                    ],
+                );
+            } else if (!finalCompositePhoto.tempFilename) {
+                Alert.alert("Please wait", "Preparing composite image...");
+            } else {
+                Alert.alert("Please wait", "Composite image is still processing...");
+            }
             return;
         }
 
@@ -666,7 +764,7 @@ export default function ReviewScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.patientInfo}>
-                    <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={patientData?.data?.doctor?.color || undefined} />
+                    <Avatar name={patientName || "Patient"} size={40} haveRing imageUrl={patientAvatar} color={patientData?.data?.doctor?.color || undefined} />
                     <View>
                         <BaseText type="Subhead" weight={600} color="labels.primary">
                             {patientName}
