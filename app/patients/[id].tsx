@@ -772,7 +772,7 @@ export default function PatientDetailsScreen() {
                             </View>
                         )}
                         {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} />}
+                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} patientId={id} />}
                         {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
                     </View>
                 );

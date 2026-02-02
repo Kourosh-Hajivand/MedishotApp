@@ -144,7 +144,8 @@ export default function AddPracticeMemberForm() {
     const remainingDoctorSlots = typeof limits?.remaining_doctor_slots === "number" ? limits.remaining_doctor_slots : null;
     const remainingStaffSlots = typeof limits?.remaining_staff_slots === "number" ? limits.remaining_staff_slots : null;
 
-    const canAddDoctor = doctorLimit === null || (remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+    // Owner counts as 1 doctor: when doctor_limit === 1, that slot is the owner — cannot add another doctor
+    const canAddDoctor = doctorLimit === null || (doctorLimit !== 1 && remainingDoctorSlots !== null && remainingDoctorSlots > 0);
     const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
 
     const filteredRoleOptions = useMemo(() => {

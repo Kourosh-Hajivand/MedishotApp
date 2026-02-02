@@ -38,6 +38,9 @@ export default function PracticeTeamScreen() {
     const remainingStaffSlots = typeof limits?.remaining_staff_slots === "number" ? limits.remaining_staff_slots : null;
     const currentDoctorCount = typeof limits?.current_doctor_count === "number" ? limits.current_doctor_count : 0;
     const currentStaffCount = typeof limits?.current_staff_count === "number" ? limits.current_staff_count : 0;
+    // Owner counts as 1 doctor for display: show at least 1 when practice has an owner
+    const hasOwner = practiceMembers?.data?.some((m) => m.role === "owner") ?? false;
+    const displayDoctorCount = hasOwner ? Math.max(currentDoctorCount, 1) : currentDoctorCount;
     const { mutate: transferOwnership } = useTransferOwnership(
         () => {},
         (error: Error) => {
@@ -50,11 +53,12 @@ export default function PracticeTeamScreen() {
             Alert.alert("Error", error?.message || "An error occurred while removing the member.");
         },
     );
+    // Owner counts as 1 doctor: when doctor_limit === 1, that slot is the owner — no extra doctor can be added
+    const canAddDoctor = doctorLimit === null || (doctorLimit !== 1 && remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+    const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
+
     const handleAddMember = () => {
-        // Check if user can add more members
-        // If limits exist, check remaining slots; if null, assume unlimited
-        const canAddDoctor = doctorLimit === null || (remainingDoctorSlots !== null && remainingDoctorSlots > 0);
-        const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
+        // Check if user can add more members (canAddDoctor/canAddStaff already account for owner = 1 doctor when limit is 1)
 
         // If both doctor and staff slots are full, show upgrade alert
         if (doctorLimit !== null && staffLimit !== null && remainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
@@ -172,7 +176,7 @@ export default function PracticeTeamScreen() {
                     </BaseText>
                     {doctorLimit !== null && (
                         <BaseText type="Caption1" weight="400" color="labels.secondary">
-                            Doctors: {String(currentDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
+                            Doctors: {String(displayDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
                         </BaseText>
                     )}
                     {staffLimit !== null && (

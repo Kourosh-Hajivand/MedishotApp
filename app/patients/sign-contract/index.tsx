@@ -1,5 +1,4 @@
 import { BaseButton, BaseText, ErrorState, PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
-import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
@@ -437,56 +436,9 @@ export default function SignContractScreen() {
         <View className="flex-1" style={{ paddingTop: headerHeight }}>
             <ScrollView className="flex-1 px-5 py-5 " contentContainerStyle={{ paddingBottom: insets.bottom + 20, gap: 28 }}>
                 {/* Header with Practice Info - Based on print_settings */}
-                <View className="flex-row items-center justify-between ">
-                    <View className="flex-row items-center gap-2">
-                        <View className="w-10 h-10 rounded-full">
-                            {printSettings.avatar === "logo" && practice.image?.url ? (
-                                <Image source={{ uri: practice.image.url }} className="w-10 h-10 rounded-full" />
-                            ) : printSettings.avatar === "profile_picture" && patient.doctor?.profile_photo_url ? (
-                                <Avatar name={`${me?.first_name} ${me?.last_name}`} size={40} imageUrl={me?.profile_photo_url || undefined} />
-                            ) : null}
-                        </View>
-                        <View className="gap-0">
-                            {printSettings.practiceName && (
-                                <BaseText type="Subhead" weight={600} color="labels.primary">
-                                    {practice.name}
-                                </BaseText>
-                            )}
-                            {printSettings.doctorName && patient.doctor && (
-                                <BaseText type="Caption2" color="labels.secondary">
-                                    Dr. {patient.doctor.first_name} {patient.doctor.last_name}
-                                </BaseText>
-                            )}
-                            {/* {printSettings.address && metadata?.address && (
-                                <BaseText type="Caption2" color="labels.secondary">
-                                    {metadata.address}
-                                </BaseText>
-                            )} */}
-                            {/* {printSettings.practicePhone && metadata?.phone && (
-                                <BaseText type="Caption2" color="labels.secondary">
-                                    {metadata.phone}
-                                </BaseText>
-                            )} */}
-                            {/* {printSettings.practiceEmail && metadata?.email && (
-                                <BaseText type="Caption2" color="labels.secondary">
-                                    {metadata.email}
-                                </BaseText>
-                            )}
-                            {printSettings.practiceURL && metadata?.website && (
-                                <BaseText type="Caption2" color="labels.secondary">
-                                    {metadata.website}
-                                </BaseText>
-                            )} */}
-                        </View>
-                    </View>
-                    <View className="flex-row items-center gap-1">
-                        <BaseText type="Caption1" color="system.black">
-                            Date:
-                        </BaseText>
-                        <BaseText type="Caption1" color="system.blue">
-                            {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-                        </BaseText>
-                    </View>
+
+                <View className="w-full">
+                    <PracticeDocumentHeader practice={practice} printSettings={printSettings} doctor={patient.doctor} me={me || undefined} variant="document" />
                 </View>
 
                 {/* Contract Title */}
@@ -625,16 +577,11 @@ export default function SignContractScreen() {
                     )}
                 </View>
 
-                {/* Submit Button */}
-                {/* <BaseButton ButtonStyle="Filled" onPress={handleSubmit} disabled={!signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature} className="mb-6">
-                    {isUploadingSignature ? "Uploading signature..." : isSubmitting ? "Submitting..." : "Submit Contract"}
-                </BaseButton> */}
+                {/* <PracticeDocumentFooter printSettings={printSettings} metadata={metadata} variant="document" showIcons /> */}
             </ScrollView>
 
             {/* Signature Modal */}
             {showSignatureModal && <SignatureModal onSave={handleSignature} onCancel={() => setShowSignatureModal(false)} />}
-
-            {/* PDF Preview Modal removed - contract is submitted directly after upload */}
 
             {/* ViewShot for PDF generation - US Letter size (8.5" x 11") at 96 DPI */}
             {/* Render only when capturing to avoid viewport issues */}
@@ -981,7 +928,7 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
             </BaseText>
 
             {/* Contract Body */}
-            <View style={{ marginBottom: 30 }}>
+            <View style={{ marginBottom: 0 }}>
                 {Array.isArray(template.body) ? (
                     template.body.map((item: any, index: number) => {
                         if (item.type === "paragraph" && item.data.content) {
@@ -1107,13 +1054,13 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
             </View>
 
             {/* Signature Section */}
-            <View style={{ marginTop: 20, flex: 1 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 15 }}>
+            <View style={{ marginTop: 0, flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 0 }}>
                     <BaseText type="Subhead" color="labels.primary" style={{ fontWeight: "600", fontSize: 11 }}>
                         Patient Signature:
                     </BaseText>
                     {signatureUri ? (
-                        <View style={{ width: 180, height: 80, overflow: "hidden", backgroundColor: "transparent", justifyContent: "center", alignItems: "center" }}>
+                        <View style={{ width: 180, height: 150, overflow: "hidden", backgroundColor: "transparent", justifyContent: "center", alignItems: "center" }}>
                             <Image
                                 source={{
                                     uri: (signatureUri.startsWith("data:") || signatureUri.startsWith("http") || signatureUri.startsWith("file://") ? signatureUri : `data:image/png;base64,${signatureUri}`) || "",
@@ -1131,7 +1078,7 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
             </View>
 
             {/* Footer */}
-            <PracticeDocumentFooter metadata={metadata} printSettings={printSettings} variant="document" />
+            <PracticeDocumentFooter metadata={metadata} printSettings={printSettings} variant="document" showIcons />
         </View>
     );
 });

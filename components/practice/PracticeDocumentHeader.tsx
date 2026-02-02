@@ -33,7 +33,7 @@ export const PracticeDocumentHeader: React.FC<PracticeDocumentHeaderProps> = ({ 
     const displayDoctor = doctor || me;
 
     return (
-        <View style={[variant === "preview" ? styles.previewHeader : styles.documentHeader, headerStyle]}>
+        <View style={[variant === "preview" ? styles.previewHeader : styles.documentHeader, headerStyle]} className="w-full">
             <View style={variant === "preview" ? styles.previewHeaderLeft : styles.documentHeaderLeft}>
                 {printSettings.avatar === "logo" ? <Avatar name={`${practice?.name}`} size={avatarSize} imageUrl={practice?.image?.url || undefined} /> : printSettings.avatar === "profile_picture" ? <Avatar name={`${me?.first_name} ${me?.last_name}`} size={avatarSize} imageUrl={me?.profile_photo_url || undefined} /> : null}
                 <View style={variant === "preview" ? styles.previewHeaderText : styles.documentHeaderText}>
@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+
         marginBottom: 16,
     },
     documentHeaderLeft: {
