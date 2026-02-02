@@ -391,6 +391,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const [isSharingComposition, setIsSharingComposition] = useState(false);
     const [shareCompositionImageUri, setShareCompositionImageUri] = useState<string | null>(null);
     const [shareCompositionDimensions, setShareCompositionDimensions] = useState<{ width: number; height: number } | null>(null);
+    const [shareCompositionImageLoaded, setShareCompositionImageLoaded] = useState(false);
     const shareViewRef = useRef<ViewShot>(null);
     const printSettings: PracticeSettings = React.useMemo(() => metadata?.print_settings ?? defaultPracticeSettings, [metadata?.print_settings]);
     // Animated opacity values for smooth transitions
@@ -657,7 +658,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     // When share composition is ready, capture and share
     React.useEffect(() => {
-        if (!isSharingComposition || !shareCompositionImageUri || !shareCompositionDimensions || !shareViewRef.current) return;
+        if (!isSharingComposition || !shareCompositionImageUri || !shareCompositionDimensions || !shareCompositionImageLoaded || !shareViewRef.current) return;
 
         const runCapture = async () => {
             const ref = shareViewRef.current;
@@ -665,11 +666,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 setIsSharingComposition(false);
                 setShareCompositionImageUri(null);
                 setShareCompositionDimensions(null);
+                setShareCompositionImageLoaded(false);
                 return;
             }
-            await new Promise((r) => setTimeout(r, 500));
+            // Give extra time for image to fully render
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-            await new Promise((r) => setTimeout(r, 300));
+            await new Promise((r) => setTimeout(r, 100));
 
             try {
                 const uri = await captureRef(ref, {
@@ -691,11 +693,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 setIsSharingComposition(false);
                 setShareCompositionImageUri(null);
                 setShareCompositionDimensions(null);
+                setShareCompositionImageLoaded(false);
             }
         };
 
         runCapture();
-    }, [isSharingComposition, shareCompositionImageUri, shareCompositionDimensions]);
+    }, [isSharingComposition, shareCompositionImageUri, shareCompositionDimensions, shareCompositionImageLoaded]);
 
     // Reset zoom when changing images and scroll thumbnail
     React.useEffect(() => {
@@ -1069,6 +1072,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             RNImage.getSize(
                 currentImageUri,
                 (imgWidth, imgHeight) => {
+                    setShareCompositionImageLoaded(false);
                     setShareCompositionDimensions({ width: imgWidth, height: imgHeight });
                     setShareCompositionImageUri(currentImageUri);
                     setIsSharingComposition(true);
@@ -1669,16 +1673,37 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             <View
                                 style={{
                                     width: width,
-                                    height: width * (shareCompositionDimensions.height / shareCompositionDimensions.width),
-                                    backgroundColor: colors.system.white,
                                     paddingHorizontal: 16,
+                                    paddingVertical: 16,
+                                    backgroundColor: colors.system.white,
+                                    justifyContent: "center",
+                                    alignItems: "center",
                                 }}
                             >
-                                <RNImage
-                                    source={{ uri: shareCompositionImageUri }}
-                                    style={{ width: "100%", height: "100%" }}
-                                    resizeMode="contain"
-                                />
+                                <View
+                                    style={{
+                                        width: width - 32,
+                                        height: (width - 32) * (shareCompositionDimensions.height / shareCompositionDimensions.width),
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                    }}
+                                >
+                                    <RNImage
+                                        source={{ uri: shareCompositionImageUri }}
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                        }}
+                                        resizeMode="contain"
+                                        onLoad={() => {
+                                            setShareCompositionImageLoaded(true);
+                                        }}
+                                        onError={() => {
+                                            console.error("Failed to load share composition image");
+                                            setShareCompositionImageLoaded(true);
+                                        }}
+                                    />
+                                </View>
                             </View>
                             <View style={{ width: width, paddingHorizontal: 16, paddingBottom: 16 }}>
                                 <PracticeDocumentFooter metadata={metadata} printSettings={printSettings} variant="document" />
