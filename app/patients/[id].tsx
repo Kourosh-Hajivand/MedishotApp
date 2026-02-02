@@ -8,7 +8,7 @@ import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
-import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments } from "@/utils/hook";
+import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useGetPracticeById } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { PatientMedia, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
@@ -42,8 +42,22 @@ export default function PatientDetailsScreen() {
     const { data: archivedData, refetch: refetchTrashMedia } = useGetTrashMedia(id || "", !!id);
     const { data: activitiesData, isLoading: isLoadingActivities, error: activitiesError, isError: isActivitiesError, refetch: refetchActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const { data: documentsData, isLoading: isLoadingDocuments, error: documentsError, isError: isDocumentsError, refetch: refetchDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
+    const { data: practiceData } = useGetPracticeById(selectedPractice?.id ?? 0, !!selectedPractice?.id);
     const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
+
+    const practice = practiceData?.data;
+    const metadata = useMemo(() => {
+        if (!practice?.metadata) return null;
+        if (typeof practice.metadata === "string") {
+            try {
+                return JSON.parse(practice.metadata);
+            } catch {
+                return null;
+            }
+        }
+        return practice.metadata;
+    }, [practice?.metadata]);
 
     // Create document mutation
     const { mutate: createDocument, isPending: isCreatingDocument } = useCreatePatientDocument(
@@ -751,6 +765,8 @@ export default function PatientDetailsScreen() {
                                     patientId={id}
                                     rawMediaData={patientMediaData?.data}
                                     description="Date"
+                                    practice={practice}
+                                    metadata={metadata}
                                 />
                             ))}
                         {activeTab === 0 && (archivedData?.data?.length ?? 0) > 0 && (
@@ -772,7 +788,7 @@ export default function PatientDetailsScreen() {
                             </View>
                         )}
                         {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} patientId={id} />}
+                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} patientId={id} practice={practice} metadata={metadata} />}
                         {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
                     </View>
                 );
@@ -818,6 +834,8 @@ export default function PatientDetailsScreen() {
             setImageEditorUri,
             setImageEditorTool,
             setImageEditorVisible,
+            practice,
+            metadata,
         ],
     );
 

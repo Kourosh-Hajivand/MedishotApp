@@ -10,6 +10,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import type { Practice } from "@/utils/service/models/ResponseModels";
 import { ImageViewerModal } from "./ImageViewerModal";
 
 // Separate component for image item to properly use hooks
@@ -230,6 +231,9 @@ interface GalleryWithMenuProps {
     description?: "Date" | "taker";
     // Callback for restore action (for archived media)
     onRestore?: (imageUri: string) => void;
+    // Optional: for Share composition (header + image + footer)
+    practice?: Practice;
+    metadata?: { address?: string; phone?: string; email?: string; website?: string; print_settings?: any } | null;
 }
 
 const { width } = Dimensions.get("window");
@@ -251,6 +255,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     rawMediaData,
     description = "taker",
     onRestore,
+    practice,
+    metadata,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
@@ -488,6 +494,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                     showRestore: !!onRestore,
                 }}
                 onRestore={onRestore}
+                practice={practice}
+                metadata={metadata}
             />
         </GestureHandlerRootView>
     );

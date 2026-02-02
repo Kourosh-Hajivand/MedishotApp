@@ -690,7 +690,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         });
     };
 
-    // ✅ تبدیل عکس به base64
     const convertImageToBase64 = async (imageUri: string): Promise<string | null> => {
         try {
             if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {

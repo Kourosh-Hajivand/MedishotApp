@@ -1,15 +1,20 @@
 import { ImageEditorModal } from "@/components/ImageEditor";
+import { PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
+import type { PracticeSettings } from "@/components";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { useAuth } from "@/utils/hook/useAuth";
 import { useBookmarkMedia, useDeletePatientMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
+import type { Practice } from "@/utils/service/models/ResponseModels";
 import { Button, ContextMenu, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import React, { useRef, useState } from "react";
-import { Alert, Dimensions, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Image as RNImage, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import ViewShot, { captureRef } from "react-native-view-shot";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -58,6 +63,25 @@ interface RawMediaData {
     [key: string]: any;
 }
 
+const defaultPracticeSettings: PracticeSettings = {
+    avatar: "logo",
+    practiceName: true,
+    doctorName: true,
+    address: true,
+    practicePhone: true,
+    practiceURL: true,
+    practiceEmail: true,
+    practiceSocialMedia: true,
+};
+
+interface ShareCompositionMetadata {
+    address?: string;
+    phone?: string;
+    email?: string;
+    website?: string;
+    print_settings?: PracticeSettings;
+}
+
 interface ImageViewerModalProps {
     visible: boolean;
     images: string[]; // For backward compatibility
@@ -81,6 +105,9 @@ interface ImageViewerModalProps {
     description?: "Date" | "taker";
     // Callback for restore action (for archived media)
     onRestore?: (imageUri: string) => void;
+    // Optional: when provided, Share will compose header + image + footer into one image
+    practice?: Practice;
+    metadata?: ShareCompositionMetadata | null;
 }
 
 interface ThumbnailItemProps {
@@ -294,8 +321,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     rawMediaData,
     description = "taker",
     onRestore,
+    practice,
+    metadata,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false } = actions;
+    const { profile: me } = useAuth();
 
     // Build maps from mediaData if provided, otherwise use legacy maps
     const { imageUrlToMediaIdMapInternal, imageUrlToBookmarkMapInternal, imageUrlToCreatedAtMapInternal, imagesList } = React.useMemo(() => {
@@ -357,6 +387,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<number, boolean>>(new Map());
     // Track loading state for thumbnail images
     const [thumbnailLoadingStates, setThumbnailLoadingStates] = useState<Map<string, boolean>>(new Map());
+    // Share composition: when practice + metadata provided, compose header + image + footer for share
+    const [isSharingComposition, setIsSharingComposition] = useState(false);
+    const [shareCompositionImageUri, setShareCompositionImageUri] = useState<string | null>(null);
+    const [shareCompositionDimensions, setShareCompositionDimensions] = useState<{ width: number; height: number } | null>(null);
+    const shareViewRef = useRef<ViewShot>(null);
+    const printSettings: PracticeSettings = React.useMemo(() => metadata?.print_settings ?? defaultPracticeSettings, [metadata?.print_settings]);
     // Animated opacity values for smooth transitions
     const imageOpacitiesRef = useRef<Map<number, ReturnType<typeof useSharedValue<number>>>>(new Map());
     const skeletonOpacitiesRef = useRef<Map<number, ReturnType<typeof useSharedValue<number>>>>(new Map());
@@ -618,6 +654,48 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         currentIndexShared.value = currentIndex;
         lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
+
+    // When share composition is ready, capture and share
+    React.useEffect(() => {
+        if (!isSharingComposition || !shareCompositionImageUri || !shareCompositionDimensions || !shareViewRef.current) return;
+
+        const runCapture = async () => {
+            const ref = shareViewRef.current;
+            if (!ref) {
+                setIsSharingComposition(false);
+                setShareCompositionImageUri(null);
+                setShareCompositionDimensions(null);
+                return;
+            }
+            await new Promise((r) => setTimeout(r, 500));
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            await new Promise((r) => setTimeout(r, 300));
+
+            try {
+                const uri = await captureRef(ref, {
+                    format: "png",
+                    quality: 1.0,
+                    result: "tmpfile",
+                    snapshotContentContainer: false,
+                });
+                await Share.share({ url: uri });
+            } catch (err: any) {
+                if (err?.message !== "User did not share") {
+                    try {
+                        await Share.share({ url: shareCompositionImageUri });
+                    } catch {
+                        Alert.alert("Error", "Failed to share image");
+                    }
+                }
+            } finally {
+                setIsSharingComposition(false);
+                setShareCompositionImageUri(null);
+                setShareCompositionDimensions(null);
+            }
+        };
+
+        runCapture();
+    }, [isSharingComposition, shareCompositionImageUri, shareCompositionDimensions]);
 
     // Reset zoom when changing images and scroll thumbnail
     React.useEffect(() => {
@@ -985,14 +1063,31 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const handleSharePress = async () => {
         const currentImageUri = imagesList[currentIndex];
+        if (!currentImageUri) return;
+
+        if (practice && metadata) {
+            RNImage.getSize(
+                currentImageUri,
+                (imgWidth, imgHeight) => {
+                    setShareCompositionDimensions({ width: imgWidth, height: imgHeight });
+                    setShareCompositionImageUri(currentImageUri);
+                    setIsSharingComposition(true);
+                },
+                () => {
+                    try {
+                        Share.share({ url: currentImageUri });
+                    } catch (err: any) {
+                        if (err?.message !== "User did not share") Alert.alert("Error", "Failed to share image");
+                    }
+                },
+            );
+            return;
+        }
+
         try {
             const patientName = `${patientData?.first_name || ""} ${patientData?.last_name || ""}`.trim();
             const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${currentImageUri}`;
-
-            await Share.share({
-                message: message,
-                url: currentImageUri,
-            });
+            await Share.share({ message, url: currentImageUri });
         } catch (error: any) {
             console.error("Error sharing image:", error);
             if (error?.message !== "User did not share") {
@@ -1546,6 +1641,51 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         </Animated.View>
                     </GestureDetector>
                 </View>
+
+                {/* Hidden composition for Share: header + image (preserve ratio) + footer */}
+                {isSharingComposition && practice && metadata && shareCompositionImageUri && shareCompositionDimensions && (
+                    <View
+                        style={{
+                            position: "absolute",
+                            left: -width * 2,
+                            top: 0,
+                            width: width,
+                            overflow: "hidden",
+                            backgroundColor: colors.system.white,
+                        }}
+                        pointerEvents="none"
+                        collapsable={false}
+                    >
+                        <ViewShot ref={shareViewRef} style={{ width: width, backgroundColor: colors.system.white }}>
+                            <View style={{ width: width, paddingHorizontal: 16, paddingTop: 16 }}>
+                                <PracticeDocumentHeader
+                                    practice={practice}
+                                    printSettings={printSettings}
+                                    doctor={patientData?.doctor ?? null}
+                                    me={me ?? undefined}
+                                    variant="document"
+                                />
+                            </View>
+                            <View
+                                style={{
+                                    width: width,
+                                    height: width * (shareCompositionDimensions.height / shareCompositionDimensions.width),
+                                    backgroundColor: colors.system.white,
+                                    paddingHorizontal: 16,
+                                }}
+                            >
+                                <RNImage
+                                    source={{ uri: shareCompositionImageUri }}
+                                    style={{ width: "100%", height: "100%" }}
+                                    resizeMode="contain"
+                                />
+                            </View>
+                            <View style={{ width: width, paddingHorizontal: 16, paddingBottom: 16 }}>
+                                <PracticeDocumentFooter metadata={metadata} printSettings={printSettings} variant="document" />
+                            </View>
+                        </ViewShot>
+                    </View>
+                )}
             </GestureHandlerRootView>
 
             <ImageEditorModal visible={imageEditorVisible} uri={imageEditorUri} initialTool={imageEditorTool} onClose={() => setImageEditorVisible(false)} />

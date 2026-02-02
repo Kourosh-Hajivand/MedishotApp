@@ -4,10 +4,50 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import type { Practice } from "@/utils/service/models/ResponseModels";
 import { PatientDocument } from "@/utils/service/models/ResponseModels";
-import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Dimensions, FlatList, Image, StyleSheet, TouchableOpacity, View } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+// Skeleton Loading Component
+const SkeletonCard: React.FC<{ index: number }> = ({ index }) => {
+    const opacity = useSharedValue(0.4);
+
+    useEffect(() => {
+        opacity.value = withRepeat(withSequence(withTiming(1, { duration: 800 }), withTiming(0.4, { duration: 800 })), -1, false);
+    }, []);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        opacity: opacity.value,
+    }));
+
+    return (
+        <Animated.View style={[styles.skeletonCard, animatedStyle, { opacity: 1 }]}>
+            {/* Image Skeleton */}
+            <View style={styles.skeletonImageContainer}>
+                <Animated.View style={[styles.skeletonImage, animatedStyle]} />
+            </View>
+            {/* Footer Skeleton */}
+            <View style={styles.skeletonFooter}>
+                <Animated.View style={[styles.skeletonTitle, animatedStyle]} />
+                <Animated.View style={[styles.skeletonDate, animatedStyle]} />
+            </View>
+        </Animated.View>
+    );
+};
+
+const IDTabSkeleton: React.FC = () => {
+    const insets = useSafeAreaInsets();
+    return (
+        <View style={[styles.listContent, { paddingBottom: insets.bottom }]}>
+            {[0, 1].map((index) => (
+                <SkeletonCard key={index} index={index} />
+            ))}
+        </View>
+    );
+};
 
 const { width: screenWidth } = Dimensions.get("window");
 
@@ -25,9 +65,12 @@ interface IDTabContentProps {
     onDocumentPress?: (document: PatientDocument) => void;
     /** Patient ID for ImageViewerModal (shows patient name in header) */
     patientId?: string | number;
+    /** Optional: for Share composition (header + image + footer) */
+    practice?: Practice;
+    metadata?: { address?: string; phone?: string; email?: string; website?: string; print_settings?: any } | null;
 }
 
-export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents, isLoading, error, isError, onRetry, onDocumentPress, patientId }) => {
+export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents, isLoading, error, isError, onRetry, onDocumentPress, patientId, practice, metadata }) => {
     const insets = useSafeAreaInsets();
     const [viewerVisible, setViewerVisible] = useState(false);
     const [viewerInitialIndex, setViewerInitialIndex] = useState(0);
@@ -90,11 +133,7 @@ export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents
     );
 
     if (isLoading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.system.blue} />
-            </View>
-        );
+        return <IDTabSkeleton />;
     }
 
     if (isError) {
@@ -129,17 +168,44 @@ export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents
                 imageUrlToCreatedAtMap={imageUrlToCreatedAtMap}
                 description="Date"
                 actions={{ showBookmark: false, showEdit: false, showArchive: false, showShare: true }}
+                practice={practice}
+                metadata={metadata}
             />
         </>
     );
 });
 
 const styles = StyleSheet.create({
-    loadingContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 64,
+    // Skeleton Styles
+    skeletonCard: {
+        overflow: "hidden",
+        marginBottom: spacing["2"],
+    },
+    skeletonImageContainer: {
+        padding: spacing["4"],
+        minHeight: 290,
+    },
+    skeletonImage: {
+        width: "100%",
+        height: "100%",
+        backgroundColor: colors.system.gray5,
+        borderRadius: 20,
+    },
+    skeletonFooter: {
+        paddingHorizontal: spacing["5"],
+        gap: 8,
+    },
+    skeletonTitle: {
+        height: 20,
+        width: "40%",
+        backgroundColor: colors.system.gray5,
+        borderRadius: 6,
+    },
+    skeletonDate: {
+        height: 16,
+        width: "25%",
+        backgroundColor: colors.system.gray5,
+        borderRadius: 6,
     },
     emptyContainer: {
         flex: 1,
