@@ -16,7 +16,7 @@ import React, { useRef, useState } from "react";
 import { Alert, Dimensions, Image as RNImage, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width, height } = Dimensions.get("window");
@@ -389,7 +389,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const thumbnailScrollPosition = useRef(0);
     const isProgrammaticScroll = useRef(false);
-    const isThumbnailProgrammaticScroll = useRef(false);
     const lastThumbnailIndex = useRef(initialIndex);
     const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isHandlingScrollEnd = useRef(false);
@@ -530,7 +529,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const patientData = patientDataResponse?.data;
 
     const scrollThumbnailToPosition = React.useCallback(
-        (currentPage: number, animated: boolean = false) => {
+        (currentPage: number) => {
             if (!thumbnailScrollRef.current || imagesList.length === 0) return;
             
             const activeThumbnailWidth = 44;
@@ -568,24 +567,18 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
             thumbnailScrollRef.current.scrollTo({
                 x: Math.max(0, Math.min(scrollX, maxScroll)),
-                animated,
+                animated: false,
             });
         },
         [imagesList.length, width],
     );
 
     const scrollThumbnailToIndex = React.useCallback(
-        (index: number, animated: boolean = true) => {
+        (index: number) => {
             if (!thumbnailScrollRef.current || imagesList.length === 0) return;
             
-            isThumbnailProgrammaticScroll.current = true;
-            
             // Simply use scrollThumbnailToPosition for consistency
-            scrollThumbnailToPosition(index, animated);
-            
-            setTimeout(() => {
-                isThumbnailProgrammaticScroll.current = false;
-            }, animated ? 250 : 50);
+            scrollThumbnailToPosition(index);
         },
         [imagesList.length, scrollThumbnailToPosition],
     );
@@ -596,21 +589,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
 
-    // Sync thumbnail scroll with main scroll progress - این باعث میشه همزمان با دست حرکت کنه
-    React.useEffect(() => {
-        if (isProgrammaticScroll.current) {
-            return;
-        }
-        
-        // Calculate current page from currentIndex and scrollProgress
-        const currentPage = currentIndexShared.value + scrollProgress.value;
-        
-        if (currentPage >= 0 && currentPage < imagesList.length && !isThumbnailProgrammaticScroll.current) {
-            requestAnimationFrame(() => {
-                scrollThumbnailToPosition(currentPage, false);
-            });
-        }
-    }, [scrollProgress.value, currentIndexShared.value, scrollThumbnailToPosition, imagesList.length]);
 
     // Reset index to initialIndex when modal closes
     React.useEffect(() => {
@@ -686,25 +664,39 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         });
 
         // Immediately scroll thumbnail to center - instant with no animation
-        scrollThumbnailToIndex(currentIndex, false);
+        scrollThumbnailToIndex(currentIndex);
     }, [currentIndex, scrollThumbnailToIndex]);
 
-    const handleScroll = (event: any) => {
-        // Don't update during programmatic scrolls
-        if (isProgrammaticScroll.current) {
-            return;
-        }
-        
-        const offsetX = event.nativeEvent.contentOffset.x;
-        const currentPage = offsetX / width;
-        const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
-        const index = Math.round(clampedPage);
-        
-        // Calculate progress for smooth thumbnail animation
-        const progress = clampedPage - index;
-        scrollProgress.value = progress;
-        currentIndexShared.value = index;
-    };
+    const scrollThumbnailToPositionJS = React.useCallback(
+        (currentPage: number) => {
+            scrollThumbnailToPosition(currentPage);
+        },
+        [scrollThumbnailToPosition],
+    );
+
+    const handleScroll = useAnimatedScrollHandler({
+        onScroll: (event) => {
+            // Don't update during programmatic scrolls
+            if (isProgrammaticScroll.current) {
+                return;
+            }
+            
+            const offsetX = event.contentOffset.x;
+            const currentPage = offsetX / width;
+            const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
+            const index = Math.round(clampedPage);
+            
+            // Calculate progress for smooth thumbnail animation
+            const progress = clampedPage - index;
+            scrollProgress.value = progress;
+            currentIndexShared.value = index;
+            
+            // Immediately scroll thumbnail - runs on UI thread for perfect sync
+            if (clampedPage >= 0 && clampedPage < imagesList.length) {
+                runOnJS(scrollThumbnailToPositionJS)(clampedPage);
+            }
+        },
+    });
 
     const handleMomentumScrollEnd = (event: any) => {
         // Don't update if scroll is programmatic
@@ -721,7 +713,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
         // Update index if changed
         if (validIndex !== currentIndex) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setCurrentIndex(validIndex);
             currentIndexShared.value = validIndex;
         }
@@ -1263,7 +1254,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             </Animated.View>
 
                             {/* Image Carousel */}
-                            <FlatList
+                            <Animated.FlatList
                                 ref={flatListRef}
                                 horizontal
                                 pagingEnabled={true}
@@ -1272,7 +1263,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 keyExtractor={(_, i) => i.toString()}
                                 onScroll={handleScroll}
                                 onMomentumScrollEnd={handleMomentumScrollEnd}
-                                scrollEventThrottle={16}
+                                scrollEventThrottle={1}
                                 showsHorizontalScrollIndicator={false}
                                 decelerationRate="fast"
                                 renderItem={renderImageItem}
