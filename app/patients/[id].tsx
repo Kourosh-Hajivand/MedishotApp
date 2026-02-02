@@ -8,7 +8,7 @@ import colors from "@/theme/colors";
 import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
-import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useTempUpload } from "@/utils/hook";
+import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { PatientMedia, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
@@ -45,33 +45,13 @@ export default function PatientDetailsScreen() {
     const headerHeight = useHeaderHeight();
     const safe = useSafeAreaInsets();
 
-    // Temp upload for scanned documents
-    const { mutate: uploadScannedImage, isPending: isUploadingScannedImage } = useTempUpload(
-        (response) => {
-            const responseAny = response as { data?: { filename?: string }; filename?: string };
-            const filename = (responseAny?.data?.filename ?? responseAny.filename) || null;
-            if (filename) {
-                // Create document with the filename
-                createDocument({
-                    type: "id_card",
-                    description: "Scanned ID Document",
-                    image: filename, // Send filename string, not File
-                });
-            } else {
-                Alert.alert("Error", "Failed to upload scanned image");
-            }
-        },
-        (error) => {
-            Alert.alert("Error", "Failed to upload scanned image");
-        },
-    );
-
     // Create document mutation
-    const { mutate: createDocument } = useCreatePatientDocument(
+    const { mutate: createDocument, isPending: isCreatingDocument } = useCreatePatientDocument(
         selectedPractice?.id,
         id,
         () => {
             Alert.alert("Success", "ID document uploaded successfully!");
+            refetchDocuments();
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to create document");
@@ -385,39 +365,44 @@ export default function PatientDetailsScreen() {
             });
 
             if (scannedImages && scannedImages.length > 0) {
-                // Only take the first image (ensure only 1 image)
                 const imagePath = scannedImages[0];
-
-                // Upload scanned image to temp-upload
-                try {
-                    // Extract filename from path (same pattern as other uploads in codebase)
-                    const filename = imagePath.split("/").pop() || `scanned-document-${Date.now()}.jpg`;
-                    const match = /\.(\w+)$/.exec(filename);
-                    const type = match ? `image/${match[1]}` : "image/jpeg";
-
-                    const file = {
-                        uri: imagePath, // Use imagePath directly (DocumentScanner returns proper URI format)
-                        type: type,
-                        name: filename,
-                    } as { uri: string; type: string; name: string };
-
-                    uploadScannedImage(file);
-                } catch (uploadError) {
-                    Alert.alert("Error", "Failed to upload scanned image");
+                if (__DEV__) {
+                    console.log("[scanDocument] imagePath:", imagePath);
                 }
 
-                // Optional: OCR processing (can be done in background)
+                const filename = imagePath.split("/").pop() || `scanned-document-${Date.now()}.jpg`;
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : "image/jpeg";
+
+                const file = {
+                    uri: imagePath,
+                    type,
+                    name: filename,
+                } as { uri: string; type: string; name: string };
+
+                if (__DEV__) {
+                    console.log("[scanDocument] file for createDocument:", { name: file.name, type: file.type, uriLength: file.uri?.length });
+                }
+
+                createDocument({
+                    type: "id_card",
+                    description: "Scanned ID Document",
+                    image: file,
+                });
+
                 try {
                     const path = imagePath.replace("file://", "");
                     const lines = await TextRecognition.recognize(path);
                     const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
-                    // Parse the extracted data (optional, for future use)
                     parseUSIDCardData(fullText, imagePath);
                 } catch {
-                    // OCR failure is not critical, continue with upload
+                    // OCR failure is not critical
                 }
             }
         } catch (error) {
+            if (__DEV__) {
+                console.log("[scanDocument] error:", error);
+            }
             Alert.alert("Error", "Failed to scan document. Please try again.");
         }
     };
@@ -428,31 +413,62 @@ export default function PatientDetailsScreen() {
 
     const HEADER_DISTANCE = 60;
     const scrollStart = -headerHeight + 60;
-    const animationStart = scrollStart; // انیمیشن از scrollStart شروع می‌شود تا فاصله بالا رو هم در نظر بگیره
+    const animationStart = scrollStart;
     const animationEnd = scrollStart + HEADER_DISTANCE;
 
-    const avatarScale = scrollY.interpolate({
-        inputRange: [animationStart, animationEnd],
-        outputRange: [1, 0.7],
-        extrapolate: "clamp",
-    });
+    const avatarScale = useMemo(
+        () =>
+            scrollY.interpolate({
+                inputRange: [animationStart, animationEnd],
+                outputRange: [1, 0.7],
+                extrapolate: "clamp",
+            }),
+        [scrollY, animationStart, animationEnd],
+    );
+    const avatarTranslateY = useMemo(
+        () =>
+            scrollY.interpolate({
+                inputRange: [animationStart, animationEnd],
+                outputRange: [0, -35],
+                extrapolate: "clamp",
+            }),
+        [scrollY, animationStart, animationEnd],
+    );
+    const avatarOpacity = useMemo(
+        () =>
+            scrollY.interpolate({
+                inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.8, animationEnd],
+                outputRange: [1, 0.5, 0.2],
+                extrapolate: "clamp",
+            }),
+        [scrollY, animationStart, animationEnd, HEADER_DISTANCE],
+    );
+    const nameOpacity = useMemo(
+        () =>
+            scrollY.interpolate({
+                inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.7, animationEnd],
+                outputRange: [1, 0.5, 0],
+                extrapolate: "clamp",
+            }),
+        [scrollY, animationStart, animationEnd, HEADER_DISTANCE],
+    );
 
-    const avatarTranslateY = scrollY.interpolate({
-        inputRange: [animationStart, animationEnd],
-        outputRange: [0, -35],
-        extrapolate: "clamp",
-    });
-
-    const avatarOpacity = scrollY.interpolate({
-        inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.8, animationEnd],
-        outputRange: [1, 0.5, 0.2],
-        extrapolate: "clamp",
-    });
-    const nameOpacity = scrollY.interpolate({
-        inputRange: [animationStart, animationStart + HEADER_DISTANCE * 0.7, animationEnd],
-        outputRange: [1, 0.5, 0],
-        extrapolate: "clamp",
-    });
+    const avatarAnimatedStyle = useMemo(
+        () => ({
+            transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }],
+            opacity: avatarOpacity,
+            alignItems: "center" as const,
+        }),
+        [avatarTranslateY, avatarScale, avatarOpacity],
+    );
+    const nameAnimatedStyle = useMemo(
+        () => ({
+            opacity: nameOpacity,
+            alignItems: "center" as const,
+            marginTop: 10,
+        }),
+        [nameOpacity],
+    );
 
     const SNAP_THRESHOLD = scrollStart + 50;
 
@@ -461,18 +477,16 @@ export default function PatientDetailsScreen() {
             const y = event.nativeEvent.contentOffset.y;
 
             if (y > scrollStart && y < SNAP_THRESHOLD) {
-                // اگر نصفه اسکرول کرده، برگرد بالا
                 Animated.spring(scrollY, {
                     toValue: scrollStart,
-                    useNativeDriver: false,
+                    useNativeDriver: true,
                     speed: 8,
                     bounciness: 0,
                 }).start();
             } else if (y >= SNAP_THRESHOLD && y < animationEnd) {
-                // اگر بیشتر از نصفه رفته، بره بالا کامل
                 Animated.spring(scrollY, {
                     toValue: animationEnd,
-                    useNativeDriver: false,
+                    useNativeDriver: true,
                     speed: 8,
                     bounciness: 0,
                 }).start();
@@ -483,7 +497,7 @@ export default function PatientDetailsScreen() {
     useEffect(() => {
         const sub = scrollY.addListener(({ value }) => blurValue.setValue(value));
         return () => scrollY.removeListener(sub);
-    }, []);
+    }, [scrollY]);
 
     useEffect(() => {
         if (!patient?.data) return;
@@ -510,11 +524,11 @@ export default function PatientDetailsScreen() {
                 return (
                     <>
                         <View className="items-center justify-center mb-6">
-                            <Animated.View style={{ transform: [{ translateY: avatarTranslateY }, { scale: avatarScale }], opacity: avatarOpacity, alignItems: "center" }}>
+                            <Animated.View style={avatarAnimatedStyle}>
                                 <Avatar name={`${patient?.data?.first_name ?? ""} ${patient?.data?.last_name ?? ""}`} size={100} haveRing color={patient?.data?.doctor?.color} imageUrl={patient?.data?.profile_image?.url} />
                             </Animated.View>
 
-                            <Animated.View style={{ opacity: nameOpacity, alignItems: "center", marginTop: 10 }}>
+                            <Animated.View style={nameAnimatedStyle}>
                                 <BaseText type="Title1" weight={600} color="labels.primary">
                                     {patient?.data?.first_name} {patient?.data?.last_name}
                                     {patientAge !== null && (
@@ -571,7 +585,7 @@ export default function PatientDetailsScreen() {
                                         Fill consent
                                     </BaseText>
                                 </TouchableOpacity>
-                                <TouchableOpacity className="flex-1 items-center justify-center gap-2" onPress={scanDocument}>
+                                <TouchableOpacity className="flex-1 items-center justify-center gap-2" onPress={scanDocument} disabled={isCreatingDocument} style={{ opacity: isCreatingDocument ? 0.5 : 1 }}>
                                     <IconSymbol name="person.text.rectangle" color={colors.system.blue} size={26} />
                                     <BaseText type="Footnote" color="labels.primary">
                                         Add ID
@@ -767,6 +781,8 @@ export default function PatientDetailsScreen() {
         },
         [
             activeTab,
+            avatarAnimatedStyle,
+            nameAnimatedStyle,
             patient,
             patientAge,
             id,
@@ -858,7 +874,7 @@ export default function PatientDetailsScreen() {
                 contentInsetAdjustmentBehavior="never"
                 scrollIndicatorInsets={{ top: headerHeight, bottom: safe.bottom }}
                 contentContainerStyle={{}}
-                onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+                onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
             />
             <ImageEditorModal visible={imageEditorVisible} uri={imageEditorUri} initialTool={imageEditorTool} onClose={() => setImageEditorVisible(false)} />
         </View>

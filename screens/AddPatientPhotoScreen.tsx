@@ -177,8 +177,40 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const birthDate = watch("birth_date");
     const gender = watch("gender");
 
-    const isFormValid = firstName?.trim() !== "" && lastName?.trim() !== "";
     const isEditMode = !!params.id;
+
+    // For create mode: require at least 1 phone, 1 email, 1 address
+    const hasValidPhone = useMemo(() => {
+        return phones.some((phone) => {
+            if (!phone?.value) return false;
+            const valueStr = String(phone.value).trim();
+            if (valueStr === "" || valueStr === "+1") return false;
+            return !!toE164(valueStr);
+        });
+    }, [phones]);
+
+    const hasValidEmail = useMemo(() => {
+        return emails.some((email) => email.value && typeof email.value === "string" && email.value.trim() !== "");
+    }, [emails]);
+
+    const hasValidAddress = useMemo(() => {
+        return addresses.some((address) => {
+            if (!address.value) return false;
+            if (typeof address.value === "object") {
+                return Object.values(address.value).some((val) => val && typeof val === "string" && (val as string).trim() !== "");
+            }
+            return typeof address.value === "string" && address.value.trim() !== "";
+        });
+    }, [addresses]);
+
+    const isFormValid = useMemo(() => {
+        const baseValid = firstName?.trim() !== "" && lastName?.trim() !== "";
+        if (isEditMode) {
+            return baseValid;
+        }
+        // Create mode: require phone, email, address
+        return baseValid && hasValidPhone && hasValidEmail && hasValidAddress;
+    }, [firstName, lastName, isEditMode, hasValidPhone, hasValidEmail, hasValidAddress]);
 
     // Get doctor information from params or practice members
     const selectedDoctor = useMemo(() => {
@@ -526,6 +558,21 @@ export const AddPatientPhotoScreen: React.FC = () => {
         // Use ref to always get the latest phones value (avoid closure issues)
         const currentPhones = phonesRef.current;
 
+        // Re-validate required contact fields for create mode
+        if (!isEditMode) {
+            const hasPhone = currentPhones.some((p) => p?.value && toE164(String(p.value).trim()));
+            const hasEmail = emailsRef.current.some((e) => e?.value && typeof e.value === "string" && e.value.trim() !== "");
+            const hasAddress = addressesRef.current.some((a) => {
+                if (!a?.value) return false;
+                if (typeof a.value === "object") return Object.values(a.value).some((v) => v && typeof v === "string" && (v as string).trim() !== "");
+                return typeof a.value === "string" && a.value.trim() !== "";
+            });
+            if (!hasPhone || !hasEmail || !hasAddress) {
+                Alert.alert("فیلدهای اجباری", "لطفاً حداقل یک شماره تلفن، یک ایمیل و یک آدرس وارد کنید.");
+                return;
+            }
+        }
+
         // Convert phone values to E.164 format (+1XXXXXXXXXX)
         // Import toE164 at the top of the file
         const phoneNumbers = currentPhones
@@ -679,6 +726,16 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     const handleNext = () => {
         if (!isFormValid) {
+            if (!isEditMode) {
+                const missing: string[] = [];
+                if (firstName?.trim() === "" || lastName?.trim() === "") missing.push("نام و نام خانوادگی");
+                if (!hasValidPhone) missing.push("شماره تلفن");
+                if (!hasValidEmail) missing.push("ایمیل");
+                if (!hasValidAddress) missing.push("آدرس");
+                if (missing.length > 0) {
+                    Alert.alert("فیلدهای اجباری", `لطفاً موارد زیر را تکمیل کنید:\n${missing.join("، ")}`);
+                }
+            }
             return;
         }
         handleSubmit(onSubmit)();

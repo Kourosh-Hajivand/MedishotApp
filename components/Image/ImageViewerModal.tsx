@@ -4,7 +4,7 @@ import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { useBookmarkMedia, useDeletePatientMedia, useUnbookmarkMedia } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
-import { Button, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
+import { Button, ContextMenu, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -19,6 +19,8 @@ const { width, height } = Dimensions.get("window");
 // Softer pan when zoomed so image doesn't move too fast
 const PAN_SENSITIVITY = 0.7;
 
+import { containerSize, iconSize } from "@/constants/theme";
+import { IconSymbol } from "../ui/icon-symbol";
 import { ViewerActionsConfig } from "./GalleryWithMenu";
 
 interface MediaItem {
@@ -1249,253 +1251,298 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         <Animated.View style={[styles.container, dismissAnimatedStyle]}>
                             {/* Header */}
                             <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
-                        <View style={styles.actionButtonsContainer}>
-                            <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                                <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
-                                    <HStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 0 }),
-                                            frame({ width: 44, height: 44 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                    >
-                                        <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="chevron.left" variant="plain" controlSize="regular" onPress={onClose} />
-                                    </HStack>
-                                    <Spacer />
-                                    <VStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 4 }),
-                                            frame({ width: description === "taker" && currentTaker ? 200 : 150 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                        spacing={4}
-                                    >
-                                        <Text size={14}>{patientData?.full_name ?? ""}</Text>
-                                        {description === "taker" && currentTaker ? (
-                                            <Text weight="light" size={12}>
-                                                {`taken by DR.${`${currentTaker.first_name || ""} ${currentTaker.last_name || ""}`.trim()}`}
-                                            </Text>
-                                        ) : description === "Date" && currentCreatedAt ? (
-                                            <Text weight="light" size={12}>
-                                                {getRelativeTime(currentCreatedAt)}
-                                            </Text>
-                                        ) : null}
-                                    </VStack>
-                                    <Spacer />
-                                    <HStack
-                                        alignment="center"
-                                        modifiers={[
-                                            padding({ all: 0 }),
-                                            frame({ width: 44, height: 44 }),
-                                            glassEffect({
-                                                glass: {
-                                                    variant: "regular",
-                                                },
-                                            }),
-                                        ]}
-                                    >
-                                        <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="ellipsis" variant="plain" controlSize="regular" onPress={() => {}} />
-                                    </HStack>
-                                </HStack>
-                            </Host>
-                        </View>
-                    </Animated.View>
+                                <View style={styles.actionButtonsContainer}>
+                                    <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                                        <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
+                                            <HStack
+                                                alignment="center"
+                                                modifiers={[
+                                                    padding({ all: 0 }),
+                                                    frame({ width: containerSize, height: containerSize }),
+                                                    glassEffect({
+                                                        glass: {
+                                                            variant: "regular",
+                                                        },
+                                                    }),
+                                                ]}
+                                            >
+                                                <TouchableOpacity onPress={onClose} className="w-[44px] h-[44px]  items-center justify-center">
+                                                    <IconSymbol size={iconSize} name="chevron.left" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                                                </TouchableOpacity>
+                                                {/* <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="chevron.left" variant="plain" controlSize="regular" onPress={onClose} /> */}
+                                            </HStack>
+                                            <Spacer />
+                                            <VStack
+                                                alignment="center"
+                                                modifiers={[
+                                                    padding({ all: 4 }),
+                                                    frame({ width: description === "taker" && currentTaker ? 200 : 150, height: containerSize }),
+                                                    glassEffect({
+                                                        glass: {
+                                                            variant: "regular",
+                                                        },
+                                                    }),
+                                                ]}
+                                                spacing={4}
+                                            >
+                                                <Text size={14}>{patientData?.full_name ?? ""}</Text>
+                                                {description === "taker" && currentTaker ? (
+                                                    <Text weight="light" size={12}>
+                                                        {`taken by DR.${`${currentTaker.first_name || ""} ${currentTaker.last_name || ""}`.trim()}`}
+                                                    </Text>
+                                                ) : description === "Date" && currentCreatedAt ? (
+                                                    <Text weight="light" size={12}>
+                                                        {getRelativeTime(currentCreatedAt)}
+                                                    </Text>
+                                                ) : null}
+                                            </VStack>
+                                            <Spacer />
+                                            <ContextMenu>
+                                                <ContextMenu.Items>
+                                                    {showShare && (
+                                                        <Button systemImage="square.and.arrow.up" onPress={handleSharePress}>
+                                                            Share
+                                                        </Button>
+                                                    )}
+                                                    {showBookmark && (
+                                                        <Button systemImage={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} onPress={handleBookmarkPress}>
+                                                            {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "Remove Bookmark" : "Bookmark"}
+                                                        </Button>
+                                                    )}
+                                                    {showEdit && (
+                                                        <Button systemImage="slider.horizontal.3" onPress={handleAdjustPress}>
+                                                            Adjustment
+                                                        </Button>
+                                                    )}
+                                                    {showArchive && (
+                                                        <Button systemImage="archivebox" role="destructive" onPress={handleArchivePress}>
+                                                            Archive
+                                                        </Button>
+                                                    )}
+                                                    {showRestore && (
+                                                        <Button systemImage="arrow.uturn.backward" onPress={handleRestorePress}>
+                                                            Restore
+                                                        </Button>
+                                                    )}
+                                                </ContextMenu.Items>
+                                                <ContextMenu.Trigger>
+                                                    <HStack
+                                                        alignment="center"
+                                                        modifiers={[
+                                                            padding({ all: 10 }),
+                                                            frame({ width: containerSize, height: containerSize, alignment: "center" }),
+                                                            glassEffect({
+                                                                glass: {
+                                                                    variant: "regular",
+                                                                },
+                                                            }),
+                                                        ]}
+                                                    >
+                                                        {/* <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} variant="plain" controlSize="regular" onPress={() => {}}>
+                                                        </Button> */}
+                                                        <TouchableOpacity>
+                                                            <IconSymbol size={iconSize} name="ellipsis" color={colors.system.white as any} style={{ left: 1 }} />
+                                                        </TouchableOpacity>
+                                                    </HStack>
+                                                </ContextMenu.Trigger>
+                                            </ContextMenu>
+                                        </HStack>
+                                    </Host>
+                                </View>
+                            </Animated.View>
 
-                    {/* Image Carousel */}
-                    <FlatList
-                        ref={flatListRef}
-                        horizontal
-                        pagingEnabled={true}
-                        initialScrollIndex={initialIndex}
-                        data={imagesList}
-                        keyExtractor={(_, i) => i.toString()}
-                        onScroll={handleScroll}
-                        onScrollEndDrag={handleScrollEndDrag}
-                        onMomentumScrollEnd={handleMomentumScrollEnd}
-                        scrollEventThrottle={1}
-                        showsHorizontalScrollIndicator={false}
-                        decelerationRate="fast"
-                        renderItem={renderImageItem}
-                        getItemLayout={(_, index) => ({
-                            length: width,
-                            offset: width * index,
-                            index,
-                        })}
-                        scrollEnabled={!isZoomed}
-                        disableIntervalMomentum={false}
-                        bounces={true}
-                        snapToInterval={width}
-                        snapToAlignment="center"
-                        removeClippedSubviews={true}
-                        maxToRenderPerBatch={3}
-                        windowSize={5}
-                        initialNumToRender={3}
-                    />
-
-                    {/* Bottom Bar with Thumbnails and Actions */}
-                    <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
-                        {/* Thumbnail Gallery - Hide when zoomed */}
-                        {!isZoomed && (
-                            <ScrollView
-                                ref={thumbnailScrollRef}
+                            {/* Image Carousel */}
+                            <FlatList
+                                ref={flatListRef}
                                 horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.thumbnailContainer}
-                                style={styles.thumbnailScroll}
-                                decelerationRate="fast"
-                                onScroll={handleThumbnailScroll}
-                                onScrollEndDrag={handleThumbnailScrollEnd}
-                                onMomentumScrollEnd={handleThumbnailScrollEnd}
+                                pagingEnabled={true}
+                                initialScrollIndex={initialIndex}
+                                data={imagesList}
+                                keyExtractor={(_, i) => i.toString()}
+                                onScroll={handleScroll}
+                                onScrollEndDrag={handleScrollEndDrag}
+                                onMomentumScrollEnd={handleMomentumScrollEnd}
                                 scrollEventThrottle={1}
-                                bounces={true}
-                                snapToInterval={undefined}
-                                pagingEnabled={false}
-                            >
-                                {imagesList.map((imageUri, index) => {
-                                    const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
-
-                                    return (
-                                        <ThumbnailItem
-                                            key={index}
-                                            imageUri={imageUri}
-                                            index={index}
-                                            isActive={index === currentIndex}
-                                            currentIndexShared={currentIndexShared}
-                                            scrollProgress={scrollProgress}
-                                            isLoading={isThumbnailLoading}
-                                            onLoadStart={() => {
-                                                setThumbnailLoadingStates((prev) => {
-                                                    const newMap = new Map(prev);
-                                                    newMap.set(imageUri, true);
-                                                    return newMap;
-                                                });
-                                            }}
-                                            onLoad={() => {
-                                                setThumbnailLoadingStates((prev) => {
-                                                    const newMap = new Map(prev);
-                                                    newMap.set(imageUri, false);
-                                                    return newMap;
-                                                });
-                                            }}
-                                            onError={() => {
-                                                setThumbnailLoadingStates((prev) => {
-                                                    const newMap = new Map(prev);
-                                                    newMap.set(imageUri, false);
-                                                    return newMap;
-                                                });
-                                            }}
-                                            onPress={() => {
-                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                scrollProgress.value = 0;
-                                                isProgrammaticScroll.current = true;
-                                                setCurrentIndex(index);
-                                                flatListRef.current?.scrollToIndex({ index, animated: true });
-                                                // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
-                                                setTimeout(() => {
-                                                    isProgrammaticScroll.current = false;
-                                                }, 500);
-                                            }}
-                                        />
-                                    );
+                                showsHorizontalScrollIndicator={false}
+                                decelerationRate="fast"
+                                renderItem={renderImageItem}
+                                getItemLayout={(_, index) => ({
+                                    length: width,
+                                    offset: width * index,
+                                    index,
                                 })}
-                            </ScrollView>
-                        )}
+                                scrollEnabled={!isZoomed}
+                                disableIntervalMomentum={false}
+                                bounces={true}
+                                snapToInterval={width}
+                                snapToAlignment="center"
+                                removeClippedSubviews={true}
+                                maxToRenderPerBatch={3}
+                                windowSize={5}
+                                initialNumToRender={3}
+                            />
 
-                        {/* Action Buttons */}
-                        <View style={styles.actionButtonsContainer}>
-                            <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                                <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
-                                    {showShare && (
-                                        <HStack
-                                            alignment="center"
-                                            modifiers={[
-                                                padding({ all: 0 }),
-                                                frame({ width: 48, height: 48 }),
-                                                glassEffect({
-                                                    glass: {
-                                                        variant: "regular",
-                                                    },
-                                                }),
-                                            ]}
-                                        >
-                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} />
-                                        </HStack>
-                                    )}
-                                    {(showBookmark || showEdit) && <Spacer />}
-                                    {(showBookmark || showEdit) && (
-                                        <HStack
-                                            alignment="center"
-                                            modifiers={[
-                                                padding({ all: 0 }),
-                                                frame({ width: showBookmark && showEdit ? 96 : 44, height: 44 }),
-                                                glassEffect({
-                                                    glass: {
-                                                        variant: "regular",
-                                                    },
-                                                }),
-                                            ]}
-                                            spacing={4}
-                                        >
-                                            {showBookmark && (
-                                                <Button
-                                                    modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]}
-                                                    systemImage={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"}
-                                                    variant="plain"
-                                                    controlSize="regular"
-                                                    onPress={handleBookmarkPress}
+                            {/* Bottom Bar with Thumbnails and Actions */}
+                            <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
+                                {/* Thumbnail Gallery - Hide when zoomed */}
+                                {!isZoomed && (
+                                    <ScrollView
+                                        ref={thumbnailScrollRef}
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.thumbnailContainer}
+                                        style={styles.thumbnailScroll}
+                                        decelerationRate="fast"
+                                        onScroll={handleThumbnailScroll}
+                                        onScrollEndDrag={handleThumbnailScrollEnd}
+                                        onMomentumScrollEnd={handleThumbnailScrollEnd}
+                                        scrollEventThrottle={1}
+                                        bounces={true}
+                                        snapToInterval={undefined}
+                                        pagingEnabled={false}
+                                    >
+                                        {imagesList.map((imageUri, index) => {
+                                            const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
+
+                                            return (
+                                                <ThumbnailItem
+                                                    key={index}
+                                                    imageUri={imageUri}
+                                                    index={index}
+                                                    isActive={index === currentIndex}
+                                                    currentIndexShared={currentIndexShared}
+                                                    scrollProgress={scrollProgress}
+                                                    isLoading={isThumbnailLoading}
+                                                    onLoadStart={() => {
+                                                        setThumbnailLoadingStates((prev) => {
+                                                            const newMap = new Map(prev);
+                                                            newMap.set(imageUri, true);
+                                                            return newMap;
+                                                        });
+                                                    }}
+                                                    onLoad={() => {
+                                                        setThumbnailLoadingStates((prev) => {
+                                                            const newMap = new Map(prev);
+                                                            newMap.set(imageUri, false);
+                                                            return newMap;
+                                                        });
+                                                    }}
+                                                    onError={() => {
+                                                        setThumbnailLoadingStates((prev) => {
+                                                            const newMap = new Map(prev);
+                                                            newMap.set(imageUri, false);
+                                                            return newMap;
+                                                        });
+                                                    }}
+                                                    onPress={() => {
+                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                        scrollProgress.value = 0;
+                                                        isProgrammaticScroll.current = true;
+                                                        setCurrentIndex(index);
+                                                        flatListRef.current?.scrollToIndex({ index, animated: true });
+                                                        // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
+                                                        setTimeout(() => {
+                                                            isProgrammaticScroll.current = false;
+                                                        }, 500);
+                                                    }}
                                                 />
+                                            );
+                                        })}
+                                    </ScrollView>
+                                )}
+
+                                {/* Action Buttons */}
+                                <View style={styles.actionButtonsContainer}>
+                                    <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                                        <HStack alignment="center" spacing={0} modifiers={[padding({ horizontal: 20 })]}>
+                                            {showShare && (
+                                                <HStack
+                                                    alignment="center"
+                                                    modifiers={[
+                                                        padding({ all: 0 }),
+                                                        frame({ width: 48, height: 48, alignment: "center" }),
+                                                        glassEffect({
+                                                            glass: {
+                                                                variant: "regular",
+                                                            },
+                                                        }),
+                                                    ]}
+                                                >
+                                                    <TouchableOpacity onPress={handleSharePress} className="  w-[48px] h-[48px] items-center justify-center">
+                                                        <IconSymbol size={iconSize} name="square.and.arrow.up" color={colors.system.white as any} style={{ bottom: 2 }} />
+                                                    </TouchableOpacity>
+                                                    {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} /> */}
+                                                </HStack>
                                             )}
-                                            {showEdit && <Button modifiers={[frame({ width: 44, height: 44 }), padding({ all: 0 })]} systemImage="slider.horizontal.3" variant="plain" controlSize="regular" onPress={handleAdjustPress} />}
+                                            {(showBookmark || showEdit) && <Spacer />}
+                                            {(showBookmark || showEdit) && (
+                                                <HStack
+                                                    alignment="center"
+                                                    modifiers={[
+                                                        padding({ all: 0 }),
+                                                        frame({ height: containerSize, alignment: "center", width: showBookmark && showEdit ? 100 : 44 }),
+                                                        glassEffect({
+                                                            glass: {
+                                                                variant: "regular",
+                                                            },
+                                                        }),
+                                                    ]}
+                                                >
+                                                    {showBookmark && (
+                                                        <TouchableOpacity onPress={handleBookmarkPress} className="  relative items-center justify-center w-[44px] h-[44px]">
+                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: 5 }} />
+                                                        </TouchableOpacity>
+                                                    )}
+                                                    {showEdit && (
+                                                        <TouchableOpacity onPress={handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                            <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                        </TouchableOpacity>
+                                                    )}
+                                                </HStack>
+                                            )}
+                                            {showArchive && <Spacer />}
+                                            {showArchive && (
+                                                <HStack
+                                                    alignment="center"
+                                                    modifiers={[
+                                                        padding({ all: 0 }),
+                                                        frame({ width: 48, height: containerSize }),
+                                                        glassEffect({
+                                                            glass: {
+                                                                variant: "regular",
+                                                            },
+                                                        }),
+                                                    ]}
+                                                >
+                                                    <TouchableOpacity onPress={handleArchivePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                        <IconSymbol size={iconSize} name="archivebox" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                                                    </TouchableOpacity>
+                                                </HStack>
+                                            )}
+                                            {showRestore && <Spacer />}
+                                            {showRestore && (
+                                                <HStack
+                                                    alignment="center"
+                                                    modifiers={[
+                                                        padding({ all: 0 }),
+                                                        frame({ width: 48, height: containerSize }),
+                                                        glassEffect({
+                                                            glass: {
+                                                                variant: "regular",
+                                                            },
+                                                        }),
+                                                    ]}
+                                                >
+                                                    <TouchableOpacity onPress={handleRestorePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                        <IconSymbol size={iconSize} name="arrow.uturn.backward" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                                                    </TouchableOpacity>
+                                                    {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="arrow.uturn.backward" variant="plain" controlSize="large" onPress={handleRestorePress} /> */}
+                                                </HStack>
+                                            )}
                                         </HStack>
-                                    )}
-                                    {showArchive && <Spacer />}
-                                    {showArchive && (
-                                        <HStack
-                                            alignment="center"
-                                            modifiers={[
-                                                padding({ all: 0 }),
-                                                frame({ width: 48, height: 48 }),
-                                                glassEffect({
-                                                    glass: {
-                                                        variant: "regular",
-                                                    },
-                                                }),
-                                            ]}
-                                        >
-                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="archivebox" variant="plain" role="destructive" controlSize="large" onPress={handleArchivePress} />
-                                        </HStack>
-                                    )}
-                                    {showRestore && <Spacer />}
-                                    {showRestore && (
-                                        <HStack
-                                            alignment="center"
-                                            modifiers={[
-                                                padding({ all: 0 }),
-                                                frame({ width: 48, height: 48 }),
-                                                glassEffect({
-                                                    glass: {
-                                                        variant: "regular",
-                                                    },
-                                                }),
-                                            ]}
-                                        >
-                                            <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="arrow.uturn.backward" variant="plain" controlSize="large" onPress={handleRestorePress} />
-                                        </HStack>
-                                    )}
-                                </HStack>
-                            </Host>
-                        </View>
-                    </Animated.View>
+                                    </Host>
+                                </View>
+                            </Animated.View>
                         </Animated.View>
                     </GestureDetector>
                 </View>

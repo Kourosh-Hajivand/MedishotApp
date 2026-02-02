@@ -1,70 +1,71 @@
 {
-    "expo": {
-        "name": "Medishots",
-        "slug": "medishots",
-        "version": "1.2.1",
-        "orientation": "portrait",
-        "scheme": "medishots",
-        "userInterfaceStyle": "light",
-        "newArchEnabled": true,
-        "ios": {
-            "supportsTablet": true,
-            "bundleIdentifier": "com.betoatexpo.medishotapp",
-            "appleTeamId": "S6GL3VTAFF",
-            "buildNumber": "1",
-            "icon": "./assets/icon.icon",
-            "infoPlist": {
-                "ITSAppUsesNonExemptEncryption": false,
-                "NSCameraUsageDescription": "This app needs access to your camera to take photos of patients.",
-                "NSMicrophoneUsageDescription": "This app needs access to your microphone for video recording."
-            }
-        },
-        "android": {
-            "versionCode": 1,
-            "adaptiveIcon": {
-                "foregroundImage": "./assets/images/adaptive-icon.png",
-                "backgroundColor": "#ffffff"
-            },
-            "edgeToEdgeEnabled": true,
-            "package": "com.betoatexpo.medishotapp",
-            "permissions": [
-                "CAMERA",
-                "RECORD_AUDIO"
-            ]
-        },
-        "web": {
-            "bundler": "metro",
-            "output": "static",
-            "favicon": "./assets/images/favicon.png"
-        },
-        "plugins": [
-            "expo-router",
-            [
-                "expo-splash-screen",
-                {
-                    "backgroundColor": "#ffffff"
-                }
-            ],
-            "expo-font",
-            "expo-web-browser",
-            "expo-video",
-            [
-                "expo-camera",
-                {
-                    "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos.",
-                    "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video recording.",
-                    "recordAudioAndroid": true
-                }
-            ]
-        ],
-        "experiments": {
-            "typedRoutes": true
-        },
-        "extra": {
-            "router": {},
-            "eas": {
-                "projectId": "17a6b875-99cc-4edd-8bcd-bb733d0b9e8b"
-            }
+  "expo": {
+    "name": "Medishots",
+    "slug": "medishots",
+    "version": "1.2.1",
+    "orientation": "portrait",
+    "scheme": "medishots",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.betoatexpo.medishotapp",
+      "appleTeamId": "S6GL3VTAFF",
+      "buildNumber": "1",
+      "icon": "./assets/icon.icon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos of patients.",
+        "NSMicrophoneUsageDescription": "This app needs access to your microphone for video recording."
+      }
+    },
+    "android": {
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.betoatexpo.medishotapp",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff"
         }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-video",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take photos.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for video recording.",
+          "recordAudioAndroid": true
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "17a6b875-99cc-4edd-8bcd-bb733d0b9e8b"
+      }
     }
+  }
 }

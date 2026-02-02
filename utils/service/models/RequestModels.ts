@@ -327,10 +327,12 @@ export interface UploadMediaWithTemplateRequest {
 }
 
 // ============= Patient Documents Models =============
+export type PatientDocumentImageInput = File | string | { uri: string; type: string; name: string };
+
 export interface CreatePatientDocumentRequest {
     type: string;
     description?: string;
-    image: File | string; // File for direct upload or string for Livewire temp filename
+    image: PatientDocumentImageInput; // File, RN file { uri, type, name }, or Livewire temp filename
 }
 
 export interface UpdatePatientDocumentRequest {

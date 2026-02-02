@@ -4,6 +4,7 @@ import { BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
+import { containerSize, iconSize } from "@/constants/theme";
 import colors from "@/theme/colors";
 import { useTempUpload } from "@/utils/hook/useMedia";
 import { useGetPatientById } from "@/utils/hook/usePatient";
@@ -1148,8 +1149,8 @@ export default function CameraScreen() {
             {/* Sample/Retake Button and Camera Controls - Absolute positioned above thumbnails */}
             {hasGhostItems && (
                 <View style={{ position: "absolute", bottom: 195 + insets.bottom, left: 0, right: 0, alignItems: "center", justifyContent: "center", pointerEvents: "box-none", zIndex: 10 }}>
-                    {/* If photo is captured, only show Retake button */}
-                    {hasCurrentPhoto ? (
+                    {/* If photo is captured and not uploading, show Retake; else Sample */}
+                    {hasCurrentPhoto && !isWaitingForUploadToReview ? (
                         <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                             <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 0 })]}>
                                 <HStack
@@ -1178,25 +1179,9 @@ export default function CameraScreen() {
                         </Host>
                     ) : (
                         <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 30 })]}>
-                                {/* Sample Button */}
-                                <HStack
-                                    alignment="center"
-                                    modifiers={[
-                                        padding({ all: 0 }),
-                                        frame({ width: 84, height: 44 }),
-                                        glassEffect({
-                                            glass: {
-                                                variant: "regular",
-                                            },
-                                        }),
-                                    ]}
-                                >
-                                    <Button onPress={handleShowSample} variant="plain">
-                                        Sample
-                                    </Button>
-                                </HStack>
-                            </HStack>
+                            <Button onPress={handleShowSample} variant="default">
+                                Sample
+                            </Button>
                         </Host>
                     )}
                 </View>
@@ -1211,7 +1196,7 @@ export default function CameraScreen() {
                 </TouchableOpacity>
 
                 <View style={styles.patientInfo}>
-                    <Avatar name={patientName || "Patient"} size={32} haveRing imageUrl={patientAvatar} color={doctorColor as string} />
+                    <Avatar name={patientName || "Patient"} size={44} haveRing imageUrl={patientAvatar} color={doctorColor as string} />
                     <View style={styles.patientTextContainer}>
                         <BaseText type="Subhead" weight={600} color="system.white">
                             {patientName || "Patient Name"}
@@ -1242,32 +1227,56 @@ export default function CameraScreen() {
                             const isDisabled = !canSave || isUploading;
 
                             return (
-                                <TouchableOpacity
-                                    style={[styles.saveButtonHeader, isDisabled && styles.saveButtonHeaderDisabled]}
-                                    onPress={() => {
-                                        if (canSave && !isUploading) {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                            // Merge tempFilename from ref into photos before going to review
-                                            const finalPhotos = capturedPhotos.map((p) => {
-                                                const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
-                                                if (tempFilenameFromRef && !p.tempFilename) {
-                                                    return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
-                                                }
-                                                return p;
-                                            });
-                                            handleGoToReview(finalPhotos);
-                                        }
-                                    }}
-                                    disabled={isDisabled}
-                                >
-                                    {isUploading ? (
-                                        <ActivityIndicator size="small" color={colors.system.gray} />
-                                    ) : (
-                                        <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
-                                            Save
-                                        </BaseText>
-                                    )}
-                                </TouchableOpacity>
+                                <Host style={{ width: 80 }}>
+                                    <Button
+                                        variant="glassProminent"
+                                        controlSize="large"
+                                        color={MINT_COLOR}
+                                        onPress={() => {
+                                            if (canSave && !isUploading) {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                                // Merge tempFilename from ref into photos before going to review
+                                                const finalPhotos = capturedPhotos.map((p) => {
+                                                    const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                                    if (tempFilenameFromRef && !p.tempFilename) {
+                                                        return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                                    }
+                                                    return p;
+                                                });
+                                                handleGoToReview(finalPhotos);
+                                            }
+                                        }}
+                                        disabled={isDisabled}
+                                    >
+                                        Save
+                                    </Button>
+                                </Host>
+                                // <TouchableOpacity
+                                //     style={[styles.saveButtonHeader, isDisabled && styles.saveButtonHeaderDisabled]}
+                                //     onPress={() => {
+                                //         if (canSave && !isUploading) {
+                                //             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                //             // Merge tempFilename from ref into photos before going to review
+                                //             const finalPhotos = capturedPhotos.map((p) => {
+                                //                 const tempFilenameFromRef = tempFilenameMapRef.current.get(p.id);
+                                //                 if (tempFilenameFromRef && !p.tempFilename) {
+                                //                     return { ...p, tempFilename: tempFilenameFromRef, uploadStatus: "success" as const };
+                                //                 }
+                                //                 return p;
+                                //             });
+                                //             handleGoToReview(finalPhotos);
+                                //         }
+                                //     }}
+                                //     disabled={isDisabled}
+                                // >
+                                //     {isUploading ? (
+                                //         <ActivityIndicator size="small" color={colors.system.gray} />
+                                //     ) : (
+                                //         <BaseText type="Body" weight={400} color={canSave ? "system.black" : "system.gray"}>
+                                //             Save
+                                //         </BaseText>
+                                //     )}
+                                // </TouchableOpacity>
                             );
                         })()}
                 </View>
@@ -1276,8 +1285,8 @@ export default function CameraScreen() {
             {/* Template Select Button and Camera Controls - Only show when no ghost items selected */}
             {!hasGhostItems && (
                 <View style={styles.templateButtonContainer}>
-                    {/* If photo is captured, only show Retake button */}
-                    {hasCurrentPhoto ? (
+                    {/* If photo is captured and not uploading, show Retake; else Select template */}
+                    {hasCurrentPhoto && !isWaitingForUploadToReview ? (
                         <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                             <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 20 })]}>
                                 <HStack
@@ -1306,24 +1315,10 @@ export default function CameraScreen() {
                         </Host>
                     ) : (
                         <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 20 })]}>
-                                <HStack
-                                    alignment="center"
-                                    modifiers={[
-                                        padding({ all: 0 }),
-
-                                        frame({ width: 150, height: 44 }),
-                                        glassEffect({
-                                            glass: {
-                                                variant: "regular",
-                                            },
-                                        }),
-                                    ]}
-                                >
-                                    <Button onPress={handleSelectTemplate} variant="plain">
-                                        Select a template
-                                    </Button>
-                                </HStack>
+                            <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 10 })]}>
+                                <Button onPress={handleSelectTemplate} variant="glassProminent" controlSize="large" color={MINT_COLOR}>
+                                    Select a template
+                                </Button>
                             </HStack>
                         </Host>
                     )}
@@ -1355,7 +1350,7 @@ export default function CameraScreen() {
                             alignment="center"
                             modifiers={[
                                 padding({ all: 0 }),
-                                frame({ width: 50, height: 50 }),
+                                frame({ width: containerSize, height: containerSize }),
                                 glassEffect({
                                     glass: {
                                         variant: "regular",
@@ -1363,7 +1358,10 @@ export default function CameraScreen() {
                                 }),
                             ]}
                         >
-                            <Button variant="plain" onPress={toggleGrid} systemImage="grid" />
+                            <TouchableOpacity onPress={toggleGrid} className="w-[44px] h-[44px]  items-center justify-center">
+                                <IconSymbol size={iconSize} name="grid" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                            </TouchableOpacity>
+                            {/* <Button variant="plain" onPress={toggleGrid} systemImage="grid" /> */}
                         </HStack>
                     </Host>
 
@@ -1380,7 +1378,7 @@ export default function CameraScreen() {
                             alignment="center"
                             modifiers={[
                                 padding({ all: 0 }),
-                                frame({ width: 50, height: 50 }),
+                                frame({ width: containerSize, height: containerSize }),
                                 glassEffect({
                                     glass: {
                                         variant: "regular",
@@ -1388,7 +1386,10 @@ export default function CameraScreen() {
                                 }),
                             ]}
                         >
-                            <Button variant="plain" onPress={toggleFlash} systemImage={getFlashIcon() as any} />
+                            <TouchableOpacity onPress={toggleFlash} className="w-[44px] h-[44px]  items-center justify-center">
+                                <IconSymbol size={iconSize} name={getFlashIcon() as any} color={colors.system.white as any} style={{ bottom: -2, left: 3 }} />
+                            </TouchableOpacity>
+                            {/* <Button variant="plain" onPress={toggleFlash} systemImage={getFlashIcon() as any} /> */}
                         </HStack>
                     </Host>
                 </View>

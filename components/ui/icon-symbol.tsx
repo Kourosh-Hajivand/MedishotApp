@@ -22,6 +22,12 @@ const MAPPING = {
   'chevron.down': 'keyboard-arrow-down',
   'envelope.fill': 'email',
   'phone.fill': 'phone',
+  'person.dress.fill': 'person',
+  'person.fill': 'person',
+  'person.crop.circle.fill': 'person',
+  'person.circle.fill': 'person',
+  'figure.stand': 'person',
+  'figure.stand.dress': 'person',
 } as IconMapping;
 
 /**

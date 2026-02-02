@@ -4,6 +4,8 @@
  */
 
 import { Platform } from "react-native";
+export const iconSize = 26;
+export const containerSize = 48;
 
 const tintColorLight = "#0a7ea4";
 const tintColorDark = "#fff";

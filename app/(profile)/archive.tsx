@@ -31,7 +31,7 @@ export default function ArchiveScreen() {
 
     // Determine doctor_id based on user role
     const doctorId = useMemo(() => {
-        if (currentUserRole === "owner" || currentUserRole === "admin" || currentUserRole === "member") {
+        if (currentUserRole === "owner" || currentUserRole === "staff") {
             return undefined;
         }
         if (currentUserRole === "doctor" && profile?.id) {
