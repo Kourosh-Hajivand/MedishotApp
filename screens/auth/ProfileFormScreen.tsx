@@ -1,7 +1,7 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
-import { DynamicFieldItem, DynamicInputConfig } from "@/models";
+import { Address, DynamicFieldItem, DynamicInputConfig, FieldLabel } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { routes } from "@/routes/routes";
 import { spacing } from "@/styles/spaces";
@@ -155,26 +155,95 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
         },
     });
 
-    // Update form when initialData changes (for edit mode)
+    // Parse metadata from API (string or object)
+    const parsedMetadata = React.useMemo(() => {
+        const raw = initialData ? (initialData as People & { metadata?: string | Record<string, unknown> | null }).metadata : undefined;
+        if (raw == null) return null;
+        if (typeof raw === "string") {
+            try {
+                return JSON.parse(raw) as {
+                    phones?: Array<{ type: string; value: string }>;
+                    emails?: Array<{ type: string; value: string }>;
+                    addresses?: Array<{ type: string; value: string }>;
+                    urls?: Array<{ type: string; value: string }>;
+                };
+            } catch {
+                return null;
+            }
+        }
+        return raw as {
+            phones?: Array<{ type: string; value: string }>;
+            emails?: Array<{ type: string; value: string }>;
+            addresses?: Array<{ type: string; value: string }>;
+            urls?: Array<{ type: string; value: string }>;
+        };
+    }, [initialData]);
+
+    // Update form and dynamic fields when initialData changes (for edit mode)
     useEffect(() => {
         if (mode === "edit" && initialData) {
             reset({
                 first_name: initialData.first_name || "",
                 last_name: initialData.last_name || "",
                 birth_date: initialData.birth_date || "",
-                // Keep gender in lowercase for form (backend format)
                 gender: initialData.gender ? initialData.gender.toLowerCase() : "",
             });
-            // Set existing image URL if available (only if no local image selected)
-            // Don't set uploadedFilename for existing images - only for newly uploaded ones
-            // This way we only send profile_photo to backend if image was changed
             if (initialData.profile_photo_url && !localImageUri) {
-                // Don't set uploadedFilename here - we only want to send it if image was changed
                 setHasImageChanged(false);
             }
-            // TODO: Set dynamic fields from initialData if available
+            // Pre-fill dynamic fields from metadata so they are not empty on save
+            if (parsedMetadata) {
+                if (parsedMetadata.phones?.length) {
+                    setPhones(
+                        parsedMetadata.phones.map((item, i) => ({
+                            id: `phone-${i}-${item.value}`,
+                            label: item.type as FieldLabel,
+                            value: item.value,
+                        }))
+                    );
+                }
+                if (parsedMetadata.emails?.length) {
+                    setEmails(
+                        parsedMetadata.emails.map((item, i) => ({
+                            id: `email-${i}-${item.value}`,
+                            label: item.type as FieldLabel,
+                            value: item.value,
+                        }))
+                    );
+                }
+                if (parsedMetadata.addresses?.length) {
+                    const defaultAddress: Address = { street1: "", street2: "", city: "", state: "", zip: "", country: "United States" };
+                    setAddresses(
+                        parsedMetadata.addresses.map((item, i) => {
+                            let value: Address | string = item.value;
+                            if (typeof item.value === "string" && item.value.trim().startsWith("{")) {
+                                try {
+                                    const parsed = JSON.parse(item.value) as Partial<Address>;
+                                    value = { ...defaultAddress, ...parsed };
+                                } catch {
+                                    value = item.value;
+                                }
+                            }
+                            return {
+                                id: `address-${i}-${typeof value === "string" ? value : value.street1 || i}`,
+                                label: item.type as FieldLabel,
+                                value,
+                            };
+                        })
+                    );
+                }
+                if (parsedMetadata.urls?.length) {
+                    setUrls(
+                        parsedMetadata.urls.map((item, i) => ({
+                            id: `url-${i}-${item.value}`,
+                            label: item.type as FieldLabel,
+                            value: item.value,
+                        }))
+                    );
+                }
+            }
         }
-    }, [initialData, mode, reset]);
+    }, [initialData, mode, reset, parsedMetadata]);
 
     // Expose form methods to parent
     useEffect(() => {

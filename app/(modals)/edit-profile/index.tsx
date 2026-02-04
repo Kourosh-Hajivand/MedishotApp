@@ -101,12 +101,20 @@ export default function EditProfileScreen() {
 
                 if (formData.addresses?.length > 0) {
                     const addressesData = formData.addresses
-                        .map((address) => ({
-                            type: String(address.label),
-                            value: typeof address.value === "string" ? address.value : String(address.value),
-                        }))
-                        .filter((address) => address.value);
+                        .map((address) => {
+                            const value =
+                                typeof address.value === "string"
+                                    ? address.value
+                                    : typeof address.value === "object" && address.value !== null
+                                      ? JSON.stringify(address.value)
+                                      : String(address.value);
+                            return { type: String(address.label), value };
+                        })
+                        .filter((address) => address.value && address.value !== "[object Object]");
                     if (addressesData.length > 0) metadataObject.addresses = addressesData;
+                    // Debug: what we send for addresses
+                    console.log("[EditProfile] addresses from form (raw):", JSON.stringify(formData.addresses, null, 2));
+                    console.log("[EditProfile] addresses to API:", JSON.stringify(addressesData, null, 2));
                 }
 
                 if (formData.urls?.length > 0) {
@@ -119,13 +127,23 @@ export default function EditProfileScreen() {
                     if (urlsData.length > 0) metadataObject.urls = urlsData;
                 }
 
+                // Always send metadata: new from form, or preserve existing so backend does not overwrite with null
+                const profileMetadata = profile ? (profile as People & { metadata?: string | Record<string, any> | null }).metadata : undefined;
+                const metadataValue =
+                    Object.keys(metadataObject).length > 0
+                        ? JSON.stringify(metadataObject)
+                        : profileMetadata != null
+                          ? typeof profileMetadata === "string"
+                            ? profileMetadata
+                            : JSON.stringify(profileMetadata)
+                          : undefined;
+
                 const payload: UpdateProfileFullBody = {
                     first_name: data.first_name,
                     last_name: data.last_name,
                     ...(data.birth_date && { birth_date: data.birth_date }),
-                    // Ensure gender is lowercase for backend
                     ...(data.gender && { gender: data.gender.toLowerCase() as "male" | "female" | "other" }),
-                    ...(Object.keys(metadataObject).length > 0 && { metadata: JSON.stringify(metadataObject) }),
+                    ...(metadataValue !== undefined && { metadata: metadataValue }),
                     ...(formData.uploadedFilename && { profile_photo: formData.uploadedFilename }),
                 };
 

@@ -36,6 +36,7 @@ export interface People {
     email_verified_at: string | null;
     created_at: string;
     updated_at: string;
+    metadata?: Record<string, any> | string | null; // JSON object or string (phones, emails, addresses, urls)
 }
 
 export interface LoginResponse {

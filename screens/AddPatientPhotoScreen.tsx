@@ -153,7 +153,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const addressesRef = useRef<DynamicFieldItem[]>([]);
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
     const urlsRef = useRef<DynamicFieldItem[]>([]);
-    
+
     // Error states for dynamic fields
     const [phoneError, setPhoneError] = useState<string>("");
     const [emailError, setEmailError] = useState<string>("");
@@ -419,10 +419,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
 
             // Set address if available (structured from scan or single string)
-            const hasStructuredAddress =
-                params.addressCity != null ||
-                params.addressState != null ||
-                params.addressZip != null;
+            const hasStructuredAddress = params.addressCity != null || params.addressState != null || params.addressZip != null;
             if (params.address || hasStructuredAddress) {
                 const street1 = params.addressStreet ?? params.address ?? "";
                 const addressValue: AddressValue = hasStructuredAddress
@@ -613,8 +610,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
         const addressList = addressesRef.current
             .filter((address) => {
                 if (!address.value) return false;
-                if (typeof address.value === "object")
-                    return Object.values(address.value).some((val) => val && typeof val === "string" && (val as string).trim() !== "");
+                if (typeof address.value === "object") return Object.values(address.value).some((val) => val && typeof val === "string" && (val as string).trim() !== "");
                 return typeof address.value === "string" && address.value.trim() !== "";
             })
             .map((address) => ({
@@ -703,7 +699,6 @@ export const AddPatientPhotoScreen: React.FC = () => {
             patientData.id_card = idCardFilename;
         }
 
-
         if (isEditMode && params.id) {
             updatePatient(
                 { patientId: params.id, data: patientData },
@@ -733,7 +728,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const handleNext = async () => {
         // Trigger form validation first
         const isValid = await trigger();
-        
+
         if (!isFormValid) {
             if (!isEditMode) {
                 // Set error messages for dynamic fields
@@ -749,12 +744,12 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
             return;
         }
-        
+
         // Clear errors if valid
         setPhoneError("");
         setEmailError("");
         setAddressError("");
-        
+
         handleSubmit(onSubmit)();
     };
     const phoneConfig: DynamicInputConfig = {

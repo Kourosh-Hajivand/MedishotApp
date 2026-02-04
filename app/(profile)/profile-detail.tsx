@@ -4,6 +4,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { headerHeight } from "@/constants/theme";
 import colors from "@/theme/colors";
 import { formatDate } from "@/utils/helper/dateUtils";
+import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useAuth } from "@/utils/hook/useAuth";
 import { People } from "@/utils/service/models/ResponseModels";
 import { router, useNavigation } from "expo-router";
@@ -15,7 +16,6 @@ export default function ProfileDetailScreen() {
     const insets = useSafeAreaInsets();
     const { profile } = useAuth();
     const navigation = useNavigation();
-    console.log("profile", profile);
     const handleEditPress = React.useCallback(() => {
         if (profile) {
             router.push({
@@ -90,6 +90,14 @@ const DetailRow = ({ label, value, isLast = false, isLink = false }: { label: st
         </View>
     );
 };
+// Parsed metadata shape (phones, emails, addresses, urls)
+interface ProfileMetadata {
+    phones?: Array<{ type: string; value: string }>;
+    emails?: Array<{ type: string; value: string }>;
+    addresses?: Array<{ type: string; value: string }>;
+    urls?: Array<{ type: string; value: string }>;
+}
+
 // Component for Profile Details
 const ProfileDetails = ({ profile }: { profile?: People | null }) => {
     // Build full name
@@ -98,11 +106,64 @@ const ProfileDetails = ({ profile }: { profile?: People | null }) => {
         return parts.length > 0 ? parts.join(" ") : null;
     }, [profile?.first_name, profile?.last_name]);
 
-    const profileFields: { label: string; value?: string | number | null }[] = [
+    // Parse metadata (API may return string or object)
+    const metadata = React.useMemo((): ProfileMetadata | null => {
+        const raw = profile ? (profile as People & { metadata?: string | Record<string, unknown> | null }).metadata : undefined;
+        if (raw == null) return null;
+        if (typeof raw === "string") {
+            try {
+                return JSON.parse(raw) as ProfileMetadata;
+            } catch {
+                return null;
+            }
+        }
+        return raw as ProfileMetadata;
+    }, [profile]);
+
+    // Format metadata label: "Category - Type" (e.g. "Phone - Mobile")
+    const formatMetadataLabel = (category: string, type: string) => {
+        const t = type?.trim() || category;
+        const capitalized = t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+        return `${category} - ${capitalized}`;
+    };
+
+    // Flatten metadata into rows: { label, value, isLink }
+    const metadataRows = React.useMemo(() => {
+        const rows: { label: string; value: string; isLink?: boolean }[] = [];
+        if (!metadata) return rows;
+
+        metadata.phones?.forEach((item) => {
+            if (item.value) rows.push({ label: formatMetadataLabel("Phone", item.type || "Phone"), value: e164ToDisplay(item.value) || item.value });
+        });
+        metadata.emails?.forEach((item) => {
+            if (item.value) rows.push({ label: formatMetadataLabel("Email", item.type || "Email"), value: item.value });
+        });
+        metadata.addresses?.forEach((item) => {
+            if (!item.value || item.value === "[object Object]") return;
+            let displayValue: string = item.value;
+            if (item.value.trim().startsWith("{")) {
+                try {
+                    const addr = JSON.parse(item.value) as { street1?: string; street2?: string; city?: string; state?: string; zip?: string; country?: string };
+                    const parts = [addr.street1, addr.street2, addr.city, addr.state, addr.zip, addr.country].filter(Boolean);
+                    displayValue = parts.length > 0 ? parts.join(", ") : item.value;
+                } catch {
+                    displayValue = item.value;
+                }
+            }
+            rows.push({ label: formatMetadataLabel("Address", item.type || "Address"), value: displayValue });
+        });
+        metadata.urls?.forEach((item) => {
+            if (item.value) rows.push({ label: formatMetadataLabel("URL", item.type || "URL"), value: item.value, isLink: true });
+        });
+        return rows;
+    }, [metadata]);
+
+    const profileFields: { label: string; value?: string | number | null; isLink?: boolean }[] = [
         { label: "Full Name", value: fullName },
         { label: "Email", value: profile?.email },
         { label: "Verified", value: profile?.is_verified ? "Yes" : profile?.is_verified === false ? "No" : null },
         { label: "Member Since", value: profile?.created_at ? formatDate(profile.created_at) : null },
+        ...metadataRows,
     ];
 
     // Filter only fields that have values
@@ -111,7 +172,7 @@ const ProfileDetails = ({ profile }: { profile?: People | null }) => {
     return (
         <View className="gap-4">
             {filledFields.map((field, index) => (
-                <DetailRow key={field.label} label={field.label} value={field.value} isLast={index === filledFields.length - 1} />
+                <DetailRow key={field.label + "-" + (typeof field.value === "string" ? field.value : index)} label={field.label} value={field.value ?? undefined} isLast={index === filledFields.length - 1} isLink={field.isLink} />
             ))}
         </View>
     );

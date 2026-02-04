@@ -17,11 +17,6 @@ export default function SubscriptionScreen() {
     const { data: plansData, isLoading: isLoadingPlans } = useGetPlans(!!selectedPractice?.id);
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
-    console.log("====================================");
-    console.log("Subscription Data:", subscriptionData);
-    console.log("Plans Data:", plansData);
-    console.log("====================================");
-
     // Get current subscription - handle multiple possible response structures
     // Priority: current_subscription (from practice detail) > current_plan (new API) > plan (old API) > direct data
     const subscriptionDataObj = subscriptionData?.data || {};
@@ -77,17 +72,17 @@ export default function SubscriptionScreen() {
     // Parse HTML description to extract features
     const parseDescriptionToFeatures = (description: string): string[] => {
         const features: string[] = [];
-        
+
         // Match all <li><p>...</p></li> patterns
         const liRegex = /<li><p>(.*?)<\/p><\/li>/gi;
         let match;
-        
+
         while ((match = liRegex.exec(description)) !== null) {
             if (match[1]) {
                 features.push(match[1].trim());
             }
         }
-        
+
         return features;
     };
 
@@ -97,7 +92,7 @@ export default function SubscriptionScreen() {
         if (plan.description) {
             return parseDescriptionToFeatures(plan.description);
         }
-        
+
         // Fallback to old features array logic
         const features: string[] = [];
         plan.features?.forEach((feature: any) => {
@@ -234,7 +229,7 @@ export default function SubscriptionScreen() {
     };
 
     // Collapse/Expand state for current plan card - MUST be before any conditional returns
-    const [isCurrentPlanExpanded, setIsCurrentPlanExpanded] = useState(false);
+    const [isCurrentPlanExpanded, setIsCurrentPlanExpanded] = useState(true);
     const rotationAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
     const expandAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
 
@@ -283,12 +278,20 @@ export default function SubscriptionScreen() {
     const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
 
     return (
-        <ScrollView style={[styles.container, { paddingTop: insets.top + 40 }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView style={[styles.container]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
             {/* Current Subscription Section */}
-            <View style={styles.currentPlanSection}>
+            <View style={{ height: insets.top + 40, width: "100%", backgroundColor: currentPlan ? getPlanColor(currentPlan.name) : colors.system.black }}></View>
+            <View
+                style={[
+                    styles.currentPlanSection,
+                    {
+                        backgroundColor: currentPlan ? getPlanColor(currentPlan.name) : colors.system.black,
+                    },
+                ]}
+            >
                 {/* Header Content */}
                 <View style={styles.currentPlanHeaderContent}>
-                    <BaseText type="Body" weight="400" color="labels.secondary" style={styles.currentPlanLabel}>
+                    <BaseText type="Body" weight="400" style={[styles.currentPlanLabel, { color: currentPlan ? colors.system.white : colors.labels.secondary }]}>
                         Your Subscription Plan:
                     </BaseText>
                     <BaseText
@@ -297,14 +300,14 @@ export default function SubscriptionScreen() {
                         style={[
                             styles.currentPlanName,
                             {
-                                color: currentPlan ? getPlanColor(currentPlan.name) : colors.system.black,
+                                color: currentPlan ? colors.system.white : colors.system.black,
                             },
                         ]}
                     >
                         {currentPlan?.name || "No Plan"}
                     </BaseText>
                     {daysRemaining !== null && daysRemaining > 0 && (
-                        <BaseText type="Body" weight="400" color="labels.secondary" style={styles.daysRemaining}>
+                        <BaseText type="Body" weight="400" style={[styles.daysRemaining, { color: currentPlan ? colors.system.white : undefined }]}>
                             {daysRemaining} Days Remaining
                         </BaseText>
                     )}

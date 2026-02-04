@@ -129,6 +129,9 @@ export const AuthService = {
                     formData.append("profile_photo", body.profile_photo);
                 }
             }
+            if (body.metadata !== undefined) {
+                formData.append("metadata", body.metadata);
+            }
 
             const response: AxiosResponse<UpdateProfileResponse> = await axiosInstance.post(baseUrl + updateProfileFull(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
