@@ -1,7 +1,7 @@
 import { useAuth } from "@/utils/hook/useAuth";
 import { useGetPracticeList } from "@/utils/hook/usePractice";
 import { loadProfileSelection } from "@/utils/hook/useProfileStore";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatedSplashScreen } from "./SplashScreen";
 
 interface AuthSplashScreenProps {
@@ -10,77 +10,74 @@ interface AuthSplashScreenProps {
 
 export function AuthSplashScreen({ onAuthReady }: AuthSplashScreenProps) {
     const [isAnimationReady, setIsAnimationReady] = useState(false);
-    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [isDataReady, setIsDataReady] = useState(false);
+    const hasLoadedPractice = useRef(false);
 
-    // استفاده از useAuth و useGetPracticeList برای چک کردن وضعیت authentication
     const { isAuthenticated, profile, isProfileLoading, isLoading: isAuthLoading } = useAuth();
     const { data: practiceList, isLoading: isPracticeListLoading } = useGetPracticeList(isAuthenticated === true);
 
-    // مدیریت انتخاب practice پیش‌فرض
+    // Load default practice selection
     useEffect(() => {
-        if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0 && !isPracticeListLoading) {
-            // اگر practice list لود شد، default practice را انتخاب کن
+        if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0 && !isPracticeListLoading && !hasLoadedPractice.current) {
+            hasLoadedPractice.current = true;
             loadProfileSelection(practiceList.data).catch(console.error);
         }
     }, [isAuthenticated, practiceList, isPracticeListLoading]);
 
-    // تعیین زمان مخفی شدن splash screen
+    // Wait for all data to be ready before hiding splash
     useEffect(() => {
-        // اگر هنوز در حال چک کردن authentication هستیم، splash را نگه دار
+        // Keep splash if still loading auth
         if (isAuthLoading || isAuthenticated === null) {
-            setIsAuthReady(false);
+            setIsDataReady(false);
             return;
         }
 
-        // اگر کاربر لاگین نکرده، splash را مخفی کن
+        // If not authenticated, ready to show login
         if (isAuthenticated === false) {
-            setIsAuthReady(true);
+            setIsDataReady(true);
             return;
         }
 
-        // اگر کاربر لاگین کرده
+        // If authenticated, wait for all data
         if (isAuthenticated === true) {
-            // اگر profile در حال لود است، splash را نگه دار
+            // Keep splash while loading profile
             if (isProfileLoading) {
-                setIsAuthReady(false);
+                setIsDataReady(false);
                 return;
             }
 
-            // اگر profile لود نشده و error داریم (مثلاً 401)، splash را مخفی کن
+            // If profile failed to load, ready to show error/welcome
             if (!profile && !isProfileLoading) {
-                setIsAuthReady(true);
+                setIsDataReady(true);
                 return;
             }
 
-            // اگر profile کامل نیست (نام و فامیل ندارد)، splash را مخفی کن
+            // If profile incomplete, ready to show complete profile flow
             if (profile && (!profile.first_name || !profile.last_name)) {
-                setIsAuthReady(true);
+                setIsDataReady(true);
                 return;
             }
 
-            // اگر practice list در حال لود است، splash را نگه دار
+            // Keep splash while loading practice list
             if (isPracticeListLoading) {
-                setIsAuthReady(false);
+                setIsDataReady(false);
                 return;
             }
 
-            // اگر practice list خالی است، splash را مخفی کن
-            if (!practiceList?.data || practiceList.data.length === 0) {
-                setIsAuthReady(true);
-                return;
-            }
-
-            // اگر همه چیز آماده است، splash را مخفی کن
-            setIsAuthReady(true);
+            // If practice list loaded (or empty), ready to show app
+            setIsDataReady(true);
         }
     }, [isAuthLoading, isAuthenticated, isProfileLoading, profile, isPracticeListLoading, practiceList]);
 
-    // وقتی هم animation و هم auth ready شد، به parent اطلاع بده
+    // Hide splash when ready - with 2s minimum display time
     useEffect(() => {
-        if (isAnimationReady && isAuthReady) {
-            onAuthReady();
+        if (isAnimationReady && isDataReady) {
+            const timer = setTimeout(() => {
+                onAuthReady();
+            }, 2200);
+            return () => clearTimeout(timer);
         }
-    }, [isAnimationReady, isAuthReady, onAuthReady]);
+    }, [isAnimationReady, isDataReady, onAuthReady]);
 
     return <AnimatedSplashScreen onAnimationComplete={() => setIsAnimationReady(true)} />;
 }

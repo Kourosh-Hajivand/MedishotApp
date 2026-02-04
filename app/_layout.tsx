@@ -9,6 +9,7 @@ import { useState } from "react";
 import "react-native-gesture-handler";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { enableScreens } from "react-native-screens";
 import ToastManager from "toastify-react-native";
 import "./global.css";
@@ -27,10 +28,11 @@ export default function RootLayout() {
                     <AuthSplashScreen onAuthReady={() => setIsSplashReady(true)} />
                 </TenstackProvider>
             ) : (
-                <BottomSheetModalProvider>
-                    <TenstackProvider>
-                        <AuthGuard>
-                            <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
+                <Animated.View style={{ flex: 1 }} entering={FadeIn.duration(300)}>
+                    <BottomSheetModalProvider>
+                        <TenstackProvider>
+                            <AuthGuard>
+                                <TabletWrapper maxWidth={Layout.TABLET_MAX_WIDTH} sideBackgroundColor={Layout.TABLET_SIDE_BACKGROUND}>
                                 <Stack
                                     screenOptions={{
                                         headerShown: false,
@@ -91,6 +93,7 @@ export default function RootLayout() {
                         </AuthGuard>
                     </TenstackProvider>
                 </BottomSheetModalProvider>
+                </Animated.View>
             )}
         </GestureHandlerRootView>
     );

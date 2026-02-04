@@ -142,28 +142,18 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         }
     }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, isPublicRoute, isInAuthFlow, effectiveSkipRedirect, segments, isOnWelcome, isOnLogin, isOnSignup, isInModals, isInTabs, isOnSelectRole, isOnCreatePractice]);
 
-    // If on (modals) (e.g. select-gender, select-date), always render children — never replace with loading/redirect.
+    // If on (modals), always render children
     if (isInModals) {
         return <>{children}</>;
     }
 
-    // If checking authentication, show loading
-    if (isAuthenticated === null && !isPublicRoute && !isInAuthFlow) {
-        return (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        );
-    }
-
     // If there's an error loading practice list, show error state
     // BUT: Don't show error in tabs - let patients/_layout.tsx handle it
-    // This allows modals to still open from tabs even if practice list has error
     if (isAuthenticated === true && practiceListError && !isPublicRoute && !isInAuthFlow && !isPracticeListLoading && !isInTabs) {
         const errorMessage = practiceListError instanceof Error ? practiceListError.message : "Failed to load practices. Please try again.";
         return (
             <ErrorState
-                title="خطا در بارگذاری Practice List"
+                title="Failed to load Practice List"
                 message={errorMessage}
                 onRetry={() => {
                     refetchPracticeList();
@@ -172,24 +162,6 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
         );
     }
 
-    // If checking profile or practice list, show loading
-    if (isAuthenticated === true && (isProfileLoading || isPracticeListLoading) && !isPublicRoute && !isInAuthFlow) {
-        return (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        );
-    }
-
-    // If not authenticated and not on public route, don't render children (redirect will happen)
-    if (isAuthenticated === false && !isPublicRoute && !isInAuthFlow) {
-        return (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#fff" }}>
-                <ActivityIndicator size="large" color="#007AFF" />
-            </View>
-        );
-    }
-
-    // Render children for authenticated users with complete profile and practice, or public routes
+    // Render children - all loading is handled by splash screen
     return <>{children}</>;
 };
