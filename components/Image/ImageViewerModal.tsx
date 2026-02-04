@@ -1,6 +1,6 @@
-import { ImageEditorModal } from "@/components/ImageEditor";
-import { PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
 import type { PracticeSettings } from "@/components";
+import { PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
+import { ImageEditorModal } from "@/components/ImageEditor";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
@@ -13,11 +13,11 @@ import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import React, { useRef, useState } from "react";
-import { Alert, Dimensions, Image as RNImage, Modal, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
-import ViewShot, { captureRef } from "react-native-view-shot";
+import { Alert, Dimensions, Modal, Image as RNImage, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ViewShot, { captureRef } from "react-native-view-shot";
 
 const { width, height } = Dimensions.get("window");
 
@@ -243,17 +243,17 @@ const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoad
         const width = withTiming(24 + activeProgress * 20, {
             duration: 150,
         });
-        
+
         // Margin: 0 (inactive) -> 6 (active)
         const margin = withTiming(activeProgress * 6, {
             duration: 150,
         });
-        
+
         // Scale: 0.95 (inactive) -> 1.0 (active) - subtle
         const scale = withTiming(0.95 + activeProgress * 0.05, {
             duration: 150,
         });
-        
+
         // Opacity: 0.7 (inactive) -> 1.0 (active)
         const opacity = withTiming(0.7 + activeProgress * 0.3, {
             duration: 150,
@@ -342,7 +342,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     practice,
     metadata,
 }) => {
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false } = actions;
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false } = actions;
     const { profile: me } = useAuth();
 
     // Build maps from mediaData if provided, otherwise use legacy maps
@@ -531,7 +531,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const scrollThumbnailToPosition = React.useCallback(
         (currentPage: number) => {
             if (!thumbnailScrollRef.current || imagesList.length === 0) return;
-            
+
             const activeThumbnailWidth = 44;
             const inactiveThumbnailWidth = 24;
             const thumbnailGap = 4;
@@ -562,7 +562,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const scrollX = interpolatedPos - width / 2;
 
             // Calculate max scroll
-            const totalWidth = padding + (imagesList.length * inactiveThumbnailWidth) + ((imagesList.length - 1) * thumbnailGap) + activeThumbnailMargin + (activeThumbnailWidth - inactiveThumbnailWidth) + activeThumbnailMargin + padding;
+            const totalWidth = padding + imagesList.length * inactiveThumbnailWidth + (imagesList.length - 1) * thumbnailGap + activeThumbnailMargin + (activeThumbnailWidth - inactiveThumbnailWidth) + activeThumbnailMargin + padding;
             const maxScroll = Math.max(0, totalWidth - width);
 
             thumbnailScrollRef.current.scrollTo({
@@ -576,7 +576,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const scrollThumbnailToIndex = React.useCallback(
         (index: number) => {
             if (!thumbnailScrollRef.current || imagesList.length === 0) return;
-            
+
             // Simply use scrollThumbnailToPosition for consistency
             scrollThumbnailToPosition(index);
         },
@@ -588,7 +588,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         currentIndexShared.value = currentIndex;
         lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
-
 
     // Reset index to initialIndex when modal closes
     React.useEffect(() => {
@@ -680,17 +679,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             if (isProgrammaticScroll.current) {
                 return;
             }
-            
+
             const offsetX = event.contentOffset.x;
             const currentPage = offsetX / width;
             const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
             const index = Math.round(clampedPage);
-            
+
             // Calculate progress for smooth thumbnail animation
             const progress = clampedPage - index;
             scrollProgress.value = progress;
             currentIndexShared.value = index;
-            
+
             // Immediately scroll thumbnail - runs on UI thread for perfect sync
             if (clampedPage >= 0 && clampedPage < imagesList.length) {
                 runOnJS(scrollThumbnailToPositionJS)(clampedPage);
@@ -833,6 +832,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const currentImageUri = imagesList[currentIndex];
         setImageEditorUri(currentImageUri);
         setImageEditorTool("Adjust");
+        setImageEditorVisible(true);
+    };
+
+    const handleMagicPress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const currentImageUri = imagesList[currentIndex];
+        setImageEditorUri(currentImageUri);
+        setImageEditorTool("Magic");
         setImageEditorVisible(true);
     };
 
@@ -1088,7 +1095,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 .onUpdate((e) => {
                     // Only allow vertical dismiss if not doing horizontal swipe
                     const isHorizontalSwipe = Math.abs(e.velocityX) > Math.abs(e.velocityY);
-                    
+
                     if (scale.value <= 1 && e.translationY > 0 && !isHorizontalSwipe) {
                         dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
                     }
@@ -1215,6 +1222,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "Remove Bookmark" : "Bookmark"}
                                                         </Button>
                                                     )}
+                                                    {showMagic && (
+                                                        <Button systemImage="sparkles" onPress={handleMagicPress}>
+                                                            Use Magic
+                                                        </Button>
+                                                    )}
                                                     {showEdit && (
                                                         <Button systemImage="slider.horizontal.3" onPress={handleAdjustPress}>
                                                             Adjustment
@@ -1288,17 +1300,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 {/* Thumbnail Gallery - Hide when zoomed */}
                                 {!isZoomed && (
-                                    <ScrollView
-                                        ref={thumbnailScrollRef}
-                                        horizontal
-                                        showsHorizontalScrollIndicator={false}
-                                        contentContainerStyle={styles.thumbnailContainer}
-                                        style={styles.thumbnailScroll}
-                                        scrollEnabled={true}
-                                        scrollEventThrottle={16}
-                                        decelerationRate="normal"
-                                        bounces={false}
-                                    >
+                                    <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} scrollEnabled={true} scrollEventThrottle={16} decelerationRate="normal" bounces={false}>
                                         {imagesList.map((imageUri, index) => {
                                             const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
 
@@ -1461,13 +1463,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     >
                         <ViewShot ref={shareViewRef} style={{ width: width, backgroundColor: colors.system.white }}>
                             <View style={{ width: width, paddingHorizontal: 16, paddingTop: 16 }}>
-                                <PracticeDocumentHeader
-                                    practice={practice}
-                                    printSettings={printSettings}
-                                    doctor={patientData?.doctor ?? null}
-                                    me={me ?? undefined}
-                                    variant="document"
-                                />
+                                <PracticeDocumentHeader practice={practice} printSettings={printSettings} doctor={patientData?.doctor ?? null} me={me ?? undefined} variant="document" />
                             </View>
                             <View
                                 style={{

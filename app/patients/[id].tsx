@@ -758,6 +758,7 @@ export default function PatientDetailsScreen() {
                                         showEdit: true,
                                         showArchive: true,
                                         showShare: true,
+                                        showMagic: true,
                                     }}
                                     sections={groupedPatientImages}
                                     imageUrlToMediaIdMap={imageUrlToMediaIdMap}

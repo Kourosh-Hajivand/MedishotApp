@@ -3,7 +3,7 @@ import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import type { Practice } from "@/utils/service/models/ResponseModels";
-import { Button, ButtonRole, ContextMenu, Host } from "@expo/ui/swift-ui";
+import { ButtonRole } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useEffect, useMemo, useState } from "react";
@@ -70,7 +70,7 @@ const GalleryImageItem: React.FC<{
 
     return (
         <View style={{ width: itemWidth, height: itemWidth }}>
-            <Host style={{ width: itemWidth, height: itemWidth }}>
+            {/* <Host style={{ width: itemWidth, height: itemWidth }}>
                 <ContextMenu activationMethod="longPress">
                     <ContextMenu.Items>
                         {menuItems.map((menu, menuIndex) => (
@@ -81,7 +81,7 @@ const GalleryImageItem: React.FC<{
                     </ContextMenu.Items>
 
                     <ContextMenu.Trigger>
-                        <View style={{ width: itemWidth, height: itemWidth }} className="relative bg-red-100">
+                        <View style={{ width: itemWidth, height: itemWidth }}>
                             <TouchableOpacity
                                 activeOpacity={0.9}
                                 onPress={() => onImagePress(uri)}
@@ -89,14 +89,13 @@ const GalleryImageItem: React.FC<{
                                     width: itemWidth,
                                     height: itemWidth,
                                     marginRight: index < numColumns - 1 ? gap : 0,
-                                    position: "relative",
                                     overflow: "hidden",
                                 }}
                             >
                                 <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
                                     <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
                                 </Animated.View>
-                                <Animated.View style={imageOpacityAnimatedStyle} className={"absolute top-0 left-0 right-0 bottom-0"}>
+                                <Animated.View style={[styles.imageContainer, imageOpacityAnimatedStyle]}>
                                     <Image
                                         source={{ uri }}
                                         style={{
@@ -118,27 +117,26 @@ const GalleryImageItem: React.FC<{
                         </View>
                     </ContextMenu.Trigger>
                 </ContextMenu>
-            </Host>
-            {/* <TouchableOpacity
+            </Host> */}
+            <TouchableOpacity
                 activeOpacity={0.9}
                 onPress={() => onImagePress(uri)}
                 style={{
                     width: itemWidth,
                     height: itemWidth,
                     marginRight: index < numColumns - 1 ? gap : 0,
-                    position: "relative",
                     overflow: "hidden",
                 }}
             >
                 <Animated.View style={[styles.skeletonContainer, skeletonAnimatedStyle]}>
                     <ImageSkeleton width={itemWidth} height={itemWidth} borderRadius={0} variant="rectangular" />
                 </Animated.View>
-                <Animated.View style={imageOpacityAnimatedStyle}>
+                <Animated.View style={[styles.imageContainer, imageOpacityAnimatedStyle]}>
                     <Image
                         source={{ uri }}
                         style={{
-                            width: "100%",
-                            height: "100%",
+                            width: itemWidth,
+                            height: itemWidth,
                         }}
                         contentFit="cover"
                         onLoadStart={handleImageLoadStart}
@@ -151,7 +149,7 @@ const GalleryImageItem: React.FC<{
                         <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                     </View>
                 )}
-            </TouchableOpacity> */}
+            </TouchableOpacity>
         </View>
     );
 };
@@ -169,6 +167,7 @@ interface ImageSection {
 }
 
 interface ImageRow {
+    id: string;
     items: string[];
     sectionKey: string;
 }
@@ -179,6 +178,7 @@ export interface ViewerActionsConfig {
     showArchive?: boolean;
     showShare?: boolean;
     showRestore?: boolean;
+    showMagic?: boolean;
 }
 
 interface MediaItem {
@@ -258,7 +258,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     practice,
     metadata,
 }) => {
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true } = actions;
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -285,14 +285,17 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return [];
     }, [images, sections]);
 
-    // Transform sections data into rows for multi-column layout
+    // Transform sections data into rows for multi-column layout (each row has stable id for list recycling)
     const sectionsWithRows = useMemo(() => {
         return imageSections.map((section, sectionIndex) => {
             const sectionKey = section.title ? section.title : `section-${sectionIndex}`;
             const rows: ImageRow[] = [];
             for (let i = 0; i < section.data.length; i += numColumns) {
+                const items = section.data.slice(i, i + numColumns);
+                const rowId = `${sectionKey}-row-${i}-${items[0] ?? i}`;
                 rows.push({
-                    items: section.data.slice(i, i + numColumns),
+                    id: rowId,
+                    items,
                     sectionKey,
                 });
             }
@@ -431,7 +434,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return (
             <View style={styles.rowContainer}>
                 {item.items.map((uri, itemIndex) => (
-                    <React.Fragment key={`${item.sectionKey}-row-${index}-item-${itemIndex}-${uri}`}>{renderImageItem(uri, itemIndex)}</React.Fragment>
+                    <React.Fragment key={uri}>{renderImageItem(uri, itemIndex)}</React.Fragment>
                 ))}
             </View>
         );
@@ -467,7 +470,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
-                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item, index) => `${item.sectionKey}-row-${index}`} stickySectionHeadersEnabled={false} removeClippedSubviews={false} contentContainerStyle={styles.sectionListContent} />
+                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item) => item.id} stickySectionHeadersEnabled={false} removeClippedSubviews={false} contentContainerStyle={styles.sectionListContent} />
                 </Animated.View>
             </GestureDetector>
 
@@ -492,6 +495,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                     showArchive,
                     showShare,
                     showRestore: !!onRestore,
+                    showMagic,
                 }}
                 onRestore={onRestore}
                 practice={practice}
@@ -556,5 +560,12 @@ const styles = StyleSheet.create({
         bottom: 0,
         justifyContent: "center",
         alignItems: "center",
+    },
+    imageContainer: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
     },
 });
