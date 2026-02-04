@@ -74,17 +74,38 @@ export default function SubscriptionScreen() {
         return null;
     };
 
-    // Get plan features text - use display_name if available, otherwise format based on feature_key
+    // Parse HTML description to extract features
+    const parseDescriptionToFeatures = (description: string): string[] => {
+        const features: string[] = [];
+        
+        // Match all <li><p>...</p></li> patterns
+        const liRegex = /<li><p>(.*?)<\/p><\/li>/gi;
+        let match;
+        
+        while ((match = liRegex.exec(description)) !== null) {
+            if (match[1]) {
+                features.push(match[1].trim());
+            }
+        }
+        
+        return features;
+    };
+
+    // Get plan features text - parse from description HTML
     const getPlanFeatures = (plan: any) => {
+        // If description exists, parse it
+        if (plan.description) {
+            return parseDescriptionToFeatures(plan.description);
+        }
+        
+        // Fallback to old features array logic
         const features: string[] = [];
         plan.features?.forEach((feature: any) => {
-            // Use display_name if available
             if (feature.display_name) {
                 features.push(feature.display_name);
                 return;
             }
 
-            // Otherwise, format based on feature_key and feature_type
             const featureKey = feature.feature_key?.toLowerCase();
             const featureType = feature.feature_type?.toLowerCase();
             const featureValue = feature.feature_value;
@@ -107,7 +128,6 @@ export default function SubscriptionScreen() {
                         features.push(`${featureValue} Cloud Storage`);
                     }
                 } else {
-                    // Generic limit feature
                     features.push(`${featureValue} ${featureKey?.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()) || ""}`);
                 }
             } else if (featureType === "boolean" && featureValue === "true") {
