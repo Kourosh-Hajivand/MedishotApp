@@ -130,6 +130,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
     }>();
 
     const { data: patient } = useGetPatientById(params.id ?? "");
+
     const [localImageUri, setLocalImageUri] = useState<string | null>(null); // Local URI for preview
     const safeAreaInsets = useSafeAreaInsets();
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null); // Filename from server for submit
@@ -497,20 +498,36 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
             if (patientData?.email) {
                 if (Array.isArray(patientData.email)) {
-                    const emailData = patientData.email.map((email: string, index: number) => ({
-                        id: `email-${index}`,
-                        label: "Personal",
-                        value: email,
-                    }));
+                    interface EmailItem {
+                        type?: string;
+                        value?: string;
+                    }
+                    const emailData = patientData.email.map((email: EmailItem | string, index: number) => {
+                        if (typeof email === "object" && email !== null && "value" in email) {
+                            return {
+                                id: `email-${index}-${(email as EmailItem).value ?? index}`,
+                                label: (email as EmailItem).type || "Personal",
+                                value: (email as EmailItem).value ?? "",
+                            };
+                        }
+                        return {
+                            id: `email-${index}`,
+                            label: "Personal",
+                            value: typeof email === "string" ? email : "",
+                        };
+                    });
                     setEmails(emailData);
+                    emailsRef.current = emailData;
                 } else if (typeof patientData.email === "string") {
-                    setEmails([
+                    const singleEmail = [
                         {
                             id: "email-0",
                             label: "Personal",
                             value: patientData.email,
                         },
-                    ]);
+                    ];
+                    setEmails(singleEmail);
+                    emailsRef.current = singleEmail;
                 }
             }
 
@@ -695,7 +712,9 @@ export const AddPatientPhotoScreen: React.FC = () => {
             }
         }
 
-        if (idCardFilename) {
+        // Only send id_card when it is a newly uploaded file (temp filename), not the existing URL from server
+        const isIdCardNewUpload = idCardFilename && !idCardFilename.startsWith("http");
+        if (isIdCardNewUpload) {
             patientData.id_card = idCardFilename;
         }
 

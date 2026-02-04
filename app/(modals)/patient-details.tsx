@@ -132,8 +132,28 @@ export default function PatientDetailsScreen() {
                 return { type: addressType, formatted: formatted || JSON.stringify(addressValueObj) };
             }
 
-            // If value is a string
+            // If value is a string (plain or JSON)
             if (typeof addressValue === "string") {
+                const trimmed = addressValue.trim();
+                if (trimmed.startsWith("{")) {
+                    try {
+                        const parsed = JSON.parse(trimmed) as AddressValue;
+                        const parts: string[] = [];
+                        if (parsed.street) parts.push(parsed.street);
+                        if (parsed.street1) parts.push(parsed.street1);
+                        if (parsed.street2) parts.push(parsed.street2);
+                        const cityStateZip: string[] = [];
+                        if (parsed.city) cityStateZip.push(parsed.city);
+                        if (parsed.state) cityStateZip.push(parsed.state);
+                        if (parsed.zip) cityStateZip.push(parsed.zip);
+                        if (cityStateZip.length > 0) parts.push(cityStateZip.join(", "));
+                        if (parsed.country) parts.push(parsed.country);
+                        const formatted = parts.filter(Boolean).join(", ");
+                        return { type: addressType, formatted: formatted || trimmed };
+                    } catch {
+                        return { type: addressType, formatted: addressValue };
+                    }
+                }
                 return { type: addressType, formatted: addressValue };
             }
         }
@@ -243,6 +263,27 @@ export default function PatientDetailsScreen() {
                     </View>
                 )}
 
+                {/* Emails */}
+                {patientData.email && (Array.isArray(patientData.email) ? patientData.email.length > 0 : true) && (
+                    <View style={styles.sectionContainer}>
+                        <View style={styles.section}>
+                            {Array.isArray(patientData.email) ? (
+                                patientData.email.map((email: { type?: string; value?: string } | string, index: number) => {
+                                    const emailValue = typeof email === "object" && email !== null && "value" in email ? (email as { value?: string }).value : typeof email === "string" ? email : "";
+                                    const emailType = typeof email === "object" && email !== null && "type" in email ? (email as { type?: string }).type : "Email";
+                                    if (!emailValue) return null;
+                                    const label = (emailType || "Email").charAt(0).toUpperCase() + (emailType || "Email").slice(1).toLowerCase();
+                                    return (
+                                        <InfoRow key={index} label={label} value={emailValue} isLast={index === patientData.email.length - 1} />
+                                    );
+                                })
+                            ) : (
+                                <InfoRow label="Email" value={patientData.email as string} isLast={true} />
+                            )}
+                        </View>
+                    </View>
+                )}
+
                 {/* Addresses */}
                 <View style={styles.sectionContainer}>
                     {genderFormatted && <InfoRow label="Gender" value={genderFormatted} isLast={false} />}
@@ -264,7 +305,7 @@ export default function PatientDetailsScreen() {
                         <View style={styles.section}>
                             {patientData.links.map((link, index) => {
                                 if (!link) return null;
-                                const linkValue = typeof link === "string" ? link : (typeof link === "object" && link !== null && "value" in link ? String((link as { value: unknown }).value) : String(link));
+                                const linkValue = typeof link === "string" ? link : typeof link === "object" && link !== null && "value" in link ? String((link as { value: unknown }).value) : String(link);
                                 const linkType = typeof link === "object" && link !== null && "type" in link ? String((link as { type: unknown }).type) : "link";
                                 if (!linkValue) return null;
                                 return <InfoRow key={index} label={linkType} value={linkValue} isLast={index === patientData.links.length - 1} />;

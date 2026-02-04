@@ -7,9 +7,11 @@ import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { Host, HStack, Picker, Switch, Text, VStack } from "@expo/ui/swift-ui";
 import { foregroundStyle } from "@expo/ui/swift-ui/modifiers";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const DEBOUNCE_MS = 500;
 
 interface PracticeSettings {
     avatar: "profile_picture" | "logo";
@@ -58,9 +60,22 @@ export default function PrintInformationScreen() {
         return metadata?.print_settings || defaultPracticeSettings;
     }, [metadata]);
 
+    // Whether practice has data for each option (disable switch if not)
+    const hasData = useMemo(
+        () => ({
+            address: !!(metadata?.address && String(metadata.address).trim()),
+            practicePhone: !!(metadata?.phone && String(metadata.phone).trim()),
+            practiceURL: !!(metadata?.website && String(metadata.website).trim()),
+            practiceEmail: !!(metadata?.email && String(metadata.email).trim()),
+        }),
+        [metadata],
+    );
+
     // Local state for settings
     const [settings, setSettings] = useState<PracticeSettings>(printSettings);
     const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const settingsRef = useRef<PracticeSettings>(printSettings);
     const rotationAnim = React.useRef(new Animated.Value(isPreviewExpanded ? 1 : 0)).current;
     const expandAnim = React.useRef(new Animated.Value(isPreviewExpanded ? 1 : 0)).current;
 
@@ -107,57 +122,59 @@ export default function PrintInformationScreen() {
     });
 
     // Update local state when data changes
-    React.useEffect(() => {
+    useEffect(() => {
         setSettings(printSettings);
+        settingsRef.current = printSettings;
     }, [printSettings]);
 
     const { mutate: updatePractice, isPending } = useUpdatePractice(() => {
         // Success - settings are already updated locally
     });
 
+    const flushSave = useCallback(() => {
+        if (!selectedPractice?.id || !practiceData?.data) return;
+        const toSave = settingsRef.current;
+        const updatedMetadata = {
+            ...metadata,
+            print_settings: toSave,
+            notification_settings: metadata?.notification_settings,
+        };
+        updatePractice({
+            id: selectedPractice.id,
+            data: {
+                name: practiceData.data.name,
+                metadata: JSON.stringify(updatedMetadata),
+            },
+        });
+    }, [selectedPractice?.id, practiceData?.data, metadata, updatePractice]);
+
+    const scheduleSave = useCallback(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            debounceRef.current = null;
+            flushSave();
+        }, DEBOUNCE_MS);
+    }, [flushSave]);
+
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+
     const handleToggle = (key: keyof Omit<PracticeSettings, "avatar">, value: boolean) => {
         const newSettings = { ...settings, [key]: value };
         setSettings(newSettings);
-
-        if (selectedPractice?.id && practiceData?.data) {
-            // Update practice metadata - preserve all existing metadata including notification_settings
-            const updatedMetadata = {
-                ...metadata,
-                print_settings: newSettings,
-                // Preserve notification_settings if it exists
-                notification_settings: metadata?.notification_settings,
-            };
-
-            updatePractice({
-                id: selectedPractice.id,
-                data: {
-                    name: practiceData.data.name,
-                    metadata: JSON.stringify(updatedMetadata),
-                },
-            });
-        }
+        settingsRef.current = newSettings;
+        scheduleSave();
     };
 
     const handleAvatarChange = (index: number) => {
         const newAvatar: "profile_picture" | "logo" = index === 1 ? "logo" : "profile_picture";
         const newSettings = { ...settings, avatar: newAvatar };
         setSettings(newSettings);
-
-        if (selectedPractice?.id && practiceData?.data) {
-            const updatedMetadata = {
-                ...metadata,
-                print_settings: newSettings,
-                notification_settings: metadata?.notification_settings,
-            };
-
-            updatePractice({
-                id: selectedPractice.id,
-                data: {
-                    name: practiceData.data.name,
-                    metadata: JSON.stringify(updatedMetadata),
-                },
-            });
-        }
+        settingsRef.current = newSettings;
+        scheduleSave();
     };
 
     const practice = practiceData?.data;
@@ -232,13 +249,13 @@ export default function PrintInformationScreen() {
                             <Picker label="Select avatar" selectedIndex={avatarIndex} variant="segmented" onOptionSelected={({ nativeEvent: { index } }) => handleAvatarChange(index)} options={avatarOptions} />
                         </HStack>
 
-                        {/* Boolean switches */}
+                        {/* Boolean switches - when no data, onValueChange is undefined so switch is effectively disabled (no View wrapper: Host/VStack require SwiftUI children) */}
                         <Switch label="Practice Name" variant="switch" value={settings.practiceName} onValueChange={isPending ? undefined : (value) => handleToggle("practiceName", value)} />
                         <Switch label="Doctor Name" variant="switch" value={settings.doctorName} onValueChange={isPending ? undefined : (value) => handleToggle("doctorName", value)} />
-                        <Switch label="Address" variant="switch" value={settings.address} onValueChange={isPending ? undefined : (value) => handleToggle("address", value)} />
-                        <Switch label="Practice Phone" variant="switch" value={settings.practicePhone} onValueChange={isPending ? undefined : (value) => handleToggle("practicePhone", value)} />
-                        <Switch label="Practice URL" variant="switch" value={settings.practiceURL} onValueChange={isPending ? undefined : (value) => handleToggle("practiceURL", value)} />
-                        <Switch label="Practice Email" variant="switch" value={settings.practiceEmail} onValueChange={isPending ? undefined : (value) => handleToggle("practiceEmail", value)} />
+                        <Switch label="Address" variant="switch" value={settings.address} onValueChange={hasData.address && !isPending ? (value) => handleToggle("address", value) : undefined} />
+                        <Switch label="Practice Phone" variant="switch" value={settings.practicePhone} onValueChange={hasData.practicePhone && !isPending ? (value) => handleToggle("practicePhone", value) : undefined} />
+                        <Switch label="Practice URL" variant="switch" value={settings.practiceURL} onValueChange={hasData.practiceURL && !isPending ? (value) => handleToggle("practiceURL", value) : undefined} />
+                        <Switch label="Practice Email" variant="switch" value={settings.practiceEmail} onValueChange={hasData.practiceEmail && !isPending ? (value) => handleToggle("practiceEmail", value) : undefined} />
                         {/* <Switch label="Practice Social Media" variant="switch" value={settings.practiceSocialMedia} onValueChange={isPending ? undefined : (value) => handleToggle("practiceSocialMedia", value)} /> */}
                     </VStack>
                 </Host>

@@ -38,6 +38,12 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
         if (eventLower.includes("consent") || eventLower.includes("contract")) {
             return "doc.text.fill";
         }
+        if (eventLower.includes("unarchived") || (eventLower.includes("unarchive") && !eventLower.includes("archived"))) {
+            return "tray.and.arrow.up";
+        }
+        if (eventLower.includes("archived") || eventLower.includes("archive")) {
+            return "archivebox";
+        }
         if (eventLower.includes("created") || eventLower.includes("create")) {
             return "plus.circle.fill";
         }
@@ -71,6 +77,12 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ activity, showBorder
             return colors.system.purple;
         }
         if (eventLower.includes("consent") || eventLower.includes("contract")) {
+            return colors.system.orange;
+        }
+        if (eventLower.includes("unarchived") || (eventLower.includes("unarchive") && !eventLower.includes("archived"))) {
+            return colors.system.green;
+        }
+        if (eventLower.includes("archived") || eventLower.includes("archive")) {
             return colors.system.orange;
         }
         if (eventLower.includes("created") || eventLower.includes("create")) {
