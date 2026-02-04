@@ -76,19 +76,13 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                             ]}
                         >
                             <BaseText type="Body" color={value ? "labels.primary" : "labels.tertiary"}>
-                                {value
-                                    ? type === "date"
-                                        ? formatDateDisplay(value)
-                                        : type === "gender"
-                                          ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
-                                          : value
-                                    : placeholder || label}
+                                {value ? (type === "date" ? formatDateDisplay(value) : type === "gender" ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase() : value) : placeholder || label}
                             </BaseText>
                         </TouchableOpacity>
 
                         {/* خطا */}
                         {!!error && (
-                            <BaseText type="Caption2" color="system.red" className="mt-1">
+                            <BaseText type="Caption2" color="system.red" className="my-2 ml-4">
                                 {error}
                             </BaseText>
                         )}

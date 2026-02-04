@@ -153,6 +153,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
     const addressesRef = useRef<DynamicFieldItem[]>([]);
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
     const urlsRef = useRef<DynamicFieldItem[]>([]);
+    
+    // Error states for dynamic fields
+    const [phoneError, setPhoneError] = useState<string>("");
+    const [emailError, setEmailError] = useState<string>("");
+    const [addressError, setAddressError] = useState<string>("");
 
     const {
         control,
@@ -160,6 +165,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
         watch,
         formState: { errors },
         setValue,
+        trigger,
     } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
@@ -724,20 +730,31 @@ export const AddPatientPhotoScreen: React.FC = () => {
         }
     };
 
-    const handleNext = () => {
+    const handleNext = async () => {
+        // Trigger form validation first
+        const isValid = await trigger();
+        
         if (!isFormValid) {
             if (!isEditMode) {
-                const missing: string[] = [];
-                if (firstName?.trim() === "" || lastName?.trim() === "") missing.push("نام و نام خانوادگی");
-                if (!hasValidPhone) missing.push("شماره تلفن");
-                if (!hasValidEmail) missing.push("ایمیل");
-                if (!hasValidAddress) missing.push("آدرس");
-                if (missing.length > 0) {
-                    Alert.alert("فیلدهای اجباری", `لطفاً موارد زیر را تکمیل کنید:\n${missing.join("، ")}`);
+                // Set error messages for dynamic fields
+                if (!hasValidPhone) {
+                    setPhoneError("At least one phone number is required");
+                }
+                if (!hasValidEmail) {
+                    setEmailError("At least one email address is required");
+                }
+                if (!hasValidAddress) {
+                    setAddressError("At least one address is required");
                 }
             }
             return;
         }
+        
+        // Clear errors if valid
+        setPhoneError("");
+        setEmailError("");
+        setAddressError("");
+        
         handleSubmit(onSubmit)();
     };
     const phoneConfig: DynamicInputConfig = {
@@ -778,18 +795,18 @@ export const AddPatientPhotoScreen: React.FC = () => {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <Pressable onPress={handleNext} disabled={!isFormValid || isPending} className="px-2">
+                <Pressable onPress={handleNext} disabled={isPending} className="px-2">
                     {isPending ? (
                         <ActivityIndicator size="small" color={colors.system.blue} />
                     ) : (
-                        <BaseText type="Body" weight="600" color={!isFormValid || isPending ? "system.gray" : "system.blue"}>
+                        <BaseText type="Body" weight="600" color="system.blue">
                             Done
                         </BaseText>
                     )}
                 </Pressable>
             ),
         });
-    }, [navigation, isFormValid, isPending, handleNext]);
+    }, [navigation, isPending, handleNext]);
 
     useLayoutEffect(() => {
         if (params.id) {
@@ -990,8 +1007,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setPhones(items);
                             phonesRef.current = items;
+                            if (items.length > 0) setPhoneError("");
                         }}
                         initialItems={phones}
+                        error={phoneError}
                     />
                     <DynamicInputList
                         config={emailConfig}
@@ -999,8 +1018,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setEmails(items);
                             emailsRef.current = items;
+                            if (items.length > 0) setEmailError("");
                         }}
                         initialItems={emails}
+                        error={emailError}
                     />
                     <DynamicInputList
                         config={addressConfig}
@@ -1008,8 +1029,10 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setAddresses(items);
                             addressesRef.current = items;
+                            if (items.length > 0) setAddressError("");
                         }}
                         initialItems={addresses}
+                        error={addressError}
                     />
                     <DynamicInputList
                         config={urlConfig}

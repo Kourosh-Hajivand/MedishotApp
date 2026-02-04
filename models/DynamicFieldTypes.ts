@@ -28,4 +28,5 @@ export interface DynamicInputListProps {
     config: DynamicInputConfig;
     onChange?: (items: DynamicFieldItem[]) => void;
     initialItems?: DynamicFieldItem[];
+    error?: string;
 }

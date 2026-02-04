@@ -131,7 +131,7 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                             {(!!error || haveBorder) && !hideError && (
                                 <View style={styles.errorContainer}>
                                     {!!error && !hideError && (
-                                        <BaseText color="system.red" type="Caption2">
+                                        <BaseText color="system.red" type="Caption2" className={classNames({ "ml-2": !haveBorder })}>
                                             {error}
                                         </BaseText>
                                     )}
@@ -158,7 +158,6 @@ const styles = StyleSheet.create({
     container: {
         width: "100%",
         gap: spacing["1"],
-
     },
     inputContainer: {
         position: "relative",

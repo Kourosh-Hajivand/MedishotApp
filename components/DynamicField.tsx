@@ -18,7 +18,7 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
-export const DynamicInputList: React.FC<DynamicInputListProps & { paramKey: string }> = ({ config, onChange, initialItems = [], paramKey }) => {
+export const DynamicInputList: React.FC<DynamicInputListProps & { paramKey: string }> = ({ config, onChange, initialItems = [], paramKey, error }) => {
     const [items, setItems] = useState<DynamicFieldItem[]>(initialItems);
     const isInitializedRef = useRef(false);
 
@@ -189,6 +189,14 @@ export const DynamicInputList: React.FC<DynamicInputListProps & { paramKey: stri
                 </AnimatedTouchableOpacity>
             </View>
 
+            {error && (
+                <View style={styles.errorContainer}>
+                    <BaseText type="Footnote" color="system.red">
+                        {error}
+                    </BaseText>
+                </View>
+            )}
+
             <LabelSelectionModal visible={visible} onClose={() => setVisible(false)} options={config.labelOptions} selectedLabel={selectedLabel as FieldLabel} onSelect={(label) => setSelectedLabel(label as FieldLabel)} />
         </>
     );
@@ -210,5 +218,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: spacing["4"],
         paddingVertical: spacing["4"],
         gap: spacing["4"],
+    },
+    errorContainer: {
+        paddingHorizontal: spacing["3"],
+        paddingTop: spacing["0"],
+        paddingBottom: spacing["0"],
     },
 });
