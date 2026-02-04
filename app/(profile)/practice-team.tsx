@@ -22,7 +22,6 @@ export default function PracticeTeamScreen() {
     const { data: subscriptionData } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const navigation = useNavigation();
 
-
     // Set default practice if none is selected
     useEffect(() => {
         if (!selectedPractice && practiceList?.data && practiceList.data.length > 0) {
@@ -62,20 +61,16 @@ export default function PracticeTeamScreen() {
 
         // If both doctor and staff slots are full, show upgrade alert
         if (doctorLimit !== null && staffLimit !== null && remainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
-            Alert.alert(
-                "Plan Limit Reached",
-                "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.",
-                [
-                    {
-                        text: "Cancel",
-                        style: "cancel",
-                    },
-                    {
-                        text: "Upgrade Plan",
-                        onPress: () => router.push("/(profile)/subscription"),
-                    },
-                ]
-            );
+            Alert.alert("Plan Limit Reached", "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.", [
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
+                {
+                    text: "Upgrade Plan",
+                    onPress: () => router.push("/(profile)/subscription"),
+                },
+            ]);
             return;
         }
 
@@ -127,82 +122,79 @@ export default function PracticeTeamScreen() {
             },
         ]);
     };
-    console.log("==============practiceMembers?.datapracticeMembers?.datapracticeMembers?.data======================");
-    console.log(practiceMembers?.data);
-    console.log("====================================");
+
     return (
         <ScrollView style={[styles.container, { paddingTop: insets.top + headerHeight }]} contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
-            <Host style={{ width: "100%", height: 68 }}>
-                <ContextMenu activationMethod="longPress">
-                    <ContextMenu.Items>
-                        {practiceList?.data.map((practice, index) => (
-                            <Switch
-                                key={index}
-                                label={practice.name}
-                                variant="switch"
-                                value={selectedPractice?.id === practice.id}
-                                onValueChange={() => {
-                                    setSelectedPractice(practice);
-                                }}
-                            />
-                        ))}
-                    </ContextMenu.Items>
+            <View className="gap-4  px-4 border-b border-system-gray5 pb-3">
+                <Host style={{ width: "100%", height: 68 }}>
+                    <ContextMenu activationMethod="longPress">
+                        <ContextMenu.Items>
+                            {practiceList?.data.map((practice, index) => (
+                                <Switch
+                                    key={index}
+                                    label={practice.name}
+                                    variant="switch"
+                                    value={selectedPractice?.id === practice.id}
+                                    onValueChange={() => {
+                                        setSelectedPractice(practice);
+                                    }}
+                                />
+                            ))}
+                        </ContextMenu.Items>
 
-                    <ContextMenu.Trigger>
-                        <View className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] rounded-[12px]`}>
-                            <View className="flex-row items-center gap-2">
-                                <Avatar size={60} rounded={8} name={selectedPractice?.name ?? ""} imageUrl={selectedPractice?.image?.url} />
-                                <View className="flex-1 ">
-                                    <BaseText type="Title3" weight="500" color="system.black" lineBreakMode="tail" numberOfLines={1}>
-                                        {selectedPractice?.name}
-                                    </BaseText>
-                                    <BaseText type="Callout" weight="400" color="labels.secondary" style={{ textTransform: "capitalize" }}>
-                                        {selectedPractice?.role}
-                                    </BaseText>
+                        <ContextMenu.Trigger>
+                            <View className={`w-full flex-row items-center justify-between bg-system-gray6 p-1 pr-[27px] rounded-[12px]`}>
+                                <View className="flex-row items-center gap-2">
+                                    <Avatar size={60} rounded={8} name={selectedPractice?.name ?? ""} imageUrl={selectedPractice?.image?.url} />
+                                    <View className="flex-1 ">
+                                        <BaseText type="Title3" weight="500" color="system.black" lineBreakMode="tail" numberOfLines={1}>
+                                            {selectedPractice?.name}
+                                        </BaseText>
+                                        <BaseText type="Callout" weight="400" color="labels.secondary" style={{ textTransform: "capitalize" }}>
+                                            {selectedPractice?.role}
+                                        </BaseText>
+                                    </View>
+                                </View>
+                                <View className="flex-1">
+                                    <IconSymbol name="chevron.up.chevron.down" size={14} color={themeColors.labels.secondary} />
                                 </View>
                             </View>
-                            <View className="flex-1">
-                                <IconSymbol name="chevron.up.chevron.down" size={14} color={themeColors.labels.secondary} />
-                            </View>
-                        </View>
-                    </ContextMenu.Trigger>
-                </ContextMenu>
-            </Host>
-            {/* Subscription Limits Info */}
-            {(doctorLimit !== null || staffLimit !== null) && (
-                <View className="bg-system-blue/10 rounded-xl p-3 mb-2">
-                    <BaseText type="Subhead" weight="600" color="system.blue" style={{ marginBottom: 4 }}>
-                        Plan Limits
-                    </BaseText>
-                    {doctorLimit !== null && (
-                        <BaseText type="Caption1" weight="400" color="labels.secondary">
-                            Doctors: {String(displayDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
+                        </ContextMenu.Trigger>
+                    </ContextMenu>
+                </Host>
+                {/* Subscription Limits Info */}
+                {(doctorLimit !== null || staffLimit !== null) && (
+                    <View className="bg-system-blue/10 rounded-xl p-3 mb-2">
+                        <BaseText type="Subhead" weight="600" color="system.blue" style={{ marginBottom: 4 }}>
+                            Plan Limits
                         </BaseText>
-                    )}
-                    {staffLimit !== null && (
-                        <BaseText type="Caption1" weight="400" color="labels.secondary" style={{ marginTop: 2 }}>
-                            Staff: {String(currentStaffCount)} / {String(staffLimit)} {typeof remainingStaffSlots === "number" && remainingStaffSlots > 0 && `(${remainingStaffSlots} remaining)`}
-                        </BaseText>
-                    )}
-                    {((doctorLimit !== null && typeof remainingDoctorSlots === "number" && remainingDoctorSlots === 0) || (staffLimit !== null && typeof remainingStaffSlots === "number" && remainingStaffSlots === 0)) && (
-                        <TouchableOpacity
-                            onPress={() => router.push("/(profile)/subscription")}
-                            className="mt-2 bg-system-blue rounded-lg py-2 px-3"
-                        >
-                            <BaseText type="Subhead" weight="600" color="system.white" style={{ textAlign: "center" }}>
-                                Upgrade Plan
+                        {doctorLimit !== null && (
+                            <BaseText type="Caption1" weight="400" color="labels.secondary">
+                                Doctors: {String(displayDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
                             </BaseText>
-                        </TouchableOpacity>
-                    )}
-                </View>
-            )}
-            <View className="pt-0 border-t border-system-gray5">
+                        )}
+                        {staffLimit !== null && (
+                            <BaseText type="Caption1" weight="400" color="labels.secondary" style={{ marginTop: 2 }}>
+                                Staff: {String(currentStaffCount)} / {String(staffLimit)} {typeof remainingStaffSlots === "number" && remainingStaffSlots > 0 && `(${remainingStaffSlots} remaining)`}
+                            </BaseText>
+                        )}
+                        {((doctorLimit !== null && typeof remainingDoctorSlots === "number" && remainingDoctorSlots === 0) || (staffLimit !== null && typeof remainingStaffSlots === "number" && remainingStaffSlots === 0)) && (
+                            <TouchableOpacity onPress={() => router.push("/(profile)/subscription")} className="mt-2 bg-system-blue rounded-lg py-2 px-3">
+                                <BaseText type="Subhead" weight="600" color="system.white" style={{ textAlign: "center" }}>
+                                    Upgrade Plan
+                                </BaseText>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                )}
+            </View>
+            <View className="pt-0 px-4 ">
                 {practiceMembers?.data?.map((member, index) => {
                     const isOwner = member.role === "owner";
                     const rowContent = (
                         <TouchableOpacity
                             disabled={member.status !== "active"}
-                            className={`flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60 ${index !== (practiceMembers?.data?.length ?? 0) - 1 ? "pb-2 border-b border-system-gray5" : ""}`}
+                            className="flex-row items-center justify-between pl-1 py-2 pr-4 bg-white disabled:opacity-60"
                             onPress={() => {
                                 if (member.status === "active") {
                                     router.push({
@@ -229,36 +221,40 @@ export default function PracticeTeamScreen() {
                             <IconSymbol name="chevron.right" size={14} color={themeColors.labels.secondary} />
                         </TouchableOpacity>
                     );
+                    const isLastItem = index === (practiceMembers?.data?.length ?? 0) - 1;
                     return (
-                        <Host key={`member-${member.id}`} style={{ width: "100%", height: 68 }}>
-                            {isOwner ? (
-                                rowContent
-                            ) : (
-                                <ContextMenu activationMethod="longPress">
-                                    <ContextMenu.Items>
-                                        <Button
-                                            systemImage="pencil.and.scribble"
-                                            onPress={() =>
-                                                router.push({
-                                                    pathname: "/(modals)/add-practice-member",
-                                                    params: {
-                                                        practiceId: selectedPractice?.id,
-                                                        mode: "edit",
-                                                        member: JSON.stringify(member),
-                                                    },
-                                                })
-                                            }
-                                        >
-                                            Update Member Role
-                                        </Button>
-                                        <Button systemImage="trash" role="destructive" onPress={() => handleRemoveMember(selectedPractice?.id ?? 0, member.id)}>
-                                            Remove
-                                        </Button>
-                                    </ContextMenu.Items>
-                                    <ContextMenu.Trigger>{rowContent}</ContextMenu.Trigger>
-                                </ContextMenu>
-                            )}
-                        </Host>
+                        <React.Fragment key={`member-${member.id}`}>
+                            <Host style={{ width: "100%", height: 68 }}>
+                                {isOwner ? (
+                                    rowContent
+                                ) : (
+                                    <ContextMenu activationMethod="longPress">
+                                        <ContextMenu.Items>
+                                            <Button
+                                                systemImage="pencil.and.scribble"
+                                                onPress={() =>
+                                                    router.push({
+                                                        pathname: "/(modals)/add-practice-member",
+                                                        params: {
+                                                            practiceId: selectedPractice?.id,
+                                                            mode: "edit",
+                                                            member: JSON.stringify(member),
+                                                        },
+                                                    })
+                                                }
+                                            >
+                                                Update Member Role
+                                            </Button>
+                                            <Button systemImage="trash" role="destructive" onPress={() => handleRemoveMember(selectedPractice?.id ?? 0, member.id)}>
+                                                Remove
+                                            </Button>
+                                        </ContextMenu.Items>
+                                        <ContextMenu.Trigger>{rowContent}</ContextMenu.Trigger>
+                                    </ContextMenu>
+                                )}
+                            </Host>
+                            {!isLastItem && <View style={{ height: 1, backgroundColor: themeColors.system.gray5, marginLeft: 60 }} />}
+                        </React.Fragment>
                     );
                 })}
             </View>
@@ -272,9 +268,8 @@ const styles = StyleSheet.create({
         backgroundColor: "#ffffff",
     },
     contentContainer: {
-        paddingHorizontal: 16,
         paddingBottom: 16,
-        gap: 12,
+        gap: 6,
     },
     description: {
         marginTop: 8,

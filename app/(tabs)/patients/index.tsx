@@ -17,7 +17,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import { useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Image, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { runOnJS, useSharedValue } from "react-native-reanimated";
@@ -25,6 +25,150 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const USE_MOCK_PATIENTS = false;
+
+// Memoized Patient List Item with SwiftUI ContextMenu
+interface PatientListItemProps {
+    item: Patient;
+    isLastItem: boolean;
+    onArchive: (id: number) => void;
+}
+
+const PatientListItem = React.memo(
+    ({ item, isLastItem, onArchive }: PatientListItemProps) => {
+        const chartNumber = item.chart_number;
+        const hasChartNumber = chartNumber !== null && chartNumber !== undefined && (typeof chartNumber === "number" || (typeof chartNumber === "string" && chartNumber.trim() !== ""));
+
+        const handleNavigate = useCallback(() => {
+            router.push(`/patients/${item.id}`);
+        }, [item.id]);
+
+        const handleAddId = useCallback(() => {
+            router.push({
+                pathname: `/patients/${item.id}` as any,
+                params: { action: "addId" },
+            });
+        }, [item.id]);
+
+        const handleTakePhoto = useCallback(() => {
+            router.push({
+                pathname: `/patients/${item.id}` as any,
+                params: { action: "takePhoto" },
+            });
+        }, [item.id]);
+
+        const handleFillConsent = useCallback(() => {
+            router.push({
+                pathname: `/patients/${item.id}` as any,
+                params: { action: "fillConsent" },
+            });
+        }, [item.id]);
+
+        const handleArchive = useCallback(() => {
+            Alert.alert("Archive Patient", `Are you sure you want to archive ${item.first_name} ${item.last_name}?`, [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Archive",
+                    style: "destructive",
+                    onPress: () => onArchive(item.id),
+                },
+            ]);
+        }, [item.id, item.first_name, item.last_name, onArchive]);
+
+        return (
+            <Host style={{ width: "100%", height: 48 }}>
+                <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
+                    <ContextMenu.Items>
+                        {hasChartNumber && (
+                            <Button systemImage="number" disabled>
+                                {String(chartNumber)}
+                            </Button>
+                        )}
+                        <Button systemImage="creditcard" onPress={handleAddId}>
+                            Add ID
+                        </Button>
+                        <Button systemImage="camera" onPress={handleTakePhoto}>
+                            Take Photo
+                        </Button>
+                        <Button systemImage="text.document" onPress={handleFillConsent}>
+                            Fill Consent
+                        </Button>
+                        {item.numbers && item.numbers.length > 0 && (
+                            <Submenu button={<Button systemImage="message">Message</Button>}>
+                                {item.numbers.map((number: any, idx: number) => {
+                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
+                                    return (
+                                        <Button
+                                            key={`message-${item.id}-${idx}`}
+                                            systemImage="message"
+                                            onPress={() => {
+                                                router.push({
+                                                    pathname: `/patients/${item.id}` as any,
+                                                    params: { action: "message", phoneIndex: idx.toString() },
+                                                });
+                                            }}
+                                        >
+                                            {phoneType}: {phoneNumberDisplay}
+                                        </Button>
+                                    );
+                                })}
+                            </Submenu>
+                        )}
+                        {item.numbers && item.numbers.length > 0 && (
+                            <Submenu button={<Button systemImage="phone">Call</Button>}>
+                                {item.numbers.map((number: any, idx: number) => {
+                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
+                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
+                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
+                                    return (
+                                        <Button
+                                            key={`call-${item.id}-${idx}`}
+                                            systemImage="phone"
+                                            onPress={() => {
+                                                router.push({
+                                                    pathname: `/patients/${item.id}` as any,
+                                                    params: { action: "call", phoneIndex: idx.toString() },
+                                                });
+                                            }}
+                                        >
+                                            {phoneType}: {phoneNumberDisplay}
+                                        </Button>
+                                    );
+                                })}
+                            </Submenu>
+                        )}
+                        <Button systemImage="archivebox" role="destructive" onPress={handleArchive}>
+                            Archive Patient
+                        </Button>
+                    </ContextMenu.Items>
+                    <ContextMenu.Trigger>
+                        <View style={{ width: "100%", height: 48 }}>
+                            <TouchableOpacity onPress={handleNavigate} style={[styles.listItem, styles.listItemPadding, !isLastItem && styles.listItemBorder]}>
+                                <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
+                                <BaseText type="Callout" weight={500} color="labels.primary">
+                                    {item.full_name}
+                                </BaseText>
+                            </TouchableOpacity>
+                        </View>
+                    </ContextMenu.Trigger>
+                </ContextMenu>
+            </Host>
+        );
+    },
+    (prevProps, nextProps) => {
+        // Custom comparison to prevent unnecessary re-renders
+        return (
+            prevProps.item.id === nextProps.item.id &&
+            prevProps.item.full_name === nextProps.item.full_name &&
+            prevProps.item.chart_number === nextProps.item.chart_number &&
+            prevProps.item.profile_image?.url === nextProps.item.profile_image?.url &&
+            prevProps.item.doctor?.color === nextProps.item.doctor?.color &&
+            prevProps.isLastItem === nextProps.isLastItem &&
+            JSON.stringify(prevProps.item.numbers) === JSON.stringify(nextProps.item.numbers)
+        );
+    },
+);
 
 export default function PatientsScreen() {
     const { selectedPractice, viewMode, selectedDoctor } = useProfileStore();
@@ -168,6 +312,36 @@ export default function PatientsScreen() {
             Alert.alert("Error", error.message || "Failed to archive patient");
         },
     );
+
+    // Stable callback for archiving patients - prevents re-render of memoized items
+    const handleArchivePatient = useCallback(
+        (patientId: number) => {
+            archivePatientMutation.mutate(patientId);
+        },
+        [archivePatientMutation],
+    );
+
+    // Stable renderItem callback to prevent unnecessary re-renders
+    const renderPatientItem = useCallback(({ item, index, section }: { item: Patient; index: number; section: { data: readonly Patient[] } }) => <PatientListItem item={item} isLastItem={index === section.data.length - 1} onArchive={handleArchivePatient} />, [handleArchivePatient]);
+
+    // Stable renderSectionHeader callback
+    const renderSectionHeader = useCallback(
+        (info: { section: { title: string; data: readonly Patient[] } }) => {
+            const { title } = info.section;
+            // Hide header when sorting by date (title is "All")
+            if (sortBy === "date" && title === "All") {
+                return null;
+            }
+            return (
+                <View style={styles.sectionHeader}>
+                    <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
+                        {title}
+                    </BaseText>
+                </View>
+            );
+        },
+        [sortBy],
+    ) as (info: { section: { title?: string; data: readonly Patient[] } }) => React.JSX.Element | null;
 
     // Group patients based on sortBy: if sorting by date, use a single section; otherwise group by first letter
     const groupedPatients = useMemo(() => {
@@ -457,7 +631,7 @@ export default function PatientsScreen() {
                     contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white" }}
                     renderItem={({ index }) => <PatientSkeleton haveRing={index % 3 === 0} />}
                     renderSectionHeader={({ section: { title } }) => (
-                        <View style={styles.sectionHeader} className="px-4">
+                        <View style={styles.sectionHeader}>
                             <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
                                 {title}
                             </BaseText>
@@ -469,12 +643,16 @@ export default function PatientsScreen() {
                     ref={scrollViewRef}
                     style={{ flex: 1, backgroundColor: "white" }}
                     sections={sections}
-                    keyExtractor={(item, index) => item.full_name + index}
+                    keyExtractor={(item) => `patient-${item.id}`}
                     stickySectionHeadersEnabled={stickyEnabled}
                     showsVerticalScrollIndicator={false}
                     scrollEventThrottle={16}
                     contentInsetAdjustmentBehavior="automatic"
                     contentContainerStyle={{ paddingEnd: spacing["5"], backgroundColor: "white" }}
+                    removeClippedSubviews={false}
+                    initialNumToRender={20}
+                    maxToRenderPerBatch={10}
+                    windowSize={21}
                     getItemLayout={(data, index) => {
                         const ITEM_HEIGHT = 60;
                         const SECTION_HEADER_HEIGHT = 24;
@@ -501,151 +679,8 @@ export default function PatientsScreen() {
                             index,
                         };
                     }}
-                    renderItem={({ item, index, section }) => {
-                        const chartNumber = item.chart_number;
-                        const hasChartNumber = chartNumber !== null && chartNumber !== undefined && (typeof chartNumber === "number" || (typeof chartNumber === "string" && chartNumber.trim() !== ""));
-                        return (
-                            <Host matchContents>
-                                <ContextMenu activationMethod="longPress" modifiers={[foregroundStyle("labels.primary")]}>
-                                    <ContextMenu.Items>
-                                        {hasChartNumber && (
-                                            <Button systemImage="number" disabled>
-                                                {String(chartNumber)}
-                                            </Button>
-                                        )}
-                                        <Button
-                                            systemImage="creditcard"
-                                            onPress={() => {
-                                                router.push({
-                                                    pathname: `/patients/${item.id}` as any,
-                                                    params: { action: "addId" },
-                                                });
-                                            }}
-                                        >
-                                            Add ID
-                                        </Button>
-                                        <Button
-                                            systemImage="camera"
-                                            onPress={() => {
-                                                router.push({
-                                                    pathname: `/patients/${item.id}` as any,
-                                                    params: { action: "takePhoto" },
-                                                });
-                                            }}
-                                        >
-                                            Take Photo
-                                        </Button>
-                                        <Button
-                                            systemImage="text.document"
-                                            onPress={() => {
-                                                router.push({
-                                                    pathname: `/patients/${item.id}` as any,
-                                                    params: { action: "fillConsent" },
-                                                });
-                                            }}
-                                        >
-                                            Fill Consent
-                                        </Button>
-                                        {item.numbers && item.numbers.length > 0 && (
-                                            <Submenu button={<Button systemImage="message">Message</Button>}>
-                                                {item.numbers.map((number: any, index: number) => {
-                                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
-                                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-                                                    // Display formatted phone number
-                                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
-                                                    return (
-                                                        <Button
-                                                            key={`message-${index}-${phoneNumberRaw}`}
-                                                            systemImage="message"
-                                                            onPress={() => {
-                                                                router.push({
-                                                                    pathname: `/patients/${item.id}` as any,
-                                                                    params: { action: "message", phoneIndex: index.toString() },
-                                                                });
-                                                            }}
-                                                        >
-                                                            {phoneType}: {phoneNumberDisplay}
-                                                        </Button>
-                                                    );
-                                                })}
-                                            </Submenu>
-                                        )}
-                                        {item.numbers && item.numbers.length > 0 && (
-                                            <Submenu button={<Button systemImage="phone">Call</Button>}>
-                                                {item.numbers.map((number: any, index: number) => {
-                                                    const phoneNumberRaw = typeof number === "string" ? number : number?.value || number?.number || String(number);
-                                                    const phoneType = typeof number === "object" ? number?.type || "phone" : "phone";
-                                                    // Display formatted phone number
-                                                    const phoneNumberDisplay = e164ToDisplay(phoneNumberRaw) || phoneNumberRaw;
-                                                    return (
-                                                        <Button
-                                                            key={`call-${index}-${phoneNumberRaw}`}
-                                                            systemImage="phone"
-                                                            onPress={() => {
-                                                                router.push({
-                                                                    pathname: `/patients/${item.id}` as any,
-                                                                    params: { action: "call", phoneIndex: index.toString() },
-                                                                });
-                                                            }}
-                                                        >
-                                                            {phoneType}: {phoneNumberDisplay}
-                                                        </Button>
-                                                    );
-                                                })}
-                                            </Submenu>
-                                        )}
-                                        <Button
-                                            systemImage="archivebox"
-                                            role="destructive"
-                                            onPress={() => {
-                                                Alert.alert("Archive Patient", `Are you sure you want to archive ${item.first_name} ${item.last_name}?`, [
-                                                    {
-                                                        text: "Cancel",
-                                                        style: "cancel",
-                                                    },
-                                                    {
-                                                        text: "Archive",
-                                                        style: "destructive",
-                                                        onPress: () => {
-                                                            archivePatientMutation.mutate(item.id);
-                                                        },
-                                                    },
-                                                ]);
-                                            }}
-                                        >
-                                            Archive Patient
-                                        </Button>
-                                    </ContextMenu.Items>
-                                    <ContextMenu.Trigger>
-                                        <TouchableOpacity
-                                            onPress={() => router.push(`/patients/${item.id}`)}
-                                            key={`${section.title}-${index}`}
-                                            style={[styles.listItem, index !== section.data.length - 1 && styles.listItemBorder]}
-                                            className={`flex-row items-center gap-3 px-4 py-2 bg-white ${index !== section.data.length - 1 ? "border-b border-gray-200" : ""}`}
-                                        >
-                                            <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
-                                            <BaseText type="Callout" weight={500} color="labels.primary">
-                                                {item.full_name}
-                                            </BaseText>
-                                        </TouchableOpacity>
-                                    </ContextMenu.Trigger>
-                                </ContextMenu>
-                            </Host>
-                        );
-                    }}
-                    renderSectionHeader={({ section: { title } }) => {
-                        // Hide header when sorting by date (title is "All")
-                        if (sortBy === "date" && title === "All") {
-                            return null;
-                        }
-                        return (
-                            <View style={styles.sectionHeader} className="px-4">
-                                <BaseText type="Footnote" color="labels.tertiary" weight={"600"}>
-                                    {title}
-                                </BaseText>
-                            </View>
-                        );
-                    }}
+                    renderItem={renderPatientItem}
+                    renderSectionHeader={renderSectionHeader}
                 />
             ) : search.length > 0 ? (
                 <View style={styles.noResults} className="flex-1 items-center justify-center">
@@ -742,9 +777,10 @@ export default function PatientsScreen() {
 }
 
 const styles = StyleSheet.create({
-    listItem: { flexDirection: "row", alignItems: "center", gap: spacing["3"], paddingVertical: spacing["2"] },
+    listItem: { flexDirection: "row", alignItems: "center", gap: spacing["3"], backgroundColor: colors.system.white },
+    listItemPadding: { paddingHorizontal: spacing["4"], paddingVertical: spacing["2"] },
     listItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.system.gray5 },
-    sectionHeader: { backgroundColor: colors.background, paddingHorizontal: 0 },
+    sectionHeader: { backgroundColor: colors.background, paddingHorizontal: spacing["4"] },
     alphabetWrapper: { alignItems: "center", justifyContent: "center" },
     alphabetItem: { paddingHorizontal: spacing["0.5"], marginVertical: 0 },
     activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
