@@ -1084,8 +1084,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         () =>
             Gesture.Pan()
                 .activeOffsetY([20, 999])
+                .failOffsetX([-15, 15])
                 .onUpdate((e) => {
-                    if (scale.value <= 1 && e.translationY > 0) {
+                    // Only allow vertical dismiss if not doing horizontal swipe
+                    const isHorizontalSwipe = Math.abs(e.velocityX) > Math.abs(e.velocityY);
+                    
+                    if (scale.value <= 1 && e.translationY > 0 && !isHorizontalSwipe) {
                         dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
                     }
                 })
