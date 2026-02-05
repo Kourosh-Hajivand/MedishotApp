@@ -26,6 +26,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const USE_MOCK_PATIENTS = false;
 
+// Layout constants for SectionList - must match actual rendered sizes
+const ITEM_HEIGHT = 48; // Height of PatientListItem (Host height)
+const SECTION_HEADER_HEIGHT = 22; // Height of section header (Footnote line-height + padding)
+const MIN_PATIENTS_FOR_ALPHABET_SIDEBAR = 30; // Minimum patients to show alphabet sidebar
+
 // Memoized Patient List Item with SwiftUI ContextMenu
 interface PatientListItemProps {
     item: Patient;
@@ -145,7 +150,9 @@ const PatientListItem = React.memo(
                     <ContextMenu.Trigger>
                         <View style={{ width: "100%", height: 48 }}>
                             <TouchableOpacity onPress={handleNavigate} style={[styles.listItem, styles.listItemPadding, !isLastItem && styles.listItemBorder]}>
-                                <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
+                                <View style={{ width: 36, height: 36 }}>
+                                    <Avatar haveRing name={item.full_name} size={36} imageUrl={item.profile_image?.url || undefined} color={item.doctor?.color} />
+                                </View>
                                 <BaseText type="Callout" weight={500} color="labels.primary">
                                     {item.full_name}
                                 </BaseText>
@@ -434,49 +441,38 @@ export default function PatientsScreen() {
     }, [alphabetWithHash.length, alphabetLengthSV]);
 
     const handleAlphabetPress = (letter: string, animated = true) => {
+        // Don't scroll if there are too few patients (avoid scroll bugs with short lists)
+        if ((currentPatients?.length ?? 0) < MIN_PATIENTS_FOR_ALPHABET_SIDEBAR) {
+            return;
+        }
+
         const sectionIndex = sections.findIndex((sec) => sec.title === letter);
         if (sectionIndex === -1 || !scrollViewRef.current) {
             return;
         }
 
-        const ITEM_HEIGHT = 60;
-        const SECTION_HEADER_HEIGHT = 24;
-        const stickyHeaderHeight = headerHeight || 0;
+        const scrollResponder = (scrollViewRef.current as any)?.getScrollResponder?.();
 
-        // Calculate offset for the first item of the target section
+        // For first section, just scroll to top
+        if (sectionIndex === 0) {
+            if (scrollResponder) {
+                scrollResponder.scrollTo({ y: 0, animated });
+            }
+            return;
+        }
+
+        // Calculate offset for other sections
         let offset = 0;
         for (let i = 0; i < sectionIndex; i++) {
             offset += SECTION_HEADER_HEIGHT + sections[i].data.length * ITEM_HEIGHT;
         }
-        // Add section header height for the target section
-        offset += SECTION_HEADER_HEIGHT;
-        // First item is at offset + 0 (already included)
 
-        // Subtract header height so first item appears below header
-        const finalOffset = Math.max(0, offset - stickyHeaderHeight);
+        // Subtract header height so content appears below navigation header
+        const adjustedOffset = Math.max(0, offset - (headerHeight || 0));
 
-        // Use scrollToOffset instead of scrollToLocation for more precise control
-        setTimeout(() => {
-            try {
-                (scrollViewRef.current as any)?.scrollTo({
-                    y: finalOffset,
-                    animated,
-                });
-            } catch (e) {
-                // Fallback to scrollToLocation
-                try {
-                    scrollViewRef.current?.scrollToLocation({
-                        sectionIndex,
-                        itemIndex: 0,
-                        animated,
-                        viewPosition: 0,
-                        viewOffset: stickyHeaderHeight,
-                    });
-                } catch (e2) {
-                    // Silent fallback - navigation failed
-                }
-            }
-        }, 100);
+        if (scrollResponder) {
+            scrollResponder.scrollTo({ y: adjustedOffset, animated });
+        }
     };
 
     const handleGestureUpdate = (index: number) => {
@@ -654,8 +650,7 @@ export default function PatientsScreen() {
                     maxToRenderPerBatch={10}
                     windowSize={21}
                     getItemLayout={(data, index) => {
-                        const ITEM_HEIGHT = 60;
-                        const SECTION_HEADER_HEIGHT = 24;
+                        // Uses ITEM_HEIGHT and SECTION_HEADER_HEIGHT constants from top of file
                         let offset = 0;
                         let currentIndex = 0;
 
@@ -777,10 +772,10 @@ export default function PatientsScreen() {
 }
 
 const styles = StyleSheet.create({
-    listItem: { flexDirection: "row", alignItems: "center", gap: spacing["3"], backgroundColor: colors.system.white },
+    listItem: { flexDirection: "row", alignItems: "center", gap: spacing["2"], backgroundColor: colors.system.white },
     listItemPadding: { paddingHorizontal: spacing["4"], paddingVertical: spacing["2"] },
     listItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.system.gray5 },
-    sectionHeader: { backgroundColor: colors.background, paddingHorizontal: spacing["4"] },
+    sectionHeader: { backgroundColor: colors.background, paddingHorizontal: spacing["4"], height: SECTION_HEADER_HEIGHT, justifyContent: "center" },
     alphabetWrapper: { alignItems: "center", justifyContent: "center" },
     alphabetItem: { paddingHorizontal: spacing["0.5"], marginVertical: 0 },
     activeAlphabetItem: { backgroundColor: "rgba(0, 122, 255, 0.1)", borderRadius: 4 },
