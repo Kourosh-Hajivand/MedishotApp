@@ -148,7 +148,8 @@ const IOSPhoneInputComponent = <T extends FieldValues>({ control, name, label, e
                                     {!displayValue && !!label && (
                                         <View style={styles.placeholder}>
                                             <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
-                                                {label} {optional && `(Optional)`}
+                                                {label}
+                                                {/* {optional && `(Optional)`} */}
                                             </BaseText>
                                         </View>
                                     )}

@@ -247,7 +247,7 @@ export default function ReviewScreen() {
     // Helper function to retry composite upload
     const retryCompositeUpload = useCallback((uri: string) => {
         console.log(`Retrying composite upload (attempt ${compositeRetryCountRef.current + 1}/${MAX_COMPOSITE_RETRIES})`);
-        
+
         setCompositePhoto((prev) => {
             if (prev) {
                 return { ...prev, uploadStatus: "uploading" as const };
@@ -261,7 +261,7 @@ export default function ReviewScreen() {
             type: "image/jpeg",
             name: filename,
         };
-        
+
         // Use ref to call mutate function
         if (tempUploadCompositeFnRef.current) {
             tempUploadCompositeFnRef.current(file);
@@ -273,7 +273,7 @@ export default function ReviewScreen() {
         (data) => {
             // Reset retry count on success
             compositeRetryCountRef.current = 0;
-            
+
             // Extract filename from TempUploadResponse
             const filename = data?.filename;
             console.log("Composite upload success:", { filename, data });
@@ -305,7 +305,7 @@ export default function ReviewScreen() {
         (error) => {
             console.log("Composite upload error:", error);
             compositeRetryCountRef.current++;
-            
+
             // Retry if we haven't exceeded max retries
             if (compositeRetryCountRef.current < MAX_COMPOSITE_RETRIES) {
                 // Get current composite photo URI for retry
@@ -518,7 +518,7 @@ export default function ReviewScreen() {
                 uploadStatus: finalCompositePhoto?.uploadStatus,
                 uri: finalCompositePhoto?.uri ? "has uri" : "no uri",
             });
-            
+
             // More specific message based on the issue
             if (!finalCompositePhoto) {
                 Alert.alert("Please wait", "Composite image is being generated...");
@@ -526,22 +526,18 @@ export default function ReviewScreen() {
                 Alert.alert("Please wait", "Composite image is uploading...");
             } else if (finalCompositePhoto.uploadStatus === "error") {
                 // Show retry option when upload failed
-                Alert.alert(
-                    "Upload Error",
-                    "Failed to upload composite image.",
-                    [
-                        { text: "Cancel", style: "cancel" },
-                        {
-                            text: "Retry",
-                            onPress: () => {
-                                if (finalCompositePhoto.uri) {
-                                    compositeRetryCountRef.current = 0; // Reset retry count for manual retry
-                                    retryCompositeUpload(finalCompositePhoto.uri);
-                                }
-                            },
+                Alert.alert("Upload Error", "Failed to upload composite image.", [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Retry",
+                        onPress: () => {
+                            if (finalCompositePhoto.uri) {
+                                compositeRetryCountRef.current = 0; // Reset retry count for manual retry
+                                retryCompositeUpload(finalCompositePhoto.uri);
+                            }
                         },
-                    ],
-                );
+                    },
+                ]);
             } else if (!finalCompositePhoto.tempFilename) {
                 Alert.alert("Please wait", "Preparing composite image...");
             } else {
@@ -697,16 +693,27 @@ export default function ReviewScreen() {
 
     const renderMainImage = useCallback(
         ({ item, index }: { item: CapturedPhoto; index: number }) => {
-            const isCompositeLoading = item.isComposite && (!item.uri || isGeneratingComposite || item.uploadStatus === "uploading");
+            const isCompositeGeneratingNow = item.isComposite && (!item.uri || isGeneratingComposite);
+            const isCompositeUploading = item.isComposite && !!item.uri && !isGeneratingComposite && item.uploadStatus === "uploading";
 
             return (
                 <View style={styles.mainImageContainer}>
-                    {isCompositeLoading ? (
+                    {isCompositeGeneratingNow ? (
                         <View style={[styles.mainImage, { justifyContent: "center", alignItems: "center", backgroundColor: colors.system.white }]}>
                             <ActivityIndicator size="large" color={colors.system.blue} />
                             <BaseText type="Body" weight={400} color="labels.secondary" style={{ marginTop: 16 }}>
                                 Generating composite image...
                             </BaseText>
+                        </View>
+                    ) : isCompositeUploading ? (
+                        <View style={[styles.mainImage, { justifyContent: "center", alignItems: "center", backgroundColor: colors.system.white }]}>
+                            <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(255,255,255,0.95)", justifyContent: "center", alignItems: "center" }}>
+                                <ActivityIndicator size="large" color={colors.system.blue} />
+                                <BaseText type="Body" weight={400} color="labels.secondary" style={{ marginTop: 16 }}>
+                                    Uploading composite image...
+                                </BaseText>
+                            </View>
                         </View>
                     ) : item.uri ? (
                         <Image source={{ uri: item.uri }} style={styles.mainImage} contentFit="contain" />

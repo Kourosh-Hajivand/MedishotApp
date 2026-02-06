@@ -2,7 +2,7 @@ import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { Address, DynamicFieldItem, DynamicInputConfig, FieldLabel } from "@/models";
-import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
+import { AddressLabel, DynamicFieldType, PhoneLabel, URLLabel } from "@/models/enums";
 import { routes } from "@/routes/routes";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
@@ -52,13 +52,6 @@ const phoneConfig: DynamicInputConfig = {
     fieldTitle: "phone number",
     labelOptions: [PhoneLabel.Mobile, PhoneLabel.Home, PhoneLabel.Work, PhoneLabel.iPhone, PhoneLabel.Main, PhoneLabel.Other],
     placeholder: "Enter phone number",
-};
-
-const emailConfig: DynamicInputConfig = {
-    fieldType: DynamicFieldType.Email,
-    fieldTitle: "email",
-    labelOptions: [EmailLabel.Home, EmailLabel.Work, EmailLabel.iCloud, EmailLabel.Personal, EmailLabel.Other],
-    placeholder: "Enter email address",
 };
 
 const addressConfig: DynamicInputConfig = {
@@ -199,7 +192,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             id: `phone-${i}-${item.value}`,
                             label: item.type as FieldLabel,
                             value: item.value,
-                        }))
+                        })),
                     );
                 }
                 if (parsedMetadata.emails?.length) {
@@ -208,7 +201,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             id: `email-${i}-${item.value}`,
                             label: item.type as FieldLabel,
                             value: item.value,
-                        }))
+                        })),
                     );
                 }
                 if (parsedMetadata.addresses?.length) {
@@ -229,7 +222,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                                 label: item.type as FieldLabel,
                                 value,
                             };
-                        })
+                        }),
                     );
                 }
                 if (parsedMetadata.urls?.length) {
@@ -238,7 +231,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             id: `url-${i}-${item.value}`,
                             label: item.type as FieldLabel,
                             value: item.value,
-                        }))
+                        })),
                     );
                 }
             }
@@ -374,23 +367,20 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                     <View className="border-b border-border">
                         <ControlledPickerInput control={control} name="birth_date" label="Birth Date" type="date" error={errors.birth_date?.message} noBorder={true} />
                     </View>
-                    <View className={`${initialData?.email && initialData.email !== "create" ? "border-b border-border" : ""}`}>
+                    <View className={`${initialData?.email ? "border-b border-border" : ""}`}>
                         <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                     </View>
 
                     {initialData?.email && (
-                        <View className="py-3">
-                            <View className="flex-row items-center  pl-4">
-                                <BaseText type="Body" weight="400" color="labels.secondary">
-                                    {initialData.email}
-                                </BaseText>
-                            </View>
+                        <View style={{ height: 50, flexDirection: "row", alignItems: "center", paddingHorizontal: 16, opacity: 0.5 }}>
+                            <BaseText style={{ fontSize: 17, lineHeight: 22, fontWeight: "400" }} color="text">
+                                {initialData.email}
+                            </BaseText>
                         </View>
                     )}
                 </View>
                 <View className="gap-4">
                     <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
-                    <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
                     <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
                     <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                 </View>

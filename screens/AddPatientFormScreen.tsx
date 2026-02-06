@@ -8,6 +8,24 @@ import { BaseButton, BaseText } from "../components";
 import { spacing } from "../styles/spaces";
 import { parseUSIDCardData } from "../utils/helper/HelperFunction";
 
+interface RouteParams {
+    firstName?: string;
+    lastName?: string;
+    birthDate?: string;
+    gender?: string;
+    idNumber?: string;
+    address?: string;
+    addressStreet?: string;
+    addressCity?: string;
+    addressState?: string;
+    addressZip?: string;
+    phone?: string;
+    email?: string;
+    scannedImageUri?: string;
+    doctor_id?: string;
+    [key: string]: string | undefined;
+}
+
 export const AddPatientFormScreen: React.FC = () => {
     const params = useLocalSearchParams<{ doctor_id?: string }>();
     const screenWidth = Dimensions.get("window").width;
@@ -15,19 +33,6 @@ export const AddPatientFormScreen: React.FC = () => {
     const imageHeight = screenWidth * 0.6;
 
     const [scannedImage, setScannedImage] = useState<string | null>(null);
-    const [extractedText, setExtractedText] = useState<string | null>(null);
-    interface ParsedIDData {
-        firstName?: string;
-        lastName?: string;
-        birthDate?: string;
-        gender?: string;
-        idNumber?: string;
-        address?: string;
-        phone?: string;
-        email?: string;
-    }
-
-    const [parsedData, setParsedData] = useState<ParsedIDData | null>(null);
 
     const scanDocument = async () => {
         try {
@@ -41,38 +46,23 @@ export const AddPatientFormScreen: React.FC = () => {
                 const path = imagePath.replace("file://", "");
                 const lines = await TextRecognition.recognize(path);
                 const fullText = Array.isArray(lines) ? lines.join("\n") : String(lines ?? "");
-                console.log("====================================");
-                console.log(fullText);
-                console.log("====================================");
-                setExtractedText(fullText);
                 const parsed = parseUSIDCardData(fullText, imagePath);
-                console.log("====================================");
-                console.log(parsed);
-                console.log("====================================");
-                setParsedData(parsed);
+
+                // Navigate automatically after scan
+                const routeParams: RouteParams = {
+                    ...parsed,
+                    scannedImageUri: imagePath,
+                };
+                if (params.doctor_id) routeParams.doctor_id = params.doctor_id;
+                router.push({
+                    pathname: "/(modals)/add-patient/photo",
+                    params: routeParams,
+                });
             }
         } catch (error) {
             // Error handled silently
         }
     };
-
-    interface RouteParams {
-        firstName?: string;
-        lastName?: string;
-        birthDate?: string;
-        gender?: string;
-        idNumber?: string;
-        address?: string;
-        addressStreet?: string;
-        addressCity?: string;
-        addressState?: string;
-        addressZip?: string;
-        phone?: string;
-        email?: string;
-        scannedImageUri?: string;
-        doctor_id?: string;
-        [key: string]: string | undefined;
-    }
 
     return (
         <SafeAreaView className="flex-1 items-center justify-center  gap-24 ">
@@ -90,44 +80,22 @@ export const AddPatientFormScreen: React.FC = () => {
             </View>
 
             <View className="w-full gap-4 px-10">
-                {scannedImage ? (
-                    <BaseButton
-                        label="Continue"
-                        size="Large"
-                        rounded
-                        ButtonStyle="Filled"
-                        onPress={() => {
-                            const routeParams: RouteParams = {
-                                ...parsedData,
-                                scannedImageUri: scannedImage,
-                            };
-                            if (params.doctor_id) routeParams.doctor_id = params.doctor_id;
-                            router.push({
-                                pathname: "/(modals)/add-patient/photo",
-                                params: routeParams,
-                            });
-                        }}
-                    />
-                ) : (
-                    <>
-                        <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
-                        <BaseButton
-                            label="Skip"
-                            size="Large"
-                            ButtonStyle="Plain"
-                            onPress={() => {
-                                const routeParams: RouteParams = {};
-                                if (params.doctor_id) {
-                                    routeParams.doctor_id = params.doctor_id;
-                                }
-                                router.push({
-                                    pathname: "/(modals)/add-patient/photo",
-                                    params: routeParams,
-                                });
-                            }}
-                        />
-                    </>
-                )}
+                <BaseButton label="Scan The ID" size="Large" rounded ButtonStyle="Filled" onPress={scanDocument} />
+                <BaseButton
+                    label="Skip"
+                    size="Large"
+                    ButtonStyle="Plain"
+                    onPress={() => {
+                        const routeParams: RouteParams = {};
+                        if (params.doctor_id) {
+                            routeParams.doctor_id = params.doctor_id;
+                        }
+                        router.push({
+                            pathname: "/(modals)/add-patient/photo",
+                            params: routeParams,
+                        });
+                    }}
+                />
             </View>
         </SafeAreaView>
     );

@@ -203,8 +203,8 @@ export const AlbumScreen: React.FC = () => {
                             }
                         }
                     });
-                } else if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
-                    // For non-template media, show all images
+                } else if (mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images) && mediaWithTemplate.images.length > 0) {
+                    // For non-template media with images, show all images
                     mediaWithTemplate.images.forEach((imageItem: (typeof mediaWithTemplate.images)[0]) => {
                         const imageGostId = imageItem?.gost?.id;
                         if (imageGostId && imageItem?.image && gostMap.has(imageGostId)) {
@@ -222,6 +222,30 @@ export const AlbumScreen: React.FC = () => {
                             }
                         }
                     });
+                } else if (mediaItem.original_media?.url) {
+                    // Fallback: no template, empty images array, but original_media exists
+                    // Add original_media to this album's gost tab and "All" tab
+                    const gostId = album.gost.id;
+                    const mediaObj: Media = {
+                        id: mediaItem.id,
+                        url: mediaItem.original_media.url,
+                        created_at: mediaItem.created_at || "",
+                        updated_at: mediaItem.created_at || "",
+                    };
+
+                    if (gostMap.has(gostId)) {
+                        const gostPhotos = gostMap.get(gostId)!.photos;
+                        const isDuplicate = gostPhotos.some((photo) => photo.id === mediaObj.id && photo.url === mediaObj.url);
+                        if (!isDuplicate) {
+                            gostPhotos.push(mediaObj);
+                        }
+                    }
+
+                    // Also add to allOnlyPhotos so it shows in "All" tab
+                    const uniqueKey = `${mediaObj.id}-${mediaObj.url}`;
+                    if (!allOnlyPhotosMap.has(uniqueKey)) {
+                        allOnlyPhotosMap.set(uniqueKey, mediaObj);
+                    }
                 }
             });
         });
@@ -234,6 +258,22 @@ export const AlbumScreen: React.FC = () => {
             extractedPatientId: patientId,
             allOnlyPhotos: Array.from(allOnlyPhotosMap.values()),
         };
+    }, [albums]);
+
+    // Initialize bookmarkedImages from API data
+    React.useEffect(() => {
+        if (!albums || albums.length === 0) return;
+        const bookmarkedIds = new Set<number>();
+        albums.forEach((album) => {
+            album.media.forEach((mediaItem) => {
+                if (mediaItem.is_bookmarked) {
+                    bookmarkedIds.add(mediaItem.id);
+                }
+            });
+        });
+        if (bookmarkedIds.size > 0) {
+            setBookmarkedImages(bookmarkedIds);
+        }
     }, [albums]);
 
     // Set "All" as selected by default (null means "All")

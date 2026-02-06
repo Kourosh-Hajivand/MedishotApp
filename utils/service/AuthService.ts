@@ -202,7 +202,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleIdToken(), { id_token });
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -230,7 +230,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleCallback(), { code });
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -257,7 +257,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleIdToken(), body);
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -273,7 +273,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + googleCallback(), { code, state });
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {
@@ -300,7 +300,7 @@ export const AuthService = {
         try {
             const response: AxiosResponse<LoginResponse> = await axiosInstance.post(baseUrl + appleCallback(), { code, state });
             if (response.data.data.token) {
-                storeTokens(response.data.data.token);
+                await storeTokens(response.data.data.token);
             }
             return response.data;
         } catch (error) {

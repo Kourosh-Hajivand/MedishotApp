@@ -350,6 +350,7 @@ export default function CameraScreen() {
     const [levelAngle, setLevelAngle] = useState(0);
     const [hasLevelSensor, setHasLevelSensor] = useState(false);
     const LEVEL_THRESHOLD = 2; // Degrees - consider level if within 2 degrees
+    const LEVEL_VISIBLE_RANGE = 15; // Degrees - hide level line when tilted beyond this range
     const LEVEL_DISPLAY_SCALE = 0.52; // Scale line rotation so it matches perceived tilt (sensor often over-reports)
 
     // Zoom state
@@ -559,15 +560,32 @@ export default function CameraScreen() {
         levelAngleSv.value = withTiming(displayAngle, { duration: 80 });
     }, [levelAngle]);
 
-    // Update level line: when level → yellow, then fade; when not level → white + visible
+    // Update level line visibility based on tilt range:
+    // - Beyond LEVEL_VISIBLE_RANGE (>15°): hide line (user is not trying to level)
+    // - Within LEVEL_VISIBLE_RANGE but not level (2°–15°): show white line (user is aligning)
+    // - Within LEVEL_THRESHOLD (<2°): show yellow, then fade out (device is level)
     useEffect(() => {
         if (!hasLevelSensor) {
-            levelLineOpacity.value = withTiming(1, { duration: 300 });
+            levelLineOpacity.value = withTiming(0, { duration: 300 });
             levelIsLevelSv.value = withTiming(0);
             return;
         }
-        const isLevel = Math.abs(levelAngle) < LEVEL_THRESHOLD;
-        if (isLevel) {
+
+        const absAngle = Math.abs(levelAngle);
+        const isLevel = absAngle < LEVEL_THRESHOLD;
+        const isInVisibleRange = absAngle <= LEVEL_VISIBLE_RANGE;
+
+        if (!isInVisibleRange) {
+            // Tilted too far — fade out
+            wasLevelRef.current = false;
+            if (levelFadeTimeoutRef.current) {
+                clearTimeout(levelFadeTimeoutRef.current);
+                levelFadeTimeoutRef.current = null;
+            }
+            levelIsLevelSv.value = withTiming(0, { duration: 120 });
+            levelLineOpacity.value = withTiming(0, { duration: 300 });
+        } else if (isLevel) {
+            // Device is level — turn yellow, then fade out after short delay
             levelIsLevelSv.value = withTiming(1, { duration: 120 });
             if (!wasLevelRef.current) {
                 wasLevelRef.current = true;
@@ -578,6 +596,7 @@ export default function CameraScreen() {
                 }, 280);
             }
         } else {
+            // Within visible range but not level — show white line so user can align
             wasLevelRef.current = false;
             if (levelFadeTimeoutRef.current) {
                 clearTimeout(levelFadeTimeoutRef.current);

@@ -26,6 +26,13 @@ export type SpecialtyOption = {
 
 export const SPECIALTIES: SpecialtyOption[] = [
     {
+        id: PracticeType.Dentistry,
+        title: "Dentistry",
+        description: "Focused on dental care, aesthetics, and oral health for every patient.",
+        icon: DentistryIcon,
+        backgroundColor: "#007AFF",
+    },
+    {
         id: PracticeType.AestheticMedicine,
         title: "Aesthetic Medicine",
         description: "Combining technology and technique to deliver non-surgical transformations.",
@@ -39,13 +46,7 @@ export const SPECIALTIES: SpecialtyOption[] = [
         icon: DermatologyIcon,
         backgroundColor: "#FF9500",
     },
-    {
-        id: PracticeType.Dentistry,
-        title: "Dentistry",
-        description: "Focused on dental care, aesthetics, and oral health for every patient.",
-        icon: DentistryIcon,
-        backgroundColor: "#007AFF",
-    },
+
     {
         id: PracticeType.Orthodontics,
         title: "Orthodontics",

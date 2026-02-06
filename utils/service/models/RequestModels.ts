@@ -218,6 +218,7 @@ export interface CreatePatientRequest {
     birth_date?: string;
     gender?: "male" | "female" | "other";
     national_id?: string;
+    chart_number?: string | number;
     email?: PatientContact[];
     numbers?: PatientContact[];
     addresses?: PatientAddress[];
@@ -270,6 +271,12 @@ export interface EditPatientMediaRequest {
     media: File | string; // File or Livewire temp filename
     notes?: EditPatientMediaNote[];
     data?: string; // JSON string, e.g. { editor: { adjustments, notes, penStrokes, magic } }
+}
+
+export interface UpdateMediaImageRequest {
+    edited_image?: File | string; // File or Livewire temp filename
+    notes?: string; // max 5000 characters
+    data?: Record<string, any>; // Custom JSON data (e.g. brightness, contrast)
 }
 
 export interface TempUploadRequest {

@@ -590,7 +590,7 @@ export interface CheckoutSuccessResponse {
 
 // ============= Contract Responses =============
 export interface ContractTemplateBodyItem {
-    type: "paragraph" | "radio_group" | "checkbox_group" | "text_input" | "textarea";
+    type: "paragraph" | "radio_group" | "radio_group_block" | "radio_group_inline" | "checkbox_group" | "text_input" | "textarea";
     data: {
         content?: string; // For paragraph type
         label?: string; // For form fields
@@ -777,7 +777,9 @@ export interface PatientMediaImage {
     patient_media_id: number;
     gost_id: number;
     notes: string | null;
+    data: Record<string, any> | null; // Custom JSON data (e.g. brightness, contrast)
     image: Media | string | null; // Can be Media object or string URL
+    edited_image: Media | string | null; // Edited version of the image
     gost: Gost;
     created_at: string;
     updated_at: string;
@@ -804,6 +806,22 @@ export interface PatientMediaWithTemplateResponse {
     success: boolean;
     message: string;
     data: PatientMediaWithTemplate;
+}
+
+// ============= Update Media Image Response =============
+export interface UpdateMediaImageResponse {
+    success: true;
+    message: string;
+    data: null;
+}
+
+// ============= Next Chart Number Response =============
+export interface NextChartNumberResponse {
+    success: true;
+    message: string;
+    data: {
+        chart_number: number;
+    };
 }
 
 // ============= Patient Documents Responses =============

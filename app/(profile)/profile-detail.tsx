@@ -158,9 +158,25 @@ const ProfileDetails = ({ profile }: { profile?: People | null }) => {
         return rows;
     }, [metadata]);
 
+    // Format birth date with age
+    const birthDateDisplay = React.useMemo(() => {
+        if (!profile?.birth_date) return null;
+        const formatted = formatDate(profile.birth_date);
+        // Calculate age
+        const birth = new Date(profile.birth_date);
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const monthDiff = today.getMonth() - birth.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+            age--;
+        }
+        return `${formatted} (${age} yrs)`;
+    }, [profile?.birth_date]);
+
     const profileFields: { label: string; value?: string | number | null; isLink?: boolean }[] = [
         { label: "Full Name", value: fullName },
         { label: "Email", value: profile?.email },
+        { label: "Birth Date", value: birthDateDisplay },
         { label: "Verified", value: profile?.is_verified ? "Yes" : profile?.is_verified === false ? "No" : null },
         { label: "Member Since", value: profile?.created_at ? formatDate(profile.created_at) : null },
         ...metadataRows,

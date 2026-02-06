@@ -45,6 +45,21 @@ export default function PatientDetailsScreen() {
         }
     }, []);
 
+    const handleEmail = useCallback(async (email: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const url = `mailto:${email}`;
+        try {
+            const canOpen = await Linking.canOpenURL(url);
+            if (canOpen) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert("Error", "Cannot open email");
+            }
+        } catch {
+            Alert.alert("Error", "Error opening email");
+        }
+    }, []);
+
     const formatDate = (dateString: string | null | undefined) => {
         if (!dateString) return null;
         try {
@@ -266,19 +281,50 @@ export default function PatientDetailsScreen() {
                 {/* Emails */}
                 {patientData.email && (Array.isArray(patientData.email) ? patientData.email.length > 0 : true) && (
                     <View style={styles.sectionContainer}>
-                        <View style={styles.section}>
+                        <View style={styles.emailContainer}>
                             {Array.isArray(patientData.email) ? (
                                 patientData.email.map((email: { type?: string; value?: string } | string, index: number) => {
                                     const emailValue = typeof email === "object" && email !== null && "value" in email ? (email as { value?: string }).value : typeof email === "string" ? email : "";
                                     const emailType = typeof email === "object" && email !== null && "type" in email ? (email as { type?: string }).type : "Email";
                                     if (!emailValue) return null;
                                     const label = (emailType || "Email").charAt(0).toUpperCase() + (emailType || "Email").slice(1).toLowerCase();
+                                    const isLast = index === patientData.email.length - 1;
                                     return (
-                                        <InfoRow key={index} label={label} value={emailValue} isLast={index === patientData.email.length - 1} />
+                                        <View key={index} style={[styles.emailRow, !isLast && styles.emailRowBorder]}>
+                                            <View style={styles.emailInfo}>
+                                                <BaseText type="Subhead" color="labels.secondary">
+                                                    {label}
+                                                </BaseText>
+                                                <BaseText type="Subhead" color="labels.primary">
+                                                    {emailValue}
+                                                </BaseText>
+                                            </View>
+                                            <TouchableOpacity onPress={() => handleEmail(emailValue)} style={styles.actionButton}>
+                                                <IconSymbol name="envelope.fill" size={16} color={colors.system.blue} />
+                                            </TouchableOpacity>
+                                        </View>
                                     );
                                 })
                             ) : (
-                                <InfoRow label="Email" value={patientData.email as string} isLast={true} />
+                                (() => {
+                                    const emailStr = typeof patientData.email === "string" ? patientData.email : "";
+                                    if (!emailStr) return null;
+                                    return (
+                                        <View style={styles.emailRow}>
+                                            <View style={styles.emailInfo}>
+                                                <BaseText type="Subhead" color="labels.secondary">
+                                                    Email
+                                                </BaseText>
+                                                <BaseText type="Subhead" color="labels.primary">
+                                                    {emailStr}
+                                                </BaseText>
+                                            </View>
+                                            <TouchableOpacity onPress={() => handleEmail(emailStr)} style={styles.actionButton}>
+                                                <IconSymbol name="envelope.fill" size={16} color={colors.system.blue} />
+                                            </TouchableOpacity>
+                                        </View>
+                                    );
+                                })()
                             )}
                         </View>
                     </View>
@@ -423,5 +469,21 @@ const styles = StyleSheet.create({
         alignItems: "center",
         backgroundColor: colors.system.blue + "15",
         borderRadius: 20,
+    },
+    emailContainer: {},
+    emailRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        backgroundColor: "white",
+        paddingVertical: 8,
+    },
+    emailRowBorder: {
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+    },
+    emailInfo: {
+        flex: 1,
+        marginRight: 12,
     },
 });

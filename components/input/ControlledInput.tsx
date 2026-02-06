@@ -80,7 +80,8 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                     {!value && !!label && (
                                         <View style={styles.placeholder}>
                                             <BaseText type="Body" color={haveBorder ? "text-secondary" : "labels.tertiary"} className="absolute">
-                                                {label} {optional && `(Optional)`}
+                                                {label}
+                                                {/* {optional && `(Optional)`} */}
                                             </BaseText>
                                         </View>
                                     )}

@@ -24,17 +24,19 @@ import { TempUploadResponse } from "../../utils/service/models/ResponseModels";
 const schema = z.object({
     practiceName: z.string().min(1, "Practice Name is required"),
     website: z.string().optional(),
-    phoneNumber: z.string().refine(
-        (val) => {
-            if (!val || val.length === 0) return true; // Optional field
-            const digits = val.replace(/\D/g, "");
-            return digits.length === 10 || (val.startsWith("+1") && val.length === 12);
-        },
-        { message: "Phone number must be 10 digits" },
-    ),
+    phoneNumber: z
+        .string()
+        .min(1, "Phone number is required")
+        .refine(
+            (val) => {
+                const digits = val.replace(/\D/g, "");
+                return digits.length === 10 || (val.startsWith("+1") && digits.length === 11);
+            },
+            { message: "Phone number must be 10 digits" },
+        ),
     email: z.string().min(1, "Email is required").email("Invalid email"),
     specialty: z.string().min(1, "Required"),
-    street: z.string().optional(),
+    street: z.string().min(1, "Street is required"),
     address: z.string().min(1, "Address is required"),
     zipCode: z.string().min(1, "Zip Code is required"),
 });
@@ -245,13 +247,13 @@ export const CreatePracticeScreen: React.FC = () => {
             {/* Form */}
             <View style={styles.formContainer}>
                 {[
-                    { name: "practiceName", label: "Practice Name", ref: practiceNameRef, returnKeyType: "next" as const, onSubmitEditing: () => websiteRef.current?.focus() },
-                    { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => phoneNumberRef.current?.focus() },
-                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", optional: true, ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => emailRef.current?.focus() },
-                    { name: "email", label: "Email", keyboardType: "email-address", ref: emailRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
+                    { name: "practiceName", label: "Practice Name", ref: practiceNameRef, returnKeyType: "next" as const, onSubmitEditing: () => emailRef.current?.focus() },
+                    { name: "email", label: "Email", keyboardType: "email-address", ref: emailRef, returnKeyType: "next" as const, onSubmitEditing: () => phoneNumberRef.current?.focus() },
+                    { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => websiteRef.current?.focus() },
+                    { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
                     { name: "specialty", label: "Specialty", disabled: true },
                     { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", ref: zipCodeRef, returnKeyType: "next" as const, onSubmitEditing: () => streetRef.current?.focus() },
-                    { name: "street", label: "Street", optional: true, ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
+                    { name: "street", label: "Street", ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
                     { name: "address", label: "City, State", ref: addressRef, returnKeyType: "done" as const, onSubmitEditing: () => Keyboard.dismiss() },
                 ].map((f, i) => (
                     <View key={f.name} style={[styles.formRow, i === 7 ? { borderBottomWidth: 0 } : {}]}>

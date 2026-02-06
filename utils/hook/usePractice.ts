@@ -1,7 +1,7 @@
 import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, PatientContractListResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, NextChartNumberResponse, PatientContractListResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useAuth } from "./useAuth";
@@ -337,6 +337,20 @@ export const useGetPracticeActivities = (practiceId: number, enabled: boolean = 
         queryKey: ["GetPracticeActivities", practiceId],
         queryFn: () => PracticeService.getActivities(practiceId),
         enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
+
+// ============= Next Chart Number =============
+
+export const useGetNextChartNumber = (practiceId: number, enabled: boolean = true): UseQueryResult<NextChartNumberResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetNextChartNumber", practiceId],
+        queryFn: () => PracticeService.getNextChartNumber(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+        // Don't cache - each call should get fresh number from server
+        staleTime: 0,
+        gcTime: 0,
     });
 };
 

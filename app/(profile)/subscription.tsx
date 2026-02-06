@@ -286,6 +286,7 @@ export default function SubscriptionScreen() {
                     styles.currentPlanSection,
                     {
                         backgroundColor: currentPlan ? getPlanColor(currentPlan.name) : colors.system.black,
+                        paddingBottom: 24,
                     },
                 ]}
             >
@@ -579,8 +580,10 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     premiumSection: {
+        paddingTop: spacing["7"], // 16px
+        paddingBottom: spacing["4"], // 16px
         backgroundColor: "#ffffff",
-        padding: spacing["4"], // 16px
+        paddingHorizontal: spacing["4"], // 16px
         gap: spacing["2.5"], // 10px
     },
     premiumTitle: {

@@ -1,12 +1,12 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
-import { PatientMediaAlbumsResponse, PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "./models/ResponseModels";
+import { EditPatientMediaRequest, UpdateMediaImageRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
+import { PatientMediaAlbumsResponse, PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse, UpdateMediaImageResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
-    patients: { getMedia, getMediaAlbums, uploadMedia, uploadMediaWithTemplate, deleteMedia, getTrashMedia, restoreMedia, editMedia, bookmarkMedia, unbookmarkMedia },
+    patients: { getMedia, getMediaAlbums, uploadMedia, uploadMediaWithTemplate, deleteMedia, getTrashMedia, restoreMedia, editMedia, updateMediaImage, bookmarkMedia, unbookmarkMedia },
     media: { tempUpload },
 } = routes;
 
@@ -174,6 +174,33 @@ const MediaService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Edit patient media failed");
+            }
+            throw error;
+        }
+    },
+
+    // Update patient media image (notes, data, edited_image)
+    updateMediaImage: async (mediaImageId: string | number, payload: UpdateMediaImageRequest): Promise<UpdateMediaImageResponse> => {
+        try {
+            const formData = new FormData();
+
+            if (payload.edited_image) {
+                formData.append("edited_image", payload.edited_image as File | Blob);
+            }
+            if (payload.notes != null) {
+                formData.append("notes", payload.notes);
+            }
+            if (payload.data != null) {
+                formData.append("data", JSON.stringify(payload.data));
+            }
+
+            const response: AxiosResponse<UpdateMediaImageResponse> = await axiosInstance.post(baseUrl + updateMediaImage(mediaImageId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Update media image failed");
             }
             throw error;
         }

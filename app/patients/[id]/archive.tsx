@@ -27,7 +27,6 @@ export default function PatientArchiveScreen() {
 
     const restoreMediaMutation = useRestoreMedia(
         () => {
-            Alert.alert("Success", "Media restored successfully");
             refetch();
         },
         (error) => {
@@ -127,7 +126,7 @@ export default function PatientArchiveScreen() {
             }
 
             // Extract image URLs from media.images array
-            if (media.images && Array.isArray(media.images)) {
+            if (media.images && Array.isArray(media.images) && media.images.length > 0) {
                 media.images.forEach((imageItem: any) => {
                     const imageUrl = imageItem.image?.url;
                     if (imageUrl) {

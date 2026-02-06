@@ -6,21 +6,19 @@ import { AddressLabel, DateLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLL
 import { routes } from "@/routes/routes";
 import colors from "@/theme/colors";
 import { toE164 } from "@/utils/helper/phoneUtils";
-import { useCreatePatient, useGetPatientById, useGetPracticeMembers, useTempUpload, useUpdatePatient } from "@/utils/hook";
+import { useCreatePatient, useGetNextChartNumber, useGetPatientById, useGetPracticeMembers, useTempUpload, useUpdatePatient } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { CreatePatientRequest } from "@/utils/service/models/RequestModels";
 import { Member } from "@/utils/service/models/ResponseModels";
-import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ActivityIndicator, Alert, Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
-import { BaseText, ControlledInput, DynamicInputList, KeyboardAwareScrollView } from "../components";
+import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "../components";
 const schema = z.object({
     first_name: z.string().min(1, "First Name is required."),
     last_name: z.string().min(1, "Last Name is required."),
@@ -178,13 +176,13 @@ export const AddPatientPhotoScreen: React.FC = () => {
     });
     const { selectedPractice } = useProfileStore();
     const { profile, isAuthenticated } = useAuth();
+    const isEditMode = !!params.id;
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: nextChartNumberData } = useGetNextChartNumber(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id && !isEditMode);
     const firstName = watch("first_name");
     const lastName = watch("last_name");
     const birthDate = watch("birth_date");
     const gender = watch("gender");
-
-    const isEditMode = !!params.id;
 
     // For create mode: require at least 1 phone, 1 email, 1 address
     const hasValidPhone = useMemo(() => {
@@ -662,6 +660,11 @@ export const AddPatientPhotoScreen: React.FC = () => {
             patientData.doctor_id = params.doctor_id;
         }
 
+        // Add chart_number from next chart number API (only in create mode)
+        if (!isEditMode && nextChartNumberData?.data?.chart_number != null) {
+            patientData.chart_number = nextChartNumberData.data.chart_number;
+        }
+
         const birthDateValue = data.birth_date?.trim();
         if (birthDateValue) {
             patientData.birth_date = birthDateValue;
@@ -830,86 +833,29 @@ export const AddPatientPhotoScreen: React.FC = () => {
         }
     }, [navigation, params.id]);
 
-    const handleSelectFromGallery = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-            alert("Permission to access gallery is required!");
-            return;
-        }
+    const handleImageSelected = async (result: { uri: string; base64?: string | null }) => {
+        setLocalImageUri(result.uri); // Save local URI for preview
 
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            quality: 0.8,
-            base64: false,
-        });
+        try {
+            const filename = result.uri.split("/").pop() || "image.jpg";
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : "image/jpeg";
 
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-            const uri = result.assets[0].uri;
-            setLocalImageUri(uri); // Save local URI for preview
-
-            try {
-                const filename = uri.split("/").pop() || "image.jpg";
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : "image/jpeg";
-
-                interface FileUpload {
-                    uri: string;
-                    type: string;
-                    name: string;
-                }
-
-                const file: FileUpload = {
-                    uri,
-                    type,
-                    name: filename,
-                };
-
-                uploadImage(file);
-            } catch (err) {
-                // Error handled silently
+            interface FileUpload {
+                uri: string;
+                type: string;
+                name: string;
             }
-        }
-    };
 
-    const handleTakePhoto = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== "granted") {
-            alert("Permission to access camera is required!");
-            return;
-        }
+            const file: FileUpload = {
+                uri: result.uri,
+                type,
+                name: filename,
+            };
 
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            quality: 0.8,
-            base64: false,
-        });
-
-        if (!result.canceled && result.assets && result.assets.length > 0) {
-            const uri = result.assets[0].uri;
-            setLocalImageUri(uri); // Save local URI for preview
-
-            try {
-                const filename = uri.split("/").pop() || "image.jpg";
-                const match = /\.(\w+)$/.exec(filename);
-                const type = match ? `image/${match[1]}` : "image/jpeg";
-
-                interface FileUpload {
-                    uri: string;
-                    type: string;
-                    name: string;
-                }
-
-                const file: FileUpload = {
-                    uri,
-                    type,
-                    name: filename,
-                };
-
-                uploadImage(file);
-            } catch (err) {
-                // Error handled silently
-            }
+            uploadImage(file);
+        } catch (err) {
+            // Error handled silently
         }
     };
 
@@ -930,44 +876,30 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
     return (
         <KeyboardAwareScrollView className="flex-1 bg-system-gray6" contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 10, paddingTop: safeAreaInsets.top + 10 }}>
-            <View className="flex-1 bg-system-gray6 gap-8">
+            <View className="flex-1 bg-system-gray6 gap-4">
                 <View className="items-center justify-center gap-5">
-                    <View className="gap-4 ">
-                        <View className="w-32 h-32 rounded-full bg-system-gray2 items-center justify-center">
-                            {isUploading ? (
-                                // Show loading indicator while uploading
-                                <ActivityIndicator size="small" color={colors.system.gray6} />
-                            ) : displaySelectedImage ? (
-                                // Show preview after upload is complete
-                                <Image source={{ uri: displaySelectedImage }} className="w-full h-full rounded-full" />
-                            ) : (
-                                // Show default avatar when no image
-                                <AvatarIcon width={50} height={50} strokeWidth={0} />
-                            )}
-                        </View>
-                        <Host style={{ width: 110, height: 35 }}>
-                            <ContextMenu>
-                                <ContextMenu.Items>
-                                    <Button systemImage="photo.stack" controlSize="mini" onPress={handleSelectFromGallery}>
-                                        Photo from Gallery
-                                    </Button>
-                                    <Button systemImage="camera" controlSize="mini" onPress={handleTakePhoto}>
-                                        with Camera
-                                    </Button>
-                                </ContextMenu.Items>
+                    <ImagePickerWrapper onImageSelected={handleImageSelected}>
+                        <View className="relative gap-4">
+                            <View style={{ width: 120, height: 120, borderRadius: 64, backgroundColor: colors.system.gray2, alignItems: "center", justifyContent: "center" }}>
+                                {isUploading ? (
+                                    // Show loading indicator while uploading
+                                    <ActivityIndicator size="small" color={colors.system.gray6} />
+                                ) : displaySelectedImage ? (
+                                    // Show preview after upload is complete
+                                    <Image source={{ uri: displaySelectedImage }} style={{ width: "100%", height: "100%", borderRadius: 64 }} />
+                                ) : (
+                                    // Show default avatar when no image
+                                    <AvatarIcon width={50} height={50} strokeWidth={0} />
+                                )}
+                            </View>
 
-                                <ContextMenu.Trigger>
-                                    <View className="flex-1 ">
-                                        <Host style={{ width: 110, height: 30 }}>
-                                            <Button role="default" controlSize="mini" variant="glassProminent">
-                                                Pick a Photo
-                                            </Button>
-                                        </Host>
-                                    </View>
-                                </ContextMenu.Trigger>
-                            </ContextMenu>
-                        </Host>
-                    </View>
+                            <View className="w-full items-center justify-center  ">
+                                <View className="w-[80%] ">
+                                    <BaseButton label="Pick a Photo" ButtonStyle="Tinted" size="Small" rounded={true} style={{ pointerEvents: "none" }} />
+                                </View>
+                            </View>
+                        </View>
+                    </ImagePickerWrapper>
                 </View>
 
                 <View className="px-4 gap-4">
@@ -988,6 +920,17 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             <ControlledPickerInput control={control} name="gender" label="Gender" type="gender" error={errors.gender?.message} noBorder={true} />
                         </View>
                     </View>
+
+                    {!isEditMode && nextChartNumberData?.data?.chart_number != null && (
+                        <View className="bg-white rounded-2xl px-5 p-4 flex-row items-center justify-between">
+                            <BaseText type="Body" weight="400" color="labels.primary">
+                                Chart Number:
+                            </BaseText>
+                            <BaseText type="Callout" weight={600} color="labels.primary">
+                                #{nextChartNumberData.data.chart_number}
+                            </BaseText>
+                        </View>
+                    )}
 
                     {selectedDoctor && (
                         <View className="bg-white rounded-2xl px-5 p-4 flex-row items-center justify-between ">

@@ -71,7 +71,8 @@ export const useLogin = (onSuccess?: (data: LoginResponse) => void, onError?: (e
 
     return useMutation({
         mutationFn: (data: LoginBody) => AuthService.login(data),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -98,7 +99,8 @@ export const useCompleteRegistration = (onSuccess?: (data: CompleteRegistrationR
 
     return useMutation({
         mutationFn: (data: CompleteRegistrationBody) => AuthService.completeRegistration(data),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -159,7 +161,8 @@ export const useGoogleCallback = (onSuccess?: (data: LoginResponse) => void, onE
 
     return useMutation({
         mutationFn: (id_token: string) => AuthService.googleIdToken(id_token),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -174,7 +177,8 @@ export const useAppleCallback = (onSuccess?: (data: LoginResponse) => void, onEr
 
     return useMutation({
         mutationFn: (body: AppleIdTokenBody) => AuthService.appleIdToken(body),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -190,7 +194,8 @@ export const useGoogleWebCallback = (onSuccess?: (data: LoginResponse) => void, 
 
     return useMutation({
         mutationFn: ({ code, state }) => AuthService.googleCallback(code, state),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -205,7 +210,8 @@ export const useAppleWebCallback = (onSuccess?: (data: LoginResponse) => void, o
 
     return useMutation({
         mutationFn: ({ code, state }) => AuthService.appleCallbackWeb(code, state),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },
@@ -232,7 +238,8 @@ export const useVerifyOtpCode = (onSuccess?: (data: VerifyOtpCodeResponse) => vo
 
     return useMutation({
         mutationFn: (data: VerifyOtpCodeBody) => AuthService.verifyOtpCode(data),
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
+            await queryClient.refetchQueries({ queryKey: [QueryKeys.tokens] });
             queryClient.invalidateQueries({ queryKey: ["GetMe"] });
             onSuccess?.(data);
         },

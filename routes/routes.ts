@@ -52,6 +52,9 @@ export const routes = {
         // Members
         getMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}`,
 
+        // Next Chart Number
+        getNextChartNumber: (practiseId: string | number) => `practises/${practiseId}/next-chart-number`,
+
         // Tags
         getTags: (practiseId: string | number) => `practises/${practiseId}/tags`,
         createTag: (practiseId: string | number) => `practises/${practiseId}/tags`,
@@ -97,6 +100,7 @@ export const routes = {
         getTrashMedia: (patientId: string | number) => `patients/media/trash/${patientId}`,
         restoreMedia: (mediaId: string | number) => `patients/media/restore/${mediaId}`,
         editMedia: (mediaId: string | number) => `patients/media/edit-image/${mediaId}`,
+        updateMediaImage: (mediaImageId: string | number) => `patients/media/image/${mediaImageId}`,
         bookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
         unbookmarkMedia: (mediaId: string | number) => `patients/media/${mediaId}/bookmark`,
 

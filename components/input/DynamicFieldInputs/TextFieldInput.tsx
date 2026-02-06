@@ -12,9 +12,10 @@ export const TextFieldInput: React.FC<Props> = ({ value, onChangeText, placehold
     return (
         <TextInput
             {...props}
-            className="flex-1 text-base px-2"
+            className="flex-1 px-0"
             style={{
                 paddingVertical: Platform.OS === "ios" ? 12 : 10,
+                fontSize: 16,
                 color: colors.text,
             }}
             placeholder={placeholder}

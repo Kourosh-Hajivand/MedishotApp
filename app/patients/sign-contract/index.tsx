@@ -54,8 +54,6 @@ export default function SignContractScreen() {
     const [showSignatureModal, setShowSignatureModal] = useState(false);
     const [uploadedSignatureFilename, setUploadedSignatureFilename] = useState<string | null>(null);
     const [radioGroupAnswers, setRadioGroupAnswers] = useState<Record<number, string | null>>({});
-    const [showPDFPreview, setShowPDFPreview] = useState(false);
-    const [contractPDFUri, setContractPDFUri] = useState<string | null>(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [signatureFileUri, setSignatureFileUri] = useState<string | null>(null);
     const [isCapturingView, setIsCapturingView] = useState(false);
@@ -66,10 +64,12 @@ export default function SignContractScreen() {
         const template = contractTemplate?.data;
         if (template && Array.isArray(template.body)) {
             const defaultAnswers: Record<number, string> = {};
+            const radioTypes = ["radio_group", "radio_group_block", "radio_group_inline"];
             template.body.forEach((item, index) => {
-                if (item.type === "radio_group" && item.data.options && item.data.options.length > 0) {
-                    // Set default to "yes" if available, otherwise first option
-                    const defaultOption = item.data.options.includes("yes") ? "yes" : item.data.options[0];
+                const opts = item.data?.options ?? [];
+                if (radioTypes.includes(item.type) && opts.length > 0) {
+                    const normalized = opts.map((o) => String(o).trim().toLowerCase());
+                    const defaultOption = normalized.includes("yes") ? (opts.find((o) => String(o).trim().toLowerCase() === "yes") ?? opts[0]) : opts[0];
                     defaultAnswers[index] = defaultOption;
                 }
             });
@@ -190,21 +190,20 @@ export default function SignContractScreen() {
             let bodyArray: any[] = [];
 
             if (template && Array.isArray(template.body)) {
+                const radioTypes = ["radio_group", "radio_group_block", "radio_group_inline"];
                 // Deep clone the body array and add selectedValue to radio groups
                 bodyArray = template.body.map((item, index) => {
-                    if (item.type === "radio_group" && radioGroupAnswers[index] !== null && radioGroupAnswers[index] !== undefined) {
-                        // Add selectedValue field to radio_group items
-                        // Convert "yes" to true, "no" to false
-                        const selectedValue = radioGroupAnswers[index] === "yes";
+                    if (radioTypes.includes(item.type) && radioGroupAnswers[index] !== null && radioGroupAnswers[index] !== undefined) {
+                        const raw = String(radioGroupAnswers[index]).trim().toLowerCase();
+                        const selectedValue = raw === "yes" || raw === "yas"; // support "yas" typo from template
                         return {
                             ...item,
                             data: {
                                 ...item.data,
-                                selectedValue: selectedValue, // true for "yes", false for "no"
+                                selectedValue,
                             },
                         };
                     }
-                    // Return other items as-is (paragraph, etc.)
                     return item;
                 });
 
@@ -405,15 +404,40 @@ export default function SignContractScreen() {
         setShowSignatureModal(false);
     };
 
-    // Helper function to replace placeholders in text
+    // Doctor display name: patient.doctor or current user (me)
+    const doctorDisplayName = useMemo(() => {
+        if (patient?.doctor?.first_name != null || patient?.doctor?.last_name != null) {
+            const first = patient.doctor.first_name ?? "";
+            const last = patient.doctor.last_name ?? "";
+            const full = `${first} ${last}`.trim();
+            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
+        }
+        if (me?.first_name != null || me?.last_name != null) {
+            const first = me.first_name ?? "";
+            const last = me.last_name ?? "";
+            const full = `${first} ${last}`.trim();
+            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
+        }
+        return "";
+    }, [patient?.doctor, me?.first_name, me?.last_name]);
+
+    // Helper function to replace placeholders in text (#Placeholder# and {placeholder} formats)
     const replacePlaceholders = (text: string): string => {
         if (!patient || !practice) return text;
+        const patientFullName = `${patient.first_name} ${patient.last_name}`.trim();
+        const practiceName = practice.name || "";
         return text
-            .replace(/#name#/g, `${patient.first_name} ${patient.last_name}`)
-            .replace(/#practise#/g, practice.name || "")
-            .replace(/\{patient_name\}/g, `${patient.first_name} ${patient.last_name}`)
-            .replace(/\{practice_name\}/g, practice.name || "")
-            .replace(/\{doctor_name\}/g, patient.doctor ? `Dr. ${patient.doctor.first_name} ${patient.doctor.last_name}` : "")
+            .replace(/#PatientName#/gi, patientFullName)
+            .replace(/#DoctorName#/gi, doctorDisplayName)
+            .replace(/#PracticeName#/gi, practiceName)
+            .replace(/#name#/g, patientFullName)
+            .replace(/#practise#/g, practiceName)
+            .replace(/\{patient_name\}/gi, patientFullName)
+            .replace(/\{practice_name\}/gi, practiceName)
+            .replace(/\{doctor_name\}/gi, doctorDisplayName)
+            .replace(/\{PatientName\}/g, patientFullName)
+            .replace(/\{DoctorName\}/g, doctorDisplayName)
+            .replace(/\{PracticeName\}/g, practiceName)
             .replace(/\{date\}/g, new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }));
     };
 
@@ -456,8 +480,8 @@ export default function SignContractScreen() {
                                 const htmlWithReplacements = replacePlaceholders(item.data.content);
                                 const text = stripHtml(htmlWithReplacements);
 
-                                // Now highlight the replaced values
-                                const patientName = `${patient.first_name} ${patient.last_name}`;
+                                // Now highlight the replaced values (patient, doctor, practice)
+                                const patientName = `${patient.first_name} ${patient.last_name}`.trim();
                                 const practiceName = practice.name || "";
 
                                 return (
@@ -468,30 +492,34 @@ export default function SignContractScreen() {
                                                     return <React.Fragment key={lineIndex}>{"\n"}</React.Fragment>;
                                                 }
 
-                                                // Find replaced values in the line
+                                                // Find replaced values in the line (order: patient, doctor, practice)
                                                 const parts: Array<{ text: string; isHighlight: boolean }> = [];
                                                 let lastIndex = 0;
+                                                const highlights = [
+                                                    { value: patientName, len: patientName.length },
+                                                    { value: doctorDisplayName, len: doctorDisplayName.length },
+                                                    { value: practiceName, len: practiceName.length },
+                                                ].filter((h) => h.len > 0);
 
-                                                // Find patient name
-                                                let nameIndex = line.indexOf(patientName, lastIndex);
-                                                while (nameIndex !== -1) {
-                                                    if (nameIndex > lastIndex) {
-                                                        parts.push({ text: line.substring(lastIndex, nameIndex), isHighlight: false });
+                                                const nextMatch = (from: number): { index: number; value: string; len: number } | null => {
+                                                    let nearest: { index: number; value: string; len: number } | null = null;
+                                                    for (const h of highlights) {
+                                                        const i = line.indexOf(h.value, from);
+                                                        if (i !== -1 && (nearest == null || i < nearest.index)) {
+                                                            nearest = { index: i, value: h.value, len: h.len };
+                                                        }
                                                     }
-                                                    parts.push({ text: patientName, isHighlight: true });
-                                                    lastIndex = nameIndex + patientName.length;
-                                                    nameIndex = line.indexOf(patientName, lastIndex);
-                                                }
+                                                    return nearest;
+                                                };
 
-                                                // Find practice name
-                                                let practiceIndex = line.indexOf(practiceName, lastIndex);
-                                                while (practiceIndex !== -1) {
-                                                    if (practiceIndex > lastIndex) {
-                                                        parts.push({ text: line.substring(lastIndex, practiceIndex), isHighlight: false });
+                                                let match = nextMatch(lastIndex);
+                                                while (match) {
+                                                    if (match.index > lastIndex) {
+                                                        parts.push({ text: line.substring(lastIndex, match.index), isHighlight: false });
                                                     }
-                                                    parts.push({ text: practiceName, isHighlight: true });
-                                                    lastIndex = practiceIndex + practiceName.length;
-                                                    practiceIndex = line.indexOf(practiceName, lastIndex);
+                                                    parts.push({ text: match.value, isHighlight: true });
+                                                    lastIndex = match.index + match.len;
+                                                    match = nextMatch(lastIndex);
                                                 }
 
                                                 if (lastIndex < line.length) {
@@ -516,7 +544,7 @@ export default function SignContractScreen() {
                                         </BaseText>
                                     </View>
                                 );
-                            } else if (item.type === "radio_group" && item.data.label) {
+                            } else if ((item.type === "radio_group" || item.type === "radio_group_block" || item.type === "radio_group_inline") && item.data?.label) {
                                 return (
                                     <RadioGroupComponent
                                         key={index}
@@ -530,6 +558,7 @@ export default function SignContractScreen() {
                                                 [index]: option,
                                             }));
                                         }}
+                                        layout="block"
                                     />
                                 );
                             }
@@ -609,7 +638,7 @@ export default function SignContractScreen() {
                             padding: 40,
                         }}
                     >
-                        <ContractPDFContent template={template} patient={patient} practice={practice} signatureUri={signatureFileUri || signatureUri} radioGroupAnswers={radioGroupAnswers} printSettings={printSettings} replacePlaceholders={replacePlaceholders} stripHtml={stripHtml} metadata={metadata} />
+                        <ContractPDFContent template={template} patient={patient} practice={practice} doctorDisplayName={doctorDisplayName} signatureUri={signatureFileUri || signatureUri} radioGroupAnswers={radioGroupAnswers} printSettings={printSettings} replacePlaceholders={replacePlaceholders} stripHtml={stripHtml} metadata={metadata} />
                     </ViewShot>
                 </View>
             )}
@@ -638,7 +667,7 @@ export default function SignContractScreen() {
                             padding: 40,
                         }}
                     >
-                        <ContractPDFContent template={template} patient={patient} practice={practice} signatureUri={signatureFileUri || signatureUri} radioGroupAnswers={radioGroupAnswers} printSettings={printSettings} replacePlaceholders={replacePlaceholders} stripHtml={stripHtml} metadata={metadata} />
+                        <ContractPDFContent template={template} patient={patient} practice={practice} doctorDisplayName={doctorDisplayName} signatureUri={signatureFileUri || signatureUri} radioGroupAnswers={radioGroupAnswers} printSettings={printSettings} replacePlaceholders={replacePlaceholders} stripHtml={stripHtml} metadata={metadata} />
                     </ViewShot>
                 </View>
             )}
@@ -646,31 +675,76 @@ export default function SignContractScreen() {
     );
 }
 
-// Radio Group Component
-function RadioGroupComponent({ index, label, options, selectedOption, onSelect }: { index: number; label: string; options: string[]; selectedOption: string | null; onSelect: (option: string) => void }) {
+// Radio Group Component — layout: block = label on top, options below (vertical); inline = label + options in one row (radio then text)
+function RadioGroupComponent({
+    index,
+    label,
+    options,
+    selectedOption,
+    onSelect,
+    layout = "default",
+}: {
+    index: number;
+    label: string;
+    options: string[];
+    selectedOption: string | null;
+    onSelect: (option: string) => void;
+    layout?: "default" | "block" | "inline";
+}) {
+    const radioOption = (option: string, optionIndex: number) => (
+        <TouchableOpacity key={optionIndex} onPress={() => onSelect(option)} className="flex-row items-center gap-2">
+            <View
+                className="w-6 h-6 rounded-full border-2 relative"
+                style={{
+                    borderColor: selectedOption === option ? colors.system.blue : colors.system.gray2,
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                {selectedOption === option && <View className="rounded-full flex-1 w-3 h-3 bg-system-blue absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />}
+            </View>
+            <BaseText type="Subhead" color="labels.primary">
+                {option.charAt(0).toUpperCase() + option.slice(1)}
+            </BaseText>
+        </TouchableOpacity>
+    );
+
+    if (layout === "block") {
+        // Label on top, then one row: both radio options side by side below the text
+        return (
+            <View className="mb-4">
+                <BaseText type="Subhead" weight={600} color="labels.primary" className="mb-3">
+                    {label}
+                </BaseText>
+                <View className="flex-row gap-6">
+                    {options.map((option, optionIndex) => radioOption(option, optionIndex))}
+                </View>
+            </View>
+        );
+    }
+
+    if (layout === "inline") {
+        // One row: first [radio text] [radio text] ..., then label (radio then text per option)
+        return (
+            <View className="mb-4 flex-row flex-wrap items-center gap-4">
+                <View className="flex-row gap-6">
+                    {options.map((option, optionIndex) => radioOption(option, optionIndex))}
+                </View>
+                <BaseText type="Subhead" weight={600} color="labels.primary">
+                    {label}
+                </BaseText>
+            </View>
+        );
+    }
+
+    // default: label on top, options in one row
     return (
         <View className="mb-4">
             <BaseText type="Subhead" weight={600} color="labels.primary" className="mb-3">
                 {label}
             </BaseText>
             <View className="flex-row gap-6">
-                {options.map((option, optionIndex) => (
-                    <TouchableOpacity key={optionIndex} onPress={() => onSelect(option)} className="flex-row items-center gap-2">
-                        <View
-                            className="w-6 h-6 rounded-full border-2 relative"
-                            style={{
-                                borderColor: selectedOption === option ? colors.system.blue : colors.system.gray2,
-                                justifyContent: "center",
-                                alignItems: "center",
-                            }}
-                        >
-                            {selectedOption === option && <View className="rounded-full  flex-1 w-3 h-3 bg-system-blue absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />}
-                        </View>
-                        <BaseText type="Subhead" color={selectedOption === option ? "labels.primary" : "labels.primary"}>
-                            {option.charAt(0).toUpperCase() + option.slice(1)}
-                        </BaseText>
-                    </TouchableOpacity>
-                ))}
+                {options.map((option, optionIndex) => radioOption(option, optionIndex))}
             </View>
         </View>
     );
@@ -858,54 +932,12 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
     );
 });
 
-// PDF Preview Modal Component
-const PDFPreviewModal = React.memo(function PDFPreviewModal({ pdfUri, onConfirm, onCancel, isGenerating }: { pdfUri: string; onConfirm: () => void; onCancel: () => void; isGenerating: boolean }) {
-    const bottomSheetModalRef = useRef<BottomSheetModal>(null);
-    const snapPoints = useMemo(() => ["90%"], []);
-
-    const renderBackdrop = useCallback((props: any) => <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} opacity={0.5} />, []);
-
-    React.useEffect(() => {
-        const timer = setTimeout(() => {
-            bottomSheetModalRef.current?.present();
-        }, 100);
-        return () => clearTimeout(timer);
-    }, []);
-
-    return (
-        <BottomSheetModal ref={bottomSheetModalRef} index={0} snapPoints={snapPoints} onDismiss={onCancel} backdropComponent={renderBackdrop} enablePanDownToClose={true} enableHandlePanningGesture={true} enableDynamicSizing={false} backgroundStyle={{ backgroundColor: colors.system.white }}>
-            <View className="flex-1">
-                {/* Header */}
-                <View className="h-[44px] flex-row items-center justify-between px-4 border-b border-system-gray6">
-                    <TouchableOpacity onPress={onCancel} className="px-2 py-[11px]">
-                        <BaseText type="Body" color="system.blue">
-                            Cancel
-                        </BaseText>
-                    </TouchableOpacity>
-                    <BaseText type="Body" weight={600} color="labels.primary">
-                        Contract Preview
-                    </BaseText>
-                    <TouchableOpacity onPress={onConfirm} disabled={isGenerating} className="px-4 py-[11px]">
-                        <BaseText type="Body" color={isGenerating ? "labels.tertiary" : "system.blue"} weight={600}>
-                            Confirm
-                        </BaseText>
-                    </TouchableOpacity>
-                </View>
-
-                {/* PDF Preview */}
-                <ScrollView className="flex-1" contentContainerStyle={{ alignItems: "center", padding: 20 }}>
-                    <Image source={{ uri: pdfUri }} style={{ width: "100%", aspectRatio: 816 / 1056 }} resizeMode="contain" />
-                </ScrollView>
-            </View>
-        </BottomSheetModal>
-    );
-});
-
 // Contract PDF Content Component (A4 layout)
 interface ContractPDFContentProps {
     template: ContractTemplate;
     patient: Patient;
     practice: Practice;
+    doctorDisplayName: string;
     signatureUri: string | null;
     radioGroupAnswers: Record<number, string | null>;
     printSettings: PracticeSettings;
@@ -914,7 +946,7 @@ interface ContractPDFContentProps {
     metadata: any;
 }
 
-const ContractPDFContent = React.memo(function ContractPDFContent({ template, patient, practice, signatureUri, radioGroupAnswers, printSettings, replacePlaceholders, stripHtml, metadata }: ContractPDFContentProps) {
+const ContractPDFContent = React.memo(function ContractPDFContent({ template, patient, practice, doctorDisplayName, signatureUri, radioGroupAnswers, printSettings, replacePlaceholders, stripHtml, metadata }: ContractPDFContentProps) {
     const { profile: me } = useAuth();
 
     return (
@@ -934,8 +966,24 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
                         if (item.type === "paragraph" && item.data.content) {
                             const htmlWithReplacements = replacePlaceholders(item.data.content);
                             const text = stripHtml(htmlWithReplacements);
-                            const patientName = `${patient.first_name} ${patient.last_name}`;
+                            const patientName = `${patient.first_name} ${patient.last_name}`.trim();
                             const practiceName = practice.name || "";
+                            const highlights = [
+                                { value: patientName, len: patientName.length },
+                                { value: doctorDisplayName, len: doctorDisplayName.length },
+                                { value: practiceName, len: practiceName.length },
+                            ].filter((h) => h.len > 0);
+
+                            const nextMatch = (line: string, from: number): { index: number; value: string; len: number } | null => {
+                                let nearest: { index: number; value: string; len: number } | null = null;
+                                for (const h of highlights) {
+                                    const i = line.indexOf(h.value, from);
+                                    if (i !== -1 && (nearest == null || i < nearest.index)) {
+                                        nearest = { index: i, value: h.value, len: h.len };
+                                    }
+                                }
+                                return nearest;
+                            };
 
                             return (
                                 <View key={index} style={{ marginBottom: 12 }}>
@@ -947,25 +995,14 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
 
                                             const parts: Array<{ text: string; isHighlight: boolean }> = [];
                                             let lastIndex = 0;
-
-                                            let nameIndex = line.indexOf(patientName, lastIndex);
-                                            while (nameIndex !== -1) {
-                                                if (nameIndex > lastIndex) {
-                                                    parts.push({ text: line.substring(lastIndex, nameIndex), isHighlight: false });
+                                            let match = nextMatch(line, lastIndex);
+                                            while (match) {
+                                                if (match.index > lastIndex) {
+                                                    parts.push({ text: line.substring(lastIndex, match.index), isHighlight: false });
                                                 }
-                                                parts.push({ text: patientName, isHighlight: true });
-                                                lastIndex = nameIndex + patientName.length;
-                                                nameIndex = line.indexOf(patientName, lastIndex);
-                                            }
-
-                                            let practiceIndex = line.indexOf(practiceName, lastIndex);
-                                            while (practiceIndex !== -1) {
-                                                if (practiceIndex > lastIndex) {
-                                                    parts.push({ text: line.substring(lastIndex, practiceIndex), isHighlight: false });
-                                                }
-                                                parts.push({ text: practiceName, isHighlight: true });
-                                                lastIndex = practiceIndex + practiceName.length;
-                                                practiceIndex = line.indexOf(practiceName, lastIndex);
+                                                parts.push({ text: match.value, isHighlight: true });
+                                                lastIndex = match.index + match.len;
+                                                match = nextMatch(line, lastIndex);
                                             }
 
                                             if (lastIndex < line.length) {
@@ -990,50 +1027,79 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
                                     </BaseText>
                                 </View>
                             );
-                        } else if (item.type === "radio_group" && item.data.label) {
+                        } else if ((item.type === "radio_group" || item.type === "radio_group_block" || item.type === "radio_group_inline") && item.data?.label) {
                             const selectedAnswer = radioGroupAnswers[index];
-                            const options = item.data.options || [];
+                            const options = (item.data.options || []) as string[];
+                            const layout = item.type === "radio_group_block" ? "block" : item.type === "radio_group_inline" ? "inline" : "default";
+
+                            const renderRadioOption = (option: string, optionIndex: number) => {
+                                const isSelected = selectedAnswer === option;
+                                return (
+                                    <View key={optionIndex} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                                        <View
+                                            style={{
+                                                width: 16,
+                                                height: 16,
+                                                borderRadius: 8,
+                                                borderWidth: 2,
+                                                borderColor: isSelected ? colors.system.blue : colors.system.gray2,
+                                                justifyContent: "center",
+                                                alignItems: "center",
+                                                backgroundColor: "white",
+                                            }}
+                                        >
+                                            {isSelected && (
+                                                <View
+                                                    style={{
+                                                        width: 8,
+                                                        height: 8,
+                                                        borderRadius: 4,
+                                                        backgroundColor: colors.system.blue,
+                                                    }}
+                                                />
+                                            )}
+                                        </View>
+                                        <BaseText type="Subhead" color="labels.primary" style={{ fontSize: 11 }}>
+                                            {option.charAt(0).toUpperCase() + option.slice(1)}
+                                        </BaseText>
+                                    </View>
+                                );
+                            };
+
+                            if (layout === "block") {
+                                return (
+                                    <View key={index} style={{ marginBottom: 12, marginTop: 8 }}>
+                                        <BaseText type="Subhead" weight={600} color="labels.primary" style={{ fontSize: 11, marginBottom: 6 }}>
+                                            {item.data.label}
+                                        </BaseText>
+                                        <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
+                                            {options.map((option, optionIndex) => renderRadioOption(option, optionIndex))}
+                                        </View>
+                                    </View>
+                                );
+                            }
+
+                            if (layout === "inline") {
+                                return (
+                                    <View key={index} style={{ marginBottom: 12, marginTop: 8, flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                                        <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
+                                            {options.map((option, optionIndex) => renderRadioOption(option, optionIndex))}
+                                        </View>
+                                        <BaseText type="Subhead" weight={600} color="labels.primary" style={{ fontSize: 11 }}>
+                                            {item.data.label}
+                                        </BaseText>
+                                    </View>
+                                );
+                            }
 
                             return (
-                                <View key={index} style={{ marginBottom: 12, marginTop: 8, flexDirection: "row", alignItems: "center", gap: 10 }}>
-                                    <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
-                                        {options.map((option: string, optionIndex: number) => {
-                                            const isSelected = selectedAnswer === option;
-                                            return (
-                                                <View key={optionIndex} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                                                    <View
-                                                        style={{
-                                                            width: 16,
-                                                            height: 16,
-                                                            borderRadius: 8,
-                                                            borderWidth: 2,
-                                                            borderColor: isSelected ? colors.system.blue : colors.system.gray2,
-                                                            justifyContent: "center",
-                                                            alignItems: "center",
-                                                            backgroundColor: "white",
-                                                        }}
-                                                    >
-                                                        {isSelected && (
-                                                            <View
-                                                                style={{
-                                                                    width: 8,
-                                                                    height: 8,
-                                                                    borderRadius: 4,
-                                                                    backgroundColor: colors.system.blue,
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </View>
-                                                    <BaseText type="Subhead" color="labels.primary" style={{ fontSize: 11 }}>
-                                                        {option.charAt(0).toUpperCase() + option.slice(1)}
-                                                    </BaseText>
-                                                </View>
-                                            );
-                                        })}
-                                    </View>
-                                    <BaseText type="Subhead" weight={600} color="labels.primary" style={{ fontSize: 11 }}>
-                                        {item.data.label}:
+                                <View key={index} style={{ marginBottom: 12, marginTop: 8 }}>
+                                    <BaseText type="Subhead" weight={600} color="labels.primary" style={{ fontSize: 11, marginBottom: 6 }}>
+                                        {item.data.label}
                                     </BaseText>
+                                    <View style={{ flexDirection: "row", gap: 16, alignItems: "center" }}>
+                                        {options.map((option, optionIndex) => renderRadioOption(option, optionIndex))}
+                                    </View>
                                 </View>
                             );
                         }

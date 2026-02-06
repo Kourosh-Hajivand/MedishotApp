@@ -1,6 +1,7 @@
 import { DynamicFieldItem } from "@/models";
 import { ProfileFormData, ProfileFormScreen } from "@/screens/auth/ProfileFormScreen";
 import { toE164 } from "@/utils/helper/phoneUtils";
+import { useAuth } from "@/utils/hook/useAuth";
 import { useUpdateProfileFull } from "@/utils/hook";
 import { UpdateProfileFullBody } from "@/utils/service/models/RequestModels";
 import { Button, Host } from "@expo/ui/swift-ui";
@@ -31,6 +32,7 @@ interface MetadataObject {
 export default function CompleteProfile() {
     const formRef = useRef<ProfileFormRef | null>(null);
     const navigation = useNavigation();
+    const { profile } = useAuth();
     const params = useLocalSearchParams<{ requireCompleteProfile?: string }>();
     const requireCompleteProfile = params.requireCompleteProfile === "1";
 
@@ -125,7 +127,7 @@ export default function CompleteProfile() {
         });
     }, [navigation, handleNext, isUpdating, requireCompleteProfile]);
 
-    return <ProfileFormScreen mode="create" title="Complete Your Profile" subtitle="Start by completing your profile." onFormReady={handleFormReady} />;
+    return <ProfileFormScreen mode="create" initialData={profile ?? null} title="Complete Your Profile" subtitle="Start by completing your profile." onFormReady={handleFormReady} />;
 }
 
 CompleteProfile.displayName = "CompleteProfile";

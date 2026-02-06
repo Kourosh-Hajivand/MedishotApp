@@ -2,7 +2,7 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, Member, PatientContractListResponse, PatientsCountResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
+import { ApiResponse, Member, NextChartNumberResponse, PatientContractListResponse, PatientsCountResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
 
 const {
     practises: {
@@ -35,6 +35,7 @@ const {
         getLatestContracts,
         getActivities,
         updateMember,
+        getNextChartNumber,
     },
 } = routes;
 
@@ -341,6 +342,21 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to get practice member");
+            }
+            throw error;
+        }
+    },
+
+    // ============= Next Chart Number =============
+
+    // Get next chart number for a practice
+    getNextChartNumber: async (practiceId: number): Promise<NextChartNumberResponse> => {
+        try {
+            const response: AxiosResponse<NextChartNumberResponse> = await axiosInstance.get(getNextChartNumber(practiceId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get next chart number");
             }
             throw error;
         }

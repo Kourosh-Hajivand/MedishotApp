@@ -1,6 +1,6 @@
 import MediaService from "@/utils/service/MediaService";
-import { EditPatientMediaRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
-import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse } from "@/utils/service/models/ResponseModels";
+import { EditPatientMediaRequest, UpdateMediaImageRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "@/utils/service/models/RequestModels";
+import { PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse, UpdateMediaImageResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useProfileStore } from "./useProfileStore";
 
@@ -61,6 +61,10 @@ export const useDeletePatientMedia = (onSuccess?: (data: PatientMediaDeleteRespo
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["GetPatientMedia", variables.patientId],
+            });
+            // Invalidate trash/archived media list
+            queryClient.invalidateQueries({
+                queryKey: ["GetTrashMedia", variables.patientId],
             });
             // Invalidate patient activities to refresh activity list
             queryClient.invalidateQueries({
@@ -137,12 +141,18 @@ export const useEditPatientMedia = (onSuccess?: (data: PatientMediaEditResponse)
 
 export const useBookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaBookmarkResponse, Error, number | string> => {
     const queryClient = useQueryClient();
+    const { selectedPractice } = useProfileStore();
 
     return useMutation({
         mutationFn: (mediaId: number | string) => MediaService.bookmarkMedia(mediaId),
         onSuccess: (data, mediaId) => {
             // Invalidate all media queries to refresh bookmark status
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            // Invalidate album queries to refresh album lists
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMediaAlbums"] });
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeAlbums", selectedPractice.id] });
+            }
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -153,12 +163,38 @@ export const useBookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkResponse
 
 export const useUnbookmarkMedia = (onSuccess?: (data: PatientMediaBookmarkResponse) => void, onError?: (error: Error) => void): UseMutationResult<PatientMediaBookmarkResponse, Error, number | string> => {
     const queryClient = useQueryClient();
+    const { selectedPractice } = useProfileStore();
 
     return useMutation({
         mutationFn: (mediaId: number | string) => MediaService.unbookmarkMedia(mediaId),
         onSuccess: (data, mediaId) => {
             // Invalidate all media queries to refresh bookmark status
             queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            // Invalidate album queries to refresh album lists
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMediaAlbums"] });
+            if (selectedPractice?.id) {
+                queryClient.invalidateQueries({ queryKey: ["GetPracticeAlbums", selectedPractice.id] });
+            }
+            onSuccess?.(data);
+        },
+        onError: (error) => {
+            onError?.(error);
+        },
+    });
+};
+
+export const useUpdateMediaImage = (onSuccess?: (data: UpdateMediaImageResponse) => void, onError?: (error: Error) => void): UseMutationResult<UpdateMediaImageResponse, Error, { mediaImageId: number | string; data: UpdateMediaImageRequest }> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ mediaImageId, data }: { mediaImageId: number | string; data: UpdateMediaImageRequest }) => MediaService.updateMediaImage(mediaImageId, data),
+        onSuccess: (data, variables) => {
+            // Invalidate all media queries to refresh the lists
+            queryClient.invalidateQueries({ queryKey: ["GetPatientMedia"] });
+            // Invalidate patient activities to refresh activity list
+            queryClient.invalidateQueries({
+                queryKey: ["GetPatientActivities"],
+            });
             onSuccess?.(data);
         },
         onError: (error) => {

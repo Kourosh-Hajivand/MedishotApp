@@ -80,6 +80,9 @@ const PatientService = {
             if (payload.national_id) {
                 formData.append("national_id", payload.national_id);
             }
+            if (payload.chart_number != null) {
+                formData.append("chart_number", String(payload.chart_number));
+            }
 
             if (payload.numbers) {
                 payload.numbers.forEach((number, index) => {
@@ -131,13 +134,12 @@ const PatientService = {
                 formData.append("id_card", payload.id_card);
             }
 
-            // Add doctor_id as query parameter if provided
-            let url = baseUrl + create(practiseId);
+            // OpenAPI: doctor_id should be in the request body
             if (payload.doctor_id) {
-                url += `?doctor_id=${payload.doctor_id}`;
+                formData.append("doctor_id", String(payload.doctor_id));
             }
 
-            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(url, formData, {
+            const response: AxiosResponse<PatientDetailResponse> = await axiosInstance.post(baseUrl + create(practiseId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;

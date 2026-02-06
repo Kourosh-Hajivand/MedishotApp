@@ -64,7 +64,6 @@ export default function PatientDetailsScreen() {
         selectedPractice?.id,
         id,
         () => {
-            Alert.alert("Success", "ID document uploaded successfully!");
             refetchDocuments();
         },
         (error) => {
@@ -107,12 +106,13 @@ export default function PatientDetailsScreen() {
             const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: add original_media to map if exists, otherwise add all images
+                // PatientMediaWithTemplate: add original_media AND all template images to map
                 const templateMedia = media as PatientMediaWithTemplate;
                 if (templateMedia.original_media?.url) {
                     map.set(templateMedia.original_media.url, mediaId);
-                } else if (Array.isArray(templateMedia.images)) {
-                    // If no original_media, add all individual images to map
+                }
+                // Always add all template images to map (even if original_media exists)
+                if (Array.isArray(templateMedia.images)) {
                     templateMedia.images.forEach((imageItem: any) => {
                         if (imageItem.image?.url) {
                             map.set(imageItem.image.url, mediaId);
@@ -885,9 +885,7 @@ export default function PatientDetailsScreen() {
                 renderItem={renderRow}
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
-                // تب‌ها حالا ایندکس 1 هستند
-                stickyHeaderIndices={[1]}
-                // «فضای مجازی» برای هدر شفاف
+                stickyHeaderIndices={[1]} // «فضای مجازی» برای هدر شفاف
                 contentInset={{ top: headerHeight }}
                 contentOffset={{ x: 0, y: -headerHeight }}
                 contentInsetAdjustmentBehavior="never"

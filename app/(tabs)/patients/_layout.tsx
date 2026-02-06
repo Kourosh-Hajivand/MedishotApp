@@ -1,6 +1,6 @@
 import { BaseText, ErrorState } from "@/components";
 import Avatar from "@/components/avatar";
-import { useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
+import { useGetPatients, useGetPracticeList, useGetPracticeMembers } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { loadProfileSelection, useProfileStore } from "@/utils/hook/useProfileStore";
 import { Button, ContextMenu, Host, Image, Submenu, Switch } from "@expo/ui/swift-ui";
@@ -55,6 +55,7 @@ export default function PatientsLayout() {
         return () => clearTimeout(id);
     }, [isAuthenticated, profile, practiceList, isPracticeListLoading, isProfileLoading, hasIncompleteProfile]);
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const { data: patientsData } = useGetPatients(selectedPractice?.id, { per_page: 1 });
 
     // Filter doctors from members
     const doctors = useMemo(() => {
@@ -233,7 +234,9 @@ export default function PatientsLayout() {
                                 </Host>
                             ),
                         headerSearchBarOptions:
-                            hasIncompleteProfile || hasNoPractice
+                            hasIncompleteProfile ||
+                            hasNoPractice ||
+                            (patientsData && Array.isArray(patientsData.data) && patientsData.data.length === 0)
                                 ? undefined
                                 : {
                                       placeholder: "Search patients",
