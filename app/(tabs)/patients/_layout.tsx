@@ -218,7 +218,9 @@ export default function PatientsLayout() {
                                                 .map((practice, index) => (
                                                     <Switch key={index} label={practice.name} variant="switch" value={selectedPractice?.id === practice.id} onValueChange={() => setSelectedPractice(practice)} />
                                                 ))}
-                                            <Button onPress={() => router.push("/(auth)/select-role")}>Create a Practice</Button>
+                                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>
+                                                Create a Practice
+                                            </Button>
                                         </ContextMenu.Items>
                                         <ContextMenu.Trigger>
                                             <TouchableOpacity onPress={() => router.push("/(profile)")} style={{ width: headerButtonWidth, backgroundColor: "white", borderRadius: 100 }} className="flex-row  bg-white items-center gap-2 overflow-hidden pr-2">
