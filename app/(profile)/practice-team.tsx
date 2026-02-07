@@ -40,6 +40,9 @@ export default function PracticeTeamScreen() {
     // Owner counts as 1 doctor for display: show at least 1 when practice has an owner
     const hasOwner = practiceMembers?.data?.some((m) => m.role === "owner") ?? false;
     const displayDoctorCount = hasOwner ? Math.max(currentDoctorCount, 1) : currentDoctorCount;
+    // If API doesn't count owner as a doctor, adjust remaining slots to account for the owner taking 1 slot
+    const ownerNotCounted = hasOwner && currentDoctorCount < displayDoctorCount;
+    const displayRemainingDoctorSlots = typeof remainingDoctorSlots === "number" && ownerNotCounted ? Math.max(remainingDoctorSlots - 1, 0) : remainingDoctorSlots;
     const { mutate: transferOwnership } = useTransferOwnership(
         () => {},
         (error: Error) => {
@@ -52,15 +55,15 @@ export default function PracticeTeamScreen() {
             Alert.alert("Error", error?.message || "An error occurred while removing the member.");
         },
     );
-    // Owner counts as 1 doctor: when doctor_limit === 1, that slot is the owner — no extra doctor can be added
-    const canAddDoctor = doctorLimit === null || (doctorLimit !== 1 && remainingDoctorSlots !== null && remainingDoctorSlots > 0);
+    // Owner counts as 1 doctor: use adjusted remaining slots that account for owner
+    const canAddDoctor = doctorLimit === null || (typeof displayRemainingDoctorSlots === "number" && displayRemainingDoctorSlots > 0);
     const canAddStaff = staffLimit === null || (remainingStaffSlots !== null && remainingStaffSlots > 0);
 
     const handleAddMember = () => {
         // Check if user can add more members (canAddDoctor/canAddStaff already account for owner = 1 doctor when limit is 1)
 
         // If both doctor and staff slots are full, show upgrade alert
-        if (doctorLimit !== null && staffLimit !== null && remainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
+        if (doctorLimit !== null && staffLimit !== null && displayRemainingDoctorSlots !== null && remainingStaffSlots !== null && !canAddDoctor && !canAddStaff) {
             Alert.alert("Plan Limit Reached", "You have reached the maximum number of members allowed in your current plan. Please upgrade your plan to add more members.", [
                 {
                     text: "Cancel",
@@ -90,7 +93,7 @@ export default function PracticeTeamScreen() {
                 </Host>
             ),
         });
-    }, [navigation, selectedPractice?.id, doctorLimit, staffLimit, remainingDoctorSlots, remainingStaffSlots]);
+    }, [navigation, selectedPractice?.id, doctorLimit, staffLimit, displayRemainingDoctorSlots, remainingStaffSlots]);
     const handleRemoveMember = (practiceId: number, memberId: string | number) => {
         Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practise.", [
             {
@@ -170,7 +173,7 @@ export default function PracticeTeamScreen() {
                         </BaseText>
                         {doctorLimit !== null && (
                             <BaseText type="Caption1" weight="400" color="labels.secondary">
-                                Doctors: {String(displayDoctorCount)} / {String(doctorLimit)} {typeof remainingDoctorSlots === "number" && remainingDoctorSlots > 0 && `(${remainingDoctorSlots} remaining)`}
+                                Doctors: {String(displayDoctorCount)} / {String(doctorLimit)} {typeof displayRemainingDoctorSlots === "number" && `(${displayRemainingDoctorSlots} remaining)`}
                             </BaseText>
                         )}
                         {staffLimit !== null && (
