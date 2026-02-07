@@ -5,10 +5,12 @@ import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSwapSubscription } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import { Host, Picker } from "@expo/ui/swift-ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import RNAnimated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SubscriptionScreen() {
@@ -228,6 +230,23 @@ export default function SubscriptionScreen() {
         }
     };
 
+    // Monthly / Yearly tab state
+    const [billingTab, setBillingTab] = useState(0); // 0 = Monthly, 1 = Yearly
+    const billingTabOptions = ["Monthly", "Yearly"];
+
+    // Filter plans by billing interval and exclude current plan
+    const filteredPlans = useMemo(() => {
+        if (!plansData?.data) return [];
+        const interval = billingTab === 0 ? "monthly" : "yearly";
+        return plansData.data.filter((plan) => {
+            if (plan.id === currentPlan?.id) return false;
+            if ((plan as any).is_default) return false;
+            const planInterval = (plan.billing_interval || "monthly").toLowerCase();
+            if (interval === "monthly") return planInterval === "monthly" || planInterval === "month";
+            return planInterval === "yearly" || planInterval === "year";
+        });
+    }, [plansData?.data, billingTab, currentPlan?.id]);
+
     // Collapse/Expand state for current plan card - MUST be before any conditional returns
     const [isCurrentPlanExpanded, setIsCurrentPlanExpanded] = useState(true);
     const rotationAnim = useRef(new Animated.Value(isCurrentPlanExpanded ? 1 : 0)).current;
@@ -384,33 +403,9 @@ export default function SubscriptionScreen() {
                                         ))}
                                     </View>
                                 </View>
-
-                                {/* Footer with Status */}
-                                <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <View style={styles.timeLeftContainer}>
-                                        <BaseText type="Body" weight="400" color="labels.secondary">
-                                            Time left:
-                                        </BaseText>
-                                        <BaseText type="Body" weight="600" color="labels.primary" style={styles.timeLeftValue}>
-                                            {daysRemaining !== null ? `${daysRemaining} ${daysRemaining === 1 ? "Day" : "Days"}` : "Unlimited"}
-                                        </BaseText>
-                                    </View>
-                                </LinearGradient>
                             </Animated.View>
                         );
                     })()}
-
-                {/* Expandable Separator Line */}
-                {/* {currentPlan && (
-                    <TouchableOpacity activeOpacity={0.7} onPress={() => setIsCurrentPlanExpanded(!isCurrentPlanExpanded)} style={styles.expandableSeparator}>
-                        <View style={styles.separatorLine} />
-                        <View style={styles.chevronButton}>
-                            <Animated.View style={{ transform: [{ rotate: rotateInterpolate }] }}>
-                                <IconSymbol name="chevron.up" size={15} color={colors.system.black} />
-                            </Animated.View>
-                        </View>
-                    </TouchableOpacity>
-                )} */}
 
                 {/* Chevron Circle */}
                 <View style={styles.chevronContainer}>
@@ -424,31 +419,49 @@ export default function SubscriptionScreen() {
 
             {/* Premium Plans Section */}
             <View style={styles.premiumSection}>
-                <BaseText type="Body" weight="400" color="labels.primary" style={styles.premiumTitle}>
+                <BaseText type="Body" weight="400" color="labels.primary" style={styles.premiumTitle} align="center">
                     Access More With{" "}
                     <BaseText weight="600" style={{ color: "#af52de" }}>
                         Medishots Premium
                     </BaseText>
                 </BaseText>
 
-                {/* Plan Cards */}
-                {plansData?.data
-                    ?.filter((plan) => plan.id !== currentPlan?.id) // Filter out current plan
-                    .map((plan) => {
-                        const planColor = getPlanColor(plan.name);
-                        const features = getPlanFeatures(plan);
-                        const planPrice = plan.price; // Use price exactly as received from API
-                        const planBillingInterval = plan.billing_interval || "monthly";
-                        const annualPrice = getAnnualPrice(plan, plansData?.data || []);
+                {/* Monthly / Yearly Segmented Picker */}
+                <View style={styles.billingTabContainer}>
+                    <Host matchContents style={{ flex: 1 }}>
+                        <Picker
+                            label="Billing Interval"
+                            options={billingTabOptions}
+                            selectedIndex={billingTab}
+                            onOptionSelected={({ nativeEvent: { index } }) => {
+                                setBillingTab(index);
+                            }}
+                            variant="segmented"
+                        />
+                    </Host>
+                </View>
 
-                        // Create gradient background for plan header
-                        const gradientColors: [string, string, string, string, string] =
-                            planColor === colors.system.blue
-                                ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
-                                : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
+                {/* Plan Cards with Animation */}
+                {filteredPlans.map((plan, index) => {
+                    const planColor = getPlanColor(plan.name);
+                    const features = getPlanFeatures(plan);
+                    const planPrice = plan.price;
+                    const planBillingInterval = plan.billing_interval || "monthly";
 
-                        return (
-                            <View key={plan.id} style={styles.planCard}>
+                    // Create gradient background for plan header
+                    const gradientColors: [string, string, string, string, string] =
+                        planColor === colors.system.blue
+                            ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
+                            : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
+
+                    return (
+                        <RNAnimated.View
+                            key={`${billingTab}-${plan.id}`}
+                            entering={FadeInDown.duration(400)
+                                .delay(index * 120)
+                                .springify()}
+                        >
+                            <View style={styles.planCard}>
                                 <View style={styles.planCardInner}>
                                     {/* Plan Header */}
                                     <View style={styles.planHeaderWrapper}>
@@ -461,25 +474,15 @@ export default function SubscriptionScreen() {
                                                     {formatPrice(planPrice, plan.currency, planBillingInterval)}
                                                 </BaseText>
                                             </LinearGradient>
-                                            {annualPrice !== null && (
-                                                <View style={styles.annualBadge}>
-                                                    <BaseText type="Footnote" weight="400" color="labels.primary">
-                                                        Annual:
-                                                    </BaseText>
-                                                    <BaseText type="Callout" weight="400" color="labels.primary">
-                                                        {formatPrice(annualPrice, plan.currency, "yearly")}
-                                                    </BaseText>
-                                                </View>
-                                            )}
                                         </View>
                                     </View>
 
                                     {/* Plan Features */}
                                     <View style={styles.planFeatures}>
-                                        {features.map((feature, index) => (
-                                            <View key={index} style={styles.featureItemContainer}>
+                                        {features.map((feature, fIndex) => (
+                                            <View key={fIndex} style={styles.featureItemContainer}>
                                                 <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
-                                                <BaseText key={index} type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                <BaseText type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
                                                     {" " + feature}
                                                 </BaseText>
                                             </View>
@@ -489,11 +492,20 @@ export default function SubscriptionScreen() {
 
                                 {/* Purchase Button */}
                                 <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton label={"Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
+                                    <BaseButton label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
                                 </LinearGradient>
                             </View>
-                        );
-                    })}
+                        </RNAnimated.View>
+                    );
+                })}
+
+                {filteredPlans.length === 0 && (
+                    <View style={{ paddingVertical: 32, alignItems: "center" }}>
+                        <BaseText type="Body" weight="400" color="labels.secondary">
+                            No {billingTab === 0 ? "monthly" : "yearly"} plans available
+                        </BaseText>
+                    </View>
+                )}
             </View>
         </ScrollView>
     );
@@ -590,6 +602,10 @@ const styles = StyleSheet.create({
         fontSize: 17,
         lineHeight: 22,
         letterSpacing: -0.43,
+    },
+    billingTabContainer: {
+        marginTop: spacing["3"],
+        marginBottom: spacing["3"],
     },
     planCard: {
         backgroundColor: "#ffffff",
