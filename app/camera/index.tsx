@@ -21,7 +21,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { DeviceMotion } from "expo-sensors";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Dimensions, FlatList, Modal, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -66,6 +66,7 @@ const GhostOverlay: React.FC<{
     ghostImageSource: { uri: string } | any;
 }> = ({ ghostImageSource }) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [overlayDimensions, setOverlayDimensions] = useState({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
     const hasLoadedRef = React.useRef(false);
     const imageOpacity = useSharedValue(0);
@@ -79,16 +80,25 @@ const GhostOverlay: React.FC<{
         opacity: skeletonOpacity.value,
     }));
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     const handleLoad = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
     const handleLoadStart = () => {
         if (!hasLoadedRef.current) {
             setIsLoading(true);
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -97,7 +107,11 @@ const GhostOverlay: React.FC<{
     const handleError = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -110,7 +124,7 @@ const GhostOverlay: React.FC<{
 
     return (
         <View style={[styles.ghostOverlay, StyleSheet.absoluteFill]} onLayout={handleLayout}>
-            {(isLoading || skeletonOpacity.value > 0) && (
+            {showSkeleton && (
                 <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
                     <ImageSkeleton width={overlayDimensions.width} height={overlayDimensions.height} borderRadius={0} variant="rectangular" />
                 </Animated.View>
@@ -136,6 +150,7 @@ const ThumbnailIconItem: React.FC<{
     const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
 
     const [isLoading, setIsLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [iconDimensions, setIconDimensions] = useState({ width: THUMBNAIL_SIZE, height: THUMBNAIL_SIZE });
     const hasLoadedRef = React.useRef(false);
     const imageOpacity = useSharedValue(0);
@@ -149,16 +164,25 @@ const ThumbnailIconItem: React.FC<{
         opacity: skeletonOpacity.value,
     }));
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     const handleLoad = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
     const handleLoadStart = () => {
         if (!hasLoadedRef.current) {
             setIsLoading(true);
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -167,7 +191,11 @@ const ThumbnailIconItem: React.FC<{
     const handleError = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -189,7 +217,7 @@ const ThumbnailIconItem: React.FC<{
                 </>
             ) : iconSource ? (
                 <View style={styles.thumbnailIconContainer} onLayout={handleLayout}>
-                    {(isLoading || skeletonOpacity.value > 0) && (
+                    {showSkeleton && (
                         <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
                             <ImageSkeleton width={iconDimensions.width} height={iconDimensions.height} borderRadius={8} variant="rectangular" />
                         </Animated.View>
@@ -962,7 +990,7 @@ export default function CameraScreen() {
 
     const checkmarkAnimStyle = useAnimatedStyle(() => ({
         transform: [{ scale: checkmarkScale.value }],
-        opacity: checkmarkScale.value > 0 ? 1 : 0, // Show/hide based on scale
+        opacity: checkmarkScale.value, // Opacity already animated from 0 to 1
     }));
 
     // Loading state - wait for patient and template data

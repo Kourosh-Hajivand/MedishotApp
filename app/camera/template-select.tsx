@@ -11,7 +11,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { FadeInDown, Layout, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { FadeInDown, Layout, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutPattern } from "./_components/create-template/types";
 import { getItemLayoutStyle } from "./_components/create-template/utils";
@@ -27,6 +27,7 @@ const TemplatePreviewImageItem: React.FC<{
     templateSize: number;
 }> = ({ ghostItem, layoutStyle, index, templateSize }) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [itemDimensions, setItemDimensions] = useState({ width: 50, height: 50 });
     const hasLoadedRef = React.useRef(false);
     const imageOpacity = useSharedValue(0);
@@ -43,13 +44,18 @@ const TemplatePreviewImageItem: React.FC<{
     const handleLoad = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(setShowSkeleton)(false);
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
     const handleLoadStart = () => {
         if (!hasLoadedRef.current) {
             setIsLoading(true);
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -58,7 +64,11 @@ const TemplatePreviewImageItem: React.FC<{
     const handleError = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(setShowSkeleton)(false);
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -79,7 +89,7 @@ const TemplatePreviewImageItem: React.FC<{
 
     return (
         <Animated.View style={[styles.templatePreviewImageContainer, layoutStyle]} onLayout={handleLayout}>
-            {(isLoading || skeletonOpacity.value > 0) && (
+            {showSkeleton && (
                 <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
                     <ImageSkeleton width={itemDimensions.width} height={itemDimensions.height} borderRadius={0} variant="rectangular" />
                 </Animated.View>

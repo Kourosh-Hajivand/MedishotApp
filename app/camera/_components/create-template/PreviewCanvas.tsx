@@ -4,7 +4,7 @@ import colors from "@/theme/colors";
 import { Image } from "expo-image";
 import React, { useState } from "react";
 import { Dimensions, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, Layout, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { FadeIn, Layout, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { LayoutPattern, TemplateItem } from "./types";
 import { getItemLayoutStyle } from "./utils";
 
@@ -23,6 +23,7 @@ const PreviewItem: React.FC<{
     index: number;
 }> = ({ item, layoutStyle, index }) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [itemDimensions, setItemDimensions] = useState({ width: 100, height: 100 });
     const hasLoadedRef = React.useRef(false); // Track if image has been loaded at least once
     const imageOpacity = useSharedValue(0);
@@ -36,10 +37,18 @@ const PreviewItem: React.FC<{
         opacity: skeletonOpacity.value,
     }));
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     const handleLoad = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -47,6 +56,7 @@ const PreviewItem: React.FC<{
         // Only show skeleton if image hasn't been loaded before
         if (!hasLoadedRef.current) {
             setIsLoading(true);
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -55,7 +65,11 @@ const PreviewItem: React.FC<{
     const handleError = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -80,7 +94,7 @@ const PreviewItem: React.FC<{
 
     return (
         <Animated.View layout={Layout.springify()} entering={FadeIn.delay(index * 50).springify()} style={[styles.previewItem, layoutStyle]} onLayout={handleLayout}>
-            {(isLoading || skeletonOpacity.value > 0) && (
+            {showSkeleton && (
                 <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
                     <ImageSkeleton width={itemDimensions.width} height={itemDimensions.height} borderRadius={0} variant="rectangular" />
                 </Animated.View>

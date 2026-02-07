@@ -15,7 +15,7 @@ import { Image } from "expo-image";
 import React, { useRef, useState } from "react";
 import { Alert, Dimensions, Modal, Image as RNImage, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { FadeIn, FadeOut, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
 
@@ -135,6 +135,7 @@ interface ImageViewerItemProps {
 
 const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSize, gestures, isCurrentImage, imageAnimatedStyle, isLoading, onLoadStart, onLoad, onError }) => {
     // Create shared values for this component (proper hooks usage)
+    const [showSkeleton, setShowSkeleton] = React.useState(isLoading);
     const imageOpacity = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacity = useSharedValue(isLoading ? 1 : 0);
     const hasLoadedRef = React.useRef(false); // Track if image has been loaded at least once
@@ -150,15 +151,21 @@ const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSiz
     // Update shared values when loading state changes (only if not already loaded)
     React.useEffect(() => {
         if (isLoading && !hasLoadedRef.current) {
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
     }, [isLoading]);
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     // Handlers that update shared values
     const handleLoadStart = () => {
         // Only show skeleton if image hasn't been loaded before
         if (!hasLoadedRef.current) {
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -167,14 +174,22 @@ const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSiz
 
     const handleLoad = (e: any) => {
         hasLoadedRef.current = true; // Mark as loaded
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
         onLoad(e);
     };
 
     const handleError = () => {
         hasLoadedRef.current = true; // Mark as loaded (even on error)
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
         onError();
     };
@@ -183,7 +198,7 @@ const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSiz
         <View style={styles.imageWrapper}>
             <GestureDetector gesture={gestures as any}>
                 <Animated.View style={[styles.imageContainer, isCurrentImage ? imageAnimatedStyle : null] as any}>
-                    {(skeletonOpacity?.value ?? (isLoading ? 1 : 0)) > 0 && (
+                    {showSkeleton && (
                         <Animated.View style={[styles.skeletonContainer, { width: imageSize.width || width, height: imageSize.height || height }, skeletonAnimatedStyle]}>
                             <ImageSkeleton width={imageSize.width || width} height={imageSize.height || height} borderRadius={0} variant="rectangular" />
                         </Animated.View>
@@ -212,6 +227,7 @@ const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSiz
 
 const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoadStart?: () => void; onLoad?: () => void; onError?: () => void }> = ({ imageUri, index, isActive, onPress, scrollProgress, currentIndexShared, isLoading = true, onLoadStart, onLoad, onError }) => {
     // Create shared values for this component (proper hooks usage)
+    const [showSkeleton, setShowSkeleton] = React.useState(isLoading);
     const thumbnailOpacity = useSharedValue(isLoading ? 0 : 1);
     const thumbnailSkeletonOpacity = useSharedValue(isLoading ? 1 : 0);
     const hasLoadedRef = React.useRef(false); // Track if thumbnail has been loaded at least once
@@ -278,15 +294,21 @@ const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoad
     // Update shared values when loading state changes (only if not already loaded)
     React.useEffect(() => {
         if (isLoading && !hasLoadedRef.current) {
+            setShowSkeleton(true);
             thumbnailOpacity.value = 0;
             thumbnailSkeletonOpacity.value = 1;
         }
     }, [isLoading]);
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     // Handlers that update shared values
     const handleLoadStart = () => {
         // Only show skeleton if thumbnail hasn't been loaded before
         if (!hasLoadedRef.current) {
+            setShowSkeleton(true);
             thumbnailOpacity.value = 0;
             thumbnailSkeletonOpacity.value = 1;
         }
@@ -295,14 +317,22 @@ const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoad
 
     const handleLoad = () => {
         hasLoadedRef.current = true; // Mark as loaded
-        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 });
+        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         thumbnailOpacity.value = withTiming(1, { duration: 300 });
         onLoad?.();
     };
 
     const handleError = () => {
         hasLoadedRef.current = true; // Mark as loaded (even on error)
-        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 });
+        thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         thumbnailOpacity.value = withTiming(1, { duration: 300 });
         onError?.();
     };
@@ -310,7 +340,7 @@ const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoad
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
             <Animated.View style={[styles.thumbnail, animatedThumbnailStyle]}>
-                {thumbnailSkeletonOpacity.value > 0 && (
+                {showSkeleton && (
                     <Animated.View style={[styles.thumbnailSkeletonContainer, skeletonOpacityStyle]}>
                         <ImageSkeleton width={44} height={44} borderRadius={8} variant="rounded" />
                     </Animated.View>
@@ -388,7 +418,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const flatListRef = useRef<FlatList>(null);
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const thumbnailScrollPosition = useRef(0);
-    const isProgrammaticScroll = useRef(false);
+    const isProgrammaticScroll = useSharedValue(false); // Changed to shared value for worklet access
     const lastThumbnailIndex = useRef(initialIndex);
     const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isHandlingScrollEnd = useRef(false);
@@ -676,7 +706,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const handleScroll = useAnimatedScrollHandler({
         onScroll: (event) => {
             // Don't update during programmatic scrolls
-            if (isProgrammaticScroll.current) {
+            if (isProgrammaticScroll.value) {
                 return;
             }
 
@@ -699,7 +729,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const handleMomentumScrollEnd = (event: any) => {
         // Don't update if scroll is programmatic
-        if (isProgrammaticScroll.current) {
+        if (isProgrammaticScroll.value) {
             return;
         }
 
@@ -1090,14 +1120,50 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const dismissPanGesture = React.useMemo(
         () =>
             Gesture.Pan()
-                .activeOffsetY([20, 999])
-                .failOffsetX([-15, 15])
-                .onUpdate((e) => {
-                    // Only allow vertical dismiss if not doing horizontal swipe
-                    const isHorizontalSwipe = Math.abs(e.velocityX) > Math.abs(e.velocityY);
+                .manualActivation(true)
+                .onTouchesDown((e, state) => {
+                    // Only allow if not zoomed
+                    if (scale.value > 1) {
+                        state.fail();
+                    }
+                })
+                .onTouchesMove((e, state) => {
+                    if (scale.value > 1) {
+                        state.fail();
+                        return;
+                    }
 
-                    if (scale.value <= 1 && e.translationY > 0 && !isHorizontalSwipe) {
-                        dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
+                    const touch = e.allTouches[0];
+                    if (!touch) {
+                        state.fail();
+                        return;
+                    }
+
+                    const absX = Math.abs(touch.x);
+                    const absY = Math.abs(touch.y);
+
+                    // Only activate if:
+                    // 1. Moving down (y > 0)
+                    // 2. Vertical movement is at least 2x more than horizontal
+                    // 3. Moved at least 20px vertically
+                    if (touch.y > 20 && absY > absX * 2) {
+                        state.activate();
+                    } 
+                    // Fail if horizontal movement is dominant or moved left/right too much
+                    else if (absX > 25 || (absX > absY && absX > 15)) {
+                        state.fail();
+                    }
+                })
+                .onUpdate((e) => {
+                    // Only update if moving down and not zoomed
+                    if (scale.value <= 1 && e.translationY > 0) {
+                        // Extra safety: ensure vertical movement is still dominant
+                        const absX = Math.abs(e.translationX);
+                        const absY = Math.abs(e.translationY);
+                        
+                        if (absY > absX * 1.5) {
+                            dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
+                        }
                     }
                 })
                 .onEnd((e) => {
@@ -1106,6 +1172,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         dismissTranslateY.value = withTiming(height, { duration: 150 });
                         runOnJS(onClose)();
                     } else {
+                        dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
+                    }
+                })
+                .onFinalize(() => {
+                    // Always reset if not dismissing
+                    if (dismissTranslateY.value > 0 && dismissTranslateY.value < DISMISS_THRESHOLD) {
                         dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
                     }
                 }),
@@ -1163,7 +1235,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     <GestureDetector gesture={dismissPanGesture}>
                         <Animated.View style={[styles.container, dismissAnimatedStyle]}>
                             {/* Header */}
-                            <Animated.View entering={FadeIn} exiting={FadeOut} style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
+                            <Animated.View style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 <View style={styles.actionButtonsContainer}>
                                     <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                         <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
@@ -1297,7 +1369,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             />
 
                             {/* Bottom Bar with Thumbnails and Actions */}
-                            <Animated.View entering={FadeIn.delay(300)} exiting={FadeOut} style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
+                            <Animated.View style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 {/* Thumbnail Gallery - Hide when zoomed */}
                                 {!isZoomed && (
                                     <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} scrollEnabled={true} scrollEventThrottle={16} decelerationRate="normal" bounces={false}>
@@ -1337,12 +1409,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                     onPress={() => {
                                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                                         scrollProgress.value = 0;
-                                                        isProgrammaticScroll.current = true;
+                                                        isProgrammaticScroll.value = true;
                                                         setCurrentIndex(index);
                                                         flatListRef.current?.scrollToIndex({ index, animated: true });
                                                         // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
                                                         setTimeout(() => {
-                                                            isProgrammaticScroll.current = false;
+                                                            isProgrammaticScroll.value = false;
                                                         }, 500);
                                                     }}
                                                 />

@@ -3,7 +3,7 @@ import colors from "@/theme/colors";
 import { Image } from "expo-image";
 import React, { useState } from "react";
 import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MINT_COLOR } from "./constants";
 import { TemplateItem } from "./types";
 
@@ -22,6 +22,7 @@ const TemplateItemCard: React.FC<{
     onToggle: () => void;
 }> = ({ item, isSelected, isDisabled, onToggle }) => {
     const [isLoading, setIsLoading] = useState(true);
+    const [showSkeleton, setShowSkeleton] = useState(true);
     const [imageContainerDimensions, setImageContainerDimensions] = useState({ width: 87, height: 87 }); // 85% of 102
     const hasLoadedRef = React.useRef(false); // Track if image has been loaded at least once
     const imageOpacity = useSharedValue(0);
@@ -35,10 +36,18 @@ const TemplateItemCard: React.FC<{
         opacity: skeletonOpacity.value,
     }));
 
+    const hideSkeletonJS = () => {
+        setShowSkeleton(false);
+    };
+
     const handleLoad = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -46,6 +55,7 @@ const TemplateItemCard: React.FC<{
         // Only show skeleton if image hasn't been loaded before
         if (!hasLoadedRef.current) {
             setIsLoading(true);
+            setShowSkeleton(true);
             imageOpacity.value = 0;
             skeletonOpacity.value = 1;
         }
@@ -54,7 +64,11 @@ const TemplateItemCard: React.FC<{
     const handleError = () => {
         hasLoadedRef.current = true;
         setIsLoading(false);
-        skeletonOpacity.value = withTiming(0, { duration: 300 });
+        skeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
+            if (finished) {
+                runOnJS(hideSkeletonJS)();
+            }
+        });
         imageOpacity.value = withTiming(1, { duration: 300 });
     };
 
@@ -81,7 +95,7 @@ const TemplateItemCard: React.FC<{
         <TouchableOpacity style={[styles.card, isSelected && styles.cardSelected]} onPress={onToggle} activeOpacity={0.8} disabled={isDisabled}>
             <View style={[styles.itemContainer, isSelected && styles.itemContainerSelected, isDisabled && styles.itemContainerDisabled]}>
                 <View style={styles.imageContainer} onLayout={handleImageContainerLayout}>
-                    {(isLoading || skeletonOpacity.value > 0) && (
+                    {showSkeleton && (
                         <Animated.View style={[StyleSheet.absoluteFill, skeletonAnimatedStyle, { justifyContent: "center", alignItems: "center" }]}>
                             <ImageSkeleton width={imageContainerDimensions.width} height={imageContainerDimensions.height} borderRadius={0} variant="rectangular" />
                         </Animated.View>
