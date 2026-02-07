@@ -195,14 +195,19 @@ export const AddPatientPhotoScreen: React.FC = () => {
     }, [phones]);
 
     const hasValidEmail = useMemo(() => {
-        return emails.some((email) => email.value && typeof email.value === "string" && email.value.trim() !== "");
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emails.some((email) => email.value && typeof email.value === "string" && emailRegex.test(email.value.trim()));
     }, [emails]);
 
     const hasValidAddress = useMemo(() => {
         return addresses.some((address) => {
             if (!address.value) return false;
             if (typeof address.value === "object") {
-                return Object.values(address.value).some((val) => val && typeof val === "string" && (val as string).trim() !== "");
+                const addr = address.value as AddressValue;
+                // Require at least street1 or city to be filled
+                const hasStreet = (addr.street1?.trim() || "") !== "";
+                const hasCity = (addr.city?.trim() || "") !== "";
+                return hasStreet || hasCity;
             }
             return typeof address.value === "string" && address.value.trim() !== "";
         });
@@ -578,15 +583,23 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
         // Re-validate required contact fields for create mode
         if (!isEditMode) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             const hasPhone = currentPhones.some((p) => p?.value && toE164(String(p.value).trim()));
-            const hasEmail = emailsRef.current.some((e) => e?.value && typeof e.value === "string" && e.value.trim() !== "");
+            const hasEmail = emailsRef.current.some((e) => e?.value && typeof e.value === "string" && emailRegex.test(e.value.trim()));
             const hasAddress = addressesRef.current.some((a) => {
                 if (!a?.value) return false;
-                if (typeof a.value === "object") return Object.values(a.value).some((v) => v && typeof v === "string" && (v as string).trim() !== "");
+                if (typeof a.value === "object") {
+                    const addr = a.value as AddressValue;
+                    return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
+                }
                 return typeof a.value === "string" && a.value.trim() !== "";
             });
             if (!hasPhone || !hasEmail || !hasAddress) {
-                Alert.alert("فیلدهای اجباری", "لطفاً حداقل یک شماره تلفن، یک ایمیل و یک آدرس وارد کنید.");
+                const missing: string[] = [];
+                if (!hasPhone) missing.push("a valid phone number");
+                if (!hasEmail) missing.push("a valid email address");
+                if (!hasAddress) missing.push("an address (street or city)");
+                Alert.alert("Required Fields", `Please provide at least ${missing.join(", ")}.`);
                 return;
             }
         }
@@ -755,13 +768,13 @@ export const AddPatientPhotoScreen: React.FC = () => {
             if (!isEditMode) {
                 // Set error messages for dynamic fields
                 if (!hasValidPhone) {
-                    setPhoneError("At least one phone number is required");
+                    setPhoneError("A valid phone number is required");
                 }
                 if (!hasValidEmail) {
-                    setEmailError("At least one email address is required");
+                    setEmailError("A valid email address is required (e.g. name@example.com)");
                 }
                 if (!hasValidAddress) {
-                    setAddressError("At least one address is required");
+                    setAddressError("An address with at least a street or city is required");
                 }
             }
             return;
@@ -964,7 +977,9 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setPhones(items);
                             phonesRef.current = items;
-                            if (items.length > 0) setPhoneError("");
+                            // Only clear error when at least one valid phone exists
+                            const hasValid = items.some((p) => p?.value && toE164(String(p.value).trim()));
+                            if (hasValid) setPhoneError("");
                         }}
                         initialItems={phones}
                         error={phoneError}
@@ -975,7 +990,9 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setEmails(items);
                             emailsRef.current = items;
-                            if (items.length > 0) setEmailError("");
+                            // Only clear error when at least one valid email exists
+                            const hasValid = items.some((e) => e?.value && typeof e.value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.value.trim()));
+                            if (hasValid) setEmailError("");
                         }}
                         initialItems={emails}
                         error={emailError}
@@ -986,7 +1003,16 @@ export const AddPatientPhotoScreen: React.FC = () => {
                         onChange={(items) => {
                             setAddresses(items);
                             addressesRef.current = items;
-                            if (items.length > 0) setAddressError("");
+                            // Only clear error when at least one valid address exists (street1 or city required)
+                            const hasValid = items.some((a) => {
+                                if (!a?.value) return false;
+                                if (typeof a.value === "object") {
+                                    const addr = a.value as AddressValue;
+                                    return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
+                                }
+                                return typeof a.value === "string" && a.value.trim() !== "";
+                            });
+                            if (hasValid) setAddressError("");
                         }}
                         initialItems={addresses}
                         error={addressError}

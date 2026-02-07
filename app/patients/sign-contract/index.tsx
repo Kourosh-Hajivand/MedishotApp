@@ -119,6 +119,8 @@ export default function SignContractScreen() {
     const { mutate: createContract, isPending: isSubmitting } = useCreateContract(
         () => {
             router.back();
+            // Set tab param so patient detail page switches to Consent tab
+            router.setParams({ tab: "consent" });
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to sign contract");

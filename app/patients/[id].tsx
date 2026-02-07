@@ -34,7 +34,7 @@ try {
 type RowKind = "header" | "tabs" | "content";
 
 export default function PatientDetailsScreen() {
-    const { id, action, phoneIndex } = useLocalSearchParams<{ id: string; action?: string; phoneIndex?: string }>();
+    const { id, action, phoneIndex, tab } = useLocalSearchParams<{ id: string; action?: string; phoneIndex?: string; tab?: string }>();
     const navigation = useNavigation();
     const { selectedPractice } = useProfileStore();
     const { data: patient, isLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(id);
@@ -73,6 +73,17 @@ export default function PatientDetailsScreen() {
 
     const tabs = ["Media", "Consent", "ID", "Activities"];
     const [activeTab, setActiveTab] = useState(0);
+
+    // Switch to tab when `tab` param is provided (e.g. after signing a consent)
+    useEffect(() => {
+        if (tab) {
+            const tabIndex = tabs.findIndex((t) => t.toLowerCase() === tab.toLowerCase());
+            if (tabIndex >= 0 && tabIndex !== activeTab) {
+                handleTabPress(tabIndex);
+            }
+        }
+    }, [tab]);
+
     const [imageEditorVisible, setImageEditorVisible] = useState(false);
     const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
     const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
