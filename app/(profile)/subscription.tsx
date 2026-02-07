@@ -489,7 +489,7 @@ export default function SubscriptionScreen() {
 
                                 {/* Purchase Button */}
                                 <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
+                                    <BaseButton label={"Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
                                 </LinearGradient>
                             </View>
                         );

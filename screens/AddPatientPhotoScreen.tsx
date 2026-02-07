@@ -894,7 +894,7 @@ export const AddPatientPhotoScreen: React.FC = () => {
                             </View>
 
                             <View className="w-full items-center justify-center  ">
-                                <View className="w-[80%] ">
+                                <View className="w-fit">
                                     <BaseButton label="Pick a Photo" ButtonStyle="Tinted" size="Small" rounded={true} style={{ pointerEvents: "none" }} />
                                 </View>
                             </View>

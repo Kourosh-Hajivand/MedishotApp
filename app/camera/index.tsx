@@ -446,8 +446,6 @@ export default function CameraScreen() {
     const [showGuideModal, setShowGuideModal] = useState(false);
     const [showSampleModal, setShowSampleModal] = useState(false);
 
-    // Ref to track which photo is being uploaded (photoId -> upload promise)
-    const uploadingPhotoIdRef = useRef<string | null>(null);
     // Ref to track tempFilename synchronously (photoId -> tempFilename)
     const tempFilenameMapRef = useRef<Map<string, string>>(new Map());
     // Viewport rect (screen coords) for mapping crop to what user sees in 3:2 frame
@@ -456,46 +454,7 @@ export default function CameraScreen() {
     const cropViewportRef = useRef<{ viewportTop: number; viewportLeft: number; viewportWidth: number; viewportHeight: number } | null>(null);
 
     // Hook for immediate temp upload (for all photos)
-    const { mutate: uploadToTemp } = useTempUpload(
-        (response) => {
-            // Response structure: {success: true, data: {filename: '...'}}
-            const responseAny = response as { data?: { filename?: string }; filename?: string; id?: string | number };
-            const tempFilename = responseAny?.data?.filename || responseAny?.filename || (responseAny?.id ? String(responseAny.id) : undefined);
-
-            if (tempFilename && uploadingPhotoIdRef.current) {
-                const photoId = uploadingPhotoIdRef.current;
-
-                // Update ref immediately (synchronous)
-                tempFilenameMapRef.current.set(photoId, tempFilename);
-
-                // Update state (async)
-                setCapturedPhotos((prev) => {
-                    return prev.map((p) => {
-                        if (p.id === photoId && !p.tempFilename) {
-                            return { ...p, tempFilename, uploadStatus: "success" as const };
-                        }
-                        return p;
-                    });
-                });
-                uploadingPhotoIdRef.current = null; // Reset
-            }
-        },
-        (error) => {
-            // Update upload status to error
-            if (uploadingPhotoIdRef.current) {
-                const photoId = uploadingPhotoIdRef.current;
-                setCapturedPhotos((prev) => {
-                    return prev.map((p) => {
-                        if (p.id === photoId && p.uploadStatus === "uploading") {
-                            return { ...p, uploadStatus: "error" as const };
-                        }
-                        return p;
-                    });
-                });
-                uploadingPhotoIdRef.current = null; // Reset
-            }
-        },
-    );
+    const { mutateAsync: uploadToTempAsync } = useTempUpload();
 
     // Keep ref in sync with state
     useEffect(() => {
@@ -876,6 +835,9 @@ export default function CameraScreen() {
                 });
 
                 // Immediately upload ALL photos to temp-upload service
+                // Capture photoId in closure to avoid race conditions with parallel uploads
+                const currentPhotoId = newPhoto.id;
+                
                 try {
                     const filename = finalPhotoUri.split("/").pop() || "image.png";
                     const match = /\.(\w+)$/.exec(filename);
@@ -887,15 +849,44 @@ export default function CameraScreen() {
                         name: filename,
                     };
 
-                    // Update status to uploading and set ref to track this photo
-                    uploadingPhotoIdRef.current = newPhoto.id;
-                    setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "uploading" } : p)));
+                    // Update status to uploading
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, uploadStatus: "uploading" } : p)));
 
-                    // Upload immediately to temp-upload
-                    uploadToTemp(file);
+                    // Upload immediately to temp-upload using mutateAsync with closure
+                    uploadToTempAsync(file)
+                        .then((response) => {
+                            // Response structure: {success: true, data: {filename: '...'}}
+                            const responseAny = response as { data?: { filename?: string }; filename?: string; id?: string | number };
+                            const tempFilename = responseAny?.data?.filename || responseAny?.filename || (responseAny?.id ? String(responseAny.id) : undefined);
+
+                            if (tempFilename) {
+                                // Update ref immediately (synchronous)
+                                tempFilenameMapRef.current.set(currentPhotoId, tempFilename);
+
+                                // Update state (async)
+                                setCapturedPhotos((prev) => {
+                                    return prev.map((p) => {
+                                        if (p.id === currentPhotoId && !p.tempFilename) {
+                                            return { ...p, tempFilename, uploadStatus: "success" as const };
+                                        }
+                                        return p;
+                                    });
+                                });
+                            }
+                        })
+                        .catch((error) => {
+                            // Update upload status to error
+                            setCapturedPhotos((prev) => {
+                                return prev.map((p) => {
+                                    if (p.id === currentPhotoId && p.uploadStatus === "uploading") {
+                                        return { ...p, uploadStatus: "error" as const };
+                                    }
+                                    return p;
+                                });
+                            });
+                        });
                 } catch (error) {
-                    setCapturedPhotos((prev) => prev.map((p) => (p.id === newPhoto.id ? { ...p, uploadStatus: "error" } : p)));
-                    uploadingPhotoIdRef.current = null; // Reset on error
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, uploadStatus: "error" } : p)));
                 }
 
                 if (hasGhostItems) {
@@ -922,7 +913,7 @@ export default function CameraScreen() {
         } finally {
             setIsCapturing(false);
         }
-    }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, uploadToTemp]);
+    }, [isCapturing, currentGhostData, currentGhostItem, hasGhostItems, ghostItemsData.length, uploadToTempAsync]);
 
     const renderThumbnailItem = useCallback(
         ({ item: ghostItem, index }: { item: GhostItemData; index: number }) => {

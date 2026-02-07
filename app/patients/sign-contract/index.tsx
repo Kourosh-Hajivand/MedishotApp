@@ -272,6 +272,23 @@ export default function SignContractScreen() {
     const patient = patientData?.data;
     const practice = practiceData?.data;
     const template = contractTemplate?.data;
+
+    // Doctor display name: patient.doctor or current user (me) — MUST be before early returns
+    const doctorDisplayName = useMemo(() => {
+        if (patient?.doctor?.first_name != null || patient?.doctor?.last_name != null) {
+            const first = patient.doctor.first_name ?? "";
+            const last = patient.doctor.last_name ?? "";
+            const full = `${first} ${last}`.trim();
+            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
+        }
+        if (me?.first_name != null || me?.last_name != null) {
+            const first = me.first_name ?? "";
+            const last = me.last_name ?? "";
+            const full = `${first} ${last}`.trim();
+            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
+        }
+        return "";
+    }, [patient?.doctor, me?.first_name, me?.last_name]);
     const isDoneDisabled = !signature || !uploadedSignatureFilename || isSubmitting || isUploadingSignature || isUploadingPDF || isGeneratingPDF;
 
     const isLoading = isLoadingTemplate || isLoadingPatient || isLoadingPractice;
@@ -403,23 +420,6 @@ export default function SignContractScreen() {
         }
         setShowSignatureModal(false);
     };
-
-    // Doctor display name: patient.doctor or current user (me)
-    const doctorDisplayName = useMemo(() => {
-        if (patient?.doctor?.first_name != null || patient?.doctor?.last_name != null) {
-            const first = patient.doctor.first_name ?? "";
-            const last = patient.doctor.last_name ?? "";
-            const full = `${first} ${last}`.trim();
-            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
-        }
-        if (me?.first_name != null || me?.last_name != null) {
-            const first = me.first_name ?? "";
-            const last = me.last_name ?? "";
-            const full = `${first} ${last}`.trim();
-            return full ? (full.startsWith("Dr.") ? full : `Dr. ${full}`) : "";
-        }
-        return "";
-    }, [patient?.doctor, me?.first_name, me?.last_name]);
 
     // Helper function to replace placeholders in text (#Placeholder# and {placeholder} formats)
     const replacePlaceholders = (text: string): string => {
