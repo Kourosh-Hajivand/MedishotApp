@@ -6,7 +6,7 @@ import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
 import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
-import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
+import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -180,7 +180,7 @@ export default function BeforeAfterCompareScreen() {
             </View>
 
             {/* Bottom toolbar: light gray bg; white circular arrows + white pill center (Figma) */}
-            <View style={[styles.toolbar, styles.toolbarLightGray, { paddingBottom: insets.bottom }]}>
+            <View style={[styles.toolbar, { paddingBottom: insets.bottom }]}>
                 <View style={styles.toolbarRow}>
                     <TouchableOpacity onPress={handlePrev} style={[styles.arrowButtonCircle, !canGoPrev && styles.arrowDisabled]} disabled={!canGoPrev}>
                         <IconSymbol name="chevron.left" size={24} color={canGoPrev ? (colors.system.black as any) : (colors.system.gray4 as any)} />
@@ -237,7 +237,7 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afte
     }));
 
     const handleStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: dividerX.value - 24 }],
+        transform: [{ translateX: dividerX.value - 32 }],
     }));
 
     const beforeLabelStyle = useAnimatedStyle(() => ({
@@ -296,54 +296,71 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afte
     );
 }
 
-/** Slider mode: two images stacked, opacity of top (after) controlled by slider */
+/** Slider mode: image on top, slider pill below image (above tab bar), opacity of after controlled by slider */
 function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl: string }) {
     const sliderValue = useSharedValue(0.5);
-    const trackWidth = SCREEN_WIDTH - 40;
-    const padding = 20;
+    const trackWidthSv = useSharedValue(SCREEN_WIDTH - 120);
+    const trackXRef = React.useRef(0);
 
     const updatePosition = useCallback(
         (pageX: number) => {
-            const w = SCREEN_WIDTH - padding * 2;
-            const x = pageX - padding;
-            const ratio = Math.max(0, Math.min(1, x / w));
-            sliderValue.value = withSpring(ratio, { damping: 20, stiffness: 200 });
+            const ratio = Math.max(0, Math.min(1, (pageX - trackXRef.current) / trackWidthSv.value));
+            sliderValue.value = ratio;
         },
-        [sliderValue],
+        [sliderValue, trackWidthSv],
     );
 
     const afterImageStyle = useAnimatedStyle(() => ({
         opacity: sliderValue.value,
     }));
 
+    const trackFillStyle = useAnimatedStyle(() => ({
+        width: sliderValue.value * trackWidthSv.value,
+    }));
+
     return (
         <View style={styles.sliderContainer}>
-            {/* Bottom layer: before */}
-            <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            {/* Top layer: after, opacity 0..1 */}
-            <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">
-                <Image source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
-            </Animated.View>
+            {/* Top: image area (no overlap) */}
+            <View style={styles.sliderImageArea}>
+                <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">
+                    <Image source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                </Animated.View>
+            </View>
 
-            {/* Slider track */}
-            <View style={styles.sliderTrack} onStartShouldSetResponder={() => true} onResponderGrant={(e) => updatePosition(e.nativeEvent.pageX)} onResponderMove={(e) => updatePosition(e.nativeEvent.pageX)}>
-                <View style={styles.sliderLabels}>
-                    <BaseText type="Caption1" color="labels.tertiary">
+            {/* Below image: slider pill (above tab bar) */}
+            <View style={styles.sliderPillWrap}>
+                <View style={styles.sliderBox} onStartShouldSetResponder={() => true} onResponderGrant={(e) => updatePosition(e.nativeEvent.pageX)} onResponderMove={(e) => updatePosition(e.nativeEvent.pageX)}>
+                    <BaseText type="Caption1" color="labels.secondary" style={styles.sliderBoxLabel}>
                         Before
                     </BaseText>
-                    <BaseText type="Caption1" color="labels.tertiary">
+                    <View
+                        style={styles.sliderTrackWrap}
+                        onLayout={(e) => {
+                            const w = e.nativeEvent.layout.width;
+                            trackWidthSv.value = w;
+                            e.currentTarget.measureInWindow((x) => {
+                                trackXRef.current = x;
+                            });
+                        }}
+                    >
+                        <View style={styles.sliderTrackBg} />
+                        <Animated.View style={[styles.sliderTrackFill, trackFillStyle]} pointerEvents="none" />
+                        <SliderThumb value={sliderValue} trackWidthSv={trackWidthSv} />
+                    </View>
+                    <BaseText type="Caption1" weight="600" color="system.blue" style={styles.sliderBoxLabel}>
                         After
                     </BaseText>
                 </View>
-                <SliderThumb value={sliderValue} trackWidth={trackWidth} />
             </View>
         </View>
     );
 }
 
-function SliderThumb({ value, trackWidth }: { value: SharedValue<number>; trackWidth: number }) {
+function SliderThumb({ value, trackWidthSv }: { value: SharedValue<number>; trackWidthSv: SharedValue<number> }) {
+    const THUMB_SIZE = 24;
     const style = useAnimatedStyle(() => ({
-        transform: [{ translateX: value.value * trackWidth - 14 }],
+        transform: [{ translateX: value.value * trackWidthSv.value - THUMB_SIZE / 2 }],
     }));
     return (
         <Animated.View style={[styles.sliderThumbWrap, style]} pointerEvents="none">
@@ -460,7 +477,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 0,
+        bottom: 16,
         height: 52,
         justifyContent: "center",
         alignItems: "center",
@@ -468,10 +485,10 @@ const styles = StyleSheet.create({
     splitLineHandle: {
         position: "absolute",
         left: 0,
-        width: 48,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: "rgba(255,255,255,0.9)",
+        width: 64,
+        height: 48,
+        borderRadius: 99,
+        backgroundColor: "rgba(255,255,255,1)",
         justifyContent: "center",
         alignItems: "center",
         shadowColor: colors.system.black,
@@ -487,7 +504,7 @@ const styles = StyleSheet.create({
         width: 20,
         height: 2,
         borderRadius: 1,
-        backgroundColor: colors.system.gray,
+        backgroundColor: colors.system.black,
     },
     splitLineLabelsOverlay: {
         position: "absolute",
@@ -525,9 +542,9 @@ const styles = StyleSheet.create({
     },
     label: {
         position: "absolute",
-        paddingHorizontal: 10,
+        paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 8,
+        borderRadius: 99,
     },
     labelBefore: {
         bottom: 12,
@@ -561,9 +578,7 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 8,
     },
-    toolbarLightGray: {
-        backgroundColor: colors.system.gray6,
-    },
+
     toolbarRow: {
         flexDirection: "row",
         alignItems: "center",
@@ -635,6 +650,53 @@ const styles = StyleSheet.create({
     sliderContainer: {
         flex: 1,
         backgroundColor: colors.system.white,
+        flexDirection: "column",
+    },
+    sliderImageArea: {
+        flex: 1,
+        position: "relative",
+        overflow: "hidden",
+    },
+    sliderPillWrap: {
+        paddingHorizontal: 20,
+        paddingTop: 12,
+        backgroundColor: colors.system.gray6,
+    },
+    sliderBox: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 4,
+        paddingHorizontal: 14,
+        backgroundColor: colors.system.white,
+        borderRadius: 999,
+        gap: 16,
+    },
+    sliderBoxLabel: {
+        minWidth: 48,
+        textAlign: "center",
+    },
+    sliderTrackWrap: {
+        flex: 1,
+        height: 40,
+        justifyContent: "center",
+        position: "relative",
+    },
+    sliderTrackBg: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 18,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.system.gray6,
+    },
+    sliderTrackFill: {
+        position: "absolute",
+        left: 0,
+        top: 18,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: colors.system.blue,
     },
     sliderTrack: {
         position: "absolute",
@@ -657,16 +719,14 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        width: 28,
+        width: 24,
         justifyContent: "center",
         alignItems: "center",
     },
     sliderThumb: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        width: 18,
+        height: 18,
+        borderRadius: 12,
         backgroundColor: colors.system.blue,
-        borderWidth: 3,
-        borderColor: colors.system.white,
     },
 });
