@@ -32,6 +32,7 @@ const {
         getArchivedMedia,
         getAlbums,
         getMember,
+        getMemberActivities,
         getLatestContracts,
         getActivities,
         updateMember,
@@ -70,6 +71,7 @@ export const PracticeService = {
             formData.append("type", String(data.type));
             if (data.metadata) formData.append("metadata", data.metadata);
             if (data.email) formData.append("email", data.email);
+            if (data.init_chart_number != null) formData.append("init_chart_number", String(data.init_chart_number));
             if (data.image != null) {
                 if (typeof data.image === "string") {
                     formData.append("image", data.image);
@@ -109,6 +111,7 @@ export const PracticeService = {
             formData.append("name", data.name);
             if (data.metadata) formData.append("metadata", data.metadata);
             if (data.email) formData.append("email", data.email);
+            if (data.init_chart_number != null) formData.append("init_chart_number", String(data.init_chart_number));
             if (data.image != null) {
                 if (typeof data.image === "string") {
                     formData.append("image", data.image);
@@ -342,6 +345,19 @@ export const PracticeService = {
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
                 throw new Error(error.response.data.message || "Failed to get practice member");
+            }
+            throw error;
+        }
+    },
+
+    // Get practice member activities
+    getMemberActivities: async (practiceId: number, memberId: string): Promise<PracticeActivitiesResponse> => {
+        try {
+            const response: AxiosResponse<PracticeActivitiesResponse> = await axiosInstance.get(getMemberActivities(practiceId, memberId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get member activities");
             }
             throw error;
         }

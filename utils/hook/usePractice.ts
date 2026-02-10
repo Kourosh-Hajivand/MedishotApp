@@ -1,7 +1,21 @@
 import { QueryKeys } from "@/models/enums";
 import { PracticeService } from "@/utils/service";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, NextChartNumberResponse, PatientContractListResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeStatsResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "@/utils/service/models/ResponseModels";
+import {
+    ApiResponse,
+    NextChartNumberResponse,
+    PatientContractListResponse,
+    PracticeActivitiesResponse,
+    PracticeDetailResponse,
+    PracticeListResponse,
+    PracticeMembersResponse,
+    PracticeStatsResponse,
+    PracticeTagResponse,
+    PracticeTagsResponse,
+    PracticeTemplateResponse,
+    PracticeTemplatesResponse,
+    RecentlyPhotosResponse,
+} from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useAuth } from "./useAuth";
@@ -124,6 +138,16 @@ export const useGetPracticeMember = (practiceId: number, memberId: string, enabl
     return useQuery({
         queryKey: ["GetPracticeMember", practiceId, memberId],
         queryFn: () => PracticeService.getMember(practiceId, memberId),
+        enabled: isAuthenticated === true && enabled && !!practiceId && !!memberId,
+    });
+};
+
+export const useGetMemberActivities = (practiceId: number, memberId: number | string, enabled: boolean = true): UseQueryResult<PracticeActivitiesResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    const memberIdString = String(memberId);
+    return useQuery({
+        queryKey: ["GetMemberActivities", practiceId, memberIdString],
+        queryFn: () => PracticeService.getMemberActivities(practiceId, memberIdString),
         enabled: isAuthenticated === true && enabled && !!practiceId && !!memberId,
     });
 };

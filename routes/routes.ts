@@ -8,7 +8,7 @@ export const routes = {
         logout: () => "auth/logout",
         refresh: () => "auth/refresh",
         me: () => "auth/me",
-        updateProfile: () => "auth/update-profile",
+        updateProfile: () => "profile/update",
         forgetPassword: () => "auth/forget-password",
         verifyOtpCode: () => "auth/verify-otp-code",
         resetPassword: () => "auth/reset-password",
@@ -51,6 +51,7 @@ export const routes = {
 
         // Members
         getMember: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}`,
+        getMemberActivities: (practiseId: string | number, memberId: string | number) => `practises/${practiseId}/members/${memberId}/activities`,
 
         // Next Chart Number
         getNextChartNumber: (practiseId: string | number) => `practises/${practiseId}/next-chart-number`,
@@ -134,6 +135,7 @@ export const routes = {
 
     subscriptions: {
         getStatus: (practiseId: string | number) => `practises/${practiseId}/subscription/status`,
+        getCurrentPlan: (practiseId: string | number) => `practises/${practiseId}/subscription/current-plan`,
         subscribe: (practiseId: string | number) => `practises/${practiseId}/subscription/subscribe`,
         checkout: (practiseId: string | number) => `practises/${practiseId}/subscription/checkout`,
         checkoutSuccess: (practiseId: string | number) => `practises/${practiseId}/subscription/checkout/success`,

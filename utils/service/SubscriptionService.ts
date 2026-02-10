@@ -2,12 +2,12 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { CheckoutDto, SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto } from "./models/RequestModels";
-import { ApiResponse, CheckoutSessionResponse, CheckoutSuccessResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "./models/ResponseModels";
+import { ApiResponse, CheckoutSessionResponse, CheckoutSuccessResponse, CurrentPlanResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "./models/ResponseModels";
 
 const {
     baseUrl,
     plans: { list: listPlans, getById: getPlanById },
-    subscriptions: { getStatus, subscribe, checkout, checkoutSuccess, checkoutCancel, cancel, resume, swap, updateAddonLimit },
+    subscriptions: { getStatus, getCurrentPlan, subscribe, checkout, checkoutSuccess, checkoutCancel, cancel, resume, swap, updateAddonLimit },
 } = routes;
 
 export const SubscriptionService = {
@@ -54,10 +54,27 @@ export const SubscriptionService = {
         }
     },
 
+    // Get current plan
+    getCurrentPlan: async (practiceId: number): Promise<CurrentPlanResponse> => {
+        try {
+            const response: AxiosResponse<CurrentPlanResponse> = await axiosInstance.get(baseUrl + getCurrentPlan(practiceId));
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to get current plan");
+            }
+            throw error;
+        }
+    },
+
     // Subscribe to a plan
     subscribe: async (practiceId: number, data: SubscribeDto): Promise<ApiResponse<any>> => {
         try {
-            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + subscribe(practiceId), data);
+            const payload = {
+                plan_id: data.plan_id,
+                payment_method: data.payment_method ?? data.payment_method_id,
+            };
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(baseUrl + subscribe(practiceId), payload);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

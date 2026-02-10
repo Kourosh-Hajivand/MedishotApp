@@ -152,7 +152,7 @@ export interface Practice {
     members_count?: number;
     taken_images_count?: number;
     consents_count?: number;
-    role?: "owner" | "doctor" | "staff";
+    role?: "owner" | "admin" | "member" | "doctor" | "staff" | "viewer";
     subscriptions?: Subscription[];
     current_subscription?: Subscription;
     created_at: string;
@@ -164,7 +164,7 @@ export interface Member {
     first_name: string | null;
     last_name: string | null;
     email: string;
-    role: "owner" | "doctor" | "staff"; // OpenAPI: includes "doctor"
+    role: "owner" | "admin" | "member" | "viewer" | "doctor" | "staff"; // OpenAPI + backward compatibility
     status: "active";
     patients_count: number;
     taken_images_count: number;
@@ -523,6 +523,12 @@ export interface PlanListResponse {
 }
 
 export interface PlanDetailResponse {
+    data: Plan;
+}
+
+export interface CurrentPlanResponse {
+    success: boolean;
+    message: string | null;
     data: Plan;
 }
 

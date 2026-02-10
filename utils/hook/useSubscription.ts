@@ -1,6 +1,6 @@
 import { SubscriptionService } from "@/utils/service";
 import { CheckoutDto, SubscribeDto, SwapSubscriptionDto, UpdateAddonLimitDto } from "@/utils/service/models/RequestModels";
-import { ApiResponse, CheckoutSessionResponse, CheckoutSuccessResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "@/utils/service/models/ResponseModels";
+import { ApiResponse, CheckoutSessionResponse, CheckoutSuccessResponse, CurrentPlanResponse, PlanDetailResponse, PlanListResponse, SubscriptionStatusResponse } from "@/utils/service/models/ResponseModels";
 import { useMutation, UseMutationResult, useQuery, useQueryClient, UseQueryResult } from "@tanstack/react-query";
 import { useAuth } from "./useAuth";
 
@@ -30,6 +30,17 @@ export const useGetSubscriptionStatus = (practiceId: number, enabled: boolean = 
         queryKey: ["GetSubscriptionStatus", practiceId],
         queryFn: () => SubscriptionService.getSubscriptionStatus(practiceId),
         enabled: isAuthenticated === true && enabled && !!practiceId,
+    });
+};
+
+export const useGetCurrentPlan = (practiceId: number, enabled: boolean = true): UseQueryResult<CurrentPlanResponse, Error> => {
+    const { isAuthenticated } = useAuth();
+    return useQuery({
+        queryKey: ["GetCurrentPlan", practiceId],
+        queryFn: () => SubscriptionService.getCurrentPlan(practiceId),
+        enabled: isAuthenticated === true && enabled && !!practiceId,
+        staleTime: 10 * 60 * 1000, // 10 دقیقه
+        gcTime: 15 * 60 * 1000, // 15 دقیقه
     });
 };
 

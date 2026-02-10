@@ -77,6 +77,7 @@ export interface PracticeMetadata {
     email?: string;
     website?: string;
     logo?: string;
+    print_settings?: string;
 }
 
 export interface CreatePracticeDto {
@@ -85,6 +86,7 @@ export interface CreatePracticeDto {
     image?: File | string;
     metadata?: string; // JSON string
     email?: string;
+    init_chart_number?: number;
 }
 
 export interface UpdatePracticeDto {
@@ -92,13 +94,14 @@ export interface UpdatePracticeDto {
     image?: File | string;
     metadata?: string; // JSON string
     email?: string;
+    init_chart_number?: number;
 }
 
 export interface AddMemberDto {
     first_name: string;
     last_name: string;
     email: string;
-    role: "owner" | "doctor" | "staff"; // OpenAPI: enum values
+    role: "owner" | "admin" | "member" | "doctor" | "staff"; // OpenAPI + backward compatibility
     birth_date?: string; // YYYY-MM-DD format
     gender?: "male" | "female" | "other";
     metadata?: string; // JSON string containing phones, emails, addresses, urls
@@ -106,7 +109,7 @@ export interface AddMemberDto {
 }
 
 export interface UpdateMemberRoleDto {
-    role: "owner" | "doctor" | "staff"; // OpenAPI: update role enum
+    role: "owner" | "admin" | "member" | "viewer" | "doctor" | "staff"; // OpenAPI + backward compatibility
 }
 
 export interface UpdateMemberDto {
@@ -286,7 +289,8 @@ export interface TempUploadRequest {
 // ============= Subscription Models =============
 export interface SubscribeDto {
     plan_id: number;
-    payment_method_id: string;
+    payment_method?: string;
+    payment_method_id?: string; // Backward compatibility
 }
 
 export interface SwapSubscriptionDto {
@@ -345,5 +349,5 @@ export interface CreatePatientDocumentRequest {
 export interface UpdatePatientDocumentRequest {
     type?: string;
     description?: string;
-    image?: File | string; // File for direct upload or string for Livewire temp filename
+    image?: PatientDocumentImageInput; // File, RN file, or Livewire temp filename
 }
