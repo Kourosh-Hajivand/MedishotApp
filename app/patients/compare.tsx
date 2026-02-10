@@ -130,7 +130,7 @@ export default function BeforeAfterCompareScreen() {
                 )}
             </View>
 
-            {/* Content: white background, comparison area */}
+            {/* Content: full space, contain = no crop, image as large as possible */}
             <View style={[styles.content, styles.contentWhite]}>
                 {isVertical && (
                     <View style={styles.verticalSplit}>
@@ -252,13 +252,13 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afte
         <View style={styles.splitLineContainer}>
             {/* Left: before image (no labels inside – they get clipped when divider moves) */}
             <Animated.View style={[styles.splitLineLeft, leftWidthStyle]}>
-                <Image source={{ uri: beforeUrl }} style={styles.splitLineImageFull} contentFit="cover" />
+                <Image source={{ uri: beforeUrl }} style={styles.splitLineImageFull} contentFit="contain" />
             </Animated.View>
 
             {/* Right: after image */}
             <Animated.View style={[styles.splitLineRight, rightLeftStyle]}>
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]}>
-                    <Image source={{ uri: afterUrl }} style={styles.splitLineImageFull} contentFit="cover" />
+                    <Image source={{ uri: afterUrl }} style={styles.splitLineImageFull} contentFit="contain" />
                 </Animated.View>
             </Animated.View>
 
@@ -322,9 +322,9 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; 
         <View style={styles.sliderContainer}>
             {/* Top: image area (no overlap) */}
             <View style={styles.sliderImageArea}>
-                <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">
-                    <Image source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                    <Image source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 </Animated.View>
             </View>
 
@@ -417,13 +417,10 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
     },
-    contentWhite: {
-        backgroundColor: colors.system.white,
-    },
+    contentWhite: {},
     splitLineContainer: {
         flex: 1,
         position: "relative",
-        backgroundColor: colors.system.white,
     },
     splitLineLeft: {
         position: "absolute",
@@ -515,11 +512,11 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     labelSplitLineBefore: {
-        bottom: 64,
+        bottom: 88,
         left: 12,
     },
     labelSplitLineAfter: {
-        bottom: 64,
+        bottom: 88,
         right: 12,
         left: undefined,
     },
@@ -649,7 +646,7 @@ const styles = StyleSheet.create({
     },
     sliderContainer: {
         flex: 1,
-        backgroundColor: colors.system.white,
+        // backgroundColor: colors.system.white,
         flexDirection: "column",
     },
     sliderImageArea: {
