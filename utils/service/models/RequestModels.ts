@@ -335,6 +335,7 @@ export interface UploadMediaWithTemplateRequest {
     data?: string; // JSON string
     media?: File | string; // Optional preview/composite image (File or Livewire temp filename)
     images: UploadMediaWithTemplateImage[];
+    before_media_id?: number | string; // ID of the media that this template photo is taken after
 }
 
 // ============= Patient Documents Models =============

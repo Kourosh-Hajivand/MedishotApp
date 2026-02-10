@@ -12,6 +12,7 @@ import { Button, ContextMenu, Host, HStack, Spacer, Text, VStack } from "@expo/u
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, Dimensions, Modal, Image as RNImage, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -24,6 +25,7 @@ const { width, height } = Dimensions.get("window");
 // Softer pan when zoomed so image doesn't move too fast
 const PAN_SENSITIVITY = 0.7;
 
+import { MINT_COLOR } from "@/app/camera/_components/create-template/constants";
 import { containerSize, iconSize } from "@/constants/theme";
 import { IconSymbol } from "../ui/icon-symbol";
 import { ViewerActionsConfig } from "./GalleryWithMenu";
@@ -372,8 +374,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     practice,
     metadata,
 }) => {
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false } = actions;
     const { profile: me } = useAuth();
+    const router = useRouter();
 
     // Build maps from mediaData if provided, otherwise use legacy maps
     const { imageUrlToMediaIdMapInternal, imageUrlToBookmarkMapInternal, imageUrlToCreatedAtMapInternal, imagesList } = React.useMemo(() => {
@@ -467,15 +469,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return patientId;
     }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
-    // Build maps from rawMediaData for taker and createdAt
-    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw } = React.useMemo(() => {
+    // Build maps from rawMediaData for taker, createdAt, and isOriginalMedia
+    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap } = React.useMemo(() => {
         const takerMap = new Map<string, { first_name?: string | null; last_name?: string | null }>();
         const createdAtMap = new Map<string, string>();
+        const isOriginalMediaMap = new Map<string, boolean>();
 
         if (rawMediaData && Array.isArray(rawMediaData)) {
             rawMediaData.forEach((media: RawMediaData) => {
                 const taker = media.taker;
                 const createdAt = media.created_at;
+                const hasTemplate = !!media.template;
 
                 // Add original_media to maps if it exists
                 if (media.original_media?.url) {
@@ -487,6 +491,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     }
                     if (createdAt) {
                         createdAtMap.set(media.original_media.url, createdAt);
+                    }
+                    // Mark as original_media if it has a template
+                    if (hasTemplate) {
+                        isOriginalMediaMap.set(media.original_media.url, true);
                     }
                 }
 
@@ -506,6 +514,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             if (imgCreatedAt) {
                                 createdAtMap.set(imageUrl, imgCreatedAt);
                             }
+                            // Template images are NOT original_media
+                            isOriginalMediaMap.set(imageUrl, false);
                         }
                     });
                 }
@@ -515,6 +525,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return {
             imageUrlToTakerMapInternal: takerMap,
             imageUrlToCreatedAtMapFromRaw: createdAtMap,
+            imageUrlToIsOriginalMediaMap: isOriginalMediaMap,
         };
     }, [rawMediaData]);
 
@@ -553,6 +564,37 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
         return null;
     }, [currentIndex, imagesList, finalCreatedAtMap]);
+
+    // Check if current image is original_media from a template
+    const isCurrentImageOriginalMedia = React.useMemo(() => {
+        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return imageUrlToIsOriginalMediaMap.get(currentImageUrl) === true;
+        }
+        return false;
+    }, [currentIndex, imagesList, imageUrlToIsOriginalMediaMap]);
+
+    // Adjust actions based on whether current image is original_media
+    const effectiveActions = React.useMemo(() => {
+        const { showShare: share = true, showRestore: restore = false } = actions;
+        if (isCurrentImageOriginalMedia) {
+            return {
+                showBookmark: true, // Show bookmark for original_media
+                showEdit: false, // Hide edit for original_media
+                showArchive: false, // Hide archive for original_media
+                showShare: share,
+                showRestore: restore,
+                showMagic: false, // Hide magic for original_media
+            };
+        }
+        return actions;
+    }, [isCurrentImageOriginalMedia, actions]);
+
+    // Destructure effective actions (for bottom buttons)
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false } = effectiveActions;
+
+    // Destructure original actions (for more menu - Archive should remain in more menu)
+    const { showArchive: showArchiveInMore = true, showEdit: showEditInMore = true, showMagic: showMagicInMore = false } = actions;
 
     // Fetch patient data if patientId is provided
     const { data: patientDataResponse } = useGetPatientById(currentPatientId || "");
@@ -907,6 +949,55 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
     };
 
+    const handleTakeAfterTemplatePress = () => {
+        if (!patientId) {
+            Alert.alert("Error", "Patient ID is required");
+            return;
+        }
+
+        // Find the template ID and before_media_id from rawMediaData for the current image
+        const currentImageUri = imagesList[currentIndex];
+        let templateId: string | number | undefined;
+        let beforeMediaId: string | number | undefined;
+
+        if (rawMediaData && Array.isArray(rawMediaData)) {
+            for (const media of rawMediaData) {
+                if (media.original_media?.url === currentImageUri && media.template?.id) {
+                    templateId = media.template.id;
+                    beforeMediaId = media.id; // Use media.id as before_media_id
+                    break;
+                }
+            }
+        }
+
+        if (!templateId) {
+            Alert.alert("Error", "Could not find template ID for this image");
+            return;
+        }
+
+        if (!beforeMediaId) {
+            Alert.alert("Error", "Could not find media ID for this image");
+            return;
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        
+        // Close modal first
+        onClose();
+        
+        // Navigate to camera after modal closes
+        setTimeout(() => {
+            router.push({
+                pathname: "/camera" as any,
+                params: {
+                    patientId: String(patientId),
+                    templateId: String(templateId),
+                    beforeMediaId: String(beforeMediaId),
+                },
+            });
+        }, 100);
+    };
+
     const handleSharePress = async () => {
         const currentImageUri = imagesList[currentIndex];
         if (!currentImageUri) return;
@@ -1148,7 +1239,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     // 3. Moved at least 20px vertically
                     if (touch.y > 20 && absY > absX * 2) {
                         state.activate();
-                    } 
+                    }
                     // Fail if horizontal movement is dominant or moved left/right too much
                     else if (absX > 25 || (absX > absY && absX > 15)) {
                         state.fail();
@@ -1160,7 +1251,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         // Extra safety: ensure vertical movement is still dominant
                         const absX = Math.abs(e.translationX);
                         const absY = Math.abs(e.translationY);
-                        
+
                         if (absY > absX * 1.5) {
                             dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
                         }
@@ -1294,17 +1385,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "Remove Bookmark" : "Bookmark"}
                                                         </Button>
                                                     )}
-                                                    {showMagic && (
+                                                    {showMagicInMore && !isCurrentImageOriginalMedia && (
                                                         <Button systemImage="sparkles" onPress={handleMagicPress}>
                                                             Use Magic
                                                         </Button>
                                                     )}
-                                                    {showEdit && (
+                                                    {showEditInMore && !isCurrentImageOriginalMedia && (
                                                         <Button systemImage="slider.horizontal.3" onPress={handleAdjustPress}>
                                                             Adjustment
                                                         </Button>
                                                     )}
-                                                    {showArchive && (
+                                                    {showArchiveInMore && (
                                                         <Button systemImage="archivebox" role="destructive" onPress={handleArchivePress}>
                                                             Archive
                                                         </Button>
@@ -1447,12 +1538,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                 </HStack>
                                             )}
                                             {(showBookmark || showEdit) && <Spacer />}
+                                            {isCurrentImageOriginalMedia && (
+                                                <>
+                                                    <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 0 })]}>
+                                                        <Button onPress={handleTakeAfterTemplatePress} variant="glassProminent" controlSize="large" color={MINT_COLOR}>
+                                                            Take After Template
+                                                        </Button>
+                                                    </HStack>
+                                                    <Spacer />
+                                                </>
+                                            )}
+
                                             {(showBookmark || showEdit) && (
                                                 <HStack
                                                     alignment="center"
                                                     modifiers={[
                                                         padding({ all: 0 }),
-                                                        frame({ height: containerSize, alignment: "center", width: showBookmark && showEdit ? 100 : 44 }),
+                                                        frame({ height: containerSize, alignment: "center", width: showBookmark && showEdit ? 100 : containerSize }),
                                                         glassEffect({
                                                             glass: {
                                                                 variant: "regular",
@@ -1462,7 +1564,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                 >
                                                     {showBookmark && (
                                                         <TouchableOpacity onPress={handleBookmarkPress} className="  relative items-center justify-center w-[44px] h-[44px]">
-                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: 5 }} />
+                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: !showEdit ? 2.2 : 5 }} />
                                                         </TouchableOpacity>
                                                     )}
                                                     {showEdit && (
@@ -1472,6 +1574,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                     )}
                                                 </HStack>
                                             )}
+
                                             {showArchive && <Spacer />}
                                             {showArchive && (
                                                 <HStack
@@ -1487,7 +1590,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                     ]}
                                                 >
                                                     <TouchableOpacity onPress={handleArchivePress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                        <IconSymbol size={iconSize} name="archivebox" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                                                        <IconSymbol size={iconSize} name="archivebox" style={{ bottom: -2, left: 2 }} color={colors.system.white as any} />
                                                     </TouchableOpacity>
                                                 </HStack>
                                             )}

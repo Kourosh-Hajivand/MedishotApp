@@ -22,11 +22,13 @@ const GalleryImageItem: React.FC<{
     menuItems: Array<{ icon: SymbolViewProps["name"]; label: string; onPress?: (uri: string) => void; role?: ButtonRole }>;
     onImagePress: (uri: string) => void;
     imageUrlToBookmarkMap?: Map<string, boolean>;
+    imageUrlToIsAfterMap?: Map<string, boolean>;
+    imageUrlToHasAfterMap?: Map<string, boolean>;
     isLoading: boolean;
     onLoadStart: () => void;
     onLoad: () => void;
     onError: () => void;
-}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, isLoading, onLoadStart, onLoad, onError }) => {
+}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, isLoading, onLoadStart, onLoad, onError }) => {
     // Use local shared values for opacity animation per image
     const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
@@ -149,6 +151,12 @@ const GalleryImageItem: React.FC<{
                         <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                     </View>
                 )}
+                {/* Before/After Badge */}
+                {(imageUrlToIsAfterMap?.get(uri) || imageUrlToHasAfterMap?.get(uri)) && (
+                    <View style={styles.badgeContainer}>
+                        <IconSymbol name={imageUrlToIsAfterMap?.get(uri) ? "rectangle.lefthalf.filled" : "rectangle.righthalf.filled"} size={14} color={colors.system.gray as any} />
+                    </View>
+                )}
             </TouchableOpacity>
         </View>
     );
@@ -206,6 +214,8 @@ interface RawMediaData {
         } | null;
         [key: string]: any;
     }>;
+    is_after?: boolean;
+    has_after?: boolean;
     [key: string]: any;
 }
 
@@ -339,6 +349,49 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return map;
     }, [rawMediaData]);
 
+    // Create maps for is_after and has_after badges
+    const { imageUrlToIsAfterMap, imageUrlToHasAfterMap } = useMemo(() => {
+        const isAfterMap = new Map<string, boolean>();
+        const hasAfterMap = new Map<string, boolean>();
+
+        if (rawMediaData && Array.isArray(rawMediaData)) {
+            rawMediaData.forEach((media: RawMediaData) => {
+                const isAfter = media.is_after === true;
+                const hasAfter = media.has_after === true;
+
+                // Add original_media to maps
+                if (media.original_media?.url) {
+                    if (isAfter) {
+                        isAfterMap.set(media.original_media.url, true);
+                    }
+                    if (hasAfter) {
+                        hasAfterMap.set(media.original_media.url, true);
+                    }
+                }
+
+                // Add template images to maps
+                if (media.images && Array.isArray(media.images)) {
+                    media.images.forEach((img: any) => {
+                        const imageUrl = img.image?.url;
+                        if (imageUrl) {
+                            if (isAfter) {
+                                isAfterMap.set(imageUrl, true);
+                            }
+                            if (hasAfter) {
+                                hasAfterMap.set(imageUrl, true);
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        return {
+            imageUrlToIsAfterMap: isAfterMap,
+            imageUrlToHasAfterMap: hasAfterMap,
+        };
+    }, [rawMediaData]);
+
     // Flatten all images for the viewer modal (gallery view - only original_media for template media)
     const allImages = useMemo(() => {
         return imageSections.flatMap((section) => section.data);
@@ -422,6 +475,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 menuItems={menuItems}
                 onImagePress={handleImagePress}
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                imageUrlToIsAfterMap={imageUrlToIsAfterMap}
+                imageUrlToHasAfterMap={imageUrlToHasAfterMap}
                 isLoading={isLoading}
                 onLoadStart={handleImageLoadStart}
                 onLoad={handleImageLoad}
@@ -546,6 +601,22 @@ const styles = StyleSheet.create({
         height: 24,
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.3,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    badgeContainer: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "white",
+        width: 27,
+        height: 27,
+        borderRadius: 99,
         shadowColor: colors.system.black,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.3,

@@ -74,6 +74,11 @@ const MediaService = {
                 formData.append("media", payload.media);
             }
 
+            // Add optional before_media_id field
+            if (payload.before_media_id != null) {
+                formData.append("before_media_id", String(payload.before_media_id));
+            }
+
             payload.images.forEach((image, index) => {
                 formData.append(`images[${index}][gost_id]`, String(image.gost_id));
                 formData.append(`images[${index}][media]`, image.media);

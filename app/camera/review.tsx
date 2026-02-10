@@ -57,10 +57,11 @@ export default function ReviewScreen() {
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
 
-    const { patientId, photos, templateId } = useLocalSearchParams<{
+    const { patientId, photos, templateId, beforeMediaId } = useLocalSearchParams<{
         patientId: string;
         photos: string;
         templateId?: string;
+        beforeMediaId?: string;
     }>();
 
     // Get patient data from API
@@ -585,11 +586,13 @@ export default function ReviewScreen() {
                     data: string;
                     images: Array<{ gost_id: number; media: string; notes?: string }>;
                     media?: string;
+                    before_media_id?: string | number;
                 } = {
                     template_id: templateIdNum,
                     type: "image",
                     data: JSON.stringify({}),
                     images: images,
+                    ...(beforeMediaId && { before_media_id: beforeMediaId }),
                 };
 
                 // Add composite photo media if available (required for template uploads with more than one ghost)

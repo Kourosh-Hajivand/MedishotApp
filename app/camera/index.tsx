@@ -247,11 +247,13 @@ export default function CameraScreen() {
         templateId,
         retakeTemplateId,
         capturedPhotos: capturedPhotosParam,
+        beforeMediaId,
     } = useLocalSearchParams<{
         patientId: string;
         templateId?: string;
         retakeTemplateId?: string;
         capturedPhotos?: string;
+        beforeMediaId?: string;
     }>();
 
     // Get patient data from API
@@ -704,10 +706,11 @@ export default function CameraScreen() {
                     patientId,
                     photos: JSON.stringify(photos),
                     ...(templateId && { templateId }),
+                    ...(beforeMediaId && { beforeMediaId }),
                 },
             });
         },
-        [patientId, templateId],
+        [patientId, templateId, beforeMediaId],
     );
 
     // Auto-navigate to review for non-template photos OR template with single ghost after successful upload
