@@ -26,6 +26,10 @@ const MAPPING: Record<string, MaterialIconName> = {
     "rectangle.split.2x1": "vertical-split",
     "rectangle.split.1x2": "horizontal-split",
     "square": "crop-square",
+    "square.split.2x1": "vertical-split",
+    "square.split.1x2": "horizontal-split",
+    "square.and.line.vertical.and.square": "vertical-split",
+    "square.on.square": "layers",
 };
 
 /**
