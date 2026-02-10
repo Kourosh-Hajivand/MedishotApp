@@ -62,6 +62,9 @@ interface RawMediaData {
         email?: string | null;
     } | null;
     created_at?: string;
+    has_after?: boolean;
+    is_after?: boolean;
+    before_media_id?: number | string | null;
     [key: string]: any;
 }
 
@@ -469,17 +472,19 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return patientId;
     }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
-    // Build maps from rawMediaData for taker, createdAt, and isOriginalMedia
-    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap } = React.useMemo(() => {
+    // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, and hideTakeAfter
+    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap } = React.useMemo(() => {
         const takerMap = new Map<string, { first_name?: string | null; last_name?: string | null }>();
         const createdAtMap = new Map<string, string>();
         const isOriginalMediaMap = new Map<string, boolean>();
+        const hideTakeAfterMap = new Map<string, boolean>();
 
         if (rawMediaData && Array.isArray(rawMediaData)) {
             rawMediaData.forEach((media: RawMediaData) => {
                 const taker = media.taker;
                 const createdAt = media.created_at;
                 const hasTemplate = !!media.template;
+                const hideTakeAfter = media.has_after === true || (media.is_after === true && media.before_media_id != null);
 
                 // Add original_media to maps if it exists
                 if (media.original_media?.url) {
@@ -495,6 +500,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     // Mark as original_media if it has a template
                     if (hasTemplate) {
                         isOriginalMediaMap.set(media.original_media.url, true);
+                        if (hideTakeAfter) {
+                            hideTakeAfterMap.set(media.original_media.url, true);
+                        }
                     }
                 }
 
@@ -516,6 +524,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             }
                             // Template images are NOT original_media
                             isOriginalMediaMap.set(imageUrl, false);
+                            if (hideTakeAfter) {
+                                hideTakeAfterMap.set(imageUrl, true);
+                            }
                         }
                     });
                 }
@@ -526,6 +537,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             imageUrlToTakerMapInternal: takerMap,
             imageUrlToCreatedAtMapFromRaw: createdAtMap,
             imageUrlToIsOriginalMediaMap: isOriginalMediaMap,
+            imageUrlToHideTakeAfterMap: hideTakeAfterMap,
         };
     }, [rawMediaData]);
 
@@ -574,17 +586,28 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [currentIndex, imagesList, imageUrlToIsOriginalMediaMap]);
 
+    // Hide "Take After Template" when has_after or (is_after + before_media_id)
+    const isCurrentImageHideTakeAfter = React.useMemo(() => {
+        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return imageUrlToHideTakeAfterMap.get(currentImageUrl) === true;
+        }
+        return false;
+    }, [currentIndex, imagesList, imageUrlToHideTakeAfterMap]);
+
+    const showTakeAfterTemplate = isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
+
     // Adjust actions based on whether current image is original_media
     const effectiveActions = React.useMemo(() => {
         const { showShare: share = true, showRestore: restore = false } = actions;
         if (isCurrentImageOriginalMedia) {
             return {
-                showBookmark: true, // Show bookmark for original_media
-                showEdit: false, // Hide edit for original_media
-                showArchive: false, // Hide archive for original_media
+                showBookmark: true,
+                showEdit: true, // Show split icon (square.split.2x1) for original_media
+                showArchive: true, // Archive to the right of split icon
                 showShare: share,
                 showRestore: restore,
-                showMagic: false, // Hide magic for original_media
+                showMagic: false,
             };
         }
         return actions;
@@ -981,10 +1004,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        
+
         // Close modal first
         onClose();
-        
+
         // Navigate to camera after modal closes
         setTimeout(() => {
             router.push({
@@ -1538,7 +1561,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                 </HStack>
                                             )}
                                             {(showBookmark || showEdit) && <Spacer />}
-                                            {isCurrentImageOriginalMedia && (
+                                            {showTakeAfterTemplate && (
                                                 <>
                                                     <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 0 })]}>
                                                         <Button onPress={handleTakeAfterTemplatePress} variant="glassProminent" controlSize="large" color={MINT_COLOR}>
@@ -1568,8 +1591,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                         </TouchableOpacity>
                                                     )}
                                                     {showEdit && (
-                                                        <TouchableOpacity onPress={handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                            <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                        <TouchableOpacity onPress={isCurrentImageOriginalMedia ? () => {} : handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                            <IconSymbol size={iconSize} name={isCurrentImageOriginalMedia ? "square.split.2x1" : "slider.horizontal.3"} color={colors.system.white as any} style={{ bottom: -2 }} />
                                                         </TouchableOpacity>
                                                     )}
                                                 </HStack>
