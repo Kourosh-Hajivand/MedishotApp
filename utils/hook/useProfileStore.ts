@@ -25,6 +25,19 @@ interface ProfileStore {
 const STORAGE_KEY = "profile_selection";
 const DEFAULT_VIEW_MODE: ViewMode = "doctor";
 
+/** Normalize practice id to number (API may return id as URL string) */
+function normalizePracticeId(id: string | number | undefined): number | undefined {
+    if (id == null) return undefined;
+    if (typeof id === "number" && !Number.isNaN(id)) return id;
+    if (typeof id === "string") {
+        const match = id.match(/\/(\d+)(?:\/|$)/);
+        if (match) return parseInt(match[1], 10);
+        const num = parseInt(id, 10);
+        return Number.isNaN(num) ? undefined : num;
+    }
+    return undefined;
+}
+
 const selectDefaultPractice = (practiceList?: Practice[]) => {
     if (!practiceList || practiceList.length === 0) {
         return null;
@@ -88,28 +101,30 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
     isLoading: false,
 
     setSelectedPractice: async (practice) => {
-        // همیشه وقتی practice عوض می‌شود، doctor را reset کن (null = all)
-        // چون هر practice دکترهای خودش را دارد و نباید تداخل داشته باشند
-        const previousPracticeId = get().selectedPractice?.id;
-        const isPracticeChanged = previousPracticeId !== practice.id;
+        const practiceId = normalizePracticeId(practice.id);
+        if (practiceId == null) return;
 
-        // Set practice immediately for UI responsiveness
+        const previousPracticeId = normalizePracticeId(get().selectedPractice?.id);
+        const isPracticeChanged = previousPracticeId !== practiceId;
+
+        const normalizedPractice: Practice = { ...practice, id: practiceId };
+
+        // Set practice immediately for UI responsiveness (use numeric id so APIs get correct URL)
         set({
-            selectedPractice: practice,
-            // اگر practice عوض شده، doctor را reset کن
+            selectedPractice: normalizedPractice,
             selectedDoctor: isPracticeChanged ? null : get().selectedDoctor,
         });
 
         await persistProfileSelection();
 
-        // Fetch full practice data from API and update store
         try {
-            const fullPracticeData = await PracticeService.getPracticeById(practice.id);
+            const fullPracticeData = await PracticeService.getPracticeById(practiceId);
 
             if (fullPracticeData?.data) {
+                const full = fullPracticeData.data;
+                const fullId = normalizePracticeId(full.id);
                 set({
-                    selectedPractice: fullPracticeData.data,
-                    // مطمئن شو که doctor reset شده است
+                    selectedPractice: fullId != null ? { ...full, id: fullId } : full,
                     selectedDoctor: isPracticeChanged ? null : get().selectedDoctor,
                 });
                 await persistProfileSelection();
@@ -164,7 +179,8 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
     // اگر قبلاً لود شده و selectedPractice وجود دارد، بررسی کن که آیا هنوز معتبر است
     // اما اگر practice در store وجود دارد و معتبر است، آن را نگه دار (کاربر قبلاً انتخاب کرده)
     if (currentState.isLoaded && currentState.selectedPractice) {
-        const isValidPractice = practiceList.some((p) => p.id === currentState.selectedPractice?.id);
+        const selectedId = normalizePracticeId(currentState.selectedPractice.id);
+        const isValidPractice = practiceList.some((p) => normalizePracticeId(p.id) === selectedId);
         if (isValidPractice) {
             // Practice معتبر است، آن را نگه دار
             // Doctor را reset نکن چون practice عوض نشده است
@@ -192,12 +208,17 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 await initializeDefaultSelection(practiceList);
             } else {
                 let selectedPractice = parsed.selectedPractice ?? null;
+                if (selectedPractice && selectedPractice.id != null) {
+                    const normalizedId = normalizePracticeId(selectedPractice.id);
+                    if (normalizedId != null) selectedPractice = { ...selectedPractice, id: normalizedId };
+                }
                 let viewMode = parsed.viewMode ?? DEFAULT_VIEW_MODE;
                 let needsPersistence = false;
 
                 // بررسی اینکه آیا selectedPractice هنوز در لیست practiceList موجود است
                 if (selectedPractice) {
-                    const isValidPractice = practiceList.some((p) => p.id === selectedPractice?.id);
+                    const practiceId = normalizePracticeId(selectedPractice.id);
+                    const isValidPractice = practiceList.some((p) => normalizePracticeId(p.id) === practiceId);
                     if (!isValidPractice) {
                         selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                         viewMode = determineDefaultViewMode(selectedPractice);

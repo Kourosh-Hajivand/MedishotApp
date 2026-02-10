@@ -59,6 +59,7 @@ export const CreatePracticeScreen: React.FC = () => {
     const websiteRef = useRef<TextInput>(null);
     const phoneNumberRef = useRef<TextInput>(null);
     const emailRef = useRef<TextInput>(null);
+    const initChartNumberRef = useRef<TextInput>(null);
     const zipCodeRef = useRef<TextInput>(null);
     const streetRef = useRef<TextInput>(null);
     const addressRef = useRef<TextInput>(null);
@@ -138,27 +139,29 @@ export const CreatePracticeScreen: React.FC = () => {
         }
     };
 
-    const { setSelectedPractice } = useProfileStore();
+    const { setSelectedPractice, setSelectedDoctor } = useProfileStore();
     const {
         mutate: createPractice,
         isPending,
         error,
     } = useCreatePractice(
         async (data) => {
-            // Switch to the newly created practice - این practice جدید است که تازه ساخته شده
+            // Switch to the newly created practice and set doctor filter to "all"
             if (data?.data) {
-                // Set the newly created practice as selected immediately
+                setSelectedDoctor(null); // Doctor filter = "All" before switching practice
                 await setSelectedPractice(data.data);
             }
 
             // Invalidate and refetch practice list to refresh it
             queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
             queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
+            queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
+            queryClient.invalidateQueries({ queryKey: ["GetPracticeMembers"] });
 
             // Wait for practice list to refetch
             await queryClient.refetchQueries({ queryKey: ["GetPracticeList"] });
 
-            // Navigate to patients tab
+            // Navigate to patients tab (new practice is already selected, data will refetch)
             router.replace("/(tabs)/patients");
         },
         (error) => {
@@ -175,6 +178,7 @@ export const CreatePracticeScreen: React.FC = () => {
 
             const createData = {
                 name: data.practiceName,
+                init_chart_number: 1000,
                 metadata: JSON.stringify({
                     website: normalizeWebsiteUrl(data.website),
                     phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),
@@ -250,9 +254,10 @@ export const CreatePracticeScreen: React.FC = () => {
                     { name: "practiceName", label: "Practice Name", ref: practiceNameRef, returnKeyType: "next" as const, onSubmitEditing: () => emailRef.current?.focus() },
                     { name: "email", label: "Email", keyboardType: "email-address", ref: emailRef, returnKeyType: "next" as const, onSubmitEditing: () => phoneNumberRef.current?.focus() },
                     { name: "phoneNumber", label: "Phone Number", keyboardType: "phone-pad", ref: phoneNumberRef, returnKeyType: "next" as const, onSubmitEditing: () => websiteRef.current?.focus() },
-                    { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
+                    { name: "website", label: "Website", optional: true, ref: websiteRef, returnKeyType: "next" as const, onSubmitEditing: () => initChartNumberRef.current?.focus() },
                     { name: "specialty", label: "Specialty", disabled: true },
-                    { name: "zipCode", label: "Zip Code", keyboardType: "phone-pad", ref: zipCodeRef, returnKeyType: "next" as const, onSubmitEditing: () => streetRef.current?.focus() },
+                    { name: "initChartNumber", label: "Initial Chart Number", keyboardType: "number-pad", ref: initChartNumberRef, returnKeyType: "done" as const, onSubmitEditing: () => zipCodeRef.current?.focus() },
+                    { name: "zipCode", label: "Zip Code", keyboardType: "number-pad", ref: zipCodeRef, returnKeyType: "next" as const, onSubmitEditing: () => streetRef.current?.focus() },
                     { name: "street", label: "Street", ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
                     { name: "address", label: "City, State", ref: addressRef, returnKeyType: "done" as const, onSubmitEditing: () => Keyboard.dismiss() },
                 ].map((f, i) => (

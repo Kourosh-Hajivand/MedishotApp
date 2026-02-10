@@ -16,10 +16,23 @@ export interface GetPatientsParams {
     per_page?: number;
 }
 
+function normalizePracticeId(id: string | number | undefined): string | number | undefined {
+    if (id == null) return undefined;
+    if (typeof id === "number" && !Number.isNaN(id)) return id;
+    if (typeof id === "string" && id.startsWith("http")) {
+        const match = id.match(/\/(\d+)(?:\/|$)/);
+        return match ? match[1] : id;
+    }
+    return id;
+}
+
 const PatientService = {
     // Patient Management
     getPatients: async (practiseId: string | number, params?: GetPatientsParams): Promise<PatientListResponse> => {
         try {
+            const id = normalizePracticeId(practiseId);
+            if (id == null) throw new Error("Practice ID is required");
+
             const queryParams = new URLSearchParams();
             if (params?.doctor_id) {
                 queryParams.append("doctor_id", String(params.doctor_id));
@@ -31,7 +44,7 @@ const PatientService = {
                 queryParams.append("per_page", String(params.per_page));
             }
 
-            const url = baseUrl + list(practiseId) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
+            const url = baseUrl + list(id) + (queryParams.toString() ? `?${queryParams.toString()}` : "");
             const response: AxiosResponse<PatientListResponse> = await axiosInstance.get(url);
             return response.data;
         } catch (error) {

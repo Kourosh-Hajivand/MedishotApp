@@ -105,7 +105,7 @@ const ControlledInputComponent = <T extends FieldValues>({ control, name, label,
                                         placeholder=""
                                         placeholderTextColor={"rgba(60, 60, 67, 0.30)"}
                                         secureTextEntry={type === "password" && !showPassword}
-                                        keyboardType={type === "number" ? "numeric" : "default"}
+                                        keyboardType={props.keyboardType ?? (type === "number" ? "numeric" : "default")}
                                         textAlign={centerText ? "center" : "left"}
                                         returnKeyType={props.returnKeyType || (type === "password" && name === "confirmPassword" ? "done" : "next")}
                                         onSubmitEditing={props.onSubmitEditing || undefined}

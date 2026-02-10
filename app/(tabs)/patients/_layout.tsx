@@ -18,7 +18,7 @@ const MODAL_PUSH_DELAY_MS = 450;
 
 export default function PatientsLayout() {
     const { logout: handleLogout, isAuthenticated, profile, isProfileLoading } = useAuth();
-    const { data: practiceList, isLoading: isPracticeListLoading, error: practiceListError, refetch: refetchPracticeList } = useGetPracticeList(isAuthenticated === true);
+    const { data: practiceList, isLoading: isPracticeListLoading, isFetching: isPracticeListFetching, error: practiceListError, refetch: refetchPracticeList } = useGetPracticeList(isAuthenticated === true);
     const { selectedPractice, setSelectedPractice, selectedDoctor, setSelectedDoctor, isLoaded, isLoading } = useProfileStore();
 
     const hasIncompleteProfile = !!profile && (!profile.first_name || !profile.last_name) && !isProfileLoading;
@@ -86,20 +86,24 @@ export default function PatientsLayout() {
         return Math.max(100, Math.min(220, totalWidth));
     }, [selectedPractice?.name]);
 
-    // Load profile selection when practice list is available
+    // Load profile selection when practice list is available (only when not loading/fetching, so we don't overwrite with stale list after creating a practice)
     useEffect(() => {
-        if (practiceList?.data && practiceList.data.length > 0 && isAuthenticated === true) {
-            const currentState = useProfileStore.getState();
-            if (!currentState.isLoaded || !currentState.selectedPractice) {
-                loadProfileSelection(practiceList.data);
-            } else {
-                const isValidPractice = practiceList.data.some((p) => p.id === currentState.selectedPractice?.id);
-                if (!isValidPractice) {
-                    loadProfileSelection(practiceList.data);
-                }
-            }
+        if (!isAuthenticated || isPracticeListLoading || isPracticeListFetching || !practiceList?.data?.length) return;
+
+        const currentState = useProfileStore.getState();
+        if (!currentState.isLoaded || !currentState.selectedPractice) {
+            loadProfileSelection(practiceList.data);
+            return;
         }
-    }, [practiceList?.data?.length, isAuthenticated, isLoaded, selectedPractice?.id]);
+
+        const selectedId = currentState.selectedPractice?.id;
+        const normalizedSelected =
+            typeof selectedId === "number" ? selectedId : typeof selectedId === "string" && /^\d+$/.test(selectedId) ? parseInt(selectedId, 10) : selectedId;
+        const isValidPractice = practiceList.data.some((p) => (typeof p.id === "number" ? p.id : parseInt(String(p.id), 10)) === normalizedSelected);
+        if (!isValidPractice) {
+            loadProfileSelection(practiceList.data);
+        }
+    }, [practiceList?.data?.length, isAuthenticated, isLoaded, selectedPractice?.id, isPracticeListLoading, isPracticeListFetching]);
 
     // Show error state if practice list fails
     // Show blocking error only if user has practices (meaning error is about loading, not about having none)
@@ -218,7 +222,7 @@ export default function PatientsLayout() {
                                                 .map((practice, index) => (
                                                     <Switch key={index} label={practice.name} variant="switch" value={selectedPractice?.id === practice.id} onValueChange={() => setSelectedPractice(practice)} />
                                                 ))}
-                                            <Button systemImage="plus" onPress={() => router.push("/(auth)/select-role")}>
+                                            <Button systemImage="plus" onPress={() => router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } })}>
                                                 Create a Practice
                                             </Button>
                                         </ContextMenu.Items>

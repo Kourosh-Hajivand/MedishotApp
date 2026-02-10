@@ -148,6 +148,7 @@ export interface Practice {
     image?: Media;
     metadata?: PracticeMetadata | string; // Can be object or JSON string
     created_by?: People;
+    init_chart_number?: number;
     patients_count?: number;
     members_count?: number;
     taken_images_count?: number;
