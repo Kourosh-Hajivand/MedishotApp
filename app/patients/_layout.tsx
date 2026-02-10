@@ -50,6 +50,13 @@ export default function PatientsLayout() {
                         headerBackground: () => <AnimatedWhiteBackground />,
                     }}
                 />
+                <Stack.Screen
+                    name="compare"
+                    options={{
+                        headerShown: false,
+                        presentation: "card",
+                    }}
+                />
             </Stack>
         </BottomSheetModalProvider>
     );

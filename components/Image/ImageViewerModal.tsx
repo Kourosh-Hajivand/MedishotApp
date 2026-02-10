@@ -65,6 +65,10 @@ interface RawMediaData {
     has_after?: boolean;
     is_after?: boolean;
     before_media_id?: number | string | null;
+    after_media?: {
+        original_media?: { url: string; [key: string]: any } | null;
+        [key: string]: any;
+    } | null;
     [key: string]: any;
 }
 
@@ -930,6 +934,53 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         setImageEditorVisible(true);
     };
 
+    const handleSplitPress = () => {
+        const currentImageUri = imagesList[currentIndex];
+        if (!rawMediaData?.length || !patientId) return;
+
+        const pairs: { beforeUrl: string; afterUrl: string }[] = [];
+        let currentPairIndex = 0;
+        let pairIndex = 0;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            if (!media.has_after || !media.after_media?.images?.length || !media.images?.length) return;
+
+            const beforeImages = media.images;
+            const afterImages = media.after_media.images;
+            const len = Math.min(beforeImages.length, afterImages.length);
+
+            for (let i = 0; i < len; i++) {
+                const beforeUrl = beforeImages[i].image?.url;
+                const afterUrl = afterImages[i].image?.url;
+                if (beforeUrl && afterUrl) {
+                    pairs.push({ beforeUrl, afterUrl });
+                    if (currentImageUri === beforeUrl || currentImageUri === afterUrl) {
+                        currentPairIndex = pairIndex;
+                    }
+                    pairIndex++;
+                }
+            }
+        });
+
+        if (pairs.length === 0) {
+            Alert.alert("Comparison not available", "Before/After comparison is only available for media with linked after images.");
+            return;
+        }
+
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onClose();
+        setTimeout(() => {
+            router.push({
+                pathname: "/patients/compare" as any,
+                params: {
+                    patientId: String(patientId),
+                    pairsJson: encodeURIComponent(JSON.stringify(pairs)),
+                    currentIndex: String(currentPairIndex),
+                },
+            });
+        }, 100);
+    };
+
     const handleMagicPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         const currentImageUri = imagesList[currentIndex];
@@ -1591,7 +1642,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                         </TouchableOpacity>
                                                     )}
                                                     {showEdit && (
-                                                        <TouchableOpacity onPress={isCurrentImageOriginalMedia ? () => {} : handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                        <TouchableOpacity onPress={isCurrentImageOriginalMedia ? handleSplitPress : handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
                                                             <IconSymbol size={iconSize} name={isCurrentImageOriginalMedia ? "square.split.2x1" : "slider.horizontal.3"} color={colors.system.white as any} style={{ bottom: -2 }} />
                                                         </TouchableOpacity>
                                                     )}
