@@ -1,7 +1,7 @@
 import { ActivitiesList, BaseText } from "@/components";
 import Avatar from "@/components/avatar";
 import { AvatarSkeleton, Skeleton } from "@/components/skeleton";
-import { useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
+import { useGetMemberActivities, useGetPatients, useGetPracticeMember, useRemoveMember } from "@/utils/hook";
 import { ActivityLog } from "@/utils/service/models/ResponseModels";
 import { Button, Host, Picker } from "@expo/ui/swift-ui";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
@@ -25,7 +25,7 @@ interface MemberData {
 }
 
 // Component for Activities tab
-const MemberActivities = ({ memberData, isLoading }: { memberData?: MemberData; isLoading?: boolean }) => {
+const MemberActivities = ({ activities, isLoading }: { activities?: ActivityLog[]; isLoading?: boolean }) => {
     return (
         <View className="gap-3">
             <View className="px-4">
@@ -33,7 +33,7 @@ const MemberActivities = ({ memberData, isLoading }: { memberData?: MemberData; 
                     Recent Activities
                 </BaseText>
             </View>
-            <ActivitiesList activities={(memberData?.activities ?? []) as ActivityLog[]} isLoading={isLoading || !memberData} emptyTitle="No recent activities" emptyDescription="" variant="flat" />
+            <ActivitiesList activities={activities ?? []} isLoading={isLoading ?? false} emptyTitle="No recent activities" emptyDescription="" variant="flat" />
         </View>
     );
 };
@@ -117,7 +117,8 @@ export default function PracticeMemberDetailsScreen() {
     const memberId = params.memberId as string;
 
     const [pickerType, setPickerType] = useState(0);
-    const { data: memberData, isLoading, error } = useGetPracticeMember(parseInt(practiceId || "0"), memberId || "");
+    const { data: memberData, isLoading } = useGetPracticeMember(parseInt(practiceId || "0"), memberId || "");
+    const { data: activitiesData, isLoading: isActivitiesLoading } = useGetMemberActivities(parseInt(practiceId || "0"), memberId || "", !!memberData?.data);
     const typeButton = memberData?.data?.role === "doctor" || memberData?.data?.role === "owner" ? ["Activities", "Patients"] : ["Activities"];
 
     const { mutate: removeMember } = useRemoveMember(
@@ -196,7 +197,7 @@ export default function PracticeMemberDetailsScreen() {
                         </Host>
                     </View>
 
-                    <View className="mt-4">{pickerType === 0 ? <MemberActivities memberData={memberData?.data} isLoading={isLoading} /> : <MemberPatients memberData={memberData?.data} practiceId={parseInt(practiceId || "0")} isLoadingMemberData={isLoading} />}</View>
+                    <View className="mt-4">{pickerType === 0 ? <MemberActivities activities={activitiesData?.data} isLoading={isLoading || isActivitiesLoading} /> : <MemberPatients memberData={memberData?.data} practiceId={parseInt(practiceId || "0")} isLoadingMemberData={isLoading} />}</View>
                 </View>
             </View>
         </ScrollView>

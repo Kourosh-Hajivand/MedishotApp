@@ -379,9 +379,11 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value, isLast = false }) => {
                     {label}
                 </BaseText>
             )}
-            <BaseText type="Subhead" color="labels.primary" style={styles.value}>
-                {value}
-            </BaseText>
+            <View style={styles.valueWrap}>
+                <BaseText type="Subhead" color="labels.primary" style={styles.value}>
+                    {value}
+                </BaseText>
+            </View>
         </View>
     );
 };
@@ -441,6 +443,11 @@ const styles = StyleSheet.create({
         marginRight: 8,
         minWidth: 120,
     },
+    valueWrap: {
+        flex: 1,
+        minWidth: 0,
+        alignSelf: "stretch",
+    },
     value: {
         flex: 1,
     },
@@ -450,12 +457,13 @@ const styles = StyleSheet.create({
     phoneRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: "flex-start",
         backgroundColor: "white",
         paddingVertical: 8,
     },
     phoneInfo: {
         flex: 1,
+        minWidth: 0,
         marginRight: 12,
     },
     actionButtonsContainer: {
@@ -474,7 +482,7 @@ const styles = StyleSheet.create({
     emailRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        alignItems: "center",
+        alignItems: "flex-start",
         backgroundColor: "white",
         paddingVertical: 8,
     },
@@ -484,6 +492,7 @@ const styles = StyleSheet.create({
     },
     emailInfo: {
         flex: 1,
+        minWidth: 0,
         marginRight: 12,
     },
 });

@@ -239,8 +239,11 @@ export default function PatientDetailsScreen() {
         // Also sort images within each section by timestamp (newest first)
         const sections = Array.from(imagesByDate.entries())
             .map(([date, imageItems]) => {
-                // Sort images within section by timestamp (newest first)
-                const sortedImages = [...imageItems].sort((a, b) => b.timestamp - a.timestamp).map((item) => item.url);
+                // Sort images within section by timestamp (newest first), filter out empty URLs
+                const sortedImages = [...imageItems]
+                    .sort((a, b) => b.timestamp - a.timestamp)
+                    .map((item) => item.url)
+                    .filter((url): url is string => !!url);
                 return {
                     title: date,
                     data: sortedImages,
@@ -779,6 +782,7 @@ export default function PatientDetailsScreen() {
                                     description="Date"
                                     practice={practice}
                                     metadata={metadata}
+                                    enableTakeAfterTemplate
                                 />
                             ))}
                         {activeTab === 0 && (archivedData?.data?.length ?? 0) > 0 && (

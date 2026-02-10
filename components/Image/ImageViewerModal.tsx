@@ -117,6 +117,8 @@ interface ImageViewerModalProps {
     // Optional: when provided, Share will compose header + image + footer into one image
     practice?: Practice;
     metadata?: ShareCompositionMetadata | null;
+    /** Only show "Take after Template" when true (e.g. only on patient gallery page) */
+    enableTakeAfterTemplate?: boolean;
 }
 
 interface ThumbnailItemProps {
@@ -380,6 +382,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     onRestore,
     practice,
     metadata,
+    enableTakeAfterTemplate = false,
 }) => {
     const { profile: me } = useAuth();
     const router = useRouter();
@@ -606,7 +609,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [currentIndex, imagesList, imageUrlToHideTakeAfterMap]);
 
-    const showTakeAfterTemplate = isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
+    const showTakeAfterTemplate = Boolean(enableTakeAfterTemplate) && isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
 
     // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
     const isCurrentImageOriginalNoBeforeAfter = React.useMemo(() => {

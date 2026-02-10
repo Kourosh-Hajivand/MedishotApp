@@ -24,11 +24,12 @@ const GalleryImageItem: React.FC<{
     imageUrlToBookmarkMap?: Map<string, boolean>;
     imageUrlToIsAfterMap?: Map<string, boolean>;
     imageUrlToHasAfterMap?: Map<string, boolean>;
+    showBookmarkBadge?: boolean;
     isLoading: boolean;
     onLoadStart: () => void;
     onLoad: () => void;
     onError: () => void;
-}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, isLoading, onLoadStart, onLoad, onError }) => {
+}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmarkBadge = true, isLoading, onLoadStart, onLoad, onError }) => {
     // Use local shared values for opacity animation per image
     const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
@@ -146,7 +147,7 @@ const GalleryImageItem: React.FC<{
                         onError={handleImageError}
                     />
                 </Animated.View>
-                {imageUrlToBookmarkMap?.get(uri) && (
+                {showBookmarkBadge && imageUrlToBookmarkMap?.get(uri) && (
                     <View style={styles.bookmarkIcon}>
                         <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                     </View>
@@ -244,6 +245,8 @@ interface GalleryWithMenuProps {
     // Optional: for Share composition (header + image + footer)
     practice?: Practice;
     metadata?: { address?: string; phone?: string; email?: string; website?: string; print_settings?: any } | null;
+    /** Only show "Take after Template" in viewer when true (e.g. only on patient gallery page) */
+    enableTakeAfterTemplate?: boolean;
 }
 
 const { width } = Dimensions.get("window");
@@ -267,6 +270,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     onRestore,
     practice,
     metadata,
+    enableTakeAfterTemplate = false,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
@@ -477,6 +481,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}
                 imageUrlToIsAfterMap={imageUrlToIsAfterMap}
                 imageUrlToHasAfterMap={imageUrlToHasAfterMap}
+                showBookmarkBadge={showBookmark}
                 isLoading={isLoading}
                 onLoadStart={handleImageLoadStart}
                 onLoad={handleImageLoad}
@@ -555,6 +560,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 onRestore={onRestore}
                 practice={practice}
                 metadata={metadata}
+                enableTakeAfterTemplate={enableTakeAfterTemplate}
             />
         </GestureHandlerRootView>
     );

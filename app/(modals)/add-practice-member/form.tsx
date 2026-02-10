@@ -393,7 +393,7 @@ export default function AddPracticeMemberForm() {
                 {!isEditMode && (
                     <View className="gap-4">
                         <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
-                        <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} />
+                        {/* <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} /> */}
                         <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
                         <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                     </View>
