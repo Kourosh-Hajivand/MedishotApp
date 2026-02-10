@@ -68,8 +68,7 @@ export default function SignContractScreen() {
             template.body.forEach((item, index) => {
                 const opts = item.data?.options ?? [];
                 if (radioTypes.includes(item.type) && opts.length > 0) {
-                    const normalized = opts.map((o) => String(o).trim().toLowerCase());
-                    const defaultOption = normalized.includes("yes") ? (opts.find((o) => String(o).trim().toLowerCase() === "yes") ?? opts[0]) : opts[0];
+                    const defaultOption = opts.find((o) => String(o).trim().toLowerCase() === "no") ?? opts[0];
                     defaultAnswers[index] = defaultOption;
                 }
             });

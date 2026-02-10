@@ -11,6 +11,7 @@ import { Button, Host, HStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Dimensions, FlatList, PixelRatio, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
@@ -193,14 +194,20 @@ export default function ReviewScreen() {
                 return;
             }
 
-            // Capture at 2x resolution for same/better quality as camera (width/height in pixels)
-            const pixelSize = Math.round(width * PixelRatio.get() * 2);
-            const uri = await captureRef(compositeViewRef.current, {
+            // Capture at 1.5x resolution (balance size vs quality), jpg with compression
+            const pixelSize = Math.round(width * PixelRatio.get() * 1.5);
+            const capturedUri = await captureRef(compositeViewRef.current, {
                 format: "jpg",
-                quality: 1,
+                quality: 0.82,
                 result: "tmpfile",
                 width: pixelSize,
                 height: pixelSize,
+            });
+
+            // Compress with expo-image-manipulator to reduce file size without visible quality loss
+            const { uri } = await ImageManipulator.manipulateAsync(capturedUri, [], {
+                compress: 0.85,
+                format: ImageManipulator.SaveFormat.JPEG,
             });
 
             const newCompositePhoto: CapturedPhoto = {

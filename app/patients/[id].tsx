@@ -623,7 +623,7 @@ export default function PatientDetailsScreen() {
                                     <View className="flex-row items-center justify-between pb-2 border-b border-border">
                                         <View>
                                             <BaseText type="Subhead" color="labels.secondary">
-                                                Phone
+                                                phone
                                             </BaseText>
                                             <BaseText type="Subhead" color="labels.primary">
                                                 {e164ToDisplay(patient?.data?.numbers?.[0]?.value) || patient?.data?.numbers?.[0]?.value}

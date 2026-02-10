@@ -476,12 +476,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return patientId;
     }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
-    // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, and hideTakeAfter
-    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap } = React.useMemo(() => {
+    // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, hideTakeAfter, and originalWithNoBeforeAfter
+    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap, imageUrlToOriginalNoBeforeAfterMap } = React.useMemo(() => {
         const takerMap = new Map<string, { first_name?: string | null; last_name?: string | null }>();
         const createdAtMap = new Map<string, string>();
         const isOriginalMediaMap = new Map<string, boolean>();
         const hideTakeAfterMap = new Map<string, boolean>();
+        const originalNoBeforeAfterMap = new Map<string, boolean>();
 
         if (rawMediaData && Array.isArray(rawMediaData)) {
             rawMediaData.forEach((media: RawMediaData) => {
@@ -489,6 +490,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 const createdAt = media.created_at;
                 const hasTemplate = !!media.template;
                 const hideTakeAfter = media.has_after === true || (media.is_after === true && media.before_media_id != null);
+                const noBeforeAfter = media.has_after !== true && media.before_media_id == null;
 
                 // Add original_media to maps if it exists
                 if (media.original_media?.url) {
@@ -506,6 +508,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         isOriginalMediaMap.set(media.original_media.url, true);
                         if (hideTakeAfter) {
                             hideTakeAfterMap.set(media.original_media.url, true);
+                        }
+                        // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
+                        if (noBeforeAfter) {
+                            originalNoBeforeAfterMap.set(media.original_media.url, true);
                         }
                     }
                 }
@@ -542,6 +548,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             imageUrlToCreatedAtMapFromRaw: createdAtMap,
             imageUrlToIsOriginalMediaMap: isOriginalMediaMap,
             imageUrlToHideTakeAfterMap: hideTakeAfterMap,
+            imageUrlToOriginalNoBeforeAfterMap: originalNoBeforeAfterMap,
         };
     }, [rawMediaData]);
 
@@ -601,21 +608,40 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const showTakeAfterTemplate = isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
 
-    // Adjust actions based on whether current image is original_media
+    // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
+    const isCurrentImageOriginalNoBeforeAfter = React.useMemo(() => {
+        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
+            const currentImageUrl = imagesList[currentIndex];
+            return imageUrlToOriginalNoBeforeAfterMap.get(currentImageUrl) === true;
+        }
+        return false;
+    }, [currentIndex, imagesList, imageUrlToOriginalNoBeforeAfterMap]);
+
+    // Adjust actions: original with no before/after → Share, Take After, Bookmark only; original with before/after → split, archive, bookmark; rest → Share, Bookmark, Edit, Archive
     const effectiveActions = React.useMemo(() => {
         const { showShare: share = true, showRestore: restore = false } = actions;
         if (isCurrentImageOriginalMedia) {
+            if (isCurrentImageOriginalNoBeforeAfter) {
+                return {
+                    showBookmark: true,
+                    showEdit: false,
+                    showArchive: false,
+                    showShare: share,
+                    showRestore: restore,
+                    showMagic: false,
+                };
+            }
             return {
                 showBookmark: true,
-                showEdit: true, // Show split icon (square.split.2x1) for original_media
-                showArchive: true, // Archive to the right of split icon
+                showEdit: true,
+                showArchive: true,
                 showShare: share,
                 showRestore: restore,
                 showMagic: false,
             };
         }
         return actions;
-    }, [isCurrentImageOriginalMedia, actions]);
+    }, [isCurrentImageOriginalMedia, isCurrentImageOriginalNoBeforeAfter, actions]);
 
     // Destructure effective actions (for bottom buttons)
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false } = effectiveActions;
