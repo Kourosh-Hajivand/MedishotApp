@@ -966,27 +966,68 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
         const pairs: { beforeUrl: string; afterUrl: string }[] = [];
         let currentPairIndex = 0;
-        let pairIndex = 0;
+        type ImageCell = NonNullable<RawMediaData["images"]>[number];
+        let beforeImages: ImageCell[] | null = null;
+        let afterImages: ImageCell[] | null = null;
 
-        rawMediaData.forEach((media: RawMediaData) => {
-            if (!media.has_after || !media.after_media?.images?.length || !media.images?.length) return;
-
-            const beforeImages = media.images;
-            const afterImages = media.after_media.images;
-            const len = Math.min(beforeImages.length, afterImages.length);
-
-            for (let i = 0; i < len; i++) {
-                const beforeUrl = beforeImages[i].image?.url;
-                const afterUrl = afterImages[i].image?.url;
-                if (beforeUrl && afterUrl) {
-                    pairs.push({ beforeUrl, afterUrl });
-                    if (currentImageUri === beforeUrl || currentImageUri === afterUrl) {
-                        currentPairIndex = pairIndex;
-                    }
-                    pairIndex++;
+        // Find the single before/after set that contains the current image (only pass that set to compare)
+        for (const media of rawMediaData) {
+            if (media.has_after && media.after_media?.images?.length && media.images?.length) {
+                if (media.original_media?.url === currentImageUri) {
+                    beforeImages = media.images;
+                    afterImages = media.after_media.images;
+                    currentPairIndex = 0;
+                    break;
+                }
+                const beforeIdx = media.images.findIndex((img: any) => img.image?.url === currentImageUri);
+                if (beforeIdx >= 0) {
+                    beforeImages = media.images;
+                    afterImages = media.after_media.images;
+                    currentPairIndex = beforeIdx;
+                    break;
+                }
+                if (media.after_media.original_media?.url === currentImageUri) {
+                    beforeImages = media.images;
+                    afterImages = media.after_media.images;
+                    currentPairIndex = 0;
+                    break;
+                }
+                const afterIdx = media.after_media.images.findIndex((img: any) => img.image?.url === currentImageUri);
+                if (afterIdx >= 0) {
+                    beforeImages = media.images;
+                    afterImages = media.after_media.images;
+                    currentPairIndex = afterIdx;
+                    break;
                 }
             }
-        });
+            if (media.is_after && media.before_media?.images?.length && media.images?.length) {
+                if (media.original_media?.url === currentImageUri) {
+                    beforeImages = media.before_media.images;
+                    afterImages = media.images;
+                    currentPairIndex = 0;
+                    break;
+                }
+                const afterIdx = media.images.findIndex((img: any) => img.image?.url === currentImageUri);
+                if (afterIdx >= 0) {
+                    beforeImages = media.before_media.images;
+                    afterImages = media.images;
+                    currentPairIndex = afterIdx;
+                    break;
+                }
+            }
+        }
+
+        if (!beforeImages || !afterImages) {
+            Alert.alert("Comparison not available", "Before/After comparison is only available for media with linked after images.");
+            return;
+        }
+
+        const len = Math.min(beforeImages.length, afterImages.length);
+        for (let i = 0; i < len; i++) {
+            const beforeUrl = beforeImages[i].image?.url;
+            const afterUrl = afterImages[i].image?.url;
+            if (beforeUrl && afterUrl) pairs.push({ beforeUrl, afterUrl });
+        }
 
         if (pairs.length === 0) {
             Alert.alert("Comparison not available", "Before/After comparison is only available for media with linked after images.");

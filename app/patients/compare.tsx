@@ -121,7 +121,7 @@ export default function BeforeAfterCompareScreen() {
             {/* Header: light gray, back left, page indicator 1/4 right */}
             <View style={[styles.header, styles.headerLightGray, { paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButtonCircle} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                    <IconSymbol name="chevron.left" size={24} color={colors.system.blue as any} />
+                    <IconSymbol name="chevron.left" size={24} color={colors.system.black as any} />
                 </TouchableOpacity>
                 {hasMultiple && (
                     <BaseText type="Caption1" weight="600" color="labels.secondary" style={styles.headerPageIndicator}>
