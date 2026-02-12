@@ -123,7 +123,6 @@ export default function BeforeAfterCompareScreen() {
     const pair = pairs[currentIndex];
     const before = pair?.beforeUrl ?? "";
     const after = pair?.afterUrl ?? "";
-    const hasMultiple = pairs.length > 1;
 
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -162,11 +161,6 @@ export default function BeforeAfterCompareScreen() {
                 <TouchableOpacity onPress={handleBack} style={styles.backButtonCircle} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <IconSymbol name="chevron.left" size={24} color={colors.system.black as any} />
                 </TouchableOpacity>
-                {hasMultiple && (
-                    <BaseText type="Caption1" weight="600" color="labels.secondary" style={styles.headerPageIndicator}>
-                        {currentIndex + 1}/{pairs.length}
-                    </BaseText>
-                )}
             </View>
 
             {/* Content: full space; horizontal = two halves with contain (own ratio), fill above tab */}
@@ -230,8 +224,8 @@ export default function BeforeAfterCompareScreen() {
                 {isSlider && <BeforeAfterSliderOpacity beforeUrl={before} afterUrl={after} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
             </View>
 
-            {/* Thumbnail strip (like ImageViewerModal) – above tab bar, only when multiple pairs */}
-            {hasMultiple && (
+            {/* Thumbnail strip (like ImageViewerModal) – above tab bar, show even for single pair so layout is consistent */}
+            {pairs.length > 0 && (
                 <View style={styles.thumbnailStripWrap}>
                     <ScrollView
                         ref={thumbnailScrollRef}
@@ -473,7 +467,7 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }
 }
 
 function SliderThumb({ value, trackWidthSv }: { value: SharedValue<number>; trackWidthSv: SharedValue<number> }) {
-    const THUMB_SIZE = 24;
+    const THUMB_SIZE = 20;
     const style = useAnimatedStyle(() => ({
         transform: [{ translateX: value.value * trackWidthSv.value - THUMB_SIZE / 2 }],
     }));
@@ -689,7 +683,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     sliderBoxLabelWrap: {
-        minWidth: 48,
+        minWidth: 44,
         alignItems: "center",
         justifyContent: "center",
     },
@@ -788,27 +782,28 @@ const styles = StyleSheet.create({
         overflow: "hidden",
     },
     sliderPillWrap: {
-        paddingHorizontal: 20,
-        paddingTop: 12,
+        paddingHorizontal: 16,
+        paddingTop: 8,
         backgroundColor: colors.system.gray6,
-        paddingBottom: 12,
+        paddingBottom: 8,
     },
     sliderBox: {
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 4,
-        paddingHorizontal: 0,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
         backgroundColor: colors.system.white,
         borderRadius: 999,
-        gap: 0,
+        gap: 20,
     },
     sliderBoxLabel: {
-        minWidth: 48,
+        minWidth: 44,
         textAlign: "center",
     },
     sliderTrackWrap: {
         flex: 1,
-        height: 40,
+        height: 28,
+        minWidth: 40,
         justifyContent: "center",
         position: "relative",
     },
@@ -816,17 +811,17 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        top: 18,
-        height: 4,
-        borderRadius: 2,
+        top: 12,
+        height: 3,
+        borderRadius: 1.5,
         backgroundColor: colors.system.gray6,
     },
     sliderTrackFill: {
         position: "absolute",
         left: 0,
-        top: 18,
-        height: 4,
-        borderRadius: 2,
+        top: 12,
+        height: 3,
+        borderRadius: 1.5,
         backgroundColor: colors.system.blue,
     },
     sliderTrack: {
@@ -850,14 +845,14 @@ const styles = StyleSheet.create({
         left: 0,
         top: 0,
         bottom: 0,
-        width: 24,
+        width: 20,
         justifyContent: "center",
         alignItems: "center",
     },
     sliderThumb: {
-        width: 18,
-        height: 18,
-        borderRadius: 12,
+        width: 14,
+        height: 14,
+        borderRadius: 7,
         backgroundColor: colors.system.blue,
     },
     thumbnailStripWrap: {

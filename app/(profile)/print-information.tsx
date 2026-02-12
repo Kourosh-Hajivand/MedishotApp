@@ -103,7 +103,7 @@ export default function PrintInformationScreen() {
 
     const rotateInterpolate = rotationAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ["0deg", "180deg"],
+        outputRange: ["180deg", "0deg"],
     });
 
     const heightInterpolate = expandAnim.interpolate({
