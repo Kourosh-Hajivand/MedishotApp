@@ -57,9 +57,7 @@ export default function PracticeDetailScreen() {
 
     // Check if user can edit (only owners)
     const canEdit = currentPractice?.role === "owner";
-    console.log("====================================");
-    console.log(currentPractice);
-    console.log("====================================");
+
     useLayoutEffect(() => {
         navigation.setOptions({
             headerTitle: "Practice Details",

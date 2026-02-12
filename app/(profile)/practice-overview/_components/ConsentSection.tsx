@@ -49,10 +49,10 @@ export function ConsentSection() {
                     {allConsents.slice(0, 3).map((consent) => (
                         <View key={consent.id} className="gap-[10px]" style={{ width: 174 }}>
                             <View>
-                                <BaseText type="Subhead" weight="600" color="labels.primary">
+                                <BaseText type="Subhead" weight="600" color="labels.primary" numberOfLines={1} lineBreakMode="tail">
                                     {consent.patientName}
                                 </BaseText>
-                                <BaseText type="Caption1" weight="400" color="labels.secondary">
+                                <BaseText type="Caption1" weight="400" color="labels.secondary" numberOfLines={2} lineBreakMode="tail">
                                     {consent.type} - {getRelativeTime(consent.date || "")}
                                 </BaseText>
                             </View>

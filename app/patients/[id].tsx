@@ -59,20 +59,22 @@ export default function PatientDetailsScreen() {
         return practice.metadata;
     }, [practice?.metadata]);
 
-    // Create document mutation
+    const tabs = ["Media", "Consent", "ID", "Activities"];
+    const [activeTab, setActiveTab] = useState(0);
+
+    // Create document mutation – onSuccess: refetch documents and switch to ID tab so the new document is visible
     const { mutate: createDocument, isPending: isCreatingDocument } = useCreatePatientDocument(
         selectedPractice?.id,
         id,
         () => {
-            refetchDocuments();
+            refetchDocuments().then(() => {
+                setActiveTab(2); // ID tab
+            });
         },
         (error) => {
             Alert.alert("Error", error.message || "Failed to create document");
         },
     );
-
-    const tabs = ["Media", "Consent", "ID", "Activities"];
-    const [activeTab, setActiveTab] = useState(0);
 
     // Switch to tab when `tab` param is provided (e.g. after signing a consent)
     useEffect(() => {
