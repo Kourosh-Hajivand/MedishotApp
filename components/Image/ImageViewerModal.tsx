@@ -14,7 +14,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Alert, Dimensions, Modal, Image as RNImage, ScrollView, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,6 +24,41 @@ const { width, height } = Dimensions.get("window");
 
 // Softer pan when zoomed so image doesn't move too fast
 const PAN_SENSITIVITY = 0.7;
+
+// Thumbnail strip layout (must match scrollThumbnailToPosition and worklet math)
+const ACTIVE_THUMB_WIDTH = 44;
+const INACTIVE_THUMB_WIDTH = 24;
+const THUMB_GAP = 4;
+const ACTIVE_THUMB_MARGIN = 6;
+const THUMB_PADDING = width / 2 - 22;
+
+function getThumbnailScrollXForPage(currentPage: number, count: number): number {
+    if (count <= 0) return 0;
+    const clampedPage = Math.max(0, Math.min(currentPage, count - 1));
+    const fromIndex = Math.floor(clampedPage);
+    const toIndex = Math.min(Math.ceil(clampedPage), count - 1);
+    const progress = clampedPage - fromIndex;
+
+    const getPos = (idx: number) => {
+        let pos = THUMB_PADDING;
+        for (let i = 0; i < idx; i++) pos += INACTIVE_THUMB_WIDTH + THUMB_GAP;
+        return pos + ACTIVE_THUMB_MARGIN + ACTIVE_THUMB_WIDTH / 2;
+    };
+    const fromPos = getPos(fromIndex);
+    const toPos = fromIndex === toIndex ? fromPos : getPos(toIndex);
+    const interpolatedPos = fromPos + (toPos - fromPos) * progress;
+    const scrollX = interpolatedPos - width / 2;
+    const totalWidth =
+        THUMB_PADDING +
+        count * INACTIVE_THUMB_WIDTH +
+        (count - 1) * THUMB_GAP +
+        ACTIVE_THUMB_MARGIN +
+        (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) +
+        ACTIVE_THUMB_MARGIN +
+        THUMB_PADDING;
+    const maxScroll = Math.max(0, totalWidth - width);
+    return Math.max(0, Math.min(scrollX, maxScroll));
+}
 
 import { MINT_COLOR } from "@/app/camera/_components/create-template/constants";
 import { containerSize, iconSize } from "@/constants/theme";
@@ -206,9 +241,9 @@ const ImageViewerItem: React.FC<ImageViewerItemProps> = ({ item, index, imageSiz
     };
 
     return (
-        <View style={styles.imageWrapper}>
+        <View style={styles.imageWrapper} collapsable={false}>
             <GestureDetector gesture={gestures as any}>
-                <Animated.View style={[styles.imageContainer, isCurrentImage ? imageAnimatedStyle : null] as any}>
+                <Animated.View style={[styles.imageContainer, isCurrentImage ? imageAnimatedStyle : null] as any} collapsable={false}>
                     {showSkeleton && (
                         <Animated.View style={[styles.skeletonContainer, { width: imageSize.width || width, height: imageSize.height || height }, skeletonAnimatedStyle]}>
                             <ImageSkeleton width={imageSize.width || width} height={imageSize.height || height} borderRadius={0} variant="rectangular" />
@@ -265,29 +300,18 @@ const ThumbnailItem: React.FC<ThumbnailItemProps & { isLoading?: boolean; onLoad
         // Clamp activeProgress between 0 and 1
         activeProgress = Math.max(0, Math.min(1, activeProgress));
 
-        // Smooth interpolation without bounce - iOS Photos style
+        // Direct mapping – no withTiming – so thumbnail updates in same frame as scroll (instant sync)
         // Width: 24 (inactive) -> 44 (active)
-        const width = withTiming(24 + activeProgress * 20, {
-            duration: 150,
-        });
-
+        const w = 24 + activeProgress * 20;
         // Margin: 0 (inactive) -> 6 (active)
-        const margin = withTiming(activeProgress * 6, {
-            duration: 150,
-        });
-
-        // Scale: 0.95 (inactive) -> 1.0 (active) - subtle
-        const scale = withTiming(0.95 + activeProgress * 0.05, {
-            duration: 150,
-        });
-
+        const margin = activeProgress * 6;
+        // Scale: 0.95 (inactive) -> 1.0 (active)
+        const scale = 0.95 + activeProgress * 0.05;
         // Opacity: 0.7 (inactive) -> 1.0 (active)
-        const opacity = withTiming(0.7 + activeProgress * 0.3, {
-            duration: 150,
-        });
+        const opacity = 0.7 + activeProgress * 0.3;
 
         return {
-            width,
+            width: w,
             marginHorizontal: margin,
             transform: [{ scale }],
             opacity,
@@ -428,8 +452,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
-    const thumbnailScrollRef = useRef<ScrollView>(null);
-    const thumbnailScrollPosition = useRef(0);
     const isProgrammaticScroll = useSharedValue(false); // Changed to shared value for worklet access
     const lastThumbnailIndex = useRef(initialIndex);
     const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -469,6 +491,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const scrollProgress = useSharedValue(0); // Progress of swipe: -1 to 1 (left to right)
     const currentIndexShared = useSharedValue(initialIndex); // Shared value for current index
     const dismissTranslateY = useSharedValue(0); // Swipe down to dismiss (iPhone Photos style)
+    // Thumbnail strip scroll position - driven on UI thread for perfect sync with image swipe
+    const thumbnailScrollX = useSharedValue(getThumbnailScrollXForPage(initialIndex, imagesList.length));
 
     // Get current patientId from currentIndex if imageUrlToPatientIdMap is provided
     const currentPatientId = React.useMemo(() => {
@@ -658,57 +682,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const scrollThumbnailToPosition = React.useCallback(
         (currentPage: number) => {
-            if (!thumbnailScrollRef.current || imagesList.length === 0) return;
-
-            const activeThumbnailWidth = 44;
-            const inactiveThumbnailWidth = 24;
-            const thumbnailGap = 4;
-            const activeThumbnailMargin = 6;
-            const padding = width / 2 - 22;
-
-            // Get indices for interpolation
-            const fromIndex = Math.floor(currentPage);
-            const toIndex = Math.min(Math.ceil(currentPage), imagesList.length - 1);
-            const progress = currentPage - fromIndex;
-
-            // Calculate position for a specific index
-            const getPositionForIndex = (idx: number) => {
-                let pos = padding;
-                for (let i = 0; i < idx; i++) {
-                    pos += inactiveThumbnailWidth + thumbnailGap;
-                }
-                pos += activeThumbnailMargin + activeThumbnailWidth / 2;
-                return pos;
-            };
-
-            // Interpolate between positions
-            const fromPos = getPositionForIndex(fromIndex);
-            const toPos = fromIndex === toIndex ? fromPos : getPositionForIndex(toIndex);
-            const interpolatedPos = fromPos + (toPos - fromPos) * progress;
-
-            // Center position
-            const scrollX = interpolatedPos - width / 2;
-
-            // Calculate max scroll
-            const totalWidth = padding + imagesList.length * inactiveThumbnailWidth + (imagesList.length - 1) * thumbnailGap + activeThumbnailMargin + (activeThumbnailWidth - inactiveThumbnailWidth) + activeThumbnailMargin + padding;
-            const maxScroll = Math.max(0, totalWidth - width);
-
-            thumbnailScrollRef.current.scrollTo({
-                x: Math.max(0, Math.min(scrollX, maxScroll)),
-                animated: false,
-            });
+            const scrollX = getThumbnailScrollXForPage(currentPage, imagesList.length);
+            thumbnailScrollX.value = scrollX;
         },
-        [imagesList.length, width],
+        [imagesList.length],
     );
 
     const scrollThumbnailToIndex = React.useCallback(
         (index: number) => {
-            if (!thumbnailScrollRef.current || imagesList.length === 0) return;
-
-            // Simply use scrollThumbnailToPosition for consistency
             scrollThumbnailToPosition(index);
         },
-        [imagesList.length, scrollThumbnailToPosition],
+        [scrollThumbnailToPosition],
     );
 
     // Keep currentIndexShared and lastThumbnailIndex in sync with currentIndex
@@ -717,18 +701,19 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
 
-    // Reset index to initialIndex when modal closes
+    // Reset index to initialIndex when modal closes; sync thumbnail when modal opens
     React.useEffect(() => {
         if (!visible) {
-            // Reset to initial index when modal is closed
             setCurrentIndex(initialIndex);
             currentIndexShared.value = initialIndex;
             scale.value = 1;
             translateX.value = 0;
             translateY.value = 0;
             setIsZoomed(false);
+        } else {
+            thumbnailScrollX.value = getThumbnailScrollXForPage(initialIndex, imagesList.length);
         }
-    }, [visible, initialIndex]);
+    }, [visible, initialIndex, imagesList.length]);
 
     // When share composition is ready, capture and share
     React.useEffect(() => {
@@ -794,34 +779,46 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         scrollThumbnailToIndex(currentIndex);
     }, [currentIndex, scrollThumbnailToIndex]);
 
-    const scrollThumbnailToPositionJS = React.useCallback(
-        (currentPage: number) => {
-            scrollThumbnailToPosition(currentPage);
-        },
-        [scrollThumbnailToPosition],
-    );
-
     const handleScroll = useAnimatedScrollHandler({
         onScroll: (event) => {
-            // Don't update during programmatic scrolls
-            if (isProgrammaticScroll.value) {
-                return;
-            }
+            "worklet";
+            if (isProgrammaticScroll.value) return;
+            if (scale.value > 1) return;
 
             const offsetX = event.contentOffset.x;
             const currentPage = offsetX / width;
-            const clampedPage = Math.max(0, Math.min(currentPage, imagesList.length - 1));
+            const count = imagesList.length;
+            if (count <= 0) return;
+
+            const clampedPage = Math.max(0, Math.min(currentPage, count - 1));
+            const fromIndex = Math.floor(clampedPage);
+            const toIndex = Math.min(Math.ceil(clampedPage), count - 1);
+            const progress = clampedPage - fromIndex;
+
+            // Same math as getThumbnailScrollXForPage - all on UI thread for perfect sync
+            const getPos = (idx: number) => {
+                let pos = THUMB_PADDING;
+                for (let i = 0; i < idx; i++) pos += INACTIVE_THUMB_WIDTH + THUMB_GAP;
+                return pos + ACTIVE_THUMB_MARGIN + ACTIVE_THUMB_WIDTH / 2;
+            };
+            const fromPos = getPos(fromIndex);
+            const toPos = fromIndex === toIndex ? fromPos : getPos(toIndex);
+            const interpolatedPos = fromPos + (toPos - fromPos) * progress;
+            let scrollX = interpolatedPos - width / 2;
+            const totalWidth =
+                THUMB_PADDING +
+                count * INACTIVE_THUMB_WIDTH +
+                (count - 1) * THUMB_GAP +
+                ACTIVE_THUMB_MARGIN +
+                (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) +
+                ACTIVE_THUMB_MARGIN +
+                THUMB_PADDING;
+            const maxScroll = Math.max(0, totalWidth - width);
+            thumbnailScrollX.value = Math.max(0, Math.min(scrollX, maxScroll));
+
             const index = Math.round(clampedPage);
-
-            // Calculate progress for smooth thumbnail animation
-            const progress = clampedPage - index;
-            scrollProgress.value = progress;
+            scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
             currentIndexShared.value = index;
-
-            // Immediately scroll thumbnail - runs on UI thread for perfect sync
-            if (clampedPage >= 0 && clampedPage < imagesList.length) {
-                runOnJS(scrollThumbnailToPositionJS)(clampedPage);
-            }
         },
     });
 
@@ -831,12 +828,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             return;
         }
 
+        // Don't update if zoomed
+        if (scale.value > 1) {
+            return;
+        }
+
         const offsetX = event.nativeEvent.contentOffset.x;
         const index = Math.round(offsetX / width);
         const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
 
-        // Reset scroll progress
-        scrollProgress.value = withTiming(0, { duration: 150 });
+        // Reset scroll progress smoothly
+        scrollProgress.value = withTiming(0, { duration: 200 });
 
         // Update index if changed
         if (validIndex !== currentIndex) {
@@ -1282,6 +1284,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     state.fail();
                 }
             })
+            .onTouchesMove((e, state) => {
+                // Double check: fail if not zoomed
+                if (scale.value <= 1) {
+                    state.fail();
+                    return;
+                }
+                // Ensure we're still zoomed before allowing pan
+                state.activate();
+            })
             .onStart(() => {
                 if (scale.value > 1) {
                     savedTranslateX.value = translateX.value;
@@ -1294,7 +1305,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     translateX.value = savedTranslateX.value + e.translationX * PAN_SENSITIVITY;
                     translateY.value = savedTranslateY.value + e.translationY * PAN_SENSITIVITY;
                 }
-                // When not zoomed, don't interfere - let FlatList handle horizontal swipe
             })
             .onEnd((e) => {
                 if (scale.value > 1 && imageSize.width > 0 && imageSize.height > 0) {
@@ -1346,7 +1356,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 runOnJS(toggleControls)();
             });
 
-        return Gesture.Simultaneous(Gesture.Simultaneous(pinchGesture, panGesture), Gesture.Exclusive(doubleTapGesture, singleTapGesture));
+        // Combine gestures with proper priorities:
+        // - Pinch and pan work together when zoomed
+        // - Tap gestures work independently
+        // - FlatList handles horizontal swipe when not zoomed
+        return Gesture.Simultaneous(
+            Gesture.Simultaneous(pinchGesture, panGesture),
+            Gesture.Exclusive(doubleTapGesture, singleTapGesture)
+        );
     };
 
     // Swipe down to dismiss (iPhone Photos style) - only when not zoomed
@@ -1360,9 +1377,12 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     // Only allow if not zoomed
                     if (scale.value > 1) {
                         state.fail();
+                        return;
                     }
+                    // Don't activate yet, wait for movement direction
                 })
                 .onTouchesMove((e, state) => {
+                    // Double check: fail if zoomed
                     if (scale.value > 1) {
                         state.fail();
                         return;
@@ -1374,30 +1394,35 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         return;
                     }
 
+                    // Get movement direction from first touch
                     const absX = Math.abs(touch.x);
                     const absY = Math.abs(touch.y);
 
                     // Only activate if:
-                    // 1. Moving down (y > 0)
-                    // 2. Vertical movement is at least 2x more than horizontal
-                    // 3. Moved at least 20px vertically
-                    if (touch.y > 20 && absY > absX * 2) {
+                    // 1. Moving down (y > 0) - at least 15px
+                    // 2. Vertical movement is at least 2.5x more than horizontal (stricter)
+                    // 3. Moved at least 15px vertically
+                    if (touch.y > 15 && absY > absX * 2.5 && absY > 15) {
                         state.activate();
                     }
-                    // Fail if horizontal movement is dominant or moved left/right too much
-                    else if (absX > 25 || (absX > absY && absX > 15)) {
+                    // Fail immediately if horizontal movement is dominant
+                    else if (absX > absY * 1.2 || absX > 20) {
                         state.fail();
                     }
                 })
                 .onUpdate((e) => {
                     // Only update if moving down and not zoomed
                     if (scale.value <= 1 && e.translationY > 0) {
-                        // Extra safety: ensure vertical movement is still dominant
+                        // Extra safety: ensure vertical movement is still dominant (stricter check)
                         const absX = Math.abs(e.translationX);
                         const absY = Math.abs(e.translationY);
 
-                        if (absY > absX * 1.5) {
+                        // Only update if vertical movement is clearly dominant
+                        if (absY > absX * 2) {
                             dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
+                        } else {
+                            // If horizontal movement becomes dominant, reset
+                            dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
                         }
                     }
                 })
@@ -1415,7 +1440,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     if (dismissTranslateY.value > 0 && dismissTranslateY.value < DISMISS_THRESHOLD) {
                         dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
                     }
-                }),
+                })
+                .activeOffsetY([15, Number.MAX_SAFE_INTEGER]) // Only activate for downward movement
+                .failOffsetX([-20, 20]), // Fail if horizontal movement exceeds 20px
         [onClose],
     );
 
@@ -1461,6 +1488,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const bottomBarAnimatedStyle = useAnimatedStyle(() => ({
         opacity: bottomBarOpacity.value,
+    }));
+
+    // Thumbnail strip: driven by thumbnailScrollX on UI thread for perfect sync with image swipe
+    const thumbnailStripWidth =
+        imagesList.length <= 0
+            ? width
+            : THUMB_PADDING * 2 +
+              imagesList.length * INACTIVE_THUMB_WIDTH +
+              (imagesList.length - 1) * THUMB_GAP +
+              ACTIVE_THUMB_MARGIN * 2 +
+              (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH);
+
+    const thumbnailStripAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: -thumbnailScrollX.value }],
     }));
 
     return (
@@ -1588,7 +1629,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 onMomentumScrollEnd={handleMomentumScrollEnd}
                                 scrollEventThrottle={1}
                                 showsHorizontalScrollIndicator={false}
-                                decelerationRate="fast"
+                                decelerationRate={0.9}
                                 renderItem={renderImageItem}
                                 getItemLayout={(_, index) => ({
                                     length: width,
@@ -1597,7 +1638,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 })}
                                 scrollEnabled={!isZoomed}
                                 bounces={false}
-                                removeClippedSubviews={true}
+                                removeClippedSubviews={false}
                                 maxToRenderPerBatch={3}
                                 windowSize={5}
                                 initialNumToRender={3}
@@ -1607,55 +1648,68 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             <Animated.View style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 {/* Thumbnail Gallery - Hide when zoomed */}
                                 {!isZoomed && (
-                                    <ScrollView ref={thumbnailScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbnailContainer} style={styles.thumbnailScroll} scrollEnabled={true} scrollEventThrottle={16} decelerationRate="normal" bounces={false}>
-                                        {imagesList.map((imageUri, index) => {
-                                            const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
+                                    <View style={[styles.thumbnailScroll, { overflow: "hidden", width }]}>
+                                        <Animated.View
+                                            style={[
+                                                {
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    paddingHorizontal: THUMB_PADDING,
+                                                    gap: THUMB_GAP,
+                                                    width: thumbnailStripWidth,
+                                                },
+                                                thumbnailStripAnimatedStyle,
+                                            ]}
+                                        >
+                                            {imagesList.map((imageUri, index) => {
+                                                const isThumbnailLoading = thumbnailLoadingStates.get(imageUri) ?? true;
 
-                                            return (
-                                                <ThumbnailItem
-                                                    key={index}
-                                                    imageUri={imageUri}
-                                                    index={index}
-                                                    isActive={index === currentIndex}
-                                                    currentIndexShared={currentIndexShared}
-                                                    scrollProgress={scrollProgress}
-                                                    isLoading={isThumbnailLoading}
-                                                    onLoadStart={() => {
-                                                        setThumbnailLoadingStates((prev) => {
-                                                            const newMap = new Map(prev);
-                                                            newMap.set(imageUri, true);
-                                                            return newMap;
-                                                        });
-                                                    }}
-                                                    onLoad={() => {
-                                                        setThumbnailLoadingStates((prev) => {
-                                                            const newMap = new Map(prev);
-                                                            newMap.set(imageUri, false);
-                                                            return newMap;
-                                                        });
-                                                    }}
-                                                    onError={() => {
-                                                        setThumbnailLoadingStates((prev) => {
-                                                            const newMap = new Map(prev);
-                                                            newMap.set(imageUri, false);
-                                                            return newMap;
-                                                        });
-                                                    }}
-                                                    onPress={() => {
-                                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                                        scrollProgress.value = 0;
-                                                        isProgrammaticScroll.value = true;
-                                                        setCurrentIndex(index);
-                                                        flatListRef.current?.scrollToIndex({ index, animated: true });
-                                                        // Reset flag after animation completes (longer timeout to prevent handleScroll interference)
-                                                        setTimeout(() => {
-                                                            isProgrammaticScroll.value = false;
-                                                        }, 500);
-                                                    }}
-                                                />
-                                            );
-                                        })}
-                                    </ScrollView>
+                                                return (
+                                                    <ThumbnailItem
+                                                        key={index}
+                                                        imageUri={imageUri}
+                                                        index={index}
+                                                        isActive={index === currentIndex}
+                                                        currentIndexShared={currentIndexShared}
+                                                        scrollProgress={scrollProgress}
+                                                        isLoading={isThumbnailLoading}
+                                                        onLoadStart={() => {
+                                                            setThumbnailLoadingStates((prev) => {
+                                                                const newMap = new Map(prev);
+                                                                newMap.set(imageUri, true);
+                                                                return newMap;
+                                                            });
+                                                        }}
+                                                        onLoad={() => {
+                                                            setThumbnailLoadingStates((prev) => {
+                                                                const newMap = new Map(prev);
+                                                                newMap.set(imageUri, false);
+                                                                return newMap;
+                                                            });
+                                                        }}
+                                                        onError={() => {
+                                                            setThumbnailLoadingStates((prev) => {
+                                                                const newMap = new Map(prev);
+                                                                newMap.set(imageUri, false);
+                                                                return newMap;
+                                                            });
+                                                        }}
+                                                        onPress={() => {
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                            scrollProgress.value = 0;
+                                                            isProgrammaticScroll.value = true;
+                                                            thumbnailScrollX.value = withTiming(getThumbnailScrollXForPage(index, imagesList.length), { duration: 300 });
+                                                            setCurrentIndex(index);
+                                                            flatListRef.current?.scrollToIndex({ index, animated: true });
+                                                            setTimeout(() => {
+                                                                isProgrammaticScroll.value = false;
+                                                            }, 500);
+                                                        }}
+                                                    />
+                                                );
+                                            })}
+                                        </Animated.View>
+                                    </View>
                                 )}
 
                                 {/* Action Buttons */}
