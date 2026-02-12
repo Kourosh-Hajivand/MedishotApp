@@ -121,6 +121,9 @@ export default function PracticeMemberDetailsScreen() {
     const { data: activitiesData, isLoading: isActivitiesLoading } = useGetMemberActivities(parseInt(practiceId || "0"), memberId || "", !!memberData?.data);
     const typeButton = memberData?.data?.role === "doctor" || memberData?.data?.role === "owner" ? ["Activities", "Patients"] : ["Activities"];
 
+    const { data: patientsData } = useGetPatients(parseInt(practiceId || "0"), { doctor_id: memberId });
+    const patientsCount = patientsData?.data?.length ?? 0;
+
     const { mutate: removeMember } = useRemoveMember(
         () => {
             router.back();
@@ -131,7 +134,15 @@ export default function PracticeMemberDetailsScreen() {
     );
     const navigation = useNavigation();
     const handleRemoveMember = () => {
-        Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practise.", [
+        if (patientsCount > 0) {
+            Alert.alert(
+                "Cannot Remove Doctor",
+                "This doctor has patients. To delete, the doctor must either have no patients or their patients must be archived.",
+                [{ text: "OK", style: "default" }],
+            );
+            return;
+        }
+        Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practice.", [
             {
                 text: "Cancel",
                 style: "cancel",
@@ -149,13 +160,15 @@ export default function PracticeMemberDetailsScreen() {
 
     useLayoutEffect(() => {
         navigation.setOptions({
-            headerRight: isOwner ? () => null : () => (
-                <Host style={{ width: 90, height: 35 }}>
-                    <Button disabled={isLoading} variant="bordered" role="destructive" onPress={handleRemoveMember}>
-                        Remove
-                    </Button>
-                </Host>
-            ),
+            headerRight: isOwner
+                ? () => null
+                : () => (
+                      <Host style={{ width: 90, height: 35 }}>
+                          <Button disabled={isLoading} variant="bordered" role="destructive" onPress={handleRemoveMember}>
+                              Remove
+                          </Button>
+                      </Host>
+                  ),
         });
     }, [navigation, memberData, handleRemoveMember, isOwner]);
     return (

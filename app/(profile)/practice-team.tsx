@@ -3,12 +3,14 @@ import Avatar from "@/components/avatar";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import themeColors from "@/theme/colors";
+import PatientService from "@/utils/service/PatientService";
 import { useGetPracticeList, useGetPracticeMembers, useGetSubscriptionStatus, useRemoveMember, useTransferOwnership } from "@/utils/hook";
 import { useAuth } from "@/utils/hook/useAuth";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { TransferOwnershipDto } from "@/utils/service/models/RequestModels";
 import { Button, ContextMenu, Host, Switch } from "@expo/ui/swift-ui";
 import { router, useNavigation } from "expo-router";
+import { useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useLayoutEffect } from "react";
 import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +22,7 @@ export default function PracticeTeamScreen() {
     const { selectedPractice, setSelectedPractice } = useProfileStore();
     const { data: practiceMembers } = useGetPracticeMembers(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
     const { data: subscriptionData } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, isAuthenticated === true && !!selectedPractice?.id);
+    const queryClient = useQueryClient();
     const navigation = useNavigation();
 
     // Set default practice if none is selected
@@ -94,8 +97,25 @@ export default function PracticeTeamScreen() {
             ),
         });
     }, [navigation, selectedPractice?.id, doctorLimit, staffLimit, displayRemainingDoctorSlots, remainingStaffSlots]);
-    const handleRemoveMember = (practiceId: number, memberId: string | number) => {
-        Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practise.", [
+    const handleRemoveMember = async (practiceId: number, memberId: string | number) => {
+        try {
+            const result = await queryClient.fetchQuery({
+                queryKey: ["GetPatients", practiceId, { doctor_id: memberId }],
+                queryFn: () => PatientService.getPatients(practiceId, { doctor_id: memberId }),
+            });
+            const hasPatients = (result?.data?.length ?? 0) > 0;
+            if (hasPatients) {
+                Alert.alert(
+                    "Cannot Remove Doctor",
+                    "This doctor has patients. To delete, the doctor must either have no patients or their patients must be archived.",
+                    [{ text: "OK", style: "default" }],
+                );
+                return;
+            }
+        } catch {
+            // If fetch fails, still show remove confirmation; API will reject if they have patients
+        }
+        Alert.alert("Remove This Doctor", "By taking this action this doctor will be removed from your practice.", [
             {
                 text: "Cancel",
                 style: "cancel",
@@ -104,8 +124,7 @@ export default function PracticeTeamScreen() {
             {
                 text: "Remove",
                 style: "destructive",
-
-                onPress: () => removeMember({ practiceId: practiceId, memberId: memberId }),
+                onPress: () => removeMember({ practiceId, memberId }),
             },
         ]);
     };
