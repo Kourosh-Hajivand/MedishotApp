@@ -22,13 +22,17 @@ import ViewShot, { captureRef } from "react-native-view-shot";
 
 const { width, height } = Dimensions.get("window");
 
+// Gap between main carousel images (px)
+const IMAGE_GAP = 8;
+const IMAGE_PAGE_WIDTH = width + IMAGE_GAP;
+
 // Softer pan when zoomed so image doesn't move too fast
 const PAN_SENSITIVITY = 0.7;
 
 // Thumbnail strip layout (must match scrollThumbnailToPosition and worklet math)
 const ACTIVE_THUMB_WIDTH = 44;
 const INACTIVE_THUMB_WIDTH = 24;
-const THUMB_GAP = 4;
+const THUMB_GAP = 2;
 const ACTIVE_THUMB_MARGIN = 6;
 const THUMB_PADDING = width / 2 - 22;
 
@@ -786,7 +790,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             if (scale.value > 1) return;
 
             const offsetX = event.contentOffset.x;
-            const currentPage = offsetX / width;
+            const currentPage = offsetX / IMAGE_PAGE_WIDTH;
             const count = imagesList.length;
             if (count <= 0) return;
 
@@ -834,7 +838,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
 
         const offsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(offsetX / width);
+        const index = Math.round(offsetX / IMAGE_PAGE_WIDTH);
         const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
 
         // Reset scroll progress smoothly
@@ -1369,64 +1373,60 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Swipe down to dismiss (iPhone Photos style) - only when not zoomed
     const DISMISS_THRESHOLD = 55;
     const DISMISS_VELOCITY = 250;
+    // Direction lock: fail as soon as horizontal move > 10px (FlatList gets touch); activate only when vertical down > 18px first
+    const HORIZONTAL_FAIL_PX = 10;
+    const VERTICAL_ACTIVATE_PX = 18;
+    const touchStartX = useSharedValue(0);
+    const touchStartY = useSharedValue(0);
+
     const dismissPanGesture = React.useMemo(
         () =>
             Gesture.Pan()
                 .manualActivation(true)
                 .onTouchesDown((e, state) => {
-                    // Only allow if not zoomed
+                    "worklet";
                     if (scale.value > 1) {
                         state.fail();
                         return;
                     }
-                    // Don't activate yet, wait for movement direction
+                    const t = e.allTouches[0];
+                    if (t) {
+                        touchStartX.value = t.x;
+                        touchStartY.value = t.y;
+                    }
                 })
                 .onTouchesMove((e, state) => {
-                    // Double check: fail if zoomed
+                    "worklet";
                     if (scale.value > 1) {
                         state.fail();
                         return;
                     }
-
-                    const touch = e.allTouches[0];
-                    if (!touch) {
+                    const t = e.allTouches[0];
+                    if (!t) return;
+                    const dx = t.x - touchStartX.value;
+                    const dy = t.y - touchStartY.value;
+                    const absDx = Math.abs(dx);
+                    const absDy = Math.abs(dy);
+                    if (absDx > HORIZONTAL_FAIL_PX) {
                         state.fail();
                         return;
                     }
-
-                    // Get movement direction from first touch
-                    const absX = Math.abs(touch.x);
-                    const absY = Math.abs(touch.y);
-
-                    // Only activate if:
-                    // 1. Moving down (y > 0) - at least 15px
-                    // 2. Vertical movement is at least 2.5x more than horizontal (stricter)
-                    // 3. Moved at least 15px vertically
-                    if (touch.y > 15 && absY > absX * 2.5 && absY > 15) {
+                    if (dy >= VERTICAL_ACTIVATE_PX && absDy >= absDx) {
                         state.activate();
-                    }
-                    // Fail immediately if horizontal movement is dominant
-                    else if (absX > absY * 1.2 || absX > 20) {
-                        state.fail();
                     }
                 })
                 .onUpdate((e) => {
-                    // Only update if moving down and not zoomed
-                    if (scale.value <= 1 && e.translationY > 0) {
-                        // Extra safety: ensure vertical movement is still dominant (stricter check)
-                        const absX = Math.abs(e.translationX);
-                        const absY = Math.abs(e.translationY);
-
-                        // Only update if vertical movement is clearly dominant
-                        if (absY > absX * 2) {
-                            dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
-                        } else {
-                            // If horizontal movement becomes dominant, reset
-                            dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
-                        }
+                    "worklet";
+                    if (scale.value > 1) return;
+                    if (e.translationY <= 0) return;
+                    const absX = Math.abs(e.translationX);
+                    const absY = Math.abs(e.translationY);
+                    if (absY >= absX) {
+                        dismissTranslateY.value = Math.min(e.translationY, height * 1.2);
                     }
                 })
                 .onEnd((e) => {
+                    "worklet";
                     const shouldDismiss = dismissTranslateY.value > DISMISS_THRESHOLD || e.velocityY > DISMISS_VELOCITY;
                     if (shouldDismiss) {
                         dismissTranslateY.value = withTiming(height, { duration: 150 });
@@ -1436,13 +1436,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     }
                 })
                 .onFinalize(() => {
-                    // Always reset if not dismissing
+                    "worklet";
                     if (dismissTranslateY.value > 0 && dismissTranslateY.value < DISMISS_THRESHOLD) {
                         dismissTranslateY.value = withSpring(0, { damping: 20, stiffness: 300 });
                     }
-                })
-                .activeOffsetY([15, Number.MAX_SAFE_INTEGER]) // Only activate for downward movement
-                .failOffsetX([-20, 20]), // Fail if horizontal movement exceeds 20px
+                }),
         [onClose],
     );
 
@@ -1621,7 +1619,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             <Animated.FlatList
                                 ref={flatListRef}
                                 horizontal
-                                pagingEnabled={true}
+                                pagingEnabled={false}
+                                snapToInterval={IMAGE_PAGE_WIDTH}
+                                snapToAlignment="start"
+                                decelerationRate="fast"
                                 initialScrollIndex={initialIndex}
                                 data={imagesList}
                                 keyExtractor={(_, i) => i.toString()}
@@ -1629,11 +1630,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 onMomentumScrollEnd={handleMomentumScrollEnd}
                                 scrollEventThrottle={1}
                                 showsHorizontalScrollIndicator={false}
-                                decelerationRate={0.9}
                                 renderItem={renderImageItem}
+                                ItemSeparatorComponent={() => <View style={{ width: IMAGE_GAP }} />}
                                 getItemLayout={(_, index) => ({
                                     length: width,
-                                    offset: width * index,
+                                    offset: index * IMAGE_PAGE_WIDTH,
                                     index,
                                 })}
                                 scrollEnabled={!isZoomed}
