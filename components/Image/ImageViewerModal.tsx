@@ -1526,7 +1526,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                     )}
                                                     {showBookmark && (
                                                         <Button systemImage={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} onPress={handleBookmarkPress}>
-                                                            {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "Remove Bookmark" : "Bookmark"}
+                                                            {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "remove from practice album" : "add to practice album"}
                                                         </Button>
                                                     )}
                                                     {showMagicInMore && !isCurrentImageOriginalMedia && (

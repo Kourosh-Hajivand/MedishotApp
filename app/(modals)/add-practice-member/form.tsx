@@ -5,6 +5,7 @@ import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
 import { spacing } from "@/styles/spaces";
 import themeColors, { colors } from "@/theme/colors";
+import { toE164 } from "@/utils/helper/phoneUtils";
 import { useAddMember, useGetSubscriptionStatus, useTempUpload, useUpdateMemberRole } from "@/utils/hook";
 import { AddMemberDto, UpdateMemberRoleDto } from "@/utils/service/models/RequestModels";
 import { TempUploadResponse } from "@/utils/service/models/ResponseModels";
@@ -30,6 +31,15 @@ interface FileUpload {
     type: string;
     name: string;
 }
+
+type AddressValue = {
+    street1: string;
+    street2: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+};
 
 interface AddMemberFormData {
     first_name: string;
@@ -120,9 +130,15 @@ export default function AddPracticeMemberForm() {
 
     // States for dynamic inputs
     const [phones, setPhones] = useState<DynamicFieldItem[]>([]);
+    const phonesRef = useRef<DynamicFieldItem[]>([]);
     const [emails, setEmails] = useState<DynamicFieldItem[]>([]);
     const [addresses, setAddresses] = useState<DynamicFieldItem[]>([]);
+    const addressesRef = useRef<DynamicFieldItem[]>([]);
     const [urls, setUrls] = useState<DynamicFieldItem[]>([]);
+
+    // Error states for dynamic fields
+    const [phoneError, setPhoneError] = useState<string>("");
+    const [addressError, setAddressError] = useState<string>("");
 
     const { mutate: uploadImage, isPending: isUploading } = useTempUpload(
         (response: TempUploadResponse) => {
@@ -160,6 +176,7 @@ export default function AddPracticeMemberForm() {
     const {
         control,
         handleSubmit,
+        watch,
         formState: { errors },
         setValue,
         getValues,
@@ -184,6 +201,42 @@ export default function AddPracticeMemberForm() {
             role: "staff",
         },
     });
+
+    const firstName = watch("first_name");
+    const lastName = watch("last_name");
+
+    // Validation: require at least 1 phone OR 1 address (not both required, but at least one)
+    const hasValidPhone = useMemo(() => {
+        return phones.some((phone) => {
+            if (!phone?.value) return false;
+            const valueStr = String(phone.value).trim();
+            if (valueStr === "" || valueStr === "+1") return false;
+            return !!toE164(valueStr);
+        });
+    }, [phones]);
+
+    const hasValidAddress = useMemo(() => {
+        return addresses.some((address) => {
+            if (!address.value) return false;
+            if (typeof address.value === "object") {
+                const addr = address.value as AddressValue;
+                // Require at least street1 or city to be filled
+                const hasStreet = (addr.street1?.trim() || "") !== "";
+                const hasCity = (addr.city?.trim() || "") !== "";
+                return hasStreet || hasCity;
+            }
+            return typeof address.value === "string" && address.value.trim() !== "";
+        });
+    }, [addresses]);
+
+    const isFormValid = useMemo(() => {
+        const baseValid = firstName?.trim() !== "" && lastName?.trim() !== "";
+        if (isEditMode) {
+            return baseValid;
+        }
+        // Create mode: require phone OR address (at least one)
+        return baseValid && (hasValidPhone || hasValidAddress);
+    }, [firstName, lastName, isEditMode, hasValidPhone, hasValidAddress]);
 
     // Set form values when member data is available (edit mode)
     React.useEffect(() => {
@@ -278,6 +331,52 @@ export default function AddPracticeMemberForm() {
         [isEditMode, memberData, updateMemberRole, addMember, practiceId, phones, emails, addresses, urls, uploadedFilename],
     );
 
+    const handleSubmitWithValidation = React.useCallback(() => {
+        // First, let react-hook-form validate the form fields (first_name, last_name, email, etc.)
+        // handleSubmit will only call onSubmit if form validation passes
+        handleSubmit((data) => {
+            // After form validation passes, check phone/address for create mode
+            if (!isEditMode) {
+                const currentPhones = phonesRef.current;
+                const currentAddresses = addressesRef.current;
+
+                const hasPhone = currentPhones.some((p) => {
+                    if (!p?.value) return false;
+                    const valueStr = String(p.value).trim();
+                    if (valueStr === "" || valueStr === "+1") return false;
+                    return !!toE164(valueStr);
+                });
+
+                const hasAddress = currentAddresses.some((a) => {
+                    if (!a?.value) return false;
+                    if (typeof a.value === "object") {
+                        const addr = a.value as AddressValue;
+                        return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
+                    }
+                    return typeof a.value === "string" && a.value.trim() !== "";
+                });
+
+                if (!hasPhone && !hasAddress) {
+                    const missing: string[] = [];
+                    if (!hasPhone) missing.push("a valid phone number");
+                    if (!hasAddress) missing.push("an address (street or city)");
+                    Alert.alert("Required Fields", `Please provide at least ${missing.join(" or ")}.`);
+                    // Set error messages
+                    if (!hasPhone) setPhoneError("A valid phone number is required");
+                    if (!hasAddress) setAddressError("An address with at least a street or city is required");
+                    return;
+                }
+
+                // Clear errors if valid
+                setPhoneError("");
+                setAddressError("");
+            }
+
+            // Call the original onSubmit
+            onSubmit(data);
+        })();
+    }, [isEditMode, handleSubmit, onSubmit]);
+
     useEffect(() => {
         if (isEditMode || filteredRoleOptions.length === 0) return;
         const currentRole = getValues("role");
@@ -290,7 +389,7 @@ export default function AddPracticeMemberForm() {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <Pressable onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} className="px-2">
+                <Pressable onPress={handleSubmitWithValidation} disabled={isAddingMember || isUpdatingRole} className="px-2">
                     {isAddingMember || isUpdatingRole ? (
                         <ActivityIndicator size="small" color={colors.system.blue} />
                     ) : (
@@ -302,7 +401,7 @@ export default function AddPracticeMemberForm() {
             ),
             // <BaseButton label="Done" onPress={handleSubmit(onSubmit)} disabled={isAddingMember || isUpdatingRole} ButtonStyle="Filled" size="Medium" />,
         });
-    }, [navigation, handleSubmit, isAddingMember, isUpdatingRole, isEditMode, onSubmit]);
+    }, [navigation, handleSubmitWithValidation, isAddingMember, isUpdatingRole, isEditMode]);
 
     return (
         <KeyboardAwareScrollView style={styles.scrollView} contentContainerStyle={{ paddingTop: insets.top, paddingBottom: insets.bottom + 40, gap: 24 }}>
@@ -338,7 +437,7 @@ export default function AddPracticeMemberForm() {
             <View className="gap-4">
                 <View className="bg-white rounded-2xl px-4">
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} disabled={isEditMode} />
+                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} disabled={isEditMode} />۹
                     </View>
                     <View className="border-b border-border">
                         <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} disabled={isEditMode} />
@@ -392,9 +491,45 @@ export default function AddPracticeMemberForm() {
                 </View>
                 {!isEditMode && (
                     <View className="gap-4">
-                        <DynamicInputList config={phoneConfig} paramKey="phone" onChange={setPhones} initialItems={phones} />
+                        <DynamicInputList
+                            config={phoneConfig}
+                            paramKey="phone"
+                            onChange={(items) => {
+                                setPhones(items);
+                                phonesRef.current = items;
+                                // Only clear error when at least one valid phone exists
+                                const hasValid = items.some((p) => {
+                                    if (!p?.value) return false;
+                                    const valueStr = String(p.value).trim();
+                                    if (valueStr === "" || valueStr === "+1") return false;
+                                    return !!toE164(valueStr);
+                                });
+                                if (hasValid) setPhoneError("");
+                            }}
+                            initialItems={phones}
+                            error={phoneError}
+                        />
                         {/* <DynamicInputList config={emailConfig} paramKey="email" onChange={setEmails} initialItems={emails} /> */}
-                        <DynamicInputList config={addressConfig} paramKey="address" onChange={setAddresses} initialItems={addresses} />
+                        <DynamicInputList
+                            config={addressConfig}
+                            paramKey="address"
+                            onChange={(items) => {
+                                setAddresses(items);
+                                addressesRef.current = items;
+                                // Only clear error when at least one valid address exists (street1 or city required)
+                                const hasValid = items.some((a) => {
+                                    if (!a?.value) return false;
+                                    if (typeof a.value === "object") {
+                                        const addr = a.value as AddressValue;
+                                        return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
+                                    }
+                                    return typeof a.value === "string" && a.value.trim() !== "";
+                                });
+                                if (hasValid) setAddressError("");
+                            }}
+                            initialItems={addresses}
+                            error={addressError}
+                        />
                         <DynamicInputList config={urlConfig} paramKey="url" onChange={setUrls} initialItems={urls} />
                     </View>
                 )}

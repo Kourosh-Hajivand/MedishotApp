@@ -88,7 +88,7 @@ export default function PatientDetailsScreen() {
 
     const formatGender = (gender: "male" | "female" | "other" | null | undefined) => {
         if (!gender) return null;
-        return gender.charAt(0).toUpperCase() + gender.slice(1);
+        return gender;
     };
 
     interface AddressValue {
@@ -257,7 +257,7 @@ export default function PatientDetailsScreen() {
                                     <View key={index} style={styles.phoneRow} className={`${index < patientData.numbers.length - 1 ? "border-b border-border" : ""}`}>
                                         <View style={styles.phoneInfo}>
                                             <BaseText type="Subhead" color="labels.secondary">
-                                                {phoneType.charAt(0).toUpperCase() + phoneType.slice(1)}
+                                                {phoneType}
                                             </BaseText>
                                             <BaseText type="Subhead" color="labels.primary">
                                                 {phoneNumberDisplay}
@@ -287,7 +287,7 @@ export default function PatientDetailsScreen() {
                                     const emailValue = typeof email === "object" && email !== null && "value" in email ? (email as { value?: string }).value : typeof email === "string" ? email : "";
                                     const emailType = typeof email === "object" && email !== null && "type" in email ? (email as { type?: string }).type : "Email";
                                     if (!emailValue) return null;
-                                    const label = (emailType || "Email").charAt(0).toUpperCase() + (emailType || "Email").slice(1).toLowerCase();
+                                    const label = emailType || "Email";
                                     const isLast = index === patientData.email.length - 1;
                                     return (
                                         <View key={index} style={[styles.emailRow, !isLast && styles.emailRowBorder]}>
@@ -332,14 +332,14 @@ export default function PatientDetailsScreen() {
 
                 {/* Addresses */}
                 <View style={styles.sectionContainer}>
-                    {genderFormatted && <InfoRow label="Gender" value={genderFormatted} isLast={false} />}
-                    {birthDateFormatted && age !== null && <InfoRow label="Birth Date" value={`${birthDateFormatted} (${age} years old)`} isLast={false} />}
+                    {genderFormatted && <InfoRow label="gender" value={genderFormatted} isLast={false} />}
+                    {birthDateFormatted && age !== null && <InfoRow label="birth date" value={`${birthDateFormatted} (${age} years old)`} isLast={false} />}
                     {patientData.addresses && patientData.addresses.length > 0 && (
                         <View style={styles.section}>
                             {patientData.addresses.map((address, index) => {
                                 const formattedAddress = formatAddress(address);
                                 if (!formattedAddress) return null;
-                                return <InfoRow key={index} label={formattedAddress.type.charAt(0).toUpperCase() + formattedAddress.type.slice(1)} value={formattedAddress.formatted} isLast={index === patientData.addresses.length - 1} />;
+                                return <InfoRow key={index} label={formattedAddress.type} value={formattedAddress.formatted} isLast={index === patientData.addresses.length - 1} />;
                             })}
                         </View>
                     )}
@@ -375,7 +375,7 @@ const InfoRow: React.FC<InfoRowProps> = ({ label, value, isLast = false }) => {
     return (
         <View style={styles.infoRow} className={`${!isLast ? "border-b border-border" : ""}`}>
             {label && (
-                <BaseText type="Subhead" color="labels.secondary" style={styles.label} className="capitalize">
+                <BaseText type="Subhead" color="labels.secondary" style={styles.label}>
                     {label}
                 </BaseText>
             )}
