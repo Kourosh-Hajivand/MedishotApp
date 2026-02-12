@@ -524,7 +524,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 const hideTakeAfter = media.has_after === true || (media.is_after === true && media.before_media_id != null);
                 const noBeforeAfter = media.has_after !== true && media.before_media_id == null;
 
-                // Add original_media to maps if it exists
+                // Add original_media to maps if it exists (composite template)
                 if (media.original_media?.url) {
                     if (taker) {
                         takerMap.set(media.original_media.url, {
@@ -535,18 +535,20 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     if (createdAt) {
                         createdAtMap.set(media.original_media.url, createdAt);
                     }
-                    // Mark as original_media if it has a template
                     if (hasTemplate) {
                         isOriginalMediaMap.set(media.original_media.url, true);
                         if (hideTakeAfter) {
                             hideTakeAfterMap.set(media.original_media.url, true);
                         }
-                        // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
                         if (noBeforeAfter) {
                             originalNoBeforeAfterMap.set(media.original_media.url, true);
                         }
                     }
                 }
+
+                // Template but no original_media (single photo with template, e.g. id 190): treat first image as primary for Take After
+                const hasTemplateNoOriginal = hasTemplate && !media.original_media?.url && media.images?.length;
+                const primaryTemplateImageUrl = hasTemplateNoOriginal ? media.images?.[0]?.image?.url : null;
 
                 // Add all template images to maps
                 if (media.images && Array.isArray(media.images)) {
@@ -559,15 +561,24 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                     last_name: taker.last_name,
                                 });
                             }
-                            // Use image's created_at if available, otherwise use media's created_at
                             const imgCreatedAt = img.created_at || createdAt;
                             if (imgCreatedAt) {
                                 createdAtMap.set(imageUrl, imgCreatedAt);
                             }
-                            // Template images are NOT original_media
-                            isOriginalMediaMap.set(imageUrl, false);
-                            if (hideTakeAfter) {
-                                hideTakeAfterMap.set(imageUrl, true);
+                            // First image when template has no original_media = same logic as composite (Take After, etc.)
+                            if (primaryTemplateImageUrl && imageUrl === primaryTemplateImageUrl) {
+                                isOriginalMediaMap.set(imageUrl, true);
+                                if (hideTakeAfter) {
+                                    hideTakeAfterMap.set(imageUrl, true);
+                                }
+                                if (noBeforeAfter) {
+                                    originalNoBeforeAfterMap.set(imageUrl, true);
+                                }
+                            } else {
+                                isOriginalMediaMap.set(imageUrl, false);
+                                if (hideTakeAfter) {
+                                    hideTakeAfterMap.set(imageUrl, true);
+                                }
                             }
                         }
                     });
@@ -977,7 +988,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const currentImageUri = imagesList[displayIndex];
         if (!rawMediaData?.length || !patientId) return;
 
-        const pairs: { beforeUrl: string; afterUrl: string }[] = [];
+        const pairs: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string }[] = [];
         let currentPairIndex = 0;
         type ImageCell = NonNullable<RawMediaData["images"]>[number];
         let beforeImages: ImageCell[] | null = null;
@@ -1039,7 +1050,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         for (let i = 0; i < len; i++) {
             const beforeUrl = beforeImages[i].image?.url;
             const afterUrl = afterImages[i].image?.url;
-            if (beforeUrl && afterUrl) pairs.push({ beforeUrl, afterUrl });
+            const beforeDate = (beforeImages[i] as any).created_at;
+            const afterDate = (afterImages[i] as any).created_at;
+            if (beforeUrl && afterUrl) pairs.push({ beforeUrl, afterUrl, beforeDate, afterDate });
         }
 
         if (pairs.length === 0) {
@@ -1115,9 +1128,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
         if (rawMediaData && Array.isArray(rawMediaData)) {
             for (const media of rawMediaData) {
+                // Composite: original_media is the main image
                 if (media.original_media?.url === currentImageUri && media.template?.id) {
                     templateId = media.template.id;
-                    beforeMediaId = media.id; // Use media.id as before_media_id
+                    beforeMediaId = media.id;
+                    break;
+                }
+                // Single photo with template (no original_media): first template image is the "main" one
+                if (media.template?.id && !media.original_media?.url && media.images?.[0]?.image?.url === currentImageUri) {
+                    templateId = media.template.id;
+                    beforeMediaId = media.id;
                     break;
                 }
             }

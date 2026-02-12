@@ -1,21 +1,25 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { getRelativeTime } from "@/utils/helper/dateUtils";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
-import { Dimensions, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
+// Thumbnail strip layout (like ImageViewerModal)
+const THUMB_PADDING = SCREEN_WIDTH / 2 - 22;
+
 type ViewMode = "vertical" | "horizontal" | "splitLine" | "slider";
 
 const VIEW_MODES: { key: ViewMode; icon: "square.split.2x1" | "square.split.1x2" | "square.and.line.vertical.and.square" | "square.on.square" }[] = [
     { key: "horizontal", icon: "square.split.2x1" },
-    { key: "vertical", icon: "square.split.1x2" },
+    // { key: "vertical", icon: "square.split.1x2" },
     { key: "splitLine", icon: "square.and.line.vertical.and.square" },
     { key: "slider", icon: "square.on.square" },
 ];
@@ -23,6 +27,8 @@ const VIEW_MODES: { key: ViewMode; icon: "square.split.2x1" | "square.split.1x2"
 interface ComparePair {
     beforeUrl: string;
     afterUrl: string;
+    beforeDate?: string;
+    afterDate?: string;
 }
 
 export default function BeforeAfterCompareScreen() {
@@ -65,31 +71,64 @@ export default function BeforeAfterCompareScreen() {
     }, [currentIndexParam, pairs.length]);
 
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
-    const [viewMode, setViewMode] = useState<ViewMode>("vertical");
+    const [viewMode, setViewMode] = useState<ViewMode>("horizontal");
+    const [contentHeight, setContentHeight] = useState(0);
+    const thumbnailScrollRef = useRef<ScrollView>(null);
+    const isProgrammaticScrollRef = useRef(false);
+
+    // Badge bottom for horizontal mode: image is 3:2 contain, so image height = (SCREEN_WIDTH/2)*2/3; badge sits on image bottom
+    const halfWidth = SCREEN_WIDTH / 2;
+    const imageHeight3x2 = halfWidth * (2 / 3);
+    const badgeBottomHorizontal = contentHeight > 0 ? Math.max(12, (contentHeight - imageHeight3x2) / 2.7) : 56;
+
+    const ACTIVE_THUMB_WIDTH = 44;
+    const INACTIVE_THUMB_WIDTH = 24;
+    const THUMB_GAP = 2;
+    const ACTIVE_MARGIN = 2;
+    const THUMB_SLOT_WIDTH = ACTIVE_THUMB_WIDTH + ACTIVE_MARGIN * 2;
+    const thumbnailStripWidth = pairs.length <= 0 ? SCREEN_WIDTH : THUMB_PADDING * 2 + pairs.length * THUMB_SLOT_WIDTH;
+    const centerOffset = THUMB_PADDING + THUMB_SLOT_WIDTH / 2;
+
+    const scrollThumbnailToIndex = useCallback(
+        (index: number) => {
+            if (pairs.length <= 0) return;
+            isProgrammaticScrollRef.current = true;
+            const clamped = Math.max(0, Math.min(index, pairs.length - 1));
+            const x = centerOffset + clamped * THUMB_SLOT_WIDTH - SCREEN_WIDTH / 2;
+            const offset = Math.max(0, Math.min(x, thumbnailStripWidth - SCREEN_WIDTH));
+            thumbnailScrollRef.current?.scrollTo({ x: offset, animated: true });
+            setTimeout(() => {
+                isProgrammaticScrollRef.current = false;
+            }, 350);
+        },
+        [pairs.length, thumbnailStripWidth, centerOffset],
+    );
+
+    useEffect(() => {
+        if (pairs.length > 0) scrollThumbnailToIndex(initialIndex);
+    }, [initialIndex, pairs.length, scrollThumbnailToIndex]);
+
+    const onThumbnailScroll = useCallback(
+        (e: { nativeEvent: { contentOffset: { x: number } } }) => {
+            if (isProgrammaticScrollRef.current) return;
+            const scrollX = e.nativeEvent.contentOffset.x;
+            const centerInContent = scrollX + SCREEN_WIDTH / 2;
+            const index = Math.round((centerInContent - centerOffset) / THUMB_SLOT_WIDTH);
+            const clamped = Math.max(0, Math.min(index, pairs.length - 1));
+            setCurrentIndex((prev) => (prev !== clamped ? clamped : prev));
+        },
+        [pairs.length, centerOffset],
+    );
 
     const pair = pairs[currentIndex];
     const before = pair?.beforeUrl ?? "";
     const after = pair?.afterUrl ?? "";
     const hasMultiple = pairs.length > 1;
-    const canGoPrev = hasMultiple && currentIndex > 0;
-    const canGoNext = hasMultiple && currentIndex < pairs.length - 1;
 
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.back();
     }, [router]);
-
-    const handlePrev = useCallback(() => {
-        if (!canGoPrev) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setCurrentIndex((i) => i - 1);
-    }, [canGoPrev]);
-
-    const handleNext = useCallback(() => {
-        if (!canGoNext) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        setCurrentIndex((i) => i + 1);
-    }, [canGoNext]);
 
     const selectViewMode = useCallback((mode: ViewMode) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -130,62 +169,118 @@ export default function BeforeAfterCompareScreen() {
                 )}
             </View>
 
-            {/* Content: full space, contain = no crop, image as large as possible */}
+            {/* Content: full space; horizontal = two halves with contain (own ratio), fill above tab */}
             <View style={[styles.content, styles.contentWhite]}>
-                {isVertical && (
+                {/* {isVertical && (
                     <View style={styles.verticalSplit}>
                         <View style={styles.halfVertical}>
                             <Image source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="cover" />
                             <View style={[styles.label, styles.labelBeforePill]}>
-                                <BaseText type="Caption1" weight="600" color="labels.secondary">
-                                    Before
-                                </BaseText>
+                                <BaseText type="Caption1" weight="600" color="labels.secondary">Before</BaseText>
                             </View>
                         </View>
                         <View style={styles.halfVertical}>
                             <Image source={{ uri: after }} style={StyleSheet.absoluteFill} contentFit="cover" />
                             <View style={[styles.label, styles.labelAfterPill]}>
-                                <BaseText type="Caption1" weight="600" color="system.blue">
-                                    After
-                                </BaseText>
+                                <BaseText type="Caption1" weight="600" color="system.blue">After</BaseText>
                             </View>
                         </View>
                     </View>
-                )}
+                )} */}
 
                 {isHorizontal && (
-                    <View style={styles.horizontalSplit}>
+                    <View
+                        style={styles.horizontalSplit}
+                        onLayout={(e) => {
+                            const h = e.nativeEvent.layout.height;
+                            if (h > 0) setContentHeight(h);
+                        }}
+                    >
                         <View style={styles.halfHorizontal}>
-                            <Image source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                            <View style={[styles.label, styles.labelBeforePill]}>
-                                <BaseText type="Caption1" weight="600" color="labels.secondary">
+                            <Image source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, { bottom: badgeBottomHorizontal }]}>
+                                <BaseText type="Caption1" weight="600" color="labels.primary">
                                     Before
                                 </BaseText>
+                                {pair?.beforeDate ? (
+                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                                        {getRelativeTime(pair.beforeDate)}
+                                    </BaseText>
+                                ) : null}
                             </View>
                         </View>
                         <View style={styles.halfHorizontal}>
-                            <Image source={{ uri: after }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                            <View style={[styles.label, styles.labelAfterPill]}>
+                            <Image source={{ uri: after }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, { bottom: badgeBottomHorizontal }]}>
                                 <BaseText type="Caption1" weight="600" color="system.blue">
                                     After
                                 </BaseText>
+                                {pair?.afterDate ? (
+                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                                        {getRelativeTime(pair.afterDate)}
+                                    </BaseText>
+                                ) : null}
                             </View>
                         </View>
                     </View>
                 )}
 
-                {isSplitLine && <BeforeAfterSplitLine beforeUrl={before} afterUrl={after} />}
+                {isSplitLine && <BeforeAfterSplitLine beforeUrl={before} afterUrl={after} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
 
-                {isSlider && <BeforeAfterSliderOpacity beforeUrl={before} afterUrl={after} />}
+                {isSlider && <BeforeAfterSliderOpacity beforeUrl={before} afterUrl={after} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
             </View>
 
-            {/* Bottom toolbar: light gray bg; white circular arrows + white pill center (Figma) */}
+            {/* Thumbnail strip (like ImageViewerModal) – above tab bar, only when multiple pairs */}
+            {hasMultiple && (
+                <View style={styles.thumbnailStripWrap}>
+                    <ScrollView
+                        ref={thumbnailScrollRef}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={[styles.thumbnailStripContent, { width: thumbnailStripWidth }]}
+                        style={styles.thumbnailStripScroll}
+                        onScroll={onThumbnailScroll}
+                        scrollEventThrottle={16}
+                        decelerationRate="fast"
+                        snapToInterval={THUMB_SLOT_WIDTH}
+                        snapToAlignment="start"
+                    >
+                        {pairs.map((p, index) => {
+                            const isActive = index === currentIndex;
+                            return (
+                                <TouchableOpacity
+                                    key={index}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                        setCurrentIndex(index);
+                                        scrollThumbnailToIndex(index);
+                                    }}
+                                    style={[styles.thumbnailSlot, { width: THUMB_SLOT_WIDTH }]}
+                                    activeOpacity={0.8}
+                                >
+                                    <View
+                                        style={[
+                                            styles.thumbnailItem,
+                                            {
+                                                width: isActive ? ACTIVE_THUMB_WIDTH : INACTIVE_THUMB_WIDTH,
+                                                marginHorizontal: isActive ? ACTIVE_MARGIN : (THUMB_SLOT_WIDTH - INACTIVE_THUMB_WIDTH) / 2,
+                                                opacity: isActive ? 1 : 0.7,
+                                                transform: [{ scale: isActive ? 1 : 0.95 }],
+                                            },
+                                        ]}
+                                    >
+                                        <Image source={{ uri: p.beforeUrl }} style={styles.thumbnailImage} contentFit="cover" />
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Bottom toolbar: view mode pill only (no arrows) */}
             <View style={[styles.toolbar, { paddingBottom: insets.bottom }]}>
                 <View style={styles.toolbarRow}>
-                    <TouchableOpacity onPress={handlePrev} style={[styles.arrowButtonCircle, !canGoPrev && styles.arrowDisabled]} disabled={!canGoPrev}>
-                        <IconSymbol name="chevron.left" size={24} color={canGoPrev ? (colors.system.black as any) : (colors.system.gray4 as any)} />
-                    </TouchableOpacity>
-
                     <View style={styles.toolbarIconsPill}>
                         {VIEW_MODES.map(({ key, icon }) => (
                             <TouchableOpacity key={key} onPress={() => selectViewMode(key)} style={[styles.toolbarIcon]}>
@@ -193,10 +288,6 @@ export default function BeforeAfterCompareScreen() {
                             </TouchableOpacity>
                         ))}
                     </View>
-
-                    <TouchableOpacity onPress={handleNext} style={[styles.arrowButtonCircle, !canGoNext && styles.arrowDisabled]} disabled={!canGoNext}>
-                        <IconSymbol name="chevron.right" size={24} color={canGoNext ? (colors.system.black as any) : (colors.system.gray4 as any)} />
-                    </TouchableOpacity>
                 </View>
             </View>
         </View>
@@ -204,7 +295,7 @@ export default function BeforeAfterCompareScreen() {
 }
 
 /** Split-line mode: vertical divider, left = before, right = after, draggable line with handle at bottom (Figma 12198-10455) */
-function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl: string }) {
+function BeforeAfterSplitLine({ beforeUrl, afterUrl, beforeDate, afterDate }: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string }) {
     const dividerX = useSharedValue(SCREEN_WIDTH * 0.5);
     const padding = 0;
     const labelMinSideWidth = 120;
@@ -262,27 +353,37 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afte
                 </Animated.View>
             </Animated.View>
 
-            {/* Labels in fixed overlay: light gray pill, Before=dark gray, After=blue */}
+            {/* Labels in fixed overlay: light gray pill, Before=dark gray, After=blue + date */}
             <View style={styles.splitLineLabelsOverlay} pointerEvents="none">
-                <Animated.View style={[styles.label, styles.labelBeforePill, styles.labelSplitLineBefore, beforeLabelStyle]}>
-                    <BaseText type="Caption1" weight="600" color="labels.secondary">
+                <Animated.View style={[styles.label, styles.labelBeforePill, styles.labelSplitLineBefore, styles.labelWithDate, beforeLabelStyle]}>
+                    <BaseText type="Caption1" weight="600" color="labels.primary">
                         Before
                     </BaseText>
+                    {beforeDate ? (
+                        <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                            {getRelativeTime(beforeDate)}
+                        </BaseText>
+                    ) : null}
                 </Animated.View>
-                <Animated.View style={[styles.label, styles.labelAfterPill, styles.labelSplitLineAfter, afterLabelStyle]}>
+                <Animated.View style={[styles.label, styles.labelAfterPill, styles.labelSplitLineAfter, styles.labelWithDate, afterLabelStyle]}>
                     <BaseText type="Caption1" weight="600" color="system.blue">
                         After
                     </BaseText>
+                    {afterDate ? (
+                        <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                            {getRelativeTime(afterDate)}
+                        </BaseText>
+                    ) : null}
                 </Animated.View>
             </View>
 
-            {/* Vertical white line + draggable hit area */}
+            {/* Vertical white line + hit area (full height) */}
             <Animated.View style={[styles.splitLineDivider, dividerLineStyle]}>
                 <View style={styles.splitLineDividerLine} pointerEvents="none" />
             </Animated.View>
             <Animated.View style={[styles.splitLineDividerHitArea, dividerLineStyle]} onStartShouldSetResponder={() => true} onResponderGrant={(e) => updatePosition(e.nativeEvent.pageX)} onResponderMove={(e) => updatePosition(e.nativeEvent.pageX)} />
 
-            {/* Draggable handle at bottom */}
+            {/* Draggable handle: aligned with badges (same bottom) */}
             <View style={styles.splitLineHandleArea} onStartShouldSetResponder={() => true} onResponderGrant={(e) => updatePosition(e.nativeEvent.pageX)} onResponderMove={(e) => updatePosition(e.nativeEvent.pageX)}>
                 <Animated.View style={[styles.splitLineHandle, handleStyle]} pointerEvents="none">
                     <View style={styles.splitLineGrip}>
@@ -297,7 +398,7 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl }: { beforeUrl: string; afte
 }
 
 /** Slider mode: image on top, slider pill below image (above tab bar), opacity of after controlled by slider */
-function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; afterUrl: string }) {
+function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string }) {
     const sliderValue = useSharedValue(0.5);
     const trackWidthSv = useSharedValue(SCREEN_WIDTH - 120);
     const trackXRef = React.useRef(0);
@@ -320,7 +421,7 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; 
 
     return (
         <View style={styles.sliderContainer}>
-            {/* Top: image area (no overlap) */}
+            {/* Top: image area (no badges on image) */}
             <View style={styles.sliderImageArea}>
                 <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">
@@ -328,12 +429,19 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; 
                 </Animated.View>
             </View>
 
-            {/* Below image: slider pill (above tab bar) */}
+            {/* Below image: slider pill with Before/After + date */}
             <View style={styles.sliderPillWrap}>
                 <View style={styles.sliderBox} onStartShouldSetResponder={() => true} onResponderGrant={(e) => updatePosition(e.nativeEvent.pageX)} onResponderMove={(e) => updatePosition(e.nativeEvent.pageX)}>
-                    <BaseText type="Caption1" color="labels.secondary" style={styles.sliderBoxLabel}>
-                        Before
-                    </BaseText>
+                    <View style={styles.sliderBoxLabelWrap}>
+                        <BaseText type="Caption1" color="labels.primary" style={styles.sliderBoxLabel}>
+                            Before
+                        </BaseText>
+                        {beforeDate ? (
+                            <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.sliderBoxDate}>
+                                {getRelativeTime(beforeDate)}
+                            </BaseText>
+                        ) : null}
+                    </View>
                     <View
                         style={styles.sliderTrackWrap}
                         onLayout={(e) => {
@@ -348,9 +456,16 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl }: { beforeUrl: string; 
                         <Animated.View style={[styles.sliderTrackFill, trackFillStyle]} pointerEvents="none" />
                         <SliderThumb value={sliderValue} trackWidthSv={trackWidthSv} />
                     </View>
-                    <BaseText type="Caption1" weight="600" color="system.blue" style={styles.sliderBoxLabel}>
-                        After
-                    </BaseText>
+                    <View style={styles.sliderBoxLabelWrap}>
+                        <BaseText type="Caption1" weight="600" color="system.blue" style={styles.sliderBoxLabel}>
+                            After
+                        </BaseText>
+                        {afterDate ? (
+                            <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.sliderBoxDate}>
+                                {getRelativeTime(afterDate)}
+                            </BaseText>
+                        ) : null}
+                    </View>
                 </View>
             </View>
         </View>
@@ -449,6 +564,7 @@ const styles = StyleSheet.create({
         top: 0,
         bottom: 0,
         width: 2,
+        height: "94.7%",
         alignItems: "center",
         pointerEvents: "none",
     },
@@ -474,7 +590,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 16,
+        bottom: 48,
         height: 52,
         justifyContent: "center",
         alignItems: "center",
@@ -512,11 +628,11 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     labelSplitLineBefore: {
-        bottom: 88,
+        bottom: 54,
         left: 12,
     },
     labelSplitLineAfter: {
-        bottom: 88,
+        bottom: 54,
         right: 12,
         left: undefined,
     },
@@ -541,7 +657,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 99,
+        borderRadius: 8,
     },
     labelBefore: {
         bottom: 12,
@@ -563,6 +679,24 @@ const styles = StyleSheet.create({
         left: 12,
         backgroundColor: colors.system.gray5,
     },
+    labelOnImage: {
+        gap: 0,
+    },
+    labelWithDate: {
+        gap: 2,
+    },
+    labelDate: {
+        marginTop: 2,
+    },
+    sliderBoxLabelWrap: {
+        minWidth: 48,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    sliderBoxDate: {
+        marginTop: 2,
+        textAlign: "center",
+    },
     toolbar: {
         paddingHorizontal: 20,
         paddingTop: 12,
@@ -579,7 +713,7 @@ const styles = StyleSheet.create({
     toolbarRow: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center",
         width: "100%",
     },
     arrowButton: {
@@ -646,7 +780,6 @@ const styles = StyleSheet.create({
     },
     sliderContainer: {
         flex: 1,
-        // backgroundColor: colors.system.white,
         flexDirection: "column",
     },
     sliderImageArea: {
@@ -658,15 +791,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 12,
         backgroundColor: colors.system.gray6,
+        paddingBottom: 12,
     },
     sliderBox: {
         flexDirection: "row",
         alignItems: "center",
         paddingVertical: 4,
-        paddingHorizontal: 14,
+        paddingHorizontal: 0,
         backgroundColor: colors.system.white,
         borderRadius: 999,
-        gap: 16,
+        gap: 0,
     },
     sliderBoxLabel: {
         minWidth: 48,
@@ -725,5 +859,34 @@ const styles = StyleSheet.create({
         height: 18,
         borderRadius: 12,
         backgroundColor: colors.system.blue,
+    },
+    thumbnailStripWrap: {
+        width: SCREEN_WIDTH,
+        overflow: "hidden",
+        marginBottom: 6,
+        backgroundColor: colors.system.gray6,
+    },
+    thumbnailStripScroll: {
+        flexGrow: 0,
+    },
+    thumbnailStripContent: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: THUMB_PADDING,
+    },
+    thumbnailSlot: {
+        height: 44,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    thumbnailItem: {
+        height: 44,
+        borderRadius: 8,
+        overflow: "hidden",
+        backgroundColor: "rgba(0,0,0,0.06)",
+    },
+    thumbnailImage: {
+        width: "100%",
+        height: "100%",
     },
 });
