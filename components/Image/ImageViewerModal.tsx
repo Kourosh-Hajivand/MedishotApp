@@ -461,6 +461,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isHandlingScrollEnd = useRef(false);
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
+    const [displayIndex, setDisplayIndex] = useState(initialIndex); // Updates with scroll so header/Take After Template stay in sync
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
     const [isZoomed, setIsZoomed] = useState(false);
@@ -498,14 +499,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Thumbnail strip scroll position - driven on UI thread for perfect sync with image swipe
     const thumbnailScrollX = useSharedValue(getThumbnailScrollXForPage(initialIndex, imagesList.length));
 
-    // Get current patientId from currentIndex if imageUrlToPatientIdMap is provided
+    // Get current patientId from displayIndex (updates with scroll)
     const currentPatientId = React.useMemo(() => {
-        if (imageUrlToPatientIdMap && imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imageUrlToPatientIdMap && imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return imageUrlToPatientIdMap.get(currentImageUrl) || patientId;
         }
         return patientId;
-    }, [currentIndex, imagesList, imageUrlToPatientIdMap, patientId]);
+    }, [displayIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
     // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, hideTakeAfter, and originalWithNoBeforeAfter
     const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap, imageUrlToOriginalNoBeforeAfterMap } = React.useMemo(() => {
@@ -601,52 +602,52 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return merged;
     }, [imageUrlToCreatedAtMap, imageUrlToCreatedAtMapFromRaw]);
 
-    // Get current taker info
+    // Get current taker info (displayIndex = updates with scroll, no delay)
     const currentTaker = React.useMemo(() => {
-        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return finalTakerMap.get(currentImageUrl);
         }
         return null;
-    }, [currentIndex, imagesList, finalTakerMap]);
+    }, [displayIndex, imagesList, finalTakerMap]);
 
     // Get current createdAt
     const currentCreatedAt = React.useMemo(() => {
-        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return finalCreatedAtMap.get(currentImageUrl);
         }
         return null;
-    }, [currentIndex, imagesList, finalCreatedAtMap]);
+    }, [displayIndex, imagesList, finalCreatedAtMap]);
 
     // Check if current image is original_media from a template
     const isCurrentImageOriginalMedia = React.useMemo(() => {
-        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return imageUrlToIsOriginalMediaMap.get(currentImageUrl) === true;
         }
         return false;
-    }, [currentIndex, imagesList, imageUrlToIsOriginalMediaMap]);
+    }, [displayIndex, imagesList, imageUrlToIsOriginalMediaMap]);
 
     // Hide "Take After Template" when has_after or (is_after + before_media_id)
     const isCurrentImageHideTakeAfter = React.useMemo(() => {
-        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return imageUrlToHideTakeAfterMap.get(currentImageUrl) === true;
         }
         return false;
-    }, [currentIndex, imagesList, imageUrlToHideTakeAfterMap]);
+    }, [displayIndex, imagesList, imageUrlToHideTakeAfterMap]);
 
     const showTakeAfterTemplate = Boolean(enableTakeAfterTemplate) && isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
 
     // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
     const isCurrentImageOriginalNoBeforeAfter = React.useMemo(() => {
-        if (imagesList.length > 0 && currentIndex >= 0 && currentIndex < imagesList.length) {
-            const currentImageUrl = imagesList[currentIndex];
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
             return imageUrlToOriginalNoBeforeAfterMap.get(currentImageUrl) === true;
         }
         return false;
-    }, [currentIndex, imagesList, imageUrlToOriginalNoBeforeAfterMap]);
+    }, [displayIndex, imagesList, imageUrlToOriginalNoBeforeAfterMap]);
 
     // Adjust actions: original with no before/after → Share, Take After, Bookmark only; original with before/after → split, archive, bookmark; rest → Share, Bookmark, Edit, Archive
     const effectiveActions = React.useMemo(() => {
@@ -699,22 +700,28 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         [scrollThumbnailToPosition],
     );
 
+    const setDisplayIndexFromScroll = React.useCallback((idx: number) => {
+        setDisplayIndex(idx);
+    }, []);
+
     // Keep currentIndexShared and lastThumbnailIndex in sync with currentIndex
     React.useEffect(() => {
         currentIndexShared.value = currentIndex;
         lastThumbnailIndex.current = currentIndex;
     }, [currentIndex]);
 
-    // Reset index to initialIndex when modal closes; sync thumbnail when modal opens
+    // Reset index to initialIndex when modal closes; sync thumbnail and displayIndex when modal opens
     React.useEffect(() => {
         if (!visible) {
             setCurrentIndex(initialIndex);
+            setDisplayIndex(initialIndex);
             currentIndexShared.value = initialIndex;
             scale.value = 1;
             translateX.value = 0;
             translateY.value = 0;
             setIsZoomed(false);
         } else {
+            setDisplayIndex(initialIndex);
             thumbnailScrollX.value = getThumbnailScrollXForPage(initialIndex, imagesList.length);
         }
     }, [visible, initialIndex, imagesList.length]);
@@ -823,8 +830,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const index = Math.round(clampedPage);
             scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
             currentIndexShared.value = index;
+            runOnJS(setDisplayIndexFromScroll)(index);
         },
-    });
+    }, [imagesList.length, setDisplayIndexFromScroll]);
 
     const handleMomentumScrollEnd = (event: any) => {
         // Don't update if scroll is programmatic
@@ -847,24 +855,24 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         // Update index if changed
         if (validIndex !== currentIndex) {
             setCurrentIndex(validIndex);
+            setDisplayIndex(validIndex);
             currentIndexShared.value = validIndex;
         }
     };
 
     const handleEditPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         setImageEditorUri(currentImageUri);
         setImageEditorTool(undefined);
         setImageEditorVisible(true);
     };
 
-    // Bookmark mutations
+    // Bookmark mutations (use displayIndex = image being viewed)
     const { mutate: bookmarkMedia } = useBookmarkMedia(
         () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            // Optimistically update local bookmark map
-            const currentImageUri = imagesList[currentIndex];
+            const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
                 const newMap = new Map(prev);
                 newMap.set(currentImageUri, true);
@@ -874,8 +882,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         (error) => {
             console.error("Error bookmarking media:", error);
             Alert.alert("Error", error.message || "Failed to bookmark image");
-            // Revert optimistic update on error
-            const currentImageUri = imagesList[currentIndex];
+            const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
                 const newMap = new Map(prev);
                 newMap.set(currentImageUri, imageUrlToBookmarkMapInternal.get(currentImageUri) ?? false);
@@ -887,8 +894,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const { mutate: unbookmarkMedia } = useUnbookmarkMedia(
         () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            // Optimistically update local bookmark map
-            const currentImageUri = imagesList[currentIndex];
+            const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
                 const newMap = new Map(prev);
                 newMap.set(currentImageUri, false);
@@ -898,8 +904,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         (error) => {
             console.error("Error unbookmarking media:", error);
             Alert.alert("Error", error.message || "Failed to unbookmark image");
-            // Revert optimistic update on error
-            const currentImageUri = imagesList[currentIndex];
+            const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
                 const newMap = new Map(prev);
                 newMap.set(currentImageUri, imageUrlToBookmarkMapInternal.get(currentImageUri) ?? false);
@@ -943,9 +948,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }, [visible, imagesList.length]);
 
     const handleBookmarkPress = () => {
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         const mediaId = imageUrlToMediaIdMapInternal.get(currentImageUri);
-        // Use local bookmark map first, fallback to internal map
         const isBookmarked = localBookmarkMap.get(currentImageUri) ?? imageUrlToBookmarkMapInternal.get(currentImageUri) ?? false;
 
         if (!mediaId) {
@@ -963,14 +967,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const handleAdjustPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         setImageEditorUri(currentImageUri);
         setImageEditorTool("Adjust");
         setImageEditorVisible(true);
     };
 
     const handleSplitPress = () => {
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         if (!rawMediaData?.length || !patientId) return;
 
         const pairs: { beforeUrl: string; afterUrl: string }[] = [];
@@ -1059,14 +1063,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const handleMagicPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         setImageEditorUri(currentImageUri);
         setImageEditorTool("Magic");
         setImageEditorVisible(true);
     };
 
     const handleArchivePress = () => {
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         const mediaId = imageUrlToMediaIdMapInternal.get(currentImageUri);
 
         if (!mediaId) {
@@ -1092,7 +1096,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     };
 
     const handleRestorePress = () => {
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         if (onRestore) {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             onRestore(currentImageUri);
@@ -1105,8 +1109,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             return;
         }
 
-        // Find the template ID and before_media_id from rawMediaData for the current image
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         let templateId: string | number | undefined;
         let beforeMediaId: string | number | undefined;
 
@@ -1149,7 +1152,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     };
 
     const handleSharePress = async () => {
-        const currentImageUri = imagesList[currentIndex];
+        const currentImageUri = imagesList[displayIndex];
         if (!currentImageUri) return;
 
         if (practice && metadata) {
@@ -1252,8 +1255,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     };
 
     const createGestures = (index: number) => {
-        // Only enable gestures for current image
-        if (index !== currentIndex) {
+        // Only enable gestures for the image being displayed (displayIndex = in sync with scroll)
+        if (index !== displayIndex) {
             return Gesture.Tap();
         }
 
@@ -1461,7 +1464,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const renderImageItem = ({ item, index }: { item: string; index: number }) => {
         const imageSize = imageSizes[index] || { width: width, height: height };
         const gestures = createGestures(index);
-        const isCurrentImage = index === currentIndex;
+        const isCurrentImage = index === displayIndex;
         const isLoading = imageLoadingStates.get(index) ?? true; // Default to loading
 
         return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
@@ -1564,8 +1567,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                         </Button>
                                                     )}
                                                     {showBookmark && (
-                                                        <Button systemImage={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} onPress={handleBookmarkPress}>
-                                                            {(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "remove from practice album" : "add to practice album"}
+                                                        <Button systemImage={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"} onPress={handleBookmarkPress}>
+                                                            {(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "remove from practice album" : "add to practice album"}
                                                         </Button>
                                                     )}
                                                     {showMagicInMore && !isCurrentImageOriginalMedia && (
@@ -1670,7 +1673,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                         key={index}
                                                         imageUri={imageUri}
                                                         index={index}
-                                                        isActive={index === currentIndex}
+                                                        isActive={index === displayIndex}
                                                         currentIndexShared={currentIndexShared}
                                                         scrollProgress={scrollProgress}
                                                         isLoading={isThumbnailLoading}
@@ -1701,6 +1704,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             isProgrammaticScroll.value = true;
                                                             thumbnailScrollX.value = withTiming(getThumbnailScrollXForPage(index, imagesList.length), { duration: 300 });
                                                             setCurrentIndex(index);
+                                                            setDisplayIndex(index);
                                                             flatListRef.current?.scrollToIndex({ index, animated: true });
                                                             setTimeout(() => {
                                                                 isProgrammaticScroll.value = false;
@@ -1763,7 +1767,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                 >
                                                     {showBookmark && (
                                                         <TouchableOpacity onPress={handleBookmarkPress} className="  relative items-center justify-center w-[44px] h-[44px]">
-                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[currentIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[currentIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: !showEdit ? 2.2 : 5 }} />
+                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: !showEdit ? 2.2 : 5 }} />
                                                         </TouchableOpacity>
                                                     )}
                                                     {showEdit && (
