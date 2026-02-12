@@ -111,25 +111,48 @@ const MediaService = {
         }
     },
 
-    // Temporary File Upload
+    // Temporary File Upload (with one retry on timeout/network)
     tempUpload: async (file: File | { uri: string; type: string; name: string }): Promise<TempUploadResponse> => {
-        try {
+        const attempt = async (): Promise<TempUploadResponse> => {
             const formData = new FormData();
             formData.append("file", file as File | Blob);
 
-            const response: AxiosResponse<any> = await axiosInstance.post(baseUrl + tempUpload(), formData, {
+            const response: AxiosResponse<any> = await axiosInstance.post(tempUpload(), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
 
-            // Response structure: {success: true, message: null, data: {filename: '...'}}
-            // Extract the inner data object (TempUploadResponse)
             const tempUploadResponse: TempUploadResponse = response.data?.data || response.data;
             return tempUploadResponse;
+        };
+
+        const isRetryable = (err: unknown) => {
+            if (!axios.isAxiosError(err)) return false;
+            if (err.response) return false; // server responded, don't retry
+            const msg = (err.message || "").toLowerCase();
+            return (
+                err.code === "ECONNABORTED" ||
+                err.code === "ETIMEDOUT" ||
+                err.code === "ERR_NETWORK" ||
+                msg.includes("timeout") ||
+                msg.includes("network")
+            );
+        };
+
+        try {
+            return await attempt();
         } catch (error) {
-            if (axios.isAxiosError(error)) {
-                if (error.response) {
-                    throw new Error(error.response.data.message || "Temporary upload failed");
+            if (isRetryable(error)) {
+                try {
+                    return await attempt();
+                } catch (retryError) {
+                    if (axios.isAxiosError(retryError) && retryError.response) {
+                        throw new Error(retryError.response.data?.message || "Temporary upload failed");
+                    }
+                    throw retryError;
                 }
+            }
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data?.message || "Temporary upload failed");
             }
             throw error;
         }

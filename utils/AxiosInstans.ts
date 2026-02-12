@@ -24,7 +24,12 @@ let networkErrorResetTimer: ReturnType<typeof setTimeout> | null = null;
 const formatRequestForLog = (config: AxiosRequestConfig) => {
     const method = (config.method || "GET").toUpperCase();
     const url = config.url || "";
-    const fullUrl = config.baseURL && config.url ? `${config.baseURL}${config.url}` : config.url || "Unknown";
+    const fullUrl =
+        url.startsWith("http://") || url.startsWith("https://")
+            ? url
+            : config.baseURL && url
+              ? `${config.baseURL}${url}`
+              : config.url || "Unknown";
     
     let requestBody = null;
     if (config.data) {
@@ -54,8 +59,13 @@ const formatRequestForLog = (config: AxiosRequestConfig) => {
 const formatResponseForLog = (response: AxiosResponse) => {
     const method = (response.config?.method || "GET").toUpperCase();
     const url = response.config?.url || "";
-    const fullUrl = response.config?.baseURL && response.config?.url ? `${response.config.baseURL}${response.config.url}` : response.config?.url || "Unknown";
-    
+    const fullUrl =
+        url.startsWith("http://") || url.startsWith("https://")
+            ? url
+            : response.config?.baseURL && url
+              ? `${response.config.baseURL}${url}`
+              : response.config?.url || "Unknown";
+
     return {
         method,
         url: fullUrl,
@@ -70,7 +80,12 @@ const formatResponseForLog = (response: AxiosResponse) => {
 const formatErrorForLog = (error: AxiosError) => {
     const method = (error.config?.method || "GET").toUpperCase();
     const url = error.config?.url || "";
-    const fullUrl = error.config?.baseURL ? `${error.config.baseURL}${url}` : url;
+    const fullUrl =
+        url.startsWith("http://") || url.startsWith("https://")
+            ? url
+            : error.config?.baseURL && url
+              ? `${error.config.baseURL}${url}`
+              : url;
 
     if (error.response) {
         interface ErrorResponseData {
