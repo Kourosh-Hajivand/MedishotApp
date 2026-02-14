@@ -9,14 +9,16 @@ import { parseUSIDCardData } from "@/utils/helper/HelperFunction";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useGetPracticeById } from "@/utils/hook";
-import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia } from "@/utils/hook/useMedia";
+import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia, useTempUpload, useUploadPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { PatientMedia, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
+import { PatientMedia, PatientMediaImage, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect } from "@react-navigation/native";
+import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Animated, Dimensions, Linking, ScrollView, Share, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, ScrollView, Share, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import TextRecognition from "react-native-text-recognition";
 import { ActivitiesTabContent } from "./_components/ActivitiesTabContent";
@@ -40,6 +42,9 @@ export default function PatientDetailsScreen() {
     const { data: patient, isLoading, error: patientError, isError: isPatientError, refetch: refetchPatient } = useGetPatientById(id);
     const { data: patientMediaData, isLoading: isLoadingMedia, error: patientMediaError, isError: isPatientMediaError, refetch: refetchPatientMedia } = useGetPatientMedia(id, !!id);
     const { data: archivedData, refetch: refetchTrashMedia } = useGetTrashMedia(id || "", !!id);
+    const { mutateAsync: tempUploadAsync } = useTempUpload();
+    const { mutateAsync: uploadMediaAsync } = useUploadPatientMedia();
+    const [isImportingFromGallery, setIsImportingFromGallery] = useState(false);
     const { data: activitiesData, isLoading: isLoadingActivities, error: activitiesError, isError: isActivitiesError, refetch: refetchActivities } = useGetPatientActivities(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const { data: documentsData, isLoading: isLoadingDocuments, error: documentsError, isError: isDocumentsError, refetch: refetchDocuments } = useGetPatientDocuments(selectedPractice?.id, id, !!id && !!selectedPractice?.id);
     const { data: practiceData } = useGetPracticeById(selectedPractice?.id ?? 0, !!selectedPractice?.id);
@@ -160,8 +165,9 @@ export default function PatientDetailsScreen() {
             if (isTemplateMedia && Array.isArray(media.images)) {
                 const templateMedia = media as PatientMediaWithTemplate;
                 if (templateMedia.original_media?.url) map.set(templateMedia.original_media.url, editorState);
-                templateMedia.images?.forEach((imageItem: { image?: { url?: string } }) => {
-                    if (imageItem.image?.url) map.set(imageItem.image.url, editorState);
+                templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
+                    const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
+                    if (imageUrl) map.set(imageUrl, editorState);
                 });
             } else {
                 const patientMedia = media as PatientMedia;
@@ -180,18 +186,18 @@ export default function PatientDetailsScreen() {
 
         patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
             const isTemplateMedia = "template" in media && "images" in media && media.template != null;
-            const baseOriginal =
-                (media as PatientMedia).original_media?.url ?? (media as PatientMedia).media?.url;
+            const baseOriginal = (media as PatientMedia).original_media?.url ?? (media as PatientMedia).media?.url;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
                 const templateMedia = media as PatientMediaWithTemplate;
                 const orig = templateMedia.original_media?.url;
                 if (orig) map.set(orig, orig);
-                if ((templateMedia as { edited_media?: { url?: string } }).edited_media?.url && orig)
-                    map.set((templateMedia as { edited_media: { url: string } }).edited_media.url, orig);
-                templateMedia.images?.forEach((imageItem: { image?: { url?: string }; edited_image?: { url?: string } }) => {
-                    if (imageItem.image?.url) map.set(imageItem.image.url, orig ?? imageItem.image.url);
-                    if (imageItem.edited_image?.url) map.set(imageItem.edited_image.url, orig ?? imageItem.image?.url ?? imageItem.edited_image.url);
+                if ((templateMedia as { edited_media?: { url?: string } }).edited_media?.url && orig) map.set((templateMedia as { edited_media: { url: string } }).edited_media.url, orig);
+                templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
+                    const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
+                    const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
+                    if (imageUrl) map.set(imageUrl, orig ?? imageUrl);
+                    if (editedUrl) map.set(editedUrl, orig ?? imageUrl ?? editedUrl);
                 });
             } else {
                 const patientMedia = media as PatientMedia;
@@ -595,6 +601,78 @@ export default function PatientDetailsScreen() {
         return () => scrollY.removeListener(sub);
     }, [navigation, patient?.data, animationEnd]);
 
+    // Import from gallery (hidden: long-press on Take photo) – each image uploaded as single media like review without template
+    const handleImportFromGallery = useCallback(async () => {
+        if (!id) return;
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+            Alert.alert("Permission Required", "Gallery permission is required to import photos.");
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.9,
+            selectionLimit: 10,
+        });
+        if (result.canceled || !result.assets?.length) return;
+
+        setIsImportingFromGallery(true);
+        let successCount = 0;
+        let failCount = 0;
+
+        const allowedExt = /\.(jpe?g|png|pdf)$/i;
+        for (let i = 0; i < result.assets.length; i++) {
+            const asset = result.assets[i];
+            try {
+                const mime = asset.mimeType ?? "image/jpeg";
+                const isPdf = /application\/pdf/i.test(mime);
+                let uriToUpload = asset.uri;
+                let uploadName = (asset.fileName ?? `image-${i + 1}`).replace(/\.[^.]+$/, "") || `image-${i + 1}`;
+                let uploadType: string;
+
+                if (isPdf) {
+                    uploadName = uploadName + ".pdf";
+                    uploadType = "application/pdf";
+                } else {
+                    // Convert any image (HEIC, PNG, etc.) to JPEG so server accepts it
+                    const { uri } = await ImageManipulator.manipulateAsync(asset.uri, [], {
+                        compress: 0.9,
+                        format: ImageManipulator.SaveFormat.JPEG,
+                    });
+                    uriToUpload = uri;
+                    uploadName = uploadName + ".jpg";
+                    uploadType = "image/jpeg";
+                }
+
+                const file = { uri: uriToUpload, type: uploadType, name: uploadName };
+                const tempRes = await tempUploadAsync(file);
+                const filename = (tempRes as { data?: { filename?: string }; filename?: string })?.data?.filename ?? (tempRes as { filename?: string })?.filename;
+                if (filename) {
+                    await uploadMediaAsync({
+                        patientId: id,
+                        data: { media: filename, type: "image", data: {} },
+                    });
+                    successCount++;
+                } else {
+                    failCount++;
+                }
+            } catch {
+                failCount++;
+            }
+        }
+
+        setIsImportingFromGallery(false);
+        await refetchPatientMedia();
+
+        if (successCount > 0) {
+            const msg = failCount > 0 ? `${successCount} photo(s) added. ${failCount} failed.` : `${successCount} photo(s) added.`;
+            Alert.alert("Import", msg);
+        } else if (failCount > 0) {
+            Alert.alert("Import Failed", "Could not add the selected photos. Please try again.");
+        }
+    }, [id, tempUploadAsync, uploadMediaAsync, refetchPatientMedia]);
+
     // Refetch media data when screen is focused (e.g., after uploading new photos)
     useFocusEffect(
         useCallback(() => {
@@ -640,6 +718,7 @@ export default function PatientDetailsScreen() {
                                 <TouchableOpacity
                                     className="flex-1 items-center justify-center gap-2 border-r border-border"
                                     onPress={() => {
+                                        if (isImportingFromGallery) return;
                                         router.push({
                                             pathname: "/camera" as any,
                                             params: {
@@ -651,10 +730,14 @@ export default function PatientDetailsScreen() {
                                             },
                                         });
                                     }}
+                                    onLongPress={handleImportFromGallery}
+                                    delayLongPress={500}
+                                    disabled={isImportingFromGallery}
+                                    style={{ opacity: isImportingFromGallery ? 0.6 : 1 }}
                                 >
-                                    <IconSymbol name="camera" color={colors.system.blue} size={26} />
+                                    {isImportingFromGallery ? <ActivityIndicator size="small" color={colors.system.blue} /> : <IconSymbol name="camera" color={colors.system.blue} size={26} />}
                                     <BaseText type="Footnote" color="labels.primary">
-                                        Take photo
+                                        {isImportingFromGallery ? "Importing…" : "Take photo"}
                                     </BaseText>
                                 </TouchableOpacity>
                                 <TouchableOpacity

@@ -17,10 +17,11 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { DeviceMotion } from "expo-sensors";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, FlatList, Modal, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, FlatList, Modal, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -144,7 +145,8 @@ const ThumbnailIconItem: React.FC<{
     isCompleted: boolean;
     photo: CapturedPhoto | undefined;
     onPress: () => void;
-}> = ({ ghostItem, index, isActive, isCompleted, photo, onPress }) => {
+    onLongPress?: () => void;
+}> = ({ ghostItem, index, isActive, isCompleted, photo, onPress, onLongPress }) => {
     const ghostId = ghostItem.gostId;
     const isGhostItemId = (value: unknown): value is GhostItemId => typeof value === "string" && Object.prototype.hasOwnProperty.call(GHOST_ASSETS, value);
     const iconSource = ghostItem.iconUrl ? { uri: ghostItem.iconUrl } : isGhostItemId(ghostId) ? getGhostIcon(ghostId) : null;
@@ -207,7 +209,7 @@ const ThumbnailIconItem: React.FC<{
     };
 
     return (
-        <TouchableOpacity onPress={onPress} style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}>
+        <TouchableOpacity onPress={onPress} onLongPress={onLongPress} delayLongPress={500} style={[styles.thumbnail, isActive && styles.thumbnailActive, isCompleted && styles.thumbnailCompleted]}>
             {photo ? (
                 <>
                     <Image source={{ uri: photo.uri }} style={styles.thumbnailImage} />
@@ -759,6 +761,82 @@ export default function CameraScreen() {
         });
     }, [currentGhostData, currentGhostItem]);
 
+    // Pick from gallery for a ghost slot (long-press on thumbnail) – same flow as retake/capture: add photo, temp upload, save on review
+    const handlePickFromGalleryForGhost = useCallback(
+        async (ghostItem: GhostItemData, index: number) => {
+            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== "granted") {
+                Alert.alert("Permission Required", "Gallery permission is required to pick a photo.");
+                return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsMultipleSelection: false,
+                quality: 0.95,
+            });
+            if (result.canceled || !result.assets[0]) return;
+
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            const asset = result.assets[0];
+            let uriToUse = asset.uri;
+            const mime = asset.mimeType ?? "image/jpeg";
+            if (!/^image\/(jpe?g|png)$/i.test(mime)) {
+                const { uri } = await ImageManipulator.manipulateAsync(asset.uri, [], {
+                    compress: 0.9,
+                    format: ImageManipulator.SaveFormat.JPEG,
+                });
+                uriToUse = uri;
+            }
+
+            const ghostId = ghostItem.gostId;
+            const ghostName = ghostItem.name ?? ghostId;
+            const photoTimestamp = Date.now();
+            const currentPhotoId = `photo-${photoTimestamp}`;
+            const newPhoto: CapturedPhoto = {
+                id: currentPhotoId,
+                uri: uriToUse,
+                templateId: ghostId,
+                templateName: ghostName,
+                timestamp: photoTimestamp,
+                isCompleted: true,
+                uploadStatus: "pending",
+            };
+
+            setCapturedPhotos((prev) => {
+                const existing = prev.findIndex((p) => p.templateId === ghostId);
+                if (existing !== -1) {
+                    const updated = [...prev];
+                    updated[existing] = newPhoto;
+                    return updated;
+                }
+                return [...prev, newPhoto];
+            });
+            setCurrentGhostIndex(index);
+
+            const file = {
+                uri: uriToUse,
+                type: "image/jpeg",
+                name: `gallery-${ghostId}-${photoTimestamp}.jpg`,
+            };
+            setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, uploadStatus: "uploading" } : p)));
+
+            try {
+                const response = await uploadToTempAsync(file);
+                const responseAny = response as { data?: { filename?: string }; filename?: string };
+                const tempFilename = responseAny?.data?.filename ?? responseAny?.filename;
+                if (tempFilename) {
+                    tempFilenameMapRef.current.set(currentPhotoId, tempFilename);
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, tempFilename, uploadStatus: "success" as const } : p)));
+                } else {
+                    setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, uploadStatus: "error" as const } : p)));
+                }
+            } catch {
+                setCapturedPhotos((prev) => prev.map((p) => (p.id === currentPhotoId ? { ...p, uploadStatus: "error" as const } : p)));
+            }
+        },
+        [uploadToTempAsync],
+    );
+
     // Take photo
     const handleTakePhoto = useCallback(async () => {
         if (!cameraRef.current || isCapturing) return;
@@ -868,7 +946,7 @@ export default function CameraScreen() {
                 // Immediately upload ALL photos to temp-upload service
                 // Capture photoId in closure to avoid race conditions with parallel uploads
                 const currentPhotoId = newPhoto.id;
-                
+
                 try {
                     const filename = finalPhotoUri.split("/").pop() || "image.png";
                     const match = /\.(\w+)$/.exec(filename);
@@ -963,10 +1041,11 @@ export default function CameraScreen() {
                     onPress={() => {
                         setCurrentGhostIndex(index);
                     }}
+                    onLongPress={() => handlePickFromGalleryForGhost(ghostItem, index)}
                 />
             );
         },
-        [capturedPhotos, currentGhostIndex],
+        [capturedPhotos, currentGhostIndex, handlePickFromGalleryForGhost],
     );
 
     const handleClose = useCallback(() => {

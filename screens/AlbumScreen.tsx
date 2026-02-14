@@ -164,8 +164,9 @@ export const AlbumScreen: React.FC = () => {
                                 const imageUrl = typeof imageItem.image === "string" ? imageItem.image : (imageItem.image?.url || null);
 
                                 if (imageUrl) {
+                                    // Use mediaItem.id (patient_media) so bookmark state and API use the same id
                                     const imageMediaObj: Media = {
-                                        id: imageItem.id || Date.now(),
+                                        id: mediaItem.id,
                                         url: imageUrl,
                                         created_at: imageItem.created_at || mediaItem.created_at || "",
                                         updated_at: imageItem.updated_at || mediaItem.created_at || "",
@@ -182,23 +183,34 @@ export const AlbumScreen: React.FC = () => {
                         });
                     }
                 } else if (hasTemplate && !mediaItem.original_media?.url && mediaWithTemplate.images && Array.isArray(mediaWithTemplate.images)) {
-                    // Template media without original_media: add individual images to allOnlyPhotos (will appear only in "All" tab)
+                    // Template media without original_media (e.g. single template): show like a normal photo in both "All" and gost tab
                     mediaWithTemplate.images.forEach((imageItem: (typeof mediaWithTemplate.images)[0]) => {
                         if (imageItem?.image) {
                             const imageUrl = typeof imageItem.image === "string" ? imageItem.image : (imageItem.image?.url || null);
 
                             if (imageUrl) {
+                                // Use mediaItem.id (patient_media) so bookmark state and API use the same id
                                 const mediaObj: Media = {
-                                    id: imageItem.id || Date.now(),
+                                    id: mediaItem.id,
                                     url: imageUrl,
                                     created_at: imageItem.created_at || mediaItem.created_at || "",
                                     updated_at: imageItem.updated_at || mediaItem.created_at || "",
                                 };
 
-                                // Add to allOnlyPhotos (will appear only in "All" tab)
+                                // Add to allOnlyPhotos (shows in "All" tab)
                                 const uniqueKey = `${mediaObj.id}-${mediaObj.url}`;
                                 if (!allOnlyPhotosMap.has(uniqueKey)) {
                                     allOnlyPhotosMap.set(uniqueKey, mediaObj);
+                                }
+
+                                // Add to gost tab too so it shows like a normal photo in the album (e.g. "Front Face")
+                                const imageGostId = imageItem?.gost?.id;
+                                if (imageGostId && gostMap.has(imageGostId)) {
+                                    const gostPhotos = gostMap.get(imageGostId)!.photos;
+                                    const isDuplicate = gostPhotos.some((photo) => photo.id === mediaObj.id && photo.url === mediaObj.url);
+                                    if (!isDuplicate) {
+                                        gostPhotos.push(mediaObj);
+                                    }
                                 }
                             }
                         }
@@ -412,7 +424,7 @@ export const AlbumScreen: React.FC = () => {
         }));
     }, [groupedPhotos]);
 
-    // Create map from image URL to media ID
+    // Create map from image URL to media ID (include template sub-images so viewer slides show correct id)
     const imageUrlToMediaIdMap = useMemo(() => {
         const map = new Map<string, number>();
         photos.forEach((photo) => {
@@ -420,10 +432,22 @@ export const AlbumScreen: React.FC = () => {
                 map.set(photo.url, photo.id);
             }
         });
+        // For template media: add original_media + each image URL -> patient_media id (so slides in viewer have correct bookmark id)
+        rawMediaData.forEach((item) => {
+            const mediaId = typeof item.id === "number" ? item.id : Number(item.id);
+            if (!item.template || Number.isNaN(mediaId)) return;
+            if (item.original_media?.url) {
+                map.set(item.original_media.url, mediaId);
+            }
+            item.images?.forEach((img: { image?: { url?: string } | null }) => {
+                const url = img?.image && typeof img.image === "object" ? img.image.url : null;
+                if (url) map.set(url, mediaId);
+            });
+        });
         return map;
-    }, [photos]);
+    }, [photos, rawMediaData]);
 
-    // Create map from image URL to bookmark status
+    // Create map from image URL to bookmark status (include template sub-images so viewer slides show correct state)
     const imageUrlToBookmarkMap = useMemo(() => {
         const map = new Map<string, boolean>();
         photos.forEach((photo) => {
@@ -431,8 +455,21 @@ export const AlbumScreen: React.FC = () => {
                 map.set(photo.url, bookmarkedImages.has(photo.id));
             }
         });
+        // For template media: same bookmark state for composite + all sub-images
+        rawMediaData.forEach((item) => {
+            const mediaId = typeof item.id === "number" ? item.id : Number(item.id);
+            if (!item.template || Number.isNaN(mediaId)) return;
+            const bookmarked = bookmarkedImages.has(mediaId);
+            if (item.original_media?.url) {
+                map.set(item.original_media.url, bookmarked);
+            }
+            item.images?.forEach((img: { image?: { url?: string } | null }) => {
+                const url = img?.image && typeof img.image === "object" ? img.image.url : null;
+                if (url) map.set(url, bookmarked);
+            });
+        });
         return map;
-    }, [photos, bookmarkedImages]);
+    }, [photos, bookmarkedImages, rawMediaData]);
 
     // Create map from image URL to created_at timestamp
     const imageUrlToCreatedAtMap = useMemo(() => {
@@ -770,7 +807,7 @@ export const AlbumScreen: React.FC = () => {
                             patientId={extractedPatientId ?? undefined}
                             rawMediaData={rawMediaData}
                             actions={{
-                                showBookmark: false,
+                                showBookmark: true,
                                 showEdit: false,
                                 showArchive: false,
                                 showShare: true,

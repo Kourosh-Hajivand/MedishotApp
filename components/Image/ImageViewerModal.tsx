@@ -609,7 +609,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 map.set(media.original_media.url, editorState);
             }
             if (media.images?.length) {
-                media.images.forEach((img: { image?: { url?: string } }) => {
+                media.images.forEach((img: { image?: { url?: string } | null }) => {
                     if (img.image?.url) map.set(img.image.url, editorState);
                 });
             }
@@ -632,7 +632,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const withEdited = media as { edited_media?: { url?: string } };
             if (withEdited.edited_media?.url && orig) map.set(withEdited.edited_media.url, orig);
             if (media.images?.length) {
-                media.images.forEach((img: { image?: { url?: string }; edited_image?: { url?: string } }) => {
+                media.images.forEach((img: { image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
                     if (img.image?.url) map.set(img.image.url, orig ?? img.image.url);
                     if (img.edited_image?.url) map.set(img.edited_image.url, orig ?? img.image?.url ?? img.edited_image.url);
                 });
@@ -709,13 +709,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [displayIndex, imagesList, imageUrlToOriginalNoBeforeAfterMap]);
 
-    // Adjust actions: original with no before/after → Share, Take After, Bookmark only; original with before/after → split, archive, bookmark; rest → Share, Bookmark, Edit, Archive
+    // Adjust actions: original with no before/after → Share, Take After, Bookmark (if allowed); original with before/after → split, archive (if allowed), bookmark (if allowed); rest → respect actions
     const effectiveActions = React.useMemo(() => {
-        const { showShare: share = true, showRestore: restore = false } = actions;
+        const { showShare: share = true, showRestore: restore = false, showArchive: archive = true, showBookmark: bookmark = true } = actions;
         if (isCurrentImageOriginalMedia) {
             if (isCurrentImageOriginalNoBeforeAfter) {
                 return {
-                    showBookmark: true,
+                    showBookmark: bookmark,
                     showEdit: false,
                     showArchive: false,
                     showShare: share,
@@ -724,9 +724,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 };
             }
             return {
-                showBookmark: true,
+                showBookmark: bookmark,
                 showEdit: true,
-                showArchive: true,
+                showArchive: archive,
                 showShare: share,
                 showRestore: restore,
                 showMagic: false,
@@ -836,15 +836,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         translateX.value = withTiming(0, { duration: 250 });
         translateY.value = withTiming(0, { duration: 250 });
         setIsZoomed(false);
-
-        // Mark new current image as loading when switching
-        setImageLoadingStates((prev) => {
-            const newMap = new Map(prev);
-            if (!newMap.has(currentIndex)) {
-                newMap.set(currentIndex, true);
-            }
-            return newMap;
-        });
 
         // Immediately scroll thumbnail to center - instant with no animation
         scrollThumbnailToIndex(currentIndex);
@@ -994,12 +985,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }, [imageUrlToBookmarkMap, visible]);
 
     // Initialize loading states when modal opens or images change
+    // Main images: no loading state (no white skeleton on open) – only thumbnails show loading
     React.useEffect(() => {
         if (visible) {
             const initialLoadingStates = new Map<number, boolean>();
             const initialThumbnailLoadingStates = new Map<string, boolean>();
             imagesList.forEach((imageUri, index) => {
-                initialLoadingStates.set(index, true);
+                initialLoadingStates.set(index, false);
                 initialThumbnailLoadingStates.set(imageUri, true);
             });
             setImageLoadingStates(initialLoadingStates);
@@ -1305,13 +1297,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
     };
 
-    const handleImageLoadStart = (index: number) => {
-        // Mark image as loading
-        setImageLoadingStates((prev) => {
-            const newMap = new Map(prev);
-            newMap.set(index, true);
-            return newMap;
-        });
+    const handleImageLoadStart = (_index: number) => {
+        // No loading state on main image – only thumbnails show loading
     };
 
     const handleImageError = (index: number) => {
@@ -1534,7 +1521,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const imageSize = imageSizes[index] || { width: width, height: height };
         const gestures = createGestures(index);
         const isCurrentImage = index === displayIndex;
-        const isLoading = imageLoadingStates.get(index) ?? true; // Default to loading
+        const isLoading = imageLoadingStates.get(index) ?? false; // No loading on main image – only thumbnails
 
         return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
     };
