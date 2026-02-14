@@ -79,15 +79,23 @@ const ADJUSTMENT_OPTIONS: AdjustmentOption[] = [
     { id: "shadows", name: "SHADOWS", icon: "moon.fill", value: 0, min: -100, max: 100, defaultValue: 0 },
 ];
 
-export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel }) => {
-    const [selectedAdjustment, setSelectedAdjustment] = useState<string>("exposure");
-    const [adjustmentValues, setAdjustmentValues] = useState<Record<string, number>>(() => {
-        const initial: Record<string, number> = {};
-        ADJUSTMENT_OPTIONS.forEach((opt) => {
-            initial[opt.id] = opt.defaultValue;
-        });
-        return initial;
+function mergeAdjustmentState(saved: AdjustChange | null | undefined): Record<string, number> {
+    const initial: Record<string, number> = {};
+    ADJUSTMENT_OPTIONS.forEach((opt) => {
+        initial[opt.id] = opt.defaultValue;
     });
+    if (saved && typeof saved === "object") {
+        ADJUSTMENT_OPTIONS.forEach((opt) => {
+            const v = (saved as Record<string, number>)[opt.id];
+            if (v !== undefined && typeof v === "number") initial[opt.id] = v;
+        });
+    }
+    return initial;
+}
+
+export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel, initialAdjustmentValues }) => {
+    const [selectedAdjustment, setSelectedAdjustment] = useState<string>("exposure");
+    const [adjustmentValues, setAdjustmentValues] = useState<Record<string, number>>(() => mergeAdjustmentState(initialAdjustmentValues));
     const [sliderWidth, setSliderWidth] = useState(0);
     const [isSliderActive, setIsSliderActive] = useState(false);
     const fadeAnim = React.useRef(new Animated.Value(1)).current;
@@ -99,6 +107,12 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel 
 
     const currentAdjustment = ADJUSTMENT_OPTIONS.find((opt) => opt.id === selectedAdjustment);
     const currentValue = adjustmentValues[selectedAdjustment] || 0;
+
+    // Sync sliders when parent passes saved adjustment values (e.g. reopening edited image)
+    React.useEffect(() => {
+        const next = mergeAdjustmentState(initialAdjustmentValues);
+        setAdjustmentValues(next);
+    }, [initialAdjustmentValues]);
 
     // Update slider position when adjustment changes
     React.useEffect(() => {

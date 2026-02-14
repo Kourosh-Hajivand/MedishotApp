@@ -1,5 +1,6 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import IOSPhoneInput from "@/components/input/IOSPhoneInput";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
@@ -261,10 +262,14 @@ export default function EditPracticeScreen() {
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
                         )}
                         {isUploading ? (
-                            <View></View>
+                            <View style={styles.plusButton}><ActivityIndicator size="small" color={colors.system.white} /></View>
                         ) : (
                             <View style={styles.plusButton}>
-                                <PlusIcon width={14} height={14} strokeWidth={0} />
+                                {localImageUri || practice?.image?.url ? (
+                                    <IconSymbol name="pencil" size={14} color={colors.system.white} />
+                                ) : (
+                                    <PlusIcon width={14} height={14} strokeWidth={0} />
+                                )}
                             </View>
                         )}
                     </View>

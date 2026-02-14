@@ -188,8 +188,8 @@ const MediaService = {
         try {
             const formData = new FormData();
             formData.append("media", payload.media);
-            if (payload.notes != null && payload.notes.length > 0) {
-                formData.append("notes", JSON.stringify(payload.notes));
+            if (payload.notes != null && (typeof payload.notes === "string" ? payload.notes !== "" : payload.notes.length > 0)) {
+                formData.append("notes", typeof payload.notes === "string" ? payload.notes : JSON.stringify(payload.notes));
             }
             if (payload.data != null && payload.data !== "") {
                 formData.append("data", typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data));

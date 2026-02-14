@@ -1,5 +1,6 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { Address, DynamicFieldItem, DynamicInputConfig, FieldLabel } from "@/models";
 import { AddressLabel, DynamicFieldType, PhoneLabel, URLLabel } from "@/models/enums";
@@ -337,10 +338,14 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
                         )}
                         {isUploading ? (
-                            <View></View>
+                            <View style={styles.plusButton}><ActivityIndicator size="small" color={colors.system.white} /></View>
                         ) : (
                             <View style={styles.plusButton}>
-                                <PlusIcon width={14} height={14} strokeWidth={0} />
+                                {displaySelectedImage ? (
+                                    <IconSymbol name="pencil" size={14} color={colors.system.white} />
+                                ) : (
+                                    <PlusIcon width={14} height={14} strokeWidth={0} />
+                                )}
                             </View>
                         )}
                     </View>

@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { AvatarIcon, PlusIcon } from "../../assets/icons";
 import { BaseText, ControlledInput, ImagePickerWrapper, KeyboardAwareScrollView } from "../../components";
+import { IconSymbol } from "../../components/ui/icon-symbol";
 import IOSPhoneInput from "../../components/input/IOSPhoneInput";
 import { QueryKeys } from "../../models/enums";
 import { spacing } from "../../styles/spaces";
@@ -235,7 +236,7 @@ export const CreatePracticeScreen: React.FC = () => {
                 <ImagePickerWrapper onImageSelected={handleImageSelected}>
                     <View style={styles.avatarWrapper}>
                         {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.avatarImage} /> : <AvatarIcon width={50} height={50} strokeWidth={0} />}
-                        <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
+                        <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={colors.system.white} /> : selectedImage ? <IconSymbol name="pencil" size={14} color={colors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>
                     </View>
                 </ImagePickerWrapper>
                 <View style={styles.titleContainer}>
@@ -261,7 +262,7 @@ export const CreatePracticeScreen: React.FC = () => {
                     { name: "street", label: "Street", ref: streetRef, returnKeyType: "next" as const, onSubmitEditing: () => addressRef.current?.focus() },
                     { name: "address", label: "City, State", ref: addressRef, returnKeyType: "done" as const, onSubmitEditing: () => Keyboard.dismiss() },
                 ].map((f, i) => (
-                    <View key={f.name} style={[styles.formRow, i === 7 ? { borderBottomWidth: 0 } : {}]}>
+                    <View key={f.name} style={[styles.formRow, i === 8 ? { borderBottomWidth: 0 } : {}]}>
                         <BaseText type="Body" weight="500" color="system.black" style={styles.label}>
                             {f.label}
                         </BaseText>

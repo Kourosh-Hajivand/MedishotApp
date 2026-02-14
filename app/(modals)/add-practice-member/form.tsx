@@ -1,5 +1,6 @@
 import { AvatarIcon, PlusIcon } from "@/assets/icons";
 import { BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "@/components";
+import { IconSymbol } from "@/components/ui/icon-symbol";
 import { ControlledPickerInput } from "@/components/input/ControlledPickerInput";
 import { DynamicFieldItem, DynamicInputConfig } from "@/models";
 import { AddressLabel, DynamicFieldType, EmailLabel, PhoneLabel, URLLabel } from "@/models/enums";
@@ -177,6 +178,7 @@ export default function AddPracticeMemberForm() {
         control,
         handleSubmit,
         watch,
+        trigger,
         formState: { errors },
         setValue,
         getValues,
@@ -205,7 +207,7 @@ export default function AddPracticeMemberForm() {
     const firstName = watch("first_name");
     const lastName = watch("last_name");
 
-    // Validation: require at least 1 phone OR 1 address (not both required, but at least one)
+    // Validation: create mode requires at least 1 phone; email is required in form fields above
     const hasValidPhone = useMemo(() => {
         return phones.some((phone) => {
             if (!phone?.value) return false;
@@ -220,7 +222,6 @@ export default function AddPracticeMemberForm() {
             if (!address.value) return false;
             if (typeof address.value === "object") {
                 const addr = address.value as AddressValue;
-                // Require at least street1 or city to be filled
                 const hasStreet = (addr.street1?.trim() || "") !== "";
                 const hasCity = (addr.city?.trim() || "") !== "";
                 return hasStreet || hasCity;
@@ -234,8 +235,8 @@ export default function AddPracticeMemberForm() {
         if (isEditMode) {
             return baseValid;
         }
-        // Create mode: require phone OR address (at least one)
-        return baseValid && (hasValidPhone || hasValidAddress);
+        // Create mode: require at least one phone and one address; email is required by form
+        return baseValid && hasValidPhone && hasValidAddress;
     }, [firstName, lastName, isEditMode, hasValidPhone, hasValidAddress]);
 
     // Set form values when member data is available (edit mode)
@@ -331,51 +332,59 @@ export default function AddPracticeMemberForm() {
         [isEditMode, memberData, updateMemberRole, addMember, practiceId, phones, emails, addresses, urls, uploadedFilename],
     );
 
-    const handleSubmitWithValidation = React.useCallback(() => {
-        // First, let react-hook-form validate the form fields (first_name, last_name, email, etc.)
-        // handleSubmit will only call onSubmit if form validation passes
-        handleSubmit((data) => {
-            // After form validation passes, check phone/address for create mode
-            if (!isEditMode) {
-                const currentPhones = phonesRef.current;
-                const currentAddresses = addressesRef.current;
+    const handleSubmitWithValidation = React.useCallback(async () => {
+        // Create mode: validate all required fields (first name, last name, email, phone, address) so errors show under the fields
+        if (!isEditMode) {
+            const values = getValues();
+            const firstNameVal = (values.first_name ?? "").trim();
+            const lastNameVal = (values.last_name ?? "").trim();
+            const emailVal = (values.email ?? "").trim();
+            const hasFirstName = firstNameVal !== "";
+            const hasLastName = lastNameVal !== "";
+            const hasValidEmail = emailVal !== "" && emailVal.includes("@");
 
-                const hasPhone = currentPhones.some((p) => {
-                    if (!p?.value) return false;
-                    const valueStr = String(p.value).trim();
-                    if (valueStr === "" || valueStr === "+1") return false;
-                    return !!toE164(valueStr);
-                });
-
-                const hasAddress = currentAddresses.some((a) => {
-                    if (!a?.value) return false;
-                    if (typeof a.value === "object") {
-                        const addr = a.value as AddressValue;
-                        return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
-                    }
-                    return typeof a.value === "string" && a.value.trim() !== "";
-                });
-
-                if (!hasPhone && !hasAddress) {
-                    const missing: string[] = [];
-                    if (!hasPhone) missing.push("a valid phone number");
-                    if (!hasAddress) missing.push("an address (street or city)");
-                    Alert.alert("Required Fields", `Please provide at least ${missing.join(" or ")}.`);
-                    // Set error messages
-                    if (!hasPhone) setPhoneError("A valid phone number is required");
-                    if (!hasAddress) setAddressError("An address with at least a street or city is required");
-                    return;
+            const currentPhones = phonesRef.current;
+            const currentAddresses = addressesRef.current;
+            const hasPhone = currentPhones.some((p) => {
+                if (!p?.value) return false;
+                const valueStr = String(p.value).trim();
+                if (valueStr === "" || valueStr === "+1") return false;
+                return !!toE164(valueStr);
+            });
+            const hasAddress = currentAddresses.some((a) => {
+                if (!a?.value) return false;
+                if (typeof a.value === "object") {
+                    const addr = a.value as AddressValue;
+                    return (addr.street1?.trim() || "") !== "" || (addr.city?.trim() || "") !== "";
                 }
+                return typeof a.value === "string" && a.value.trim() !== "";
+            });
 
-                // Clear errors if valid
-                setPhoneError("");
-                setAddressError("");
+            const missing: string[] = [];
+            if (!hasFirstName) missing.push("First Name");
+            if (!hasLastName) missing.push("Last Name");
+            if (!hasValidEmail) missing.push("Email Address");
+            if (!hasPhone) missing.push("at least one valid phone number");
+            if (!hasAddress) missing.push("at least one address (street or city)");
+
+            if (missing.length > 0) {
+                // Run form validation so errors show under First Name / Last Name / Email
+                await trigger(["first_name", "last_name", "email"]);
+                if (!hasPhone) setPhoneError("At least one valid phone number is required");
+                else setPhoneError("");
+                if (!hasAddress) setAddressError("At least one address with street or city is required");
+                else setAddressError("");
+                Alert.alert("Required Fields", `Please fill in all required fields: ${missing.join(", ")}.`);
+                return;
             }
 
-            // Call the original onSubmit
-            onSubmit(data);
-        })();
-    }, [isEditMode, handleSubmit, onSubmit]);
+            setPhoneError("");
+            setAddressError("");
+        }
+
+        // Then validate form fields (zod) and submit
+        handleSubmit(onSubmit)();
+    }, [isEditMode, getValues, trigger, handleSubmit, onSubmit]);
 
     useEffect(() => {
         if (isEditMode || filteredRoleOptions.length === 0) return;
@@ -421,7 +430,17 @@ export default function AddPracticeMemberForm() {
                             // Show default avatar when no image
                             <AvatarIcon width={50} height={50} strokeWidth={0} />
                         )}
-                        {!isEditMode && <View style={styles.plusButton}>{isUploading ? <ActivityIndicator size="small" color={themeColors.system.white} /> : <PlusIcon width={14} height={14} strokeWidth={0} />}</View>}
+                        {!isEditMode && (
+                            <View style={styles.plusButton}>
+                                {isUploading ? (
+                                    <ActivityIndicator size="small" color={themeColors.system.white} />
+                                ) : localImageUri || memberData?.image?.url ? (
+                                    <IconSymbol name="pencil" size={14} color={themeColors.system.white} />
+                                ) : (
+                                    <PlusIcon width={14} height={14} strokeWidth={0} />
+                                )}
+                            </View>
+                        )}
                     </View>
                 </ImagePickerWrapper>
                 <View style={styles.titleContainer}>
@@ -437,7 +456,7 @@ export default function AddPracticeMemberForm() {
             <View className="gap-4">
                 <View className="bg-white rounded-2xl px-4">
                     <View className="border-b border-border">
-                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} disabled={isEditMode} />۹
+                        <ControlledInput control={control} name="first_name" label="First Name" haveBorder={false} error={errors.first_name?.message} disabled={isEditMode} />
                     </View>
                     <View className="border-b border-border">
                         <ControlledInput control={control} name="last_name" label="Last Name" haveBorder={false} error={errors.last_name?.message} disabled={isEditMode} />

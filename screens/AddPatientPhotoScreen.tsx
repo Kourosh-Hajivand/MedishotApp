@@ -19,6 +19,7 @@ import { ActivityIndicator, Alert, Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 import { BaseButton, BaseText, ControlledInput, DynamicInputList, ImagePickerWrapper, KeyboardAwareScrollView } from "../components";
+import { IconSymbol } from "../components/ui/icon-symbol";
 const schema = z.object({
     first_name: z.string().min(1, "First Name is required."),
     last_name: z.string().min(1, "Last Name is required."),
@@ -769,12 +770,26 @@ export const AddPatientPhotoScreen: React.FC = () => {
                 // Set error messages for dynamic fields
                 if (!hasValidPhone) {
                     setPhoneError("A valid phone number is required");
-                }
+                } else setPhoneError("");
                 if (!hasValidEmail) {
                     setEmailError("A valid email address is required (e.g. name@example.com)");
-                }
+                } else setEmailError("");
                 if (!hasValidAddress) {
                     setAddressError("An address with at least a street or city is required");
+                } else setAddressError("");
+                const missing: string[] = [];
+                if (firstName?.trim() === "") missing.push("First Name");
+                if (lastName?.trim() === "") missing.push("Last Name");
+                if (!hasValidPhone) missing.push("at least one phone number");
+                if (!hasValidEmail) missing.push("at least one email");
+                if (!hasValidAddress) missing.push("at least one address");
+                Alert.alert("Required Fields", `Please fill in all required fields: ${missing.join(", ")}.`);
+            } else {
+                const missing: string[] = [];
+                if (firstName?.trim() === "") missing.push("First Name");
+                if (lastName?.trim() === "") missing.push("Last Name");
+                if (missing.length > 0) {
+                    Alert.alert("Required Fields", `Please fill in: ${missing.join(", ")}.`);
                 }
             }
             return;
@@ -908,7 +923,14 @@ export const AddPatientPhotoScreen: React.FC = () => {
 
                             <View className="w-full items-center justify-center  ">
                                 <View className="w-fit">
-                                    <BaseButton label="Pick a Photo" ButtonStyle="Tinted" size="Small" rounded={true} style={{ pointerEvents: "none" }} />
+                                    <BaseButton
+                                        label={displaySelectedImage ? "Edit Photo" : "Pick a Photo"}
+                                        leftIcon={displaySelectedImage ? <IconSymbol name="pencil" size={14} color={colors.system.blue} /> : <IconSymbol name="plus" size={14} color={colors.system.blue} />}
+                                        ButtonStyle="Tinted"
+                                        size="Small"
+                                        rounded={true}
+                                        style={{ pointerEvents: "none" }}
+                                    />
                                 </View>
                             </View>
                         </View>

@@ -1,12 +1,11 @@
-import { CameraIcon, GalleryWideIcon } from "@/assets/icons";
 import colors from "@/theme/colors.shared";
 import * as ImagePicker from "expo-image-picker";
 import React, { useCallback, useState } from "react";
 import { Alert, Animated, Keyboard, Modal, Pressable, StyleSheet, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { spacing } from "../styles/spaces";
-import BaseButton from "./button/BaseButton";
 import { BaseText } from "./text/BaseText";
+import { IconSymbol } from "./ui/icon-symbol.ios";
 
 type Props = {
     onImageSelected?: (result: { uri: string; base64?: string | null }) => void;
@@ -101,9 +100,19 @@ export default function ImagePickerWrapper({ onImageSelected, children, disabled
                             <BaseText type="Title3" weight="600" color="system.black" className="w-full">
                                 Select Image
                             </BaseText>
-                            <View className="w-full gap-3 mt-4">
-                                <BaseButton label="Take Photo" leftIcon={<CameraIcon width={20} height={20} color={colors.system.blue} />} onPress={takePhoto} ButtonStyle="Plain" className="!justify-start" />
-                                <BaseButton label="Choose from Gallery" leftIcon={<GalleryWideIcon width={20} height={20} color={colors.system.blue} />} onPress={pickImage} ButtonStyle="Plain" className="!justify-start" />
+                            <View style={styles.actions}>
+                                <TouchableOpacity style={styles.optionButton} onPress={takePhoto} activeOpacity={0.7}>
+                                    <IconSymbol name="camera" size={22} color={colors.system.black} />
+                                    <BaseText type="Body" color="labels.primary" weight="400">
+                                        Take Photo
+                                    </BaseText>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.optionButton} onPress={pickImage} activeOpacity={0.7}>
+                                    <IconSymbol name="photo" size={22} color={colors.system.black} />
+                                    <BaseText type="Body" color="labels.primary" weight="400">
+                                        Choose from Gallery
+                                    </BaseText>
+                                </TouchableOpacity>
                             </View>
                         </View>
                     </Animated.View>
@@ -139,5 +148,19 @@ const styles = StyleSheet.create({
     sheetContent: {
         paddingHorizontal: spacing["5"],
         paddingVertical: spacing["4"],
+    },
+    actions: {
+        width: "100%",
+        gap: 8,
+        marginTop: spacing["4"],
+    },
+    optionButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        borderRadius: 12,
+        backgroundColor: "#f5f5f5",
     },
 });

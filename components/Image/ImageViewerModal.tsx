@@ -1,6 +1,6 @@
 import type { PracticeSettings } from "@/components";
 import { PracticeDocumentFooter, PracticeDocumentHeader } from "@/components";
-import { ImageEditorModal } from "@/components/ImageEditor";
+import { ImageEditorModal, parseEditorStateFromMediaData } from "@/components/ImageEditor";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
@@ -593,6 +593,55 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             imageUrlToHideTakeAfterMap: hideTakeAfterMap,
             imageUrlToOriginalNoBeforeAfterMap: originalNoBeforeAfterMap,
         };
+    }, [rawMediaData]);
+
+    // Map image URL -> editor state (from media.data) for restoring edits when opening editor
+    const imageUrlToEditorStateMapInternal = React.useMemo(() => {
+        const map = new Map<string, ReturnType<typeof parseEditorStateFromMediaData>>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            const data = (media as { data?: unknown }).data;
+            const editorState = parseEditorStateFromMediaData(data);
+            if (!editorState) return;
+
+            if (media.original_media?.url) {
+                map.set(media.original_media.url, editorState);
+            }
+            if (media.images?.length) {
+                media.images.forEach((img: { image?: { url?: string } }) => {
+                    if (img.image?.url) map.set(img.image.url, editorState);
+                });
+            }
+            const simpleMedia = media as { media?: { url?: string } };
+            if (simpleMedia.media?.url) {
+                map.set(simpleMedia.media.url, editorState);
+            }
+        });
+
+        return map;
+    }, [rawMediaData]);
+
+    const imageUrlToOriginalUriMapInternal = React.useMemo(() => {
+        const map = new Map<string, string>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            const orig = media.original_media?.url ?? (media as { media?: { url?: string } }).media?.url;
+            if (media.original_media?.url) map.set(media.original_media.url, media.original_media.url);
+            const withEdited = media as { edited_media?: { url?: string } };
+            if (withEdited.edited_media?.url && orig) map.set(withEdited.edited_media.url, orig);
+            if (media.images?.length) {
+                media.images.forEach((img: { image?: { url?: string }; edited_image?: { url?: string } }) => {
+                    if (img.image?.url) map.set(img.image.url, orig ?? img.image.url);
+                    if (img.edited_image?.url) map.set(img.edited_image.url, orig ?? img.image?.url ?? img.edited_image.url);
+                });
+            }
+            const simpleMedia = media as { media?: { url?: string } };
+            if (simpleMedia.media?.url) map.set(simpleMedia.media.url, orig ?? simpleMedia.media.url);
+        });
+
+        return map;
     }, [rawMediaData]);
 
     // Merge taker maps (rawMediaData takes precedence)
@@ -1906,7 +1955,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 )}
             </GestureHandlerRootView>
 
-            <ImageEditorModal visible={imageEditorVisible} uri={imageEditorUri} initialTool={imageEditorTool} onClose={() => setImageEditorVisible(false)} />
+            <ImageEditorModal
+                visible={imageEditorVisible}
+                uri={imageEditorUri}
+                originalUri={imageEditorUri ? imageUrlToOriginalUriMapInternal.get(imageEditorUri) : undefined}
+                initialTool={imageEditorTool}
+                mediaId={imageEditorUri ? imageUrlToMediaIdMapInternal.get(imageEditorUri) : undefined}
+                initialEditorState={imageEditorUri ? imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined : undefined}
+                onClose={() => setImageEditorVisible(false)}
+            />
         </Modal>
     );
 };

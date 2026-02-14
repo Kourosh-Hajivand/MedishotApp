@@ -272,7 +272,8 @@ export interface EditPatientMediaNote {
 
 export interface EditPatientMediaRequest {
     media: File | string; // File or Livewire temp filename
-    notes?: EditPatientMediaNote[];
+    /** Notes: array or already JSON-encoded string for backend */
+    notes?: EditPatientMediaNote[] | string;
     data?: string; // JSON string, e.g. { editor: { adjustments, notes, penStrokes, magic } }
 }
 

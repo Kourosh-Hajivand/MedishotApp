@@ -5,6 +5,7 @@ import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
 import { useEditPatientMedia, useTempUpload } from "@/utils/hook/useMedia";
+import { EditPatientMediaRequest } from "@/utils/service/models/RequestModels";
 import { Button, Host, Text } from "@expo/ui/swift-ui";
 import axios from "axios";
 import { BlurView } from "expo-blur";
@@ -23,6 +24,45 @@ const { width, height } = Dimensions.get("window");
 const CANVAS_MAX_WIDTH = width;
 const CANVAS_MAX_HEIGHT = height * 0.55;
 const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+
+const SNAPSHOT_PRECISION = 4;
+function roundForSnapshot(n: number): number {
+    return Math.round(n * 10 ** SNAPSHOT_PRECISION) / 10 ** SNAPSHOT_PRECISION;
+}
+
+/** Normalize editor state so comparison is stable (rounded numbers, sorted keys). */
+function normalizeEditorSnapshot(state: EditorState): string {
+    const o: Record<string, unknown> = {};
+    if (state.editorVersion != null) o.editorVersion = state.editorVersion;
+    if (state.adjustments != null && typeof state.adjustments === "object") {
+        const adj: Record<string, number> = {};
+        Object.keys(state.adjustments)
+            .sort()
+            .forEach((k) => {
+                const v = (state.adjustments as Record<string, number>)[k];
+                if (typeof v === "number") adj[k] = roundForSnapshot(v);
+            });
+        o.adjustments = adj;
+    }
+    if (state.notes != null && state.notes.length > 0) {
+        const notesList = state.notes.map((n) => ({ id: n.id, x: roundForSnapshot(n.x), y: roundForSnapshot(n.y), text: n.text }));
+        notesList.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        o.notes = notesList;
+    }
+    if (state.penStrokes != null && state.penStrokes.length > 0) {
+        const strokes = state.penStrokes.map((s) => ({
+            id: s.id,
+            path: s.path.map((p) => ({ x: roundForSnapshot(p.x), y: roundForSnapshot(p.y) })),
+            color: s.color,
+            width: roundForSnapshot(s.width),
+        }));
+        strokes.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        o.penStrokes = strokes;
+    }
+    if (state.magic != null) o.magic = state.magic;
+    if (state.lastActiveTool != null) o.lastActiveTool = state.lastActiveTool;
+    return JSON.stringify(o);
+}
 
 // Debug Overlay Component
 type DebugOverlayProps = {
@@ -438,6 +478,8 @@ const NoteMarker: React.FC<{
 interface ImageEditorModalProps {
     visible: boolean;
     uri?: string;
+    /** When opening edited media, pass original image URL so Revert can restore it */
+    originalUri?: string;
     initialTool?: string;
     mediaId?: number | string;
     patientId?: number | string;
@@ -446,7 +488,7 @@ interface ImageEditorModalProps {
     onSaveSuccess?: () => void;
 }
 
-export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, initialTool, mediaId, patientId, initialEditorState, onClose, onSaveSuccess }) => {
+export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, patientId, initialEditorState, onClose, onSaveSuccess }) => {
     const [activeTool, setActiveTool] = useState(initialTool || "Magic");
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
@@ -477,6 +519,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [isSaving, setIsSaving] = useState(false);
     const hasRequestedRef = useRef(false);
     const exportViewRef = useRef<ViewShot | null>(null);
+    const pendingNormalizedPenStrokesRef = useRef<EditorState["penStrokes"]>(null);
+    const savedEditorSnapshotRef = useRef<string | null>(null);
 
     // Pen tool states
     const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
@@ -787,19 +831,30 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 setPenStrokesHistory([[]]);
                 setPenHistoryIndex(0);
                 setMagicSelection(null);
+                pendingNormalizedPenStrokesRef.current = null;
+                savedEditorSnapshotRef.current = null;
             }
-            if (initialTool) setActiveTool(initialTool);
+            if (initialEditorState?.lastActiveTool) setActiveTool(initialEditorState.lastActiveTool);
+            else if (initialTool) setActiveTool(initialTool);
         }
     }, [uri, initialTool, visible, initialEditorState]);
 
     useEffect(() => {
-        if (!visible || !initialEditorState) return;
+        if (!visible || !initialEditorState) {
+            if (!visible) savedEditorSnapshotRef.current = null;
+            return;
+        }
+        savedEditorSnapshotRef.current = normalizeEditorSnapshot(initialEditorState);
         if (initialEditorState.adjustments != null) setAdjustmentValues(initialEditorState.adjustments);
         if (initialEditorState.notes?.length) setNotes(initialEditorState.notes as Note[]);
         if (initialEditorState.penStrokes?.length) {
-            setPenStrokes(initialEditorState.penStrokes as Stroke[]);
-            setPenStrokesHistory([[], initialEditorState.penStrokes as Stroke[]]);
-            setPenHistoryIndex(1);
+            if (initialEditorState.editorVersion === 1) {
+                pendingNormalizedPenStrokesRef.current = initialEditorState.penStrokes;
+            } else {
+                setPenStrokes(initialEditorState.penStrokes as Stroke[]);
+                setPenStrokesHistory([[], initialEditorState.penStrokes as Stroke[]]);
+                setPenHistoryIndex(1);
+            }
         }
         if (initialEditorState.magic) {
             setMagicSelection({
@@ -809,6 +864,26 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             });
         }
     }, [visible, initialEditorState]);
+
+    useEffect(() => {
+        const pending = pendingNormalizedPenStrokesRef.current;
+        const w = imageContainerLayout.width;
+        const h = imageContainerLayout.height;
+        if (!visible || !pending?.length || w <= 0 || h <= 0) return;
+        const inPixels: Stroke[] = pending.map((s) => ({
+            id: s.id,
+            path: s.path.map((p) => ({
+                x: roundForSnapshot(p.x) * w,
+                y: roundForSnapshot(p.y) * h,
+            })),
+            color: s.color,
+            width: s.width,
+        }));
+        pendingNormalizedPenStrokesRef.current = null;
+        setPenStrokes(inPixels);
+        setPenStrokesHistory([[], inPixels]);
+        setPenHistoryIndex(1);
+    }, [visible, imageContainerLayout.width, imageContainerLayout.height]);
 
     // Get image dimensions and calculate aspect ratio (fallback if onLoad doesn't fire)
     useEffect(() => {
@@ -909,6 +984,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
     const handleDone = useCallback(async () => {
         if (!mediaId) {
+            Alert.alert("Cannot save", "This image is not linked to patient media. Closing without saving.");
             onClose();
             return;
         }
@@ -920,6 +996,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         }
         setIsSaving(true);
         try {
+            // Wait for view to be fully painted (hidden view used to capture blank; capturing visible view needs one frame + paint)
+            await new Promise<void>((r) => requestAnimationFrame(() => r()));
+            await new Promise<void>((r) => setTimeout(r, 200));
+
             const uriOut = await captureRef(exportViewRef.current, {
                 format: "jpg",
                 quality: 0.95,
@@ -931,20 +1011,33 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             if (!filename) throw new Error("Temp upload did not return filename");
 
             const apiNotes = notes.filter((n) => n.text.trim()).map((n) => ({ text: n.text.trim(), x: n.x * w, y: n.y * h }));
+            // Normalize pen paths (0–1), rounded for stable restore and comparison
+            const normalizedPenStrokes =
+                penStrokes.length && w > 0 && h > 0
+                    ? penStrokes.map((s) => ({
+                          id: s.id,
+                          path: s.path.map((p) => ({
+                              x: roundForSnapshot(p.x / w),
+                              y: roundForSnapshot(p.y / h),
+                          })),
+                          color: s.color,
+                          width: s.width,
+                      }))
+                    : undefined;
             const editor: EditorState = {
+                editorVersion: 1,
                 adjustments: adjustmentValues ?? undefined,
                 notes: notes.length ? notes : undefined,
-                penStrokes: penStrokes.length ? penStrokes : undefined,
+                penStrokes: normalizedPenStrokes,
                 magic: magicSelection ? { modeKey: magicSelection.modeKey, resultType: magicSelection.resultType } : undefined,
+                lastActiveTool: activeTool,
             };
-            const payload = {
-                mediaId,
-                data: {
-                    media: filename,
-                    notes: apiNotes.length ? apiNotes : undefined,
-                    data: JSON.stringify({ editor }),
-                },
+            const requestData: EditPatientMediaRequest = {
+                media: filename,
+                notes: apiNotes.length ? JSON.stringify(apiNotes) : undefined,
+                data: JSON.stringify({ editor }),
             };
+            const payload = { mediaId, data: requestData };
             console.log("📤 [ImageEditor] ارسال به بک‌اند:", JSON.stringify(payload, null, 2));
             await editPatientMediaAsync(payload);
             onSaveSuccess?.();
@@ -955,7 +1048,80 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         } finally {
             setIsSaving(false);
         }
-    }, [mediaId, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
+    }, [mediaId, activeTool, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
+
+    const currentEditorSnapshot = useMemo(() => {
+        const w = imageContainerLayout.width;
+        const h = imageContainerLayout.height;
+        const normalizedPenStrokes =
+            penStrokes.length && w > 0 && h > 0
+                ? penStrokes.map((s) => ({
+                      id: s.id,
+                      path: s.path.map((p) => ({
+                          x: roundForSnapshot(p.x / w),
+                          y: roundForSnapshot(p.y / h),
+                      })),
+                      color: s.color,
+                      width: s.width,
+                  }))
+                : undefined;
+        const state: EditorState = {
+            editorVersion: 1,
+            adjustments: adjustmentValues ?? undefined,
+            notes: notes.length ? notes : undefined,
+            penStrokes: normalizedPenStrokes,
+            magic: magicSelection ? { modeKey: magicSelection.modeKey, resultType: magicSelection.resultType } : undefined,
+            lastActiveTool: activeTool,
+        };
+        return normalizeEditorSnapshot(state);
+    }, [imageContainerLayout.width, imageContainerLayout.height, adjustmentValues, notes, penStrokes, magicSelection, activeTool]);
+
+    const hasUnsavedChanges = savedEditorSnapshotRef.current === null || currentEditorSnapshot !== savedEditorSnapshotRef.current;
+
+    const handleRevert = useCallback(async () => {
+        if (!mediaId) {
+            onClose();
+            return;
+        }
+        const uriToShow = originalUri ?? uri ?? null;
+        setAdjustmentValues(null);
+        setNotes([]);
+        setPenStrokes([]);
+        setPenStrokesHistory([[]]);
+        setPenHistoryIndex(0);
+        setMagicSelection(null);
+        setDisplayedImageUri(uriToShow);
+        setOriginalImageUri(uriToShow);
+        savedEditorSnapshotRef.current = null;
+
+        if (!uriToShow || !uriToShow.startsWith("http")) {
+            onSaveSuccess?.();
+            onClose();
+            return;
+        }
+        setIsSaving(true);
+        try {
+            const fileUri = FileSystem.documentDirectory + `revert-original-${Date.now()}.jpg`;
+            const downloadResult = await FileSystem.downloadAsync(uriToShow, fileUri);
+            if (downloadResult.status !== 200) throw new Error("Failed to download original image");
+            const file = { uri: fileUri, type: "image/jpeg", name: `revert-${Date.now()}.jpg` };
+            const uploadRes = await tempUploadAsync(file);
+            const filename = uploadRes?.filename;
+            if (!filename) throw new Error("Temp upload did not return filename");
+            const requestData: EditPatientMediaRequest = {
+                media: filename,
+                data: JSON.stringify({ editor: { editorVersion: 1 } }),
+            };
+            await editPatientMediaAsync({ mediaId, data: requestData });
+            onSaveSuccess?.();
+            onClose();
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : "Revert failed.";
+            Alert.alert("Error", msg);
+        } finally {
+            setIsSaving(false);
+        }
+    }, [mediaId, originalUri, uri, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
 
     // Calculate dynamic image container style based on aspect ratio
     // Use actual imageWrapper height to fill available space, with smart fallback
@@ -995,7 +1161,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
         switch (activeTool) {
             case "Adjust":
-                return <ToolAdjust {...commonProps} />;
+                return <ToolAdjust {...commonProps} initialAdjustmentValues={adjustmentValues} />;
             // case "Crop":
             //     return <ToolCrop {...commonProps} />; // TODO: not complete yet
             case "Note":
@@ -1035,27 +1201,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     </View>
                 </Modal>
 
-                {/* Hidden Export View for capture (image + adjust + pen only; no notes) */}
-                {imageContainerLayout.width > 0 && imageContainerLayout.height > 0 && (
-                    <ViewShot
-                        ref={exportViewRef}
-                        style={{
-                            position: "absolute",
-                            left: -9999,
-                            width: imageContainerLayout.width,
-                            height: imageContainerLayout.height,
-                            opacity: 0,
-                            overflow: "hidden",
-                            pointerEvents: "none",
-                        }}
-                    >
-                        <View style={{ width: imageContainerLayout.width, height: imageContainerLayout.height, position: "relative" }}>
-                            <FilteredImage source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }} style={StyleSheet.absoluteFill} adjustments={adjustmentValues} />
-                            <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={() => {}} enabled={false} />
-                        </View>
-                    </ViewShot>
-                )}
-
                 <View style={styles.header}>
                     <Host style={{ width: 78, height: 40 }}>
                         <Button variant="bordered" color="#787880" onPress={onClose} disabled={isSaving}>
@@ -1075,9 +1220,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                         </View>
                     )}
 
-                    <Host style={{ width: 65, height: 40 }}>
-                        <Button variant="glassProminent" color="#FFCC00" onPress={handleDone} disabled={isSaving}>
-                            <Text color="black">{isSaving ? "Saving…" : "Done"}</Text>
+                    <Host
+                        style={{
+                            width: isSaving || !hasUnsavedChanges ? 92 : 65,
+                            height: isSaving || !hasUnsavedChanges ? 44 : 40,
+                        }}
+                    >
+                        <Button variant="glassProminent" color={!hasUnsavedChanges ? "#E53935" : "#FFCC00"} onPress={hasUnsavedChanges ? handleDone : handleRevert} disabled={isSaving}>
+                            <Text color={!hasUnsavedChanges ? "white" : "black"}>{isSaving ? "Saving…" : hasUnsavedChanges ? "Done" : "Revert"}</Text>
                         </Button>
                     </Host>
                 </View>
@@ -1099,20 +1249,21 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                     setImageContainerLayout({ width, height, x, y });
                                 }}
                             >
-                                <FilteredImage
-                                    source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }}
-                                    style={styles.image}
-                                    adjustments={adjustmentValues}
-                                    onLoad={(event) => {
-                                        const ratio = event.width / event.height;
-                                        setImageAspectRatio(ratio);
-                                    }}
-                                />
+                                {/* ViewShot wraps only image + pen so capture = exactly what user sees (no note markers in export) */}
+                                <ViewShot ref={exportViewRef} style={[styles.image, { overflow: "hidden" }]} options={{ format: "jpg", quality: 0.95 }}>
+                                    <FilteredImage
+                                        source={{ uri: displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900" }}
+                                        style={StyleSheet.absoluteFill}
+                                        adjustments={adjustmentValues}
+                                        onLoad={(event) => {
+                                            const ratio = event.width / event.height;
+                                            setImageAspectRatio(ratio);
+                                        }}
+                                    />
+                                    <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
+                                </ViewShot>
 
-                                {/* Drawing Canvas for Pen Tool */}
-                                <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
-
-                                {/* Note Markers */}
+                                {/* Note Markers outside ViewShot so they are not in the exported image */}
                                 {activeTool === "Note" &&
                                     notes.map((note, index) => (
                                         <NoteMarker
