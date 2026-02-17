@@ -1034,7 +1034,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             };
             const requestData: EditPatientMediaRequest = {
                 media: filename,
-                notes: apiNotes.length ? JSON.stringify(apiNotes) : undefined,
+                notes: apiNotes.length ? apiNotes : undefined,
                 data: JSON.stringify({ editor }),
             };
             const payload = { mediaId, data: requestData };

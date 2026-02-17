@@ -913,9 +913,11 @@ export default function PatientDetailsScreen() {
                                     actions={{
                                         showBookmark: true,
                                         showEdit: true,
+                                        showNote: true,
                                         showArchive: true,
                                         showShare: true,
                                         showMagic: true,
+                                        showCompare: true,
                                     }}
                                     sections={groupedPatientImages}
                                     imageUrlToMediaIdMap={imageUrlToMediaIdMap}

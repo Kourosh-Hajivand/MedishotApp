@@ -14,7 +14,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
-import { Alert, Dimensions, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Modal, Image as RNImage, Text as RNText, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -52,22 +52,17 @@ function getThumbnailScrollXForPage(currentPage: number, count: number): number 
     const toPos = fromIndex === toIndex ? fromPos : getPos(toIndex);
     const interpolatedPos = fromPos + (toPos - fromPos) * progress;
     const scrollX = interpolatedPos - width / 2;
-    const totalWidth =
-        THUMB_PADDING +
-        count * INACTIVE_THUMB_WIDTH +
-        (count - 1) * THUMB_GAP +
-        ACTIVE_THUMB_MARGIN +
-        (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) +
-        ACTIVE_THUMB_MARGIN +
-        THUMB_PADDING;
+    const totalWidth = THUMB_PADDING + count * INACTIVE_THUMB_WIDTH + (count - 1) * THUMB_GAP + ACTIVE_THUMB_MARGIN + (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) + ACTIVE_THUMB_MARGIN + THUMB_PADDING;
     const maxScroll = Math.max(0, totalWidth - width);
     return Math.max(0, Math.min(scrollX, maxScroll));
 }
 
 import { MINT_COLOR } from "@/app/camera/_components/create-template/constants";
 import { containerSize, iconSize } from "@/constants/theme";
+import { BlurView } from "expo-blur";
 import { IconSymbol } from "../ui/icon-symbol";
 import { ViewerActionsConfig } from "./GalleryWithMenu";
+import { ImageViewerNotesPanel } from "./ImageViewerNotesPanel";
 
 interface MediaItem {
     url: string;
@@ -158,6 +153,8 @@ interface ImageViewerModalProps {
     metadata?: ShareCompositionMetadata | null;
     /** Only show "Take after Template" when true (e.g. only on patient gallery page) */
     enableTakeAfterTemplate?: boolean;
+    /** Callback when note icon is pressed (optional; showNote in actions must be true to show icon) */
+    onNotePress?: (imageUri: string) => void;
 }
 
 interface ThumbnailItemProps {
@@ -404,13 +401,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     patientId,
     imageUrlToPatientIdMap,
     imageUrlToTakerMap,
-    actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true },
+    actions = { showBookmark: true, showEdit: true, showArchive: true, showShare: true, showNote: false },
     rawMediaData,
     description = "taker",
     onRestore,
     practice,
     metadata,
     enableTakeAfterTemplate = false,
+    onNotePress,
 }) => {
     const { profile: me } = useAuth();
     const router = useRouter();
@@ -469,6 +467,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const [imageEditorVisible, setImageEditorVisible] = useState(false);
     const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
     const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
+    const [notesPanelVisible, setNotesPanelVisible] = useState(false);
+    /** Keeps bottom bar layout (pinned + minHeight) during close animation so content slides up smoothly without reflow lag */
+    const [isNotesClosing, setIsNotesClosing] = useState(false);
+    /** Note selected in notes panel / on image markers; syncs panel and overlay */
+    const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
     // Track loading state for each image
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<number, boolean>>(new Map());
     // Track loading state for thumbnail images
@@ -498,6 +501,21 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const dismissTranslateY = useSharedValue(0); // Swipe down to dismiss (iPhone Photos style)
     // Thumbnail strip scroll position - driven on UI thread for perfect sync with image swipe
     const thumbnailScrollX = useSharedValue(getThumbnailScrollXForPage(initialIndex, imagesList.length));
+    // Notes panel: header slides up, bottom bar slides down, X slides into Back position, notes panel slides up
+    const HEADER_SLIDE_UP = 80;
+    const BOTTOM_SLIDE_DOWN = 120;
+    const NOTES_PANEL_SLIDE_UP = 320;
+    const X_BUTTON_SLIDE_OFFSET = 56;
+    /** Height of thumbnail strip + gap + action row when notes closed; keeps bottom bar layout stable */
+    const BOTTOM_BAR_CONTENT_HEIGHT = 130;
+    const bottomBarContentOpacity = useSharedValue(1);
+    const bottomBarContentTranslateY = useSharedValue(0);
+    const notesPanelOpacity = useSharedValue(0);
+    const notesPanelTranslateY = useSharedValue(NOTES_PANEL_SLIDE_UP);
+    const headerContentOpacity = useSharedValue(1);
+    const headerTranslateY = useSharedValue(0);
+    const notesCloseBarOpacity = useSharedValue(0);
+    const notesCloseBarTranslateY = useSharedValue(-X_BUTTON_SLIDE_OFFSET);
 
     // Get current patientId from displayIndex (updates with scroll)
     const currentPatientId = React.useMemo(() => {
@@ -698,9 +716,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [displayIndex, imagesList, imageUrlToHideTakeAfterMap]);
 
-    const showTakeAfterTemplate = Boolean(enableTakeAfterTemplate) && isCurrentImageOriginalMedia && !isCurrentImageHideTakeAfter;
-
-    // Original with no before/after (e.g. id 176): only Share, Take After Template, Bookmark
+    // Original with no before/after (e.g. id 176): show split with + badge for take-after; no archive
     const isCurrentImageOriginalNoBeforeAfter = React.useMemo(() => {
         if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
             const currentImageUrl = imagesList[displayIndex];
@@ -709,34 +725,29 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [displayIndex, imagesList, imageUrlToOriginalNoBeforeAfterMap]);
 
-    // Adjust actions: original with no before/after → Share, Take After, Bookmark (if allowed); original with before/after → split, archive (if allowed), bookmark (if allowed); rest → respect actions
+    // hasAfter = current image already has linked after (split tap → compare); !hasAfter = show + on split, tap → take after
+    const currentImageHasAfter = isCurrentImageHideTakeAfter;
+
+    // Adjust actions: original gets split icon only when showCompare (e.g. patient route); respect showEdit from parent (Album has showEdit: false)
     const effectiveActions = React.useMemo(() => {
-        const { showShare: share = true, showRestore: restore = false, showArchive: archive = true, showBookmark: bookmark = true } = actions;
+        const { showShare: share = true, showRestore: restore = false, showArchive: archive = true, showBookmark: bookmark = true, showNote: note = false, showCompare: compare = false, showEdit: edit = true } = actions;
         if (isCurrentImageOriginalMedia) {
-            if (isCurrentImageOriginalNoBeforeAfter) {
-                return {
-                    showBookmark: bookmark,
-                    showEdit: false,
-                    showArchive: false,
-                    showShare: share,
-                    showRestore: restore,
-                    showMagic: false,
-                };
-            }
             return {
                 showBookmark: bookmark,
-                showEdit: true,
+                showEdit: edit,
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
                 showMagic: false,
+                showNote: note,
+                showCompare: compare,
             };
         }
-        return actions;
+        return { ...actions, showCompare: actions.showCompare ?? false };
     }, [isCurrentImageOriginalMedia, isCurrentImageOriginalNoBeforeAfter, actions]);
 
     // Destructure effective actions (for bottom buttons)
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false } = effectiveActions;
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false, showNote = false, showCompare = false } = effectiveActions;
 
     // Destructure original actions (for more menu - Archive should remain in more menu)
     const { showArchive: showArchiveInMore = true, showEdit: showEditInMore = true, showMagic: showMagicInMore = false } = actions;
@@ -775,11 +786,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         if (!visible) {
             setCurrentIndex(initialIndex);
             setDisplayIndex(initialIndex);
+            setNotesPanelVisible(false);
+            setIsNotesClosing(false);
+            setSelectedNoteId(null);
             currentIndexShared.value = initialIndex;
             scale.value = 1;
             translateX.value = 0;
             translateY.value = 0;
             setIsZoomed(false);
+            // Reset notes panel animation values so next open is correct
+            headerTranslateY.value = 0;
+            headerContentOpacity.value = 1;
+            bottomBarContentTranslateY.value = 0;
+            bottomBarContentOpacity.value = 1;
+            notesCloseBarTranslateY.value = -X_BUTTON_SLIDE_OFFSET;
+            notesCloseBarOpacity.value = 0;
+            notesPanelTranslateY.value = NOTES_PANEL_SLIDE_UP;
+            notesPanelOpacity.value = 0;
         } else {
             setDisplayIndex(initialIndex);
             thumbnailScrollX.value = getThumbnailScrollXForPage(initialIndex, imagesList.length);
@@ -841,49 +864,45 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         scrollThumbnailToIndex(currentIndex);
     }, [currentIndex, scrollThumbnailToIndex]);
 
-    const handleScroll = useAnimatedScrollHandler({
-        onScroll: (event) => {
-            "worklet";
-            if (isProgrammaticScroll.value) return;
-            if (scale.value > 1) return;
+    const handleScroll = useAnimatedScrollHandler(
+        {
+            onScroll: (event) => {
+                "worklet";
+                if (isProgrammaticScroll.value) return;
+                if (scale.value > 1) return;
 
-            const offsetX = event.contentOffset.x;
-            const currentPage = offsetX / IMAGE_PAGE_WIDTH;
-            const count = imagesList.length;
-            if (count <= 0) return;
+                const offsetX = event.contentOffset.x;
+                const currentPage = offsetX / IMAGE_PAGE_WIDTH;
+                const count = imagesList.length;
+                if (count <= 0) return;
 
-            const clampedPage = Math.max(0, Math.min(currentPage, count - 1));
-            const fromIndex = Math.floor(clampedPage);
-            const toIndex = Math.min(Math.ceil(clampedPage), count - 1);
-            const progress = clampedPage - fromIndex;
+                const clampedPage = Math.max(0, Math.min(currentPage, count - 1));
+                const fromIndex = Math.floor(clampedPage);
+                const toIndex = Math.min(Math.ceil(clampedPage), count - 1);
+                const progress = clampedPage - fromIndex;
 
-            // Same math as getThumbnailScrollXForPage - all on UI thread for perfect sync
-            const getPos = (idx: number) => {
-                let pos = THUMB_PADDING;
-                for (let i = 0; i < idx; i++) pos += INACTIVE_THUMB_WIDTH + THUMB_GAP;
-                return pos + ACTIVE_THUMB_MARGIN + ACTIVE_THUMB_WIDTH / 2;
-            };
-            const fromPos = getPos(fromIndex);
-            const toPos = fromIndex === toIndex ? fromPos : getPos(toIndex);
-            const interpolatedPos = fromPos + (toPos - fromPos) * progress;
-            let scrollX = interpolatedPos - width / 2;
-            const totalWidth =
-                THUMB_PADDING +
-                count * INACTIVE_THUMB_WIDTH +
-                (count - 1) * THUMB_GAP +
-                ACTIVE_THUMB_MARGIN +
-                (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) +
-                ACTIVE_THUMB_MARGIN +
-                THUMB_PADDING;
-            const maxScroll = Math.max(0, totalWidth - width);
-            thumbnailScrollX.value = Math.max(0, Math.min(scrollX, maxScroll));
+                // Same math as getThumbnailScrollXForPage - all on UI thread for perfect sync
+                const getPos = (idx: number) => {
+                    let pos = THUMB_PADDING;
+                    for (let i = 0; i < idx; i++) pos += INACTIVE_THUMB_WIDTH + THUMB_GAP;
+                    return pos + ACTIVE_THUMB_MARGIN + ACTIVE_THUMB_WIDTH / 2;
+                };
+                const fromPos = getPos(fromIndex);
+                const toPos = fromIndex === toIndex ? fromPos : getPos(toIndex);
+                const interpolatedPos = fromPos + (toPos - fromPos) * progress;
+                let scrollX = interpolatedPos - width / 2;
+                const totalWidth = THUMB_PADDING + count * INACTIVE_THUMB_WIDTH + (count - 1) * THUMB_GAP + ACTIVE_THUMB_MARGIN + (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH) + ACTIVE_THUMB_MARGIN + THUMB_PADDING;
+                const maxScroll = Math.max(0, totalWidth - width);
+                thumbnailScrollX.value = Math.max(0, Math.min(scrollX, maxScroll));
 
-            const index = Math.round(clampedPage);
-            scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
-            currentIndexShared.value = index;
-            runOnJS(setDisplayIndexFromScroll)(index);
+                const index = Math.round(clampedPage);
+                scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
+                currentIndexShared.value = index;
+                runOnJS(setDisplayIndexFromScroll)(index);
+            },
         },
-    }, [imagesList.length, setDisplayIndexFromScroll]);
+        [imagesList.length, setDisplayIndexFromScroll],
+    );
 
     const handleMomentumScrollEnd = (event: any) => {
         // Don't update if scroll is programmatic
@@ -1016,6 +1035,89 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             bookmarkMedia(mediaId);
         }
     };
+
+    /** Notes from media.data.editor.notes for current image (for notes panel) */
+    const notesForCurrentImage = React.useMemo(() => {
+        const uri = imagesList[displayIndex];
+        if (!uri) return [];
+        const state = imageUrlToEditorStateMapInternal.get(uri);
+        return state?.notes ?? [];
+    }, [displayIndex, imagesList, imageUrlToEditorStateMapInternal]);
+
+    React.useEffect(() => {
+        if (notesPanelVisible && notesForCurrentImage.length > 0) {
+            const firstId = notesForCurrentImage[0]?.id ?? null;
+            setSelectedNoteId((prev) => (notesForCurrentImage.some((n) => n.id === prev) ? prev : firstId));
+        }
+    }, [notesPanelVisible, displayIndex, notesForCurrentImage]);
+
+    const openNotesPanel = React.useCallback(() => {
+        const currentImageUri = imagesList[displayIndex];
+        setNotesPanelVisible(true);
+        const notes = imageUrlToEditorStateMapInternal.get(currentImageUri ?? "")?.notes ?? [];
+        setSelectedNoteId(notes[0]?.id ?? null);
+        onNotePress?.(currentImageUri ?? "");
+    }, [displayIndex, imagesList, imageUrlToEditorStateMapInternal, onNotePress]);
+
+    const handleNotePress = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const duration = 220;
+        const onZoomOutDone = () => {
+            setIsZoomed(false);
+            openNotesPanel();
+        };
+        scale.value = withTiming(1, { duration }, (finished) => {
+            if (finished) runOnJS(onZoomOutDone)();
+        });
+        translateX.value = withTiming(0, { duration });
+        translateY.value = withTiming(0, { duration });
+    };
+
+    // When notes panel opens: header slides up + fades, bottom bar slides down + fades, X slides in, notes panel slides up
+    React.useEffect(() => {
+        if (notesPanelVisible) {
+            headerTranslateY.value = withTiming(-HEADER_SLIDE_UP, { duration: 280 });
+            headerContentOpacity.value = withTiming(0, { duration: 250 });
+            bottomBarContentTranslateY.value = withTiming(BOTTOM_SLIDE_DOWN, { duration: 280 });
+            bottomBarContentOpacity.value = withTiming(0, { duration: 250 });
+            notesCloseBarTranslateY.value = withTiming(0, { duration: 280 });
+            notesCloseBarOpacity.value = withTiming(1, { duration: 250 });
+            notesPanelTranslateY.value = withTiming(0, { duration: 300 });
+            notesPanelOpacity.value = withTiming(1, { duration: 280 });
+        }
+    }, [notesPanelVisible]);
+
+    const handleNotesPanelClose = React.useCallback(() => {
+        setIsNotesClosing(true);
+        // Reset zoom when closing notes so user exits zoom state
+        scale.value = withTiming(1, { duration: 220 });
+        translateX.value = withTiming(0, { duration: 220 });
+        translateY.value = withTiming(0, { duration: 220 });
+        setIsZoomed(false);
+
+        notesPanelTranslateY.value = withTiming(NOTES_PANEL_SLIDE_UP, { duration: 280 });
+        notesPanelOpacity.value = withTiming(0, { duration: 250 });
+        notesCloseBarTranslateY.value = withTiming(-X_BUTTON_SLIDE_OFFSET, { duration: 280 });
+        notesCloseBarOpacity.value = withTiming(0, { duration: 250 });
+        headerTranslateY.value = withTiming(0, { duration: 280 });
+        headerContentOpacity.value = withTiming(1, { duration: 250 });
+        bottomBarContentTranslateY.value = withTiming(0, { duration: 280 });
+        bottomBarContentOpacity.value = withTiming(1, { duration: 250 });
+        // Unmount notes panel after slide-up; keep layout (pinned + minHeight) until animation fully done to avoid reflow lag
+        setTimeout(() => setNotesPanelVisible(false), 300);
+        setTimeout(() => setIsNotesClosing(false), 380);
+    }, [scale, translateX, translateY, notesPanelOpacity, notesPanelTranslateY, notesCloseBarOpacity, notesCloseBarTranslateY, headerContentOpacity, headerTranslateY, bottomBarContentOpacity, bottomBarContentTranslateY]);
+
+    /** Open image editor on Note tab (from notes panel Edit / Add note); closes notes panel */
+    const handleNotesPanelEditPress = React.useCallback(() => {
+        const uri = imagesList[displayIndex];
+        if (!uri) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setImageEditorUri(uri);
+        setImageEditorTool("Note");
+        setImageEditorVisible(true);
+        handleNotesPanelClose();
+    }, [displayIndex, imagesList, handleNotesPanelClose]);
 
     const handleAdjustPress = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1423,10 +1525,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         // - Pinch and pan work together when zoomed
         // - Tap gestures work independently
         // - FlatList handles horizontal swipe when not zoomed
-        return Gesture.Simultaneous(
-            Gesture.Simultaneous(pinchGesture, panGesture),
-            Gesture.Exclusive(doubleTapGesture, singleTapGesture)
-        );
+        return Gesture.Simultaneous(Gesture.Simultaneous(pinchGesture, panGesture), Gesture.Exclusive(doubleTapGesture, singleTapGesture));
     };
 
     // Swipe down to dismiss (iPhone Photos style) - only when not zoomed
@@ -1540,26 +1639,39 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }, [controlsVisible]);
 
     const headerAnimatedStyle = useAnimatedStyle(() => ({
-        opacity: headerOpacity.value,
+        opacity: headerOpacity.value * headerContentOpacity.value,
+        transform: [{ translateY: headerTranslateY.value }],
     }));
 
     const bottomBarAnimatedStyle = useAnimatedStyle(() => ({
         opacity: bottomBarOpacity.value,
     }));
 
+    const bottomBarContentAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: bottomBarContentOpacity.value,
+        transform: [{ translateY: bottomBarContentTranslateY.value }],
+    }));
+
+    const notesCloseBarAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: notesCloseBarOpacity.value,
+        transform: [{ translateY: notesCloseBarTranslateY.value }],
+    }));
+
+    const notesPanelAnimatedStyle = useAnimatedStyle(() => ({
+        opacity: notesPanelOpacity.value,
+        transform: [{ translateY: notesPanelTranslateY.value }],
+    }));
+
     // Thumbnail strip: driven by thumbnailScrollX on UI thread for perfect sync with image swipe
-    const thumbnailStripWidth =
-        imagesList.length <= 0
-            ? width
-            : THUMB_PADDING * 2 +
-              imagesList.length * INACTIVE_THUMB_WIDTH +
-              (imagesList.length - 1) * THUMB_GAP +
-              ACTIVE_THUMB_MARGIN * 2 +
-              (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH);
+    const thumbnailStripWidth = imagesList.length <= 0 ? width : THUMB_PADDING * 2 + imagesList.length * INACTIVE_THUMB_WIDTH + (imagesList.length - 1) * THUMB_GAP + ACTIVE_THUMB_MARGIN * 2 + (ACTIVE_THUMB_WIDTH - INACTIVE_THUMB_WIDTH);
 
     const thumbnailStripAnimatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: -thumbnailScrollX.value }],
     }));
+
+    const bottomActionCount = (showBookmark ? 1 : 0) + (showNote ? 1 : 0) + (showEdit ? 1 : 0);
+    const bottomActionWidth =
+        bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
 
     return (
         <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen">
@@ -1567,8 +1679,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 <View style={styles.container}>
                     <GestureDetector gesture={dismissPanGesture}>
                         <Animated.View style={[styles.container, dismissAnimatedStyle]}>
-                            {/* Header */}
-                            <Animated.View style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]}>
+                            {/* X button at top (same position as Back) - only when notes panel open */}
+                            {notesPanelVisible && (
+                                <Animated.View style={[styles.notesCloseBar, { paddingTop: insets.top }, notesCloseBarAnimatedStyle]} pointerEvents="box-none">
+                                    <TouchableOpacity onPress={handleNotesPanelClose} style={styles.notesCloseButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} activeOpacity={0.7}>
+                                        <IconSymbol size={iconSize} name="xmark" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
+                                    </TouchableOpacity>
+                                </Animated.View>
+                            )}
+                            {/* Header - fades out when notes panel is open */}
+                            <Animated.View style={[{ paddingTop: insets.top }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]} pointerEvents={notesPanelVisible ? "none" : "auto"}>
                                 <View style={styles.actionButtonsContainer}>
                                     <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
                                         <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
@@ -1627,6 +1747,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             {(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "remove from practice album" : "add to practice album"}
                                                         </Button>
                                                     )}
+                                                    {showNote && (
+                                                        <Button systemImage="note.text" onPress={handleNotePress}>
+                                                            Note
+                                                        </Button>
+                                                    )}
                                                     {showMagicInMore && !isCurrentImageOriginalMedia && (
                                                         <Button systemImage="sparkles" onPress={handleMagicPress}>
                                                             Use Magic
@@ -1674,6 +1799,57 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 </View>
                             </Animated.View>
 
+                            {/* Note markers on image when notes panel open – same transform as image so pins stay on image when zoomed */}
+                            {notesPanelVisible &&
+                                notesForCurrentImage.length > 0 &&
+                                (() => {
+                                    const imageSize = imageSizes[displayIndex] || { width, height };
+                                    const imageLeft = (width - imageSize.width) / 2;
+                                    const imageTop = (height - imageSize.height) / 2;
+                                    const MARKER_SIZE = 30;
+                                    const MARKER_R = MARKER_SIZE / 2;
+                                    return (
+                                        <Animated.View style={[styles.notesOverlay, imageAnimatedStyle]} pointerEvents="box-none">
+                                            {notesForCurrentImage.map((note, index) => {
+                                                const px = imageLeft + note.x * imageSize.width - MARKER_R;
+                                                const py = imageTop + note.y * imageSize.height - MARKER_R;
+                                                const isActive = selectedNoteId === note.id;
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={note.id}
+                                                        style={[styles.noteMarker]}
+                                                        onPress={() => {
+                                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                                            setSelectedNoteId(note.id);
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <BlurView
+                                                            intensity={80}
+                                                            tint={isActive ? "light" : "dark"}
+                                                            style={{
+                                                                overflow: "hidden",
+                                                                left: px,
+                                                                top: py,
+                                                                width: MARKER_SIZE,
+                                                                height: MARKER_SIZE,
+                                                                borderRadius: MARKER_R,
+                                                                backgroundColor: isActive ? colors.system.blue : "transparent",
+                                                                borderWidth: isActive ? 2 : 1.5,
+                                                                borderColor: "white",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                            }}
+                                                        >
+                                                            <RNText style={styles.noteMarkerText}>{String(index + 1)}</RNText>
+                                                        </BlurView>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </Animated.View>
+                                    );
+                                })()}
+
                             {/* Image Carousel */}
                             <Animated.FlatList
                                 ref={flatListRef}
@@ -1704,11 +1880,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                 initialNumToRender={3}
                             />
 
-                            {/* Bottom Bar with Thumbnails and Actions */}
-                            <Animated.View style={[styles.bottomBar, { paddingBottom: insets.bottom }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
-                                {/* Thumbnail Gallery - Hide when zoomed */}
-                                {!isZoomed && (
-                                    <View style={[styles.thumbnailScroll, { overflow: "hidden", width }]}>
+                            {/* Bottom Bar: content always pinned to bottom so no layout jump when closing notes */}
+                            <Animated.View style={[styles.bottomBar, { paddingBottom: (insets.bottom || 0) + 40 }, { minHeight: notesPanelVisible || isNotesClosing ? Math.min(height * 0.45, 320) : BOTTOM_BAR_CONTENT_HEIGHT }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
+                                <Animated.View style={[styles.bottomBarContentPinnedToBottom, bottomBarContentAnimatedStyle]} pointerEvents={notesPanelVisible ? "none" : "auto"}>
+                                    {/* Thumbnail Gallery - always in layout to avoid reflow lag; when zoomed only hide visually (opacity 0) */}
+                                    <View style={[styles.thumbnailScroll, { overflow: "hidden", width }, isZoomed && !notesPanelVisible && styles.thumbnailHidden]} pointerEvents={isZoomed && !notesPanelVisible ? "none" : "auto"}>
                                         <Animated.View
                                             style={[
                                                 {
@@ -1771,111 +1947,126 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                             })}
                                         </Animated.View>
                                     </View>
-                                )}
 
-                                {/* Action Buttons */}
-                                <View style={styles.actionButtonsContainer}>
-                                    <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                                        <HStack alignment="center" spacing={0} modifiers={[padding({ horizontal: 20 })]}>
-                                            {showShare && (
-                                                <HStack
-                                                    alignment="center"
-                                                    modifiers={[
-                                                        padding({ all: 0 }),
-                                                        frame({ width: 48, height: 48, alignment: "center" }),
-                                                        glassEffect({
-                                                            glass: {
-                                                                variant: "regular",
-                                                            },
-                                                        }),
-                                                    ]}
-                                                >
-                                                    <TouchableOpacity onPress={handleSharePress} className="  w-[48px] h-[48px] items-center justify-center">
-                                                        <IconSymbol size={iconSize} name="square.and.arrow.up" color={colors.system.white as any} style={{ bottom: 2 }} />
-                                                    </TouchableOpacity>
-                                                    {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} /> */}
-                                                </HStack>
-                                            )}
-                                            {(showBookmark || showEdit) && <Spacer />}
-                                            {showTakeAfterTemplate && (
-                                                <>
-                                                    <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 0, vertical: 0 })]}>
-                                                        <Button onPress={handleTakeAfterTemplatePress} variant="glassProminent" controlSize="large" color={MINT_COLOR}>
-                                                            Take After Template
-                                                        </Button>
+                                    {/* Action Buttons */}
+                                    <View style={styles.actionButtonsContainer}>
+                                        <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
+                                            <HStack alignment="center" spacing={0} modifiers={[padding({ horizontal: 20 })]}>
+                                                {showShare && (
+                                                    <HStack
+                                                        alignment="center"
+                                                        modifiers={[
+                                                            padding({ all: 0 }),
+                                                            frame({ width: 48, height: 48, alignment: "center" }),
+                                                            glassEffect({
+                                                                glass: {
+                                                                    variant: "regular",
+                                                                },
+                                                            }),
+                                                        ]}
+                                                    >
+                                                        <TouchableOpacity onPress={handleSharePress} className="  w-[48px] h-[48px] items-center justify-center">
+                                                            <IconSymbol size={iconSize} name="square.and.arrow.up" color={colors.system.white as any} style={{ bottom: 2 }} />
+                                                        </TouchableOpacity>
+                                                        {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} /> */}
                                                     </HStack>
-                                                    <Spacer />
-                                                </>
-                                            )}
+                                                )}
+                                                {(showBookmark || showEdit || showNote) && <Spacer />}
+                                                {(showBookmark || showEdit || showNote) && (
+                                                    <HStack
+                                                        alignment="center"
+                                                        modifiers={[
+                                                            padding({ all: 0 }),
+                                                            frame({
+                                                                height: containerSize,
+                                                                alignment: "center",
+                                                                width: bottomActionWidth,
+                                                            }),
+                                                            glassEffect({
+                                                                glass: {
+                                                                    variant: "regular",
+                                                                },
+                                                            }),
+                                                        ]}
+                                                    >
+                                                        {showNote && (
+                                                            <TouchableOpacity onPress={handleNotePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                                <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} style={{ bottom: -2, left: 8 }} />
+                                                            </TouchableOpacity>
+                                                        )}
+                                                        {showBookmark && (
+                                                            <TouchableOpacity onPress={handleBookmarkPress} className="relative items-center justify-center w-[44px] h-[44px]">
+                                                                <IconSymbol
+                                                                    size={iconSize}
+                                                                    name={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"}
+                                                                    color={colors.system.white as any}
+                                                                    style={{ bottom: -2, left: bottomActionCount === 1 ? 2 : 5 }}
+                                                                />
+                                                            </TouchableOpacity>
+                                                        )}
+                                                        {showEdit && (
+                                                            <TouchableOpacity onPress={showCompare && isCurrentImageOriginalMedia ? (currentImageHasAfter ? handleSplitPress : enableTakeAfterTemplate ? handleTakeAfterTemplatePress : handleSplitPress) : handleAdjustPress} className="w-[44px] h-[44px] relative items-center justify-center">
+                                                                <IconSymbol size={iconSize} name={showCompare && isCurrentImageOriginalMedia ? "square.split.2x1" : "slider.horizontal.3"} color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                                {showCompare && isCurrentImageOriginalMedia && !currentImageHasAfter && enableTakeAfterTemplate && (
+                                                                    <View style={{ position: "absolute", top: 10, right: 4, backgroundColor: MINT_COLOR, borderRadius: 8, minWidth: 14, height: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                                                                        <IconSymbol name="plus" size={10} color={colors.system.white as any} />
+                                                                    </View>
+                                                                )}
+                                                            </TouchableOpacity>
+                                                        )}
+                                                    </HStack>
+                                                )}
 
-                                            {(showBookmark || showEdit) && (
-                                                <HStack
-                                                    alignment="center"
-                                                    modifiers={[
-                                                        padding({ all: 0 }),
-                                                        frame({ height: containerSize, alignment: "center", width: showBookmark && showEdit ? 100 : containerSize }),
-                                                        glassEffect({
-                                                            glass: {
-                                                                variant: "regular",
-                                                            },
-                                                        }),
-                                                    ]}
-                                                >
-                                                    {showBookmark && (
-                                                        <TouchableOpacity onPress={handleBookmarkPress} className="  relative items-center justify-center w-[44px] h-[44px]">
-                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: !showEdit ? 2.2 : 5 }} />
+                                                {showArchive && <Spacer />}
+                                                {showArchive && (
+                                                    <HStack
+                                                        alignment="center"
+                                                        modifiers={[
+                                                            padding({ all: 0 }),
+                                                            frame({ width: 48, height: containerSize }),
+                                                            glassEffect({
+                                                                glass: {
+                                                                    variant: "regular",
+                                                                },
+                                                            }),
+                                                        ]}
+                                                    >
+                                                        <TouchableOpacity onPress={handleArchivePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                            <IconSymbol size={iconSize} name="archivebox" style={{ bottom: -2, left: 2 }} color={colors.system.white as any} />
                                                         </TouchableOpacity>
-                                                    )}
-                                                    {showEdit && (
-                                                        <TouchableOpacity onPress={isCurrentImageOriginalMedia ? handleSplitPress : handleAdjustPress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                            <IconSymbol size={iconSize} name={isCurrentImageOriginalMedia ? "square.split.2x1" : "slider.horizontal.3"} color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                    </HStack>
+                                                )}
+                                                {showRestore && <Spacer />}
+                                                {showRestore && (
+                                                    <HStack
+                                                        alignment="center"
+                                                        modifiers={[
+                                                            padding({ all: 0 }),
+                                                            frame({ width: 48, height: containerSize }),
+                                                            glassEffect({
+                                                                glass: {
+                                                                    variant: "regular",
+                                                                },
+                                                            }),
+                                                        ]}
+                                                    >
+                                                        <TouchableOpacity onPress={handleRestorePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                                            <IconSymbol size={iconSize} name="arrow.uturn.backward" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
                                                         </TouchableOpacity>
-                                                    )}
-                                                </HStack>
-                                            )}
+                                                        {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="arrow.uturn.backward" variant="plain" controlSize="large" onPress={handleRestorePress} /> */}
+                                                    </HStack>
+                                                )}
+                                            </HStack>
+                                        </Host>
+                                    </View>
+                                </Animated.View>
 
-                                            {showArchive && <Spacer />}
-                                            {showArchive && (
-                                                <HStack
-                                                    alignment="center"
-                                                    modifiers={[
-                                                        padding({ all: 0 }),
-                                                        frame({ width: 48, height: containerSize }),
-                                                        glassEffect({
-                                                            glass: {
-                                                                variant: "regular",
-                                                            },
-                                                        }),
-                                                    ]}
-                                                >
-                                                    <TouchableOpacity onPress={handleArchivePress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                        <IconSymbol size={iconSize} name="archivebox" style={{ bottom: -2, left: 2 }} color={colors.system.white as any} />
-                                                    </TouchableOpacity>
-                                                </HStack>
-                                            )}
-                                            {showRestore && <Spacer />}
-                                            {showRestore && (
-                                                <HStack
-                                                    alignment="center"
-                                                    modifiers={[
-                                                        padding({ all: 0 }),
-                                                        frame({ width: 48, height: containerSize }),
-                                                        glassEffect({
-                                                            glass: {
-                                                                variant: "regular",
-                                                            },
-                                                        }),
-                                                    ]}
-                                                >
-                                                    <TouchableOpacity onPress={handleRestorePress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                        <IconSymbol size={iconSize} name="arrow.uturn.backward" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
-                                                    </TouchableOpacity>
-                                                    {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="arrow.uturn.backward" variant="plain" controlSize="large" onPress={handleRestorePress} /> */}
-                                                </HStack>
-                                            )}
-                                        </HStack>
-                                    </Host>
-                                </View>
+                                {/* Notes panel (slides up from bottom) */}
+                                {notesPanelVisible && (
+                                    <Animated.View style={[styles.notesPanelWrapper, notesPanelAnimatedStyle]} pointerEvents="box-none">
+                                        <ImageViewerNotesPanel visible onClose={handleNotesPanelClose} imageUri={imagesList[displayIndex] ?? ""} paddingBottom={0} notes={notesForCurrentImage} selectedNoteId={selectedNoteId} onSelectNote={setSelectedNoteId} onEditPress={handleNotesPanelEditPress} />
+                                    </Animated.View>
+                                )}
                             </Animated.View>
                         </Animated.View>
                     </GestureDetector>
@@ -1948,7 +2139,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 originalUri={imageEditorUri ? imageUrlToOriginalUriMapInternal.get(imageEditorUri) : undefined}
                 initialTool={imageEditorTool}
                 mediaId={imageEditorUri ? imageUrlToMediaIdMapInternal.get(imageEditorUri) : undefined}
-                initialEditorState={imageEditorUri ? imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined : undefined}
+                initialEditorState={imageEditorUri ? (imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined) : undefined}
                 onClose={() => setImageEditorVisible(false)}
             />
         </Modal>
@@ -1966,6 +2157,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 10,
+        overflow: "hidden",
     },
 
     backButton: {
@@ -2037,9 +2229,64 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 10,
+        overflow: "hidden",
+    },
+    /** When notes panel is open, pin bottom bar content to real bottom so slide-down animates from screen bottom */
+    bottomBarContentPinnedToBottom: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+    },
+    notesOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 15,
+    },
+    noteMarker: {
+        position: "absolute",
+        borderColor: colors.system.white,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    noteMarkerText: {
+        fontSize: 13,
+        fontWeight: "700",
+        color: colors.system.white,
+    },
+    notesPanelWrapper: {
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 11,
+    },
+    notesCloseBar: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 20,
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+    },
+    notesCloseButton: {
+        width: 44,
+        height: 44,
+        alignItems: "center",
+        justifyContent: "center",
     },
     thumbnailScroll: {
-        marginBottom: 6,
+        marginBottom: 24,
+    },
+    /** When zoomed (and notes closed): hide thumbnail visually but keep in layout to avoid reflow lag */
+    thumbnailHidden: {
+        opacity: 0,
     },
     thumbnailContainer: {
         flexDirection: "row", // Center first/last thumbnails (active width / 2)

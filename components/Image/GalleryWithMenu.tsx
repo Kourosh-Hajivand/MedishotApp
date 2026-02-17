@@ -188,6 +188,9 @@ export interface ViewerActionsConfig {
     showShare?: boolean;
     showRestore?: boolean;
     showMagic?: boolean;
+    showNote?: boolean;
+    /** Show Compare (before/after split) only on patient detail route; hide in album */
+    showCompare?: boolean;
 }
 
 interface MediaItem {
@@ -247,6 +250,8 @@ interface GalleryWithMenuProps {
     metadata?: { address?: string; phone?: string; email?: string; website?: string; print_settings?: any } | null;
     /** Only show "Take after Template" in viewer when true (e.g. only on patient gallery page) */
     enableTakeAfterTemplate?: boolean;
+    /** Callback when note icon is pressed in viewer (optional; showNote in actions must be true) */
+    onNotePress?: (imageUri: string) => void;
 }
 
 const { width } = Dimensions.get("window");
@@ -271,8 +276,9 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     practice,
     metadata,
     enableTakeAfterTemplate = false,
+    onNotePress,
 }) => {
-    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false } = actions;
+    const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false, showNote = false, showCompare = false } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -556,8 +562,11 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                     showShare,
                     showRestore: !!onRestore,
                     showMagic,
+                    showNote,
+                    showCompare,
                 }}
                 onRestore={onRestore}
+                onNotePress={onNotePress}
                 practice={practice}
                 metadata={metadata}
                 enableTakeAfterTemplate={enableTakeAfterTemplate}

@@ -53,7 +53,8 @@
                     "recordAudioAndroid": true
                 }
             ],
-            "expo-secure-store"
+            "expo-secure-store",
+            "./plugins/withCodeSignEntitlements.js"
         ],
         "experiments": {
             "typedRoutes": true

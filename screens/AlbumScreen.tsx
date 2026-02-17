@@ -808,9 +808,12 @@ export const AlbumScreen: React.FC = () => {
                             rawMediaData={rawMediaData}
                             actions={{
                                 showBookmark: true,
-                                showEdit: false,
-                                showArchive: false,
                                 showShare: true,
+                                showEdit: false,
+                                showNote: false,
+                                showArchive: false,
+                                showMagic: false,
+                                showCompare: false,
                             }}
                             initialColumns={2}
                             minColumns={2}

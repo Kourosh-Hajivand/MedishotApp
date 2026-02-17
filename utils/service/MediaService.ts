@@ -1,7 +1,7 @@
 import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
-import { EditPatientMediaRequest, UpdateMediaImageRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
+import { EditPatientMediaRequest, EditPatientMediaNote, UpdateMediaImageRequest, UploadMediaWithTemplateRequest, UploadPatientMediaRequest } from "./models/RequestModels";
 import { PatientMediaAlbumsResponse, PatientMediaBookmarkResponse, PatientMediaDeleteResponse, PatientMediaEditResponse, PatientMediaListResponse, PatientMediaRestoreResponse, PatientMediaTrashResponse, PatientMediaUploadResponse, PatientMediaWithTemplateResponse, TempUploadResponse, UpdateMediaImageResponse } from "./models/ResponseModels";
 
 const {
@@ -183,13 +183,26 @@ const MediaService = {
         }
     },
 
-    // Edit patient media image
+    // Edit patient media image (backend expects notes as array; send as notes[i][text], notes[i][x], notes[i][y])
     editPatientMedia: async (mediaId: string | number, payload: EditPatientMediaRequest): Promise<PatientMediaEditResponse> => {
         try {
             const formData = new FormData();
             formData.append("media", payload.media);
-            if (payload.notes != null && (typeof payload.notes === "string" ? payload.notes !== "" : payload.notes.length > 0)) {
-                formData.append("notes", typeof payload.notes === "string" ? payload.notes : JSON.stringify(payload.notes));
+            if (payload.notes != null) {
+                const notesArray: EditPatientMediaNote[] = Array.isArray(payload.notes) ? payload.notes : (() => {
+                    try {
+                        return JSON.parse(payload.notes as string) as EditPatientMediaNote[];
+                    } catch {
+                        return [];
+                    }
+                })();
+                if (Array.isArray(notesArray) && notesArray.length > 0) {
+                    notesArray.forEach((note, i) => {
+                        formData.append(`notes[${i}][text]`, String(note.text ?? ""));
+                        formData.append(`notes[${i}][x]`, String(Number(note.x)));
+                        formData.append(`notes[${i}][y]`, String(Number(note.y)));
+                    });
+                }
             }
             if (payload.data != null && payload.data !== "") {
                 formData.append("data", typeof payload.data === "string" ? payload.data : JSON.stringify(payload.data));
