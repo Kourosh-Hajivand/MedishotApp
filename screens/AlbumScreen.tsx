@@ -815,6 +815,7 @@ export const AlbumScreen: React.FC = () => {
                                 showMagic: false,
                                 showCompare: false,
                             }}
+                            showCompareBadgeOnThumbnails={false}
                             initialColumns={2}
                             minColumns={2}
                             maxColumns={6}

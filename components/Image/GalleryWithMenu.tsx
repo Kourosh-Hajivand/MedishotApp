@@ -25,11 +25,12 @@ const GalleryImageItem: React.FC<{
     imageUrlToIsAfterMap?: Map<string, boolean>;
     imageUrlToHasAfterMap?: Map<string, boolean>;
     showBookmarkBadge?: boolean;
+    showCompareBadgeOnThumbnails?: boolean;
     isLoading: boolean;
     onLoadStart: () => void;
     onLoad: () => void;
     onError: () => void;
-}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmarkBadge = true, isLoading, onLoadStart, onLoad, onError }) => {
+}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmarkBadge = true, showCompareBadgeOnThumbnails = true, isLoading, onLoadStart, onLoad, onError }) => {
     // Use local shared values for opacity animation per image
     const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
@@ -152,8 +153,8 @@ const GalleryImageItem: React.FC<{
                         <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                     </View>
                 )}
-                {/* Before/After Badge */}
-                {(imageUrlToIsAfterMap?.get(uri) || imageUrlToHasAfterMap?.get(uri)) && (
+                {/* Before/After Badge – در البوم با showCompareBadgeOnThumbnails=false مخفی می‌شود */}
+                {showCompareBadgeOnThumbnails && (imageUrlToIsAfterMap?.get(uri) || imageUrlToHasAfterMap?.get(uri)) && (
                     <View style={styles.badgeContainer}>
                         <IconSymbol name={imageUrlToIsAfterMap?.get(uri) ? "rectangle.lefthalf.filled" : "rectangle.righthalf.filled"} size={14} color={colors.system.gray as any} />
                     </View>
@@ -252,6 +253,8 @@ interface GalleryWithMenuProps {
     enableTakeAfterTemplate?: boolean;
     /** Callback when note icon is pressed in viewer (optional; showNote in actions must be true) */
     onNotePress?: (imageUri: string) => void;
+    /** در البوم false بگذار تا آیکون before/after روی thumbnailها نشان داده نشود */
+    showCompareBadgeOnThumbnails?: boolean;
 }
 
 const { width } = Dimensions.get("window");
@@ -277,6 +280,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     metadata,
     enableTakeAfterTemplate = false,
     onNotePress,
+    showCompareBadgeOnThumbnails = true,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false, showNote = false, showCompare = false } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
@@ -488,6 +492,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 imageUrlToIsAfterMap={imageUrlToIsAfterMap}
                 imageUrlToHasAfterMap={imageUrlToHasAfterMap}
                 showBookmarkBadge={showBookmark}
+                showCompareBadgeOnThumbnails={showCompareBadgeOnThumbnails}
                 isLoading={isLoading}
                 onLoadStart={handleImageLoadStart}
                 onLoad={handleImageLoad}

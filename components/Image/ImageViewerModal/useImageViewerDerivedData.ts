@@ -496,7 +496,7 @@ export function useImageViewerDerivedData({
             }
         }
 
-        // For composite original_media: show compare but not adjust
+        // For composite original_media: show compare only if caller allowed (e.g. hide in album)
         if (isCompositeOriginal) {
             return {
                 showBookmark: bookmark,
@@ -506,7 +506,7 @@ export function useImageViewerDerivedData({
                 showRestore: restore,
                 showMagic: false,
                 showNote: note,
-                showCompare: true,
+                showCompare: compare,
             };
         }
 
