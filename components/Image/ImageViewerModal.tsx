@@ -221,6 +221,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             isCurrentImageHideTakeAfter,
             isCurrentImageOriginalNoBeforeAfter,
             currentImageHasAfter,
+            isCurrentImageMagicTemplate,
         },
         effectiveActions,
         notesForCurrentImage,
@@ -1233,8 +1234,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }));
 
     const bottomActionCount = React.useMemo(() => {
-        return (showNote ? 1 : 0) + (showEdit ? 1 : 0) + (showCompare ? 1 : 0);
-    }, [showNote, showEdit, showCompare]);
+        return (showNote ? 1 : 0) + (showEdit ? 1 : 0) + (showCompare ? 1 : 0) + (showMagic ? 1 : 0);
+    }, [showNote, showEdit, showCompare, showMagic]);
 
     const bottomActionWidth = React.useMemo(() => {
         return bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
@@ -1383,6 +1384,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                         showNote={showNote}
                                         showEdit={showEdit}
                                         showCompare={showCompare}
+                                        showMagic={showMagic}
                                         showBookmark={showBookmark}
                                         showRestore={showRestore}
                                         isBookmarked={localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex]) ?? false}
@@ -1394,6 +1396,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                         onSplitPress={handleSplitPress}
                                         onTakeAfterTemplatePress={handleTakeAfterTemplatePress}
                                         onAdjustPress={handleAdjustPress}
+                                        onMagicPress={handleMagicPress}
                                         onBookmarkPress={handleBookmarkPress}
                                         onRestorePress={handleRestorePress}
                                     />
@@ -1442,6 +1445,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 initialEditorState={imageEditorUri ? (imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined) : undefined}
                 onClose={() => setImageEditorVisible(false)}
                 showOnlyNote={imageEditorTool === "Note" && isCurrentImageCompositeOriginal}
+                showMagicTab={isCurrentImageMagicTemplate}
             />
         </Modal>
     );

@@ -492,10 +492,13 @@ interface ImageEditorModalProps {
     onSaveSuccess?: () => void;
     /** Show only Note tab (hide other tabs) */
     showOnlyNote?: boolean;
+    /** Show Magic tab (only for templates "Full Teeth-Open" / "Front Face Smile"); when false, Adjustment has no Magic tab */
+    showMagicTab?: boolean;
 }
 
-export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, mediaImageId, hasTemplate, patientId, initialEditorState, onClose, onSaveSuccess, showOnlyNote = false }) => {
-    const [activeTool, setActiveTool] = useState(initialTool || "Magic");
+export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, mediaImageId, hasTemplate, patientId, initialEditorState, onClose, onSaveSuccess, showOnlyNote = false, showMagicTab = true }) => {
+    const defaultTool = showMagicTab ? "Magic" : "Adjust";
+    const [activeTool, setActiveTool] = useState(initialTool || defaultTool);
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -665,7 +668,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         { name: "Magic", icon: "sparkles" as SymbolViewProps["name"], disabled: false },
         { name: "Pen", icon: "pencil.tip.crop.circle" as SymbolViewProps["name"], disabled: false },
     ];
-    const tools = showOnlyNote ? allTools.filter((tool) => tool.name === "Note") : allTools;
+    const tools = showOnlyNote
+        ? allTools.filter((tool) => tool.name === "Note")
+        : showMagicTab
+          ? allTools
+          : allTools.filter((tool) => tool.name !== "Magic");
 
     const handleToolPress = (tool: string) => {
         if (showOnlyNote && tool !== "Note") {
@@ -852,10 +859,16 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 pendingNormalizedPenStrokesRef.current = null;
                 savedEditorSnapshotRef.current = null;
             }
-            if (initialEditorState?.lastActiveTool) setActiveTool(initialEditorState.lastActiveTool);
-            else if (initialTool) setActiveTool(initialTool);
+            if (initialEditorState?.lastActiveTool) {
+                const t = initialEditorState.lastActiveTool;
+                setActiveTool(t === "Magic" && !showMagicTab ? "Adjust" : t);
+            } else if (initialTool) {
+                setActiveTool(initialTool === "Magic" && !showMagicTab ? "Adjust" : initialTool);
+            } else if (!showMagicTab) {
+                setActiveTool("Adjust");
+            }
         }
-    }, [uri, initialTool, visible, initialEditorState]);
+    }, [uri, initialTool, visible, initialEditorState, showMagicTab]);
 
     useEffect(() => {
         if (!visible || !initialEditorState) {

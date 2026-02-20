@@ -12,6 +12,7 @@ export interface BottomActionBarProps {
     showNote: boolean;
     showEdit: boolean;
     showCompare: boolean;
+    showMagic: boolean;
     showBookmark: boolean;
     showRestore: boolean;
     isBookmarked: boolean;
@@ -23,6 +24,7 @@ export interface BottomActionBarProps {
     onSplitPress: () => void;
     onTakeAfterTemplatePress: () => void;
     onAdjustPress: () => void;
+    onMagicPress: () => void;
     onBookmarkPress: () => void;
     onRestorePress: () => void;
 }
@@ -32,6 +34,7 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
     showNote,
     showEdit,
     showCompare,
+    showMagic,
     showBookmark,
     showRestore,
     isBookmarked,
@@ -43,6 +46,7 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
     onSplitPress,
     onTakeAfterTemplatePress,
     onAdjustPress,
+    onMagicPress,
     onBookmarkPress,
     onRestorePress,
 }) {
@@ -68,12 +72,17 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                             </TouchableOpacity>
                         </HStack>
                     )}
-                    {(showNote || showEdit || showCompare) && <Spacer />}
-                    {(showNote || showEdit || showCompare) && (
+                    {(showNote || showEdit || showCompare || showMagic) && <Spacer />}
+                    {(showNote || showEdit || showCompare || showMagic) && (
                         <HStack alignment="center" modifiers={bottomActionModifiers as any}>
                             {showNote && (
                                 <TouchableOpacity onPress={onNotePress} className="w-[44px] h-[44px]  items-center justify-center">
                                     <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} style={{ bottom: -2, left: 8 }} />
+                                </TouchableOpacity>
+                            )}
+                            {showMagic && (
+                                <TouchableOpacity onPress={onMagicPress} className="w-[44px] h-[44px] relative items-center justify-center">
+                                    <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} style={{ bottom: -1, left: 4 }} />
                                 </TouchableOpacity>
                             )}
                             {showCompare && (

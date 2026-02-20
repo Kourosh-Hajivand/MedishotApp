@@ -313,6 +313,23 @@ export function useImageViewerDerivedData({
         return map;
     }, [rawMediaData]);
 
+    // Map image URL → gost name (pose name from media.images[].gost.name; Magic only for "Full Teeth-Open" and "Front Face Smile")
+    const imageUrlToTemplateNameMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            if (!media.images?.length) return;
+            media.images.forEach((img: { gost?: { name?: string }; image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
+                const gostName = typeof img.gost?.name === "string" ? img.gost.name : null;
+                if (!gostName) return;
+                if (img.image?.url) map.set(img.image.url, gostName);
+                if (img.edited_image?.url) map.set(img.edited_image.url, gostName);
+            });
+        });
+        return map;
+    }, [rawMediaData]);
+
     // Merge taker maps (rawMediaData takes precedence)
     const finalTakerMap = React.useMemo(() => {
         const merged = new Map(imageUrlToTakerMap || []);
@@ -433,6 +450,17 @@ export function useImageViewerDerivedData({
     // hasAfter = current image already has linked after (split tap → compare); !hasAfter = show + on split, tap → take after
     const currentImageHasAfter = isCurrentImageHideTakeAfter;
 
+    // Templates that show Magic icon and Magic tab in editor (only these two)
+    const MAGIC_TEMPLATE_NAMES = ["Full Teeth-Open", "Front Face Smile"] as const;
+    const isCurrentImageMagicTemplate = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            const name = imageUrlToTemplateNameMap.get(currentImageUrl);
+            return name != null && MAGIC_TEMPLATE_NAMES.includes(name as (typeof MAGIC_TEMPLATE_NAMES)[number]);
+        }
+        return false;
+    }, [displayIndex, imagesList, imageUrlToTemplateNameMap]);
+
     // Adjust actions based on image type:
     // 1. Single image without template: note, like, adjust (no compare)
     // 2. Single image with template (no original_media): note, like, compare, adjust
@@ -482,7 +510,7 @@ export function useImageViewerDerivedData({
             };
         }
 
-        // For composite child images: show adjust but not compare
+        // For composite child images: show adjust but not compare; Magic only for Full Teeth-Open / Front Face Smile
         if (isCompositeChild) {
             return {
                 showBookmark: bookmark,
@@ -490,13 +518,13 @@ export function useImageViewerDerivedData({
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
-                showMagic: false,
+                showMagic: isCurrentImageMagicTemplate,
                 showNote: note,
                 showCompare: false,
             };
         }
 
-        // For single image without template: show adjust but not compare
+        // For single image without template: show adjust but not compare; Magic only for magic templates
         if (isSingleImage) {
             return {
                 showBookmark: bookmark,
@@ -504,13 +532,13 @@ export function useImageViewerDerivedData({
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
-                showMagic: false,
+                showMagic: isCurrentImageMagicTemplate,
                 showNote: note,
                 showCompare: false, // Hide compare for single images without template
             };
         }
 
-        // For single image with template (template without original_media): show compare and adjust
+        // For single image with template (template without original_media): show compare and adjust; Magic only for magic templates
         const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
         return {
             showBookmark: bookmark,
@@ -518,11 +546,11 @@ export function useImageViewerDerivedData({
             showArchive: archive,
             showShare: share,
             showRestore: restore,
-            showMagic: false,
+            showMagic: isCurrentImageMagicTemplate,
             showNote: note,
             showCompare: shouldShowCompare,
         };
-    }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap, imageUrlToHasTemplateMapInternal, rawMediaData, actions]);
+    }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap, imageUrlToHasTemplateMapInternal, rawMediaData, actions, isCurrentImageMagicTemplate]);
 
     // Notes from media.data.editor.notes for current image (for notes panel)
     const notesForCurrentImage = React.useMemo(() => {
@@ -557,6 +585,7 @@ export function useImageViewerDerivedData({
                 isCurrentImageHideTakeAfter,
                 isCurrentImageOriginalNoBeforeAfter,
                 currentImageHasAfter,
+                isCurrentImageMagicTemplate,
             },
             effectiveActions,
             notesForCurrentImage,
@@ -581,6 +610,7 @@ export function useImageViewerDerivedData({
             isCurrentImageHideTakeAfter,
             isCurrentImageOriginalNoBeforeAfter,
             currentImageHasAfter,
+            isCurrentImageMagicTemplate,
             effectiveActions,
             notesForCurrentImage,
         ],
