@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import { Alert, Dimensions, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
 
@@ -443,6 +443,16 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
                 currentIndexShared.value = index;
             },
+        },
+        [imagesList.length],
+    );
+
+    // Sync currentIndexShared -> displayIndex during scroll so bottom bar/header update immediately, not only on momentum end
+    useAnimatedReaction(
+        () => currentIndexShared.value,
+        (idx) => {
+            const clamped = Math.max(0, Math.min(Math.round(idx), imagesList.length - 1));
+            runOnJS(setDisplayIndex)(clamped);
         },
         [imagesList.length],
     );
