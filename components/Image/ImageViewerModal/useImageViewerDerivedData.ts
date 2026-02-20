@@ -540,9 +540,11 @@ export function useImageViewerDerivedData({
 
         // For single image with template (template without original_media): show compare and adjust; Magic only for magic templates
         const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
+        // وقتی ورق می‌زنیم روی تصاویر composite، اگر به هر دلیل نقشه‌ها این تصویر را پیدا نکنند، حداقل Adjust را نشان بده (تا ایکون‌ها هاید نشوند)
+        const forceShowEditWhenFromTemplate = isFromTemplate && !edit && !shouldShowCompare;
         return {
             showBookmark: bookmark,
-            showEdit: edit,
+            showEdit: edit || forceShowEditWhenFromTemplate,
             showArchive: archive,
             showShare: share,
             showRestore: restore,
