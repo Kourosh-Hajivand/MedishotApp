@@ -1,3 +1,4 @@
+import { containerSize, iconSize } from "@/constants/theme";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { Button, ContextMenu, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
@@ -6,7 +7,6 @@ import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { IconSymbol } from "../../ui/icon-symbol";
-import { containerSize, iconSize } from "@/constants/theme";
 
 export interface HeaderBarProps {
     paddingTop: number;
@@ -77,7 +77,7 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
         <Animated.View style={[{ paddingTop }, styles.header, headerAnimatedStyle, !controlsVisible && styles.hidden]} pointerEvents={notesPanelVisible ? "none" : "auto"}>
             <View style={styles.actionButtonsContainer}>
                 <Host style={{ width: "100%" }} matchContents={{ vertical: true }}>
-                    <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 20 })]}>
+                    <HStack alignment="center" spacing={10} modifiers={[padding({ horizontal: 20 })]}>
                         <HStack
                             alignment="center"
                             modifiers={[
@@ -99,7 +99,7 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
                             alignment="center"
                             modifiers={[
                                 padding({ all: 4 }),
-                                frame({ width: description === "taker" && currentTaker ? 200 : 150, height: containerSize }),
+                                frame({ width: description === "taker" && currentTaker ? 230 : 230, height: containerSize }),
                                 glassEffect({
                                     glass: {
                                         variant: "regular",
