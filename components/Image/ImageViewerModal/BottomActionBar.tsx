@@ -1,6 +1,6 @@
 import { MINT_COLOR } from "@/app/camera/_components/create-template/constants";
-import colors from "@/theme/colors";
 import { containerSize, iconSize } from "@/constants/theme";
+import colors from "@/theme/colors";
 import { Host, HStack, Spacer } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import React from "react";

@@ -42,7 +42,7 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(function ImageCarous
             keyExtractor={(_, i) => i.toString()}
             onScroll={onScroll}
             onMomentumScrollEnd={onMomentumScrollEnd}
-            scrollEventThrottle={1}
+            scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
             renderItem={renderItem}
             ItemSeparatorComponent={() => <View style={{ width: IMAGE_GAP }} />}
