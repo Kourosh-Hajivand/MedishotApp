@@ -1,7 +1,7 @@
 import { MAGIC_API_SETTINGS } from "@/components/ImageEditor/ToolMagic";
 import axios from "axios";
 
-const MAGIC_API_URL = "https://0k6nu0kv35629q-5000.proxy.runpod.net/generate";
+const MAGIC_API_URL = "https://medical-api.alipour.me/generate";
 const MAGIC_REQUEST_TIMEOUT_MS = 180000;
 
 /** پاسخ خام API پردازش دندان */
@@ -23,11 +23,7 @@ export interface MagicGenerateRequest {
  * با ارسال signal می‌توان درخواست را با AbortController لغو کرد.
  * خطاها داخل سرویس هندل می‌شوند و به صورت Error پرتاب می‌شوند.
  */
-export async function magicGenerate(
-    imageBase64: string,
-    settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS,
-    signal?: AbortSignal
-): Promise<Record<string, string>> {
+export async function magicGenerate(imageBase64: string, settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS, signal?: AbortSignal): Promise<Record<string, string>> {
     const requestBody: MagicGenerateRequest = {
         type: "teeth",
         image: imageBase64,
@@ -52,10 +48,7 @@ export async function magicGenerate(
             throw error; // لغو توسط کاربر – همان خطا را پرتاب کن
         }
         if (axios.isAxiosError(error)) {
-            const message =
-                error.response?.data?.message ??
-                error.message ??
-                "Magic API request failed";
+            const message = error.response?.data?.message ?? error.message ?? "Magic API request failed";
             throw new Error(message);
         }
         throw error;
