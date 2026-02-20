@@ -20,11 +20,13 @@ export interface MagicGenerateRequest {
 
 /**
  * ارسال تصویر به API Magic و دریافت تصاویر پردازش‌شده.
+ * با ارسال signal می‌توان درخواست را با AbortController لغو کرد.
  * خطاها داخل سرویس هندل می‌شوند و به صورت Error پرتاب می‌شوند.
  */
 export async function magicGenerate(
     imageBase64: string,
-    settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS
+    settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS,
+    signal?: AbortSignal
 ): Promise<Record<string, string>> {
     const requestBody: MagicGenerateRequest = {
         type: "teeth",
@@ -36,6 +38,7 @@ export async function magicGenerate(
         const { data } = await axios.post<MagicGenerateApiResponse>(MAGIC_API_URL, requestBody, {
             headers: { "Content-Type": "application/json" },
             timeout: MAGIC_REQUEST_TIMEOUT_MS,
+            signal,
         });
 
         if (data?.status !== "success") {
@@ -45,6 +48,9 @@ export async function magicGenerate(
         const images = data.images ?? (data as unknown as Record<string, string>);
         return images;
     } catch (error) {
+        if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
+            throw error; // لغو توسط کاربر – همان خطا را پرتاب کن
+        }
         if (axios.isAxiosError(error)) {
             const message =
                 error.response?.data?.message ??

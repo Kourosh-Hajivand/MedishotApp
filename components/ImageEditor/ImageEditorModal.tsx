@@ -552,6 +552,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const savedEditorSnapshotRef = useRef<string | null>(null);
     const magicCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const magicCancelledRef = useRef(false);
+    const magicAbortControllerRef = useRef<AbortController | null>(null);
 
     const magicGenerateMutation = useMagicGenerateMutation();
 
@@ -689,6 +690,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const animatedImageStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
     }));
+
+    // وقتی زوم فعال است (scale !== 1) نوت‌مارکرها و مگنایفر مخفی شوند تا بد دیده نشوند
+    const overlayWhenZoomedHiddenStyle = useAnimatedStyle(() => {
+        const s = scale.value;
+        const isZoomed = s < 0.995 || s > 1.005;
+        return { opacity: isZoomed ? 0 : 1 };
+    }, []);
 
     const allTools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
         { name: "Adjust", icon: "dial.min.fill" as SymbolViewProps["name"], disabled: false },
@@ -1007,16 +1015,22 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     }, []);
 
     const handleMagicCancel = useCallback(() => {
-        magicCancelledRef.current = true;
-        magicRequestInFlight = false;
-        hasRequestedRef.current = false;
         setIsLoading(false);
         setIsProcessing(false);
         setMagicCompleted(null);
-        magicProgressShared.value = 0;
-        magicCompleteShared.value = 0;
-        magicErrorShared.value = 0;
-    }, []);
+        // ابتدا مودال لودینگ بسته شود، بعد ادیتور تا از مشکی شدن اپ (تداخل دو مودال) جلوگیری شود
+        setTimeout(() => {
+            magicCancelledRef.current = true;
+            magicRequestInFlight = false;
+            hasRequestedRef.current = false;
+            magicAbortControllerRef.current?.abort();
+            magicAbortControllerRef.current = null;
+            magicProgressShared.value = 0;
+            magicCompleteShared.value = 0;
+            magicErrorShared.value = 0;
+            onClose();
+        }, 0);
+    }, [onClose]);
 
     const handleMagicRetry = useCallback(() => {
         setMagicCompleted(null);
@@ -1043,6 +1057,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             magicRequestInFlight = true;
             hasRequestedRef.current = true;
             magicCancelledRef.current = false;
+            const controller = new AbortController();
+            magicAbortControllerRef.current = controller;
             setIsProcessing(true);
             setIsLoading(true);
             let success = false;
@@ -1050,14 +1066,18 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 const imageBase64 = await convertImageToBase64(uri);
                 if (magicCancelledRef.current) return;
                 if (imageBase64) {
-                    const result = await magicGenerateMutation.mutateAsync(imageBase64);
+                    const result = await magicGenerateMutation.mutateAsync({
+                        imageBase64,
+                        signal: controller.signal,
+                    });
                     if (magicCancelledRef.current) return;
                     setResultImages(result);
                     success = true;
                 }
             } catch {
-                // Error shown in UI (red state + Retry); no Alert, no console
+                // Error shown in UI (red state + Retry); یا لغو با AbortController
             } finally {
+                magicAbortControllerRef.current = null;
                 magicRequestInFlight = false;
                 if (magicCancelledRef.current) return;
                 setIsProcessing(false);
@@ -1133,7 +1153,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     data: { editor },
                 };
                 const payload = { mediaImageId, data: requestData };
-                console.log("📤 [ImageEditor] ارسال به بک‌اند (Template):", JSON.stringify(payload, null, 2));
                 await updateMediaImageAsync(payload);
             } else {
                 // Use editMedia for non-template images
@@ -1146,7 +1165,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     data: JSON.stringify({ editor }),
                 };
                 const payload = { mediaId, data: requestData };
-                console.log("📤 [ImageEditor] ارسال به بک‌اند (Non-Template):", JSON.stringify(payload, null, 2));
                 await editPatientMediaAsync(payload);
             }
             onSaveSuccess?.();
@@ -1511,39 +1529,44 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                     <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
                                 </ViewShot>
 
-                                {/* Note Markers outside ViewShot so they are not in the exported image */}
-                                {activeTool === "Note" &&
-                                    notes.map((note, index) => (
-                                        <NoteMarker
-                                            key={note.id}
-                                            note={note}
-                                            index={index}
-                                            containerWidth={imageContainerLayout.width}
-                                            containerHeight={imageContainerLayout.height}
-                                            isActive={activeNoteId === note.id}
-                                            onMove={handleMoveNote}
-                                            onSelect={setActiveNoteId}
-                                            onDragStart={handleDragStart}
-                                            onDragUpdate={handleDragUpdate}
-                                            onDragEnd={handleDragEnd}
-                                        />
-                                    ))}
+                                {/* Note Markers outside ViewShot – هنگام زوم مخفی می‌شوند */}
+                                {activeTool === "Note" && (
+                                    <Animated.View style={[StyleSheet.absoluteFill, overlayWhenZoomedHiddenStyle]} pointerEvents="box-none">
+                                        {notes.map((note, index) => (
+                                            <NoteMarker
+                                                key={note.id}
+                                                note={note}
+                                                index={index}
+                                                containerWidth={imageContainerLayout.width}
+                                                containerHeight={imageContainerLayout.height}
+                                                isActive={activeNoteId === note.id}
+                                                onMove={handleMoveNote}
+                                                onSelect={setActiveNoteId}
+                                                onDragStart={handleDragStart}
+                                                onDragUpdate={handleDragUpdate}
+                                                onDragEnd={handleDragEnd}
+                                            />
+                                        ))}
+                                    </Animated.View>
+                                )}
                             </View>
                         </Animated.View>
                     </GestureDetector>
 
-                    {/* Magnifier - rendered at canvasContainer level to appear above everything */}
+                    {/* Magnifier – هنگام زوم مخفی می‌شود */}
                     {activeTool === "Note" && magnifierState.visible && (
-                        <NoteMagnifier
-                            visible={magnifierState.visible}
-                            x={magnifierState.x}
-                            y={magnifierState.y}
-                            imageUri={displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900"}
-                            containerX={imageContainerLayout.x}
-                            containerY={imageContainerLayout.y}
-                            containerWidth={imageContainerLayout.width}
-                            containerHeight={imageContainerLayout.height}
-                        />
+                        <Animated.View style={[StyleSheet.absoluteFill, overlayWhenZoomedHiddenStyle]} pointerEvents="none">
+                            <NoteMagnifier
+                                visible={magnifierState.visible}
+                                x={magnifierState.x}
+                                y={magnifierState.y}
+                                imageUri={displayedImageUri ?? uri ?? "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900"}
+                                containerX={imageContainerLayout.x}
+                                containerY={imageContainerLayout.y}
+                                containerWidth={imageContainerLayout.width}
+                                containerHeight={imageContainerLayout.height}
+                            />
+                        </Animated.View>
                     )}
 
                     {/* Debug Overlay */}

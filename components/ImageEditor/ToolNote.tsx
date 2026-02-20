@@ -380,7 +380,7 @@ export const ToolNote: React.FC<ImageEditorToolProps & { activeNoteId?: string |
                 <View style={styles.emptyState}>
                     <View style={styles.hintBox}>
                         <BaseText type="Footnote" color="labels.primary" style={styles.hintText}>
-                            Hold your finger over desired spot
+                            Tap on the image where you want to add a note
                         </BaseText>
                     </View>
                 </View>
