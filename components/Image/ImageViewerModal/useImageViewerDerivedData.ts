@@ -457,16 +457,6 @@ export function useImageViewerDerivedData({
             isCompositeOriginal = isComposite && isOriginalMedia;
             isCompositeChild = isComposite && !isOriginalMedia;
 
-            console.log("[ImageViewerModal] effectiveActions calculation:", {
-                displayIndex,
-                currentImageUrl: currentImageUrl?.substring(0, 60),
-                isComposite,
-                isOriginalMedia,
-                isFromTemplate,
-                isCompositeOriginal,
-                isCompositeChild,
-            });
-
             // Check if single image (has original_media but no template)
             if (rawMediaData) {
                 for (const media of rawMediaData) {
@@ -480,34 +470,30 @@ export function useImageViewerDerivedData({
 
         // For composite original_media: show compare but not adjust
         if (isCompositeOriginal) {
-            const result = {
+            return {
                 showBookmark: bookmark,
-                showEdit: false, // Hide adjust button for composite original
+                showEdit: false,
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
                 showMagic: false,
                 showNote: note,
-                showCompare: true, // Always show compare for composite original
+                showCompare: true,
             };
-            console.log("[ImageViewerModal] effectiveActions - composite original result:", result);
-            return result;
         }
 
         // For composite child images: show adjust but not compare
         if (isCompositeChild) {
-            const result = {
+            return {
                 showBookmark: bookmark,
-                showEdit: true, // Always show adjust for composite child images
+                showEdit: true,
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
                 showMagic: false,
                 showNote: note,
-                showCompare: false, // Hide compare for composite child images
+                showCompare: false,
             };
-            console.log("[ImageViewerModal] effectiveActions - composite child result:", result);
-            return result;
         }
 
         // For single image without template: show adjust but not compare

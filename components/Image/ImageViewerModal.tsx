@@ -228,11 +228,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const insets = useSafeAreaInsets();
     const flatListRef = useRef<FlatList>(null);
-    const isProgrammaticScroll = useSharedValue(false); // Changed to shared value for worklet access
-    const lastThumbnailIndex = useRef(initialIndex);
-    const thumbnailUpdateTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const isHandlingScrollEnd = useRef(false);
-    const [currentIndex, setCurrentIndex] = useState(initialIndex);
+    const isProgrammaticScroll = useSharedValue(false);
     const [controlsVisible, setControlsVisible] = useState(true);
     const [imageSizes, setImageSizes] = useState<Record<number, { width: number; height: number }>>({});
     const [isZoomed, setIsZoomed] = useState(false);
@@ -302,16 +298,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Destructure effective actions (for bottom buttons)
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false, showNote = false, showCompare = false } = effectiveActions;
 
-    // Debug log for effectiveActions values
-    React.useEffect(() => {
-        console.log("[ImageViewerModal] effectiveActions destructured:", {
-            displayIndex,
-            showEdit,
-            showCompare,
-            currentImageUrl: imagesList[displayIndex]?.substring(0, 60),
-        });
-    }, [displayIndex, showEdit, showCompare, imagesList]);
-
     // Destructure effective actions for more menu (sync with bottom buttons)
     const { showArchive: showArchiveInMore = true, showEdit: showEditInMore = true, showMagic: showMagicInMore = false, showCompare: showCompareInMore = false } = effectiveActions;
 
@@ -334,20 +320,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         [scrollThumbnailToPosition],
     );
 
-    const setDisplayIndexFromScroll = React.useCallback((idx: number) => {
-        setDisplayIndex(idx);
-    }, []);
-
-    // Keep currentIndexShared and lastThumbnailIndex in sync with currentIndex
-    React.useEffect(() => {
-        currentIndexShared.value = currentIndex;
-        lastThumbnailIndex.current = currentIndex;
-    }, [currentIndex]);
-
-    // Reset index to initialIndex when modal closes; sync thumbnail and displayIndex when modal opens
+    // Reset index when modal closes; sync thumbnail and displayIndex when modal opens
     React.useEffect(() => {
         if (!visible) {
-            setCurrentIndex(initialIndex);
             setDisplayIndex(initialIndex);
             setNotesPanelVisible(false);
             setIsNotesClosing(false);
@@ -371,6 +346,13 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             thumbnailScrollX.value = getThumbnailScrollXForPage(initialIndex, imagesList.length);
         }
     }, [visible, initialIndex, imagesList.length]);
+
+    // When modal becomes visible, sync shared value and thumbnail position
+    React.useEffect(() => {
+        if (visible) {
+            currentIndexShared.value = displayIndex;
+        }
+    }, [visible, displayIndex]);
 
     // When share composition is ready, capture and share
     React.useEffect(() => {
@@ -416,16 +398,15 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         runCapture();
     }, [isSharingComposition, shareCompositionImageUri, shareCompositionDimensions, shareCompositionImageLoaded]);
 
-    // Reset zoom when changing images and scroll thumbnail
+    // Reset zoom when displayIndex changes (momentum end or thumbnail tap) and scroll thumbnail
     React.useEffect(() => {
         scale.value = withTiming(1, { duration: 250 });
         translateX.value = withTiming(0, { duration: 250 });
         translateY.value = withTiming(0, { duration: 250 });
         setIsZoomed(false);
-
-        // Immediately scroll thumbnail to center - instant with no animation
-        scrollThumbnailToIndex(currentIndex);
-    }, [currentIndex, scrollThumbnailToIndex]);
+        currentIndexShared.value = displayIndex;
+        scrollThumbnailToIndex(displayIndex);
+    }, [displayIndex, scrollThumbnailToIndex]);
 
     const handleScroll = useAnimatedScrollHandler(
         {
@@ -461,19 +442,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 const index = Math.round(clampedPage);
                 scrollProgress.value = clampedPage - index; // -0.5..0.5 for thumbnail scale animation
                 currentIndexShared.value = index;
-                runOnJS(setDisplayIndexFromScroll)(index);
             },
         },
-        [imagesList.length, setDisplayIndexFromScroll],
+        [imagesList.length],
     );
 
     const handleMomentumScrollEnd = (event: any) => {
-        // Don't update if scroll is programmatic
         if (isProgrammaticScroll.value) {
+            isProgrammaticScroll.value = false;
             return;
         }
 
-        // Don't update if zoomed
         if (scale.value > 1) {
             return;
         }
@@ -482,15 +461,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const index = Math.round(offsetX / IMAGE_PAGE_WIDTH);
         const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
 
-        // Reset scroll progress smoothly
         scrollProgress.value = withTiming(0, { duration: 200 });
-
-        // Update index if changed
-        if (validIndex !== currentIndex) {
-            setCurrentIndex(validIndex);
-            setDisplayIndex(validIndex);
-            currentIndexShared.value = validIndex;
-        }
+        setDisplayIndex(validIndex);
+        currentIndexShared.value = validIndex;
     };
 
     const handleEditPress = () => {
@@ -1172,14 +1145,38 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         };
     });
 
-    const renderImageItem = ({ item, index }: { item: string; index: number }) => {
-        const imageSize = imageSizes[index] || { width: width, height: height };
-        const gestures = createGestures(index);
-        const isCurrentImage = index === displayIndex;
-        const isLoading = imageLoadingStates.get(index) ?? false; // No loading on main image – only thumbnails
-
-        return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
-    };
+    const renderImageItem = React.useCallback(
+        ({ item, index }: { item: string; index: number }) => {
+            const imageSize = imageSizes[index] ?? { width, height };
+            const gestures = createGestures(index);
+            const isCurrentImage = index === displayIndex;
+            const isLoading = imageLoadingStates.get(index) ?? false;
+            return (
+                <ImageViewerItem
+                    item={item}
+                    index={index}
+                    imageSize={imageSize}
+                    gestures={gestures}
+                    isCurrentImage={isCurrentImage}
+                    imageAnimatedStyle={imageAnimatedStyle}
+                    isLoading={isLoading}
+                    onLoadStart={() => handleImageLoadStart(index)}
+                    onLoad={(e) => handleImageLoad(index, e)}
+                    onError={() => handleImageError(index)}
+                />
+            );
+        },
+        [
+            displayIndex,
+            imageSizes,
+            imageLoadingStates,
+            imageAnimatedStyle,
+            createGestures,
+            handleImageLoadStart,
+            handleImageLoad,
+            handleImageError,
+        ],
+    );
 
     const headerOpacity = useSharedValue(1);
     const bottomBarOpacity = useSharedValue(1);
@@ -1226,16 +1223,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }));
 
     const bottomActionCount = React.useMemo(() => {
-        const count = (showNote ? 1 : 0) + (showEdit ? 1 : 0) + (showCompare ? 1 : 0);
-        console.log("[ImageViewerModal] bottomActionCount:", {
-            displayIndex,
-            showNote,
-            showEdit,
-            showCompare,
-            count,
-        });
-        return count;
-    }, [displayIndex, showNote, showEdit, showCompare]);
+        return (showNote ? 1 : 0) + (showEdit ? 1 : 0) + (showCompare ? 1 : 0);
+    }, [showNote, showEdit, showCompare]);
 
     const bottomActionWidth = React.useMemo(() => {
         return bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
@@ -1368,13 +1357,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                                             scrollProgress.value = 0;
                                             isProgrammaticScroll.value = true;
-                                            thumbnailScrollX.value = withTiming(getThumbnailScrollXForPage(index, imagesList.length), { duration: 300 });
-                                            setCurrentIndex(index);
+                                            thumbnailScrollX.value = getThumbnailScrollXForPage(index, imagesList.length);
+                                            currentIndexShared.value = index;
                                             setDisplayIndex(index);
                                             flatListRef.current?.scrollToIndex({ index, animated: true });
-                                            setTimeout(() => {
-                                                isProgrammaticScroll.value = false;
-                                            }, 500);
                                         }}
                                         isZoomed={isZoomed}
                                         notesPanelVisible={notesPanelVisible}
