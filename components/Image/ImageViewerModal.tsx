@@ -526,13 +526,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return patientId;
     }, [displayIndex, imagesList, imageUrlToPatientIdMap, patientId]);
 
-    // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, hideTakeAfter, and originalWithNoBeforeAfter
-    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap, imageUrlToOriginalNoBeforeAfterMap } = React.useMemo(() => {
+    // Build maps from rawMediaData for taker, createdAt, isOriginalMedia, hideTakeAfter, originalWithNoBeforeAfter, and isComposite
+    const { imageUrlToTakerMapInternal, imageUrlToCreatedAtMapFromRaw, imageUrlToIsOriginalMediaMap, imageUrlToHideTakeAfterMap, imageUrlToOriginalNoBeforeAfterMap, imageUrlToIsCompositeMap } = React.useMemo(() => {
         const takerMap = new Map<string, { first_name?: string | null; last_name?: string | null }>();
         const createdAtMap = new Map<string, string>();
         const isOriginalMediaMap = new Map<string, boolean>();
         const hideTakeAfterMap = new Map<string, boolean>();
         const originalNoBeforeAfterMap = new Map<string, boolean>();
+        const isCompositeMap = new Map<string, boolean>();
 
         if (rawMediaData && Array.isArray(rawMediaData)) {
             rawMediaData.forEach((media: RawMediaData) => {
@@ -541,6 +542,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 const hasTemplate = !!media.template;
                 const hideTakeAfter = media.has_after === true || (media.is_after === true && media.before_media_id != null);
                 const noBeforeAfter = media.has_after !== true && media.before_media_id == null;
+
+                // Check if this is a composite (has original_media, template, and images)
+                const isComposite = !!(media.original_media?.url && hasTemplate && media.images?.length);
 
                 // Add original_media to maps if it exists (composite template)
                 if (media.original_media?.url) {
@@ -561,6 +565,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                         if (noBeforeAfter) {
                             originalNoBeforeAfterMap.set(media.original_media.url, true);
                         }
+                    }
+                    // Mark as composite if it has template and images
+                    if (isComposite) {
+                        isCompositeMap.set(media.original_media.url, true);
                     }
                 }
 
@@ -598,6 +606,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                     hideTakeAfterMap.set(imageUrl, true);
                                 }
                             }
+                            // Mark template images as part of composite if parent is composite
+                            if (isComposite) {
+                                isCompositeMap.set(imageUrl, true);
+                            }
                         }
                     });
                 }
@@ -610,6 +622,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             imageUrlToIsOriginalMediaMap: isOriginalMediaMap,
             imageUrlToHideTakeAfterMap: hideTakeAfterMap,
             imageUrlToOriginalNoBeforeAfterMap: originalNoBeforeAfterMap,
+            imageUrlToIsCompositeMap: isCompositeMap,
         };
     }, [rawMediaData]);
 
@@ -662,6 +675,64 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return map;
     }, [rawMediaData]);
 
+    // Create a map from image URL to mediaImageId (for template images)
+    const imageUrlToMediaImageIdMapInternal = React.useMemo(() => {
+        const map = new Map<string, number>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            const hasTemplate = !!media.template;
+            if (hasTemplate && media.images?.length) {
+                media.images.forEach((img: { id?: number; image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
+                    if (img.id && img.image?.url) {
+                        map.set(img.image.url, img.id);
+                    }
+                    if (img.id && img.edited_image?.url) {
+                        map.set(img.edited_image.url, img.id);
+                    }
+                });
+            }
+        });
+
+        return map;
+    }, [rawMediaData]);
+
+    // Create a map from image URL to hasTemplate flag
+    const imageUrlToHasTemplateMapInternal = React.useMemo(() => {
+        const map = new Map<string, boolean>();
+        if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
+
+        rawMediaData.forEach((media: RawMediaData) => {
+            const hasTemplate = !!media.template;
+            // Mark original_media as non-template (it uses editMedia)
+            if (media.original_media?.url) {
+                map.set(media.original_media.url, false);
+            }
+            // Mark all template images as having template (they use updateMediaImage)
+            if (hasTemplate && media.images?.length) {
+                media.images.forEach((img: { image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
+                    if (img.image?.url) {
+                        map.set(img.image.url, true);
+                    }
+                    if (img.edited_image?.url) {
+                        map.set(img.edited_image.url, true);
+                    }
+                });
+            } else {
+                // Non-template media
+                const simpleMedia = media as { media?: { url?: string }; edited_media?: { url?: string } };
+                if (simpleMedia.media?.url) {
+                    map.set(simpleMedia.media.url, false);
+                }
+                if (simpleMedia.edited_media?.url) {
+                    map.set(simpleMedia.edited_media.url, false);
+                }
+            }
+        });
+
+        return map;
+    }, [rawMediaData]);
+
     // Merge taker maps (rawMediaData takes precedence)
     const finalTakerMap = React.useMemo(() => {
         const merged = new Map(imageUrlToTakerMap || []);
@@ -707,6 +778,60 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         return false;
     }, [displayIndex, imagesList, imageUrlToIsOriginalMediaMap]);
 
+    // Check if current image is from a template
+    const isCurrentImageFromTemplate = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            return imageUrlToHasTemplateMapInternal.get(currentImageUrl) === true;
+        }
+        return false;
+    }, [displayIndex, imagesList, imageUrlToHasTemplateMapInternal]);
+
+    // Check if current image is part of a composite (has original_media, template, and images)
+    const isCurrentImageComposite = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            return imageUrlToIsCompositeMap.get(currentImageUrl) === true;
+        }
+        return false;
+    }, [displayIndex, imagesList, imageUrlToIsCompositeMap]);
+
+    // Check if current image is the original_media of a composite
+    const isCurrentImageCompositeOriginal = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            const isComposite = imageUrlToIsCompositeMap.get(currentImageUrl) === true;
+            const isOriginalMedia = imageUrlToIsOriginalMediaMap.get(currentImageUrl) === true;
+            return isComposite && isOriginalMedia;
+        }
+        return false;
+    }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap]);
+
+    // Check if current image is a template image (not original_media) of a composite
+    const isCurrentImageCompositeChild = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            const isComposite = imageUrlToIsCompositeMap.get(currentImageUrl) === true;
+            const isOriginalMedia = imageUrlToIsOriginalMediaMap.get(currentImageUrl) === true;
+            return isComposite && !isOriginalMedia;
+        }
+        return false;
+    }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap]);
+
+    // Check if current image is a single image (has original_media but no template)
+    const isCurrentImageSingleImage = React.useMemo(() => {
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length && rawMediaData) {
+            const currentImageUrl = imagesList[displayIndex];
+            // Check if current image is original_media from a media item that has no template
+            for (const media of rawMediaData) {
+                if (media.original_media?.url === currentImageUrl && !media.template) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }, [displayIndex, imagesList, rawMediaData]);
+
     // Hide "Take After Template" when has_after or (is_after + before_media_id)
     const isCurrentImageHideTakeAfter = React.useMemo(() => {
         if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
@@ -728,10 +853,85 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // hasAfter = current image already has linked after (split tap → compare); !hasAfter = show + on split, tap → take after
     const currentImageHasAfter = isCurrentImageHideTakeAfter;
 
-    // Adjust actions: original gets split icon only when showCompare (e.g. patient route); respect showEdit from parent (Album has showEdit: false)
+    // Adjust actions based on image type:
+    // 1. Single image without template: note, like, adjust (no compare)
+    // 2. Single image with template (no original_media): note, like, compare, adjust
+    // 3. Composite original_media: note, like, compare (no adjust)
+    // 4. Composite child images: note, like, adjust (no compare)
     const effectiveActions = React.useMemo(() => {
         const { showShare: share = true, showRestore: restore = false, showArchive: archive = true, showBookmark: bookmark = true, showNote: note = false, showCompare: compare = false, showEdit: edit = true } = actions;
-        if (isCurrentImageOriginalMedia) {
+
+        // Get current image info directly from maps
+        let isCompositeOriginal = false;
+        let isCompositeChild = false;
+        let isSingleImage = false;
+        let isOriginalMedia = false;
+        let isFromTemplate = false;
+
+        if (imagesList.length > 0 && displayIndex >= 0 && displayIndex < imagesList.length) {
+            const currentImageUrl = imagesList[displayIndex];
+            const isComposite = imageUrlToIsCompositeMap.get(currentImageUrl) === true;
+            isOriginalMedia = imageUrlToIsOriginalMediaMap.get(currentImageUrl) === true;
+            isFromTemplate = imageUrlToHasTemplateMapInternal.get(currentImageUrl) === true;
+
+            isCompositeOriginal = isComposite && isOriginalMedia;
+            isCompositeChild = isComposite && !isOriginalMedia;
+
+            console.log("[ImageViewerModal] effectiveActions calculation:", {
+                displayIndex,
+                currentImageUrl: currentImageUrl?.substring(0, 60),
+                isComposite,
+                isOriginalMedia,
+                isFromTemplate,
+                isCompositeOriginal,
+                isCompositeChild,
+            });
+
+            // Check if single image (has original_media but no template)
+            if (rawMediaData) {
+                for (const media of rawMediaData) {
+                    if (media.original_media?.url === currentImageUrl && !media.template) {
+                        isSingleImage = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // For composite original_media: show compare but not adjust
+        if (isCompositeOriginal) {
+            const result = {
+                showBookmark: bookmark,
+                showEdit: false, // Hide adjust button for composite original
+                showArchive: archive,
+                showShare: share,
+                showRestore: restore,
+                showMagic: false,
+                showNote: note,
+                showCompare: true, // Always show compare for composite original
+            };
+            console.log("[ImageViewerModal] effectiveActions - composite original result:", result);
+            return result;
+        }
+
+        // For composite child images: show adjust but not compare
+        if (isCompositeChild) {
+            const result = {
+                showBookmark: bookmark,
+                showEdit: true, // Always show adjust for composite child images
+                showArchive: archive,
+                showShare: share,
+                showRestore: restore,
+                showMagic: false,
+                showNote: note,
+                showCompare: false, // Hide compare for composite child images
+            };
+            console.log("[ImageViewerModal] effectiveActions - composite child result:", result);
+            return result;
+        }
+
+        // For single image without template: show adjust but not compare
+        if (isSingleImage) {
             return {
                 showBookmark: bookmark,
                 showEdit: edit,
@@ -740,17 +940,39 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 showRestore: restore,
                 showMagic: false,
                 showNote: note,
-                showCompare: compare,
+                showCompare: false, // Hide compare for single images without template
             };
         }
-        return { ...actions, showCompare: actions.showCompare ?? false };
-    }, [isCurrentImageOriginalMedia, isCurrentImageOriginalNoBeforeAfter, actions]);
+
+        // For single image with template (template without original_media): show compare and adjust
+        const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
+        return {
+            showBookmark: bookmark,
+            showEdit: edit,
+            showArchive: archive,
+            showShare: share,
+            showRestore: restore,
+            showMagic: false,
+            showNote: note,
+            showCompare: shouldShowCompare,
+        };
+    }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap, imageUrlToHasTemplateMapInternal, rawMediaData, actions]);
 
     // Destructure effective actions (for bottom buttons)
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showRestore = false, showMagic = false, showNote = false, showCompare = false } = effectiveActions;
 
-    // Destructure original actions (for more menu - Archive should remain in more menu)
-    const { showArchive: showArchiveInMore = true, showEdit: showEditInMore = true, showMagic: showMagicInMore = false } = actions;
+    // Debug log for effectiveActions values
+    React.useEffect(() => {
+        console.log("[ImageViewerModal] effectiveActions destructured:", {
+            displayIndex,
+            showEdit,
+            showCompare,
+            currentImageUrl: imagesList[displayIndex]?.substring(0, 60),
+        });
+    }, [displayIndex, showEdit, showCompare, imagesList]);
+
+    // Destructure effective actions for more menu (sync with bottom buttons)
+    const { showArchive: showArchiveInMore = true, showEdit: showEditInMore = true, showMagic: showMagicInMore = false, showCompare: showCompareInMore = false } = effectiveActions;
 
     // Fetch patient data if patientId is provided
     const { data: patientDataResponse } = useGetPatientById(currentPatientId || "");
@@ -1669,9 +1891,38 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         transform: [{ translateX: -thumbnailScrollX.value }],
     }));
 
-    const bottomActionCount = (showBookmark ? 1 : 0) + (showNote ? 1 : 0) + (showEdit ? 1 : 0);
-    const bottomActionWidth =
-        bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
+    const bottomActionCount = React.useMemo(() => {
+        const count = (showNote ? 1 : 0) + (showEdit ? 1 : 0) + (showCompare ? 1 : 0);
+        console.log("[ImageViewerModal] bottomActionCount:", {
+            displayIndex,
+            showNote,
+            showEdit,
+            showCompare,
+            count,
+        });
+        return count;
+    }, [displayIndex, showNote, showEdit, showCompare]);
+
+    const bottomActionWidth = React.useMemo(() => {
+        return bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
+    }, [bottomActionCount, containerSize]);
+
+    // Memoize modifiers to prevent re-rendering glass effect
+    const bottomActionModifiers = React.useMemo(() => {
+        return [
+            padding({ all: 0 }),
+            frame({
+                height: containerSize,
+                alignment: "center",
+                width: bottomActionWidth,
+            }),
+            glassEffect({
+                glass: {
+                    variant: "regular",
+                },
+            }),
+        ];
+    }, [containerSize, bottomActionWidth]);
 
     return (
         <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen">
@@ -1744,11 +1995,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                     )}
                                                     {showBookmark && (
                                                         <Button systemImage={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"} onPress={handleBookmarkPress}>
-                                                            {(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "remove from practice album" : "add to practice album"}
+                                                            {(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "Remove from Practice Album" : "Add to Practice Album"}
                                                         </Button>
                                                     )}
                                                     {showNote && (
-                                                        <Button systemImage="note.text" onPress={handleNotePress}>
+                                                        <Button systemImage="pin" onPress={handleNotePress}>
                                                             Note
                                                         </Button>
                                                     )}
@@ -1757,9 +2008,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             Use Magic
                                                         </Button>
                                                     )}
-                                                    {showEditInMore && !isCurrentImageOriginalMedia && (
+                                                    {showCompare && (
+                                                        <Button systemImage="square.split.2x1" onPress={currentImageHasAfter ? handleSplitPress : enableTakeAfterTemplate ? handleTakeAfterTemplatePress : handleSplitPress}>
+                                                            {currentImageHasAfter ? "Compare Before & After" : enableTakeAfterTemplate ? "Create After from Template" : "Compare"}
+                                                        </Button>
+                                                    )}
+                                                    {showEditInMore && (
                                                         <Button systemImage="slider.horizontal.3" onPress={handleAdjustPress}>
-                                                            Adjustment
+                                                            Adjust
                                                         </Button>
                                                     )}
                                                     {showArchiveInMore && (
@@ -1881,7 +2137,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             />
 
                             {/* Bottom Bar: content always pinned to bottom so no layout jump when closing notes */}
-                            <Animated.View style={[styles.bottomBar, { paddingBottom: (insets.bottom || 0) + 40 }, { minHeight: notesPanelVisible || isNotesClosing ? Math.min(height * 0.45, 320) : BOTTOM_BAR_CONTENT_HEIGHT }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
+                            <Animated.View style={[styles.bottomBar, { paddingBottom: (insets.bottom || 0) + 0 }, { minHeight: notesPanelVisible || isNotesClosing ? Math.min(height * 0.45, 320) : BOTTOM_BAR_CONTENT_HEIGHT }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 <Animated.View style={[styles.bottomBarContentPinnedToBottom, bottomBarContentAnimatedStyle]} pointerEvents={notesPanelVisible ? "none" : "auto"}>
                                     {/* Thumbnail Gallery - always in layout to avoid reflow lag; when zoomed only hide visually (opacity 0) */}
                                     <View style={[styles.thumbnailScroll, { overflow: "hidden", width }, isZoomed && !notesPanelVisible && styles.thumbnailHidden]} pointerEvents={isZoomed && !notesPanelVisible ? "none" : "auto"}>
@@ -1971,54 +2227,33 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                         {/* <Button modifiers={[frame({ width: 48, height: 48 }), padding({ all: 0 })]} systemImage="square.and.arrow.up" variant="plain" controlSize="regular" onPress={handleSharePress} /> */}
                                                     </HStack>
                                                 )}
-                                                {(showBookmark || showEdit || showNote) && <Spacer />}
-                                                {(showBookmark || showEdit || showNote) && (
-                                                    <HStack
-                                                        alignment="center"
-                                                        modifiers={[
-                                                            padding({ all: 0 }),
-                                                            frame({
-                                                                height: containerSize,
-                                                                alignment: "center",
-                                                                width: bottomActionWidth,
-                                                            }),
-                                                            glassEffect({
-                                                                glass: {
-                                                                    variant: "regular",
-                                                                },
-                                                            }),
-                                                        ]}
-                                                    >
+                                                {(showNote || showEdit || showCompare) && <Spacer />}
+                                                {(showNote || showEdit || showCompare) && (
+                                                    <HStack alignment="center" modifiers={bottomActionModifiers}>
                                                         {showNote && (
                                                             <TouchableOpacity onPress={handleNotePress} className="w-[44px] h-[44px]  items-center justify-center">
                                                                 <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} style={{ bottom: -2, left: 8 }} />
                                                             </TouchableOpacity>
                                                         )}
-                                                        {showBookmark && (
-                                                            <TouchableOpacity onPress={handleBookmarkPress} className="relative items-center justify-center w-[44px] h-[44px]">
-                                                                <IconSymbol
-                                                                    size={iconSize}
-                                                                    name={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"}
-                                                                    color={colors.system.white as any}
-                                                                    style={{ bottom: -2, left: bottomActionCount === 1 ? 2 : 5 }}
-                                                                />
-                                                            </TouchableOpacity>
-                                                        )}
-                                                        {showEdit && (
-                                                            <TouchableOpacity onPress={showCompare && isCurrentImageOriginalMedia ? (currentImageHasAfter ? handleSplitPress : enableTakeAfterTemplate ? handleTakeAfterTemplatePress : handleSplitPress) : handleAdjustPress} className="w-[44px] h-[44px] relative items-center justify-center">
-                                                                <IconSymbol size={iconSize} name={showCompare && isCurrentImageOriginalMedia ? "square.split.2x1" : "slider.horizontal.3"} color={colors.system.white as any} style={{ bottom: -2 }} />
-                                                                {showCompare && isCurrentImageOriginalMedia && !currentImageHasAfter && enableTakeAfterTemplate && (
+                                                        {showCompare && (
+                                                            <TouchableOpacity onPress={currentImageHasAfter ? handleSplitPress : enableTakeAfterTemplate ? handleTakeAfterTemplatePress : handleSplitPress} className="w-[44px] h-[44px] relative items-center justify-center">
+                                                                <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                                {!currentImageHasAfter && enableTakeAfterTemplate && (
                                                                     <View style={{ position: "absolute", top: 10, right: 4, backgroundColor: MINT_COLOR, borderRadius: 8, minWidth: 14, height: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
                                                                         <IconSymbol name="plus" size={10} color={colors.system.white as any} />
                                                                     </View>
                                                                 )}
                                                             </TouchableOpacity>
                                                         )}
+                                                        {showEdit && (
+                                                            <TouchableOpacity onPress={handleAdjustPress} className="w-[44px] h-[44px] relative items-center justify-center">
+                                                                <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                                            </TouchableOpacity>
+                                                        )}
                                                     </HStack>
                                                 )}
-
-                                                {showArchive && <Spacer />}
-                                                {showArchive && (
+                                                {showBookmark && <Spacer />}
+                                                {showBookmark && (
                                                     <HStack
                                                         alignment="center"
                                                         modifiers={[
@@ -2031,8 +2266,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                                             }),
                                                         ]}
                                                     >
-                                                        <TouchableOpacity onPress={handleArchivePress} className="w-[44px] h-[44px]  items-center justify-center">
-                                                            <IconSymbol size={iconSize} name="archivebox" style={{ bottom: -2, left: 2 }} color={colors.system.white as any} />
+                                                        <TouchableOpacity onPress={handleBookmarkPress} className="relative items-center justify-center w-[44px] h-[44px]">
+                                                            <IconSymbol size={iconSize} name={(localBookmarkMap.get(imagesList[displayIndex]) ?? imageUrlToBookmarkMapInternal.get(imagesList[displayIndex])) ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
                                                         </TouchableOpacity>
                                                     </HStack>
                                                 )}
@@ -2139,8 +2374,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 originalUri={imageEditorUri ? imageUrlToOriginalUriMapInternal.get(imageEditorUri) : undefined}
                 initialTool={imageEditorTool}
                 mediaId={imageEditorUri ? imageUrlToMediaIdMapInternal.get(imageEditorUri) : undefined}
+                mediaImageId={imageEditorUri ? imageUrlToMediaImageIdMapInternal.get(imageEditorUri) : undefined}
+                hasTemplate={imageEditorUri ? imageUrlToHasTemplateMapInternal.get(imageEditorUri) : undefined}
                 initialEditorState={imageEditorUri ? (imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined) : undefined}
                 onClose={() => setImageEditorVisible(false)}
+                showOnlyNote={imageEditorTool === "Note" && isCurrentImageCompositeOriginal}
             />
         </Modal>
     );
@@ -2228,13 +2466,14 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
+
         zIndex: 10,
         overflow: "hidden",
     },
     /** When notes panel is open, pin bottom bar content to real bottom so slide-down animates from screen bottom */
     bottomBarContentPinnedToBottom: {
         position: "absolute",
-        bottom: 0,
+        bottom: 20,
         left: 0,
         right: 0,
     },
@@ -2282,7 +2521,7 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     thumbnailScroll: {
-        marginBottom: 24,
+        marginBottom: 16,
     },
     /** When zoomed (and notes closed): hide thumbnail visually but keep in layout to avoid reflow lag */
     thumbnailHidden: {

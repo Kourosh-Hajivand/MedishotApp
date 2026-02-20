@@ -4,8 +4,8 @@ import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
-import { useEditPatientMedia, useTempUpload } from "@/utils/hook/useMedia";
-import { EditPatientMediaRequest } from "@/utils/service/models/RequestModels";
+import { useEditPatientMedia, useTempUpload, useUpdateMediaImage } from "@/utils/hook/useMedia";
+import { EditPatientMediaRequest, UpdateMediaImageRequest } from "@/utils/service/models/RequestModels";
 import { Button, Host, Text } from "@expo/ui/swift-ui";
 import axios from "axios";
 import { BlurView } from "expo-blur";
@@ -482,13 +482,19 @@ interface ImageEditorModalProps {
     originalUri?: string;
     initialTool?: string;
     mediaId?: number | string;
+    /** MediaImageId for template images (when hasTemplate is true) */
+    mediaImageId?: number | string;
+    /** Whether this image has a template (determines which API to use) */
+    hasTemplate?: boolean;
     patientId?: number | string;
     initialEditorState?: EditorState | null;
     onClose: () => void;
     onSaveSuccess?: () => void;
+    /** Show only Note tab (hide other tabs) */
+    showOnlyNote?: boolean;
 }
 
-export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, patientId, initialEditorState, onClose, onSaveSuccess }) => {
+export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, mediaImageId, hasTemplate, patientId, initialEditorState, onClose, onSaveSuccess, showOnlyNote = false }) => {
     const [activeTool, setActiveTool] = useState(initialTool || "Magic");
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
@@ -551,6 +557,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
     const { mutateAsync: tempUploadAsync } = useTempUpload();
     const { mutateAsync: editPatientMediaAsync } = useEditPatientMedia();
+    const { mutateAsync: updateMediaImageAsync } = useUpdateMediaImage();
 
     const scale = useSharedValue(1);
 
@@ -651,18 +658,29 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         transform: [{ scale: scale.value }],
     }));
 
-    const tools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
-        { name: "Adjust", icon: "dial.min.fill", disabled: false },
+    const allTools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
+        { name: "Adjust", icon: "dial.min.fill" as SymbolViewProps["name"], disabled: false },
         // { name: "Crop", icon: "crop.rotate", disabled: false }, // TODO: not complete yet
-        { name: "Note", icon: "pin.circle.fill", disabled: false },
-        { name: "Magic", icon: "sparkles", disabled: false },
-        { name: "Pen", icon: "pencil.tip.crop.circle", disabled: false },
+        { name: "Note", icon: "pin.circle.fill" as SymbolViewProps["name"], disabled: false },
+        { name: "Magic", icon: "sparkles" as SymbolViewProps["name"], disabled: false },
+        { name: "Pen", icon: "pencil.tip.crop.circle" as SymbolViewProps["name"], disabled: false },
     ];
+    const tools = showOnlyNote ? allTools.filter((tool) => tool.name === "Note") : allTools;
 
     const handleToolPress = (tool: string) => {
+        if (showOnlyNote && tool !== "Note") {
+            return; // Don't allow changing tool when showOnlyNote is true
+        }
         Haptics.selectionAsync();
         setActiveTool(tool);
     };
+
+    // When showOnlyNote is true, force activeTool to "Note"
+    useEffect(() => {
+        if (showOnlyNote && activeTool !== "Note") {
+            setActiveTool("Note");
+        }
+    }, [showOnlyNote, activeTool]);
 
     const applyAdjustments = async (imageUri: string, adjustments: AdjustChange): Promise<string | null> => {
         try {
@@ -983,7 +1001,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     }, [uri, activeTool, visible]);
 
     const handleDone = useCallback(async () => {
-        if (!mediaId) {
+        // Check if we have the required IDs based on template status
+        if (hasTemplate && !mediaImageId) {
+            Alert.alert("Cannot save", "This template image is not linked to a media image. Closing without saving.");
+            onClose();
+            return;
+        }
+        if (!hasTemplate && !mediaId) {
             Alert.alert("Cannot save", "This image is not linked to patient media. Closing without saving.");
             onClose();
             return;
@@ -1032,14 +1056,31 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 magic: magicSelection ? { modeKey: magicSelection.modeKey, resultType: magicSelection.resultType } : undefined,
                 lastActiveTool: activeTool,
             };
-            const requestData: EditPatientMediaRequest = {
-                media: filename,
-                notes: apiNotes.length ? apiNotes : undefined,
-                data: JSON.stringify({ editor }),
-            };
-            const payload = { mediaId, data: requestData };
-            console.log("📤 [ImageEditor] ارسال به بک‌اند:", JSON.stringify(payload, null, 2));
-            await editPatientMediaAsync(payload);
+
+            if (hasTemplate && mediaImageId) {
+                // Use updateMediaImage for template images
+                const requestData: UpdateMediaImageRequest = {
+                    edited_image: filename,
+                    notes: apiNotes.length ? JSON.stringify(apiNotes) : undefined,
+                    data: { editor },
+                };
+                const payload = { mediaImageId, data: requestData };
+                console.log("📤 [ImageEditor] ارسال به بک‌اند (Template):", JSON.stringify(payload, null, 2));
+                await updateMediaImageAsync(payload);
+            } else {
+                // Use editMedia for non-template images
+                if (!mediaId) {
+                    throw new Error("Missing required mediaId for non-template image");
+                }
+                const requestData: EditPatientMediaRequest = {
+                    media: filename,
+                    notes: apiNotes.length ? apiNotes : undefined,
+                    data: JSON.stringify({ editor }),
+                };
+                const payload = { mediaId, data: requestData };
+                console.log("📤 [ImageEditor] ارسال به بک‌اند (Non-Template):", JSON.stringify(payload, null, 2));
+                await editPatientMediaAsync(payload);
+            }
             onSaveSuccess?.();
             onClose();
         } catch (e) {
@@ -1048,7 +1089,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         } finally {
             setIsSaving(false);
         }
-    }, [mediaId, activeTool, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
+    }, [mediaId, mediaImageId, hasTemplate, activeTool, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, updateMediaImageAsync, onClose, onSaveSuccess]);
 
     const currentEditorSnapshot = useMemo(() => {
         const w = imageContainerLayout.width;
@@ -1079,7 +1120,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const hasUnsavedChanges = savedEditorSnapshotRef.current === null || currentEditorSnapshot !== savedEditorSnapshotRef.current;
 
     const handleRevert = useCallback(async () => {
-        if (!mediaId) {
+        if (hasTemplate && !mediaImageId) {
+            onClose();
+            return;
+        }
+        if (!hasTemplate && !mediaId) {
             onClose();
             return;
         }
@@ -1108,11 +1153,25 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             const uploadRes = await tempUploadAsync(file);
             const filename = uploadRes?.filename;
             if (!filename) throw new Error("Temp upload did not return filename");
-            const requestData: EditPatientMediaRequest = {
-                media: filename,
-                data: JSON.stringify({ editor: { editorVersion: 1 } }),
-            };
-            await editPatientMediaAsync({ mediaId, data: requestData });
+
+            if (hasTemplate && mediaImageId) {
+                // Use updateMediaImage for template images
+                const requestData: UpdateMediaImageRequest = {
+                    edited_image: filename,
+                    data: { editor: { editorVersion: 1 } },
+                };
+                await updateMediaImageAsync({ mediaImageId, data: requestData });
+            } else {
+                // Use editMedia for non-template images
+                if (!mediaId) {
+                    throw new Error("Missing required mediaId for non-template image revert");
+                }
+                const requestData: EditPatientMediaRequest = {
+                    media: filename,
+                    data: JSON.stringify({ editor: { editorVersion: 1 } }),
+                };
+                await editPatientMediaAsync({ mediaId, data: requestData });
+            }
             onSaveSuccess?.();
             onClose();
         } catch (e) {
@@ -1121,7 +1180,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         } finally {
             setIsSaving(false);
         }
-    }, [mediaId, originalUri, uri, tempUploadAsync, editPatientMediaAsync, onClose, onSaveSuccess]);
+    }, [mediaId, mediaImageId, hasTemplate, originalUri, uri, tempUploadAsync, editPatientMediaAsync, updateMediaImageAsync, onClose, onSaveSuccess]);
 
     // Calculate dynamic image container style based on aspect ratio
     // Use actual imageWrapper height to fill available space, with smart fallback

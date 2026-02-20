@@ -210,6 +210,78 @@ export default function PatientDetailsScreen() {
         return map;
     }, [patientMediaData?.data]);
 
+    // Create a map from image URL to mediaImageId (for template images)
+    const imageUrlToMediaImageIdMap = useMemo(() => {
+        const map = new Map<string, number>();
+        if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
+
+        patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
+            // Type guard: check if it's PatientMediaWithTemplate
+            const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
+
+            if (isTemplateMedia && Array.isArray(media.images)) {
+                const templateMedia = media as PatientMediaWithTemplate;
+                // Map each template image URL to its mediaImageId (PatientMediaImage.id)
+                templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
+                    const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
+                    if (imageUrl && imageItem.id) {
+                        map.set(imageUrl, imageItem.id);
+                    }
+                    // Also map edited_image URL if exists
+                    const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
+                    if (editedUrl && imageItem.id) {
+                        map.set(editedUrl, imageItem.id);
+                    }
+                });
+            }
+        });
+
+        return map;
+    }, [patientMediaData?.data]);
+
+    // Create a map from image URL to hasTemplate flag
+    const imageUrlToHasTemplateMap = useMemo(() => {
+        const map = new Map<string, boolean>();
+        if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
+
+        patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
+            const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
+
+            if (isTemplateMedia && Array.isArray(media.images)) {
+                const templateMedia = media as PatientMediaWithTemplate;
+                // Mark original_media as template (but it uses editMedia, not updateMediaImage)
+                if (templateMedia.original_media?.url) {
+                    map.set(templateMedia.original_media.url, false); // original_media uses editMedia
+                }
+                // Mark all template images as having template
+                templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
+                    const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
+                    if (imageUrl) {
+                        map.set(imageUrl, true); // template images use updateMediaImage
+                    }
+                    const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
+                    if (editedUrl) {
+                        map.set(editedUrl, true);
+                    }
+                });
+            } else {
+                // Non-template media
+                const patientMedia = media as PatientMedia;
+                if (patientMedia.original_media?.url) {
+                    map.set(patientMedia.original_media.url, false);
+                }
+                if (patientMedia.edited_media?.url) {
+                    map.set(patientMedia.edited_media.url, false);
+                }
+                if (patientMedia.media?.url) {
+                    map.set(patientMedia.media.url, false);
+                }
+            }
+        });
+
+        return map;
+    }, [patientMediaData?.data]);
+
     // Create a map from image URL to bookmark status
     const imageUrlToBookmarkMap = useMemo(() => {
         const map = new Map<string, boolean>();
@@ -1059,6 +1131,8 @@ export default function PatientDetailsScreen() {
                 originalUri={imageEditorUri ? imageUrlToOriginalUriMap.get(imageEditorUri) : undefined}
                 initialTool={imageEditorTool}
                 mediaId={imageEditorUri ? imageUrlToMediaIdMap.get(imageEditorUri) : undefined}
+                mediaImageId={imageEditorUri ? imageUrlToMediaImageIdMap.get(imageEditorUri) : undefined}
+                hasTemplate={imageEditorUri ? imageUrlToHasTemplateMap.get(imageEditorUri) : undefined}
                 initialEditorState={imageEditorUri ? imageUrlToEditorStateMap.get(imageEditorUri) : undefined}
                 onClose={() => setImageEditorVisible(false)}
                 onSaveSuccess={() => refetchPatientMedia()}
