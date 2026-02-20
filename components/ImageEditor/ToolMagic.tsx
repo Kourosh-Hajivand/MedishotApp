@@ -3,15 +3,12 @@ import colors from "@/theme/colors";
 import React, { useEffect, useRef, useState } from "react";
 import { Image, TouchableOpacity, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import Animated, { Extrapolation, FadeIn, FadeInLeft, interpolate, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, Extrapolation, FadeIn, FadeInLeft, interpolate, useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
 import { ImageEditorToolProps, MagicColorOption, MagicStyleOption } from "./types";
 
-// Apple-style spring config - smooth & fast
-const SPRING_CONFIG = {
-    damping: 22,
-    stiffness: 400,
-    mass: 0.6,
-};
+const EASE_OUT = Easing.out(Easing.cubic);
+const DURATION_FAST = 180;
+const DURATION_NORMAL = 220;
 
 const StyleOptionButton: React.FC<{
     item: MagicStyleOption;
@@ -21,21 +18,17 @@ const StyleOptionButton: React.FC<{
     index: number;
 }> = ({ item, isSelected, pulse, onPress, index }) => {
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: withSpring(isSelected ? 1 + 0.12 * pulse.value : 1, SPRING_CONFIG) }],
+        transform: [{ scale: withTiming(isSelected ? 1 + 0.06 * pulse.value : 1, { duration: DURATION_FAST, easing: EASE_OUT }) }],
     }));
 
     const borderStyle = useAnimatedStyle(() => ({
-        borderColor: withTiming(isSelected ? colors.labels.primary : "#D1D1D6", { duration: 200 }),
-        borderWidth: withTiming(isSelected ? 2 : 1, { duration: 200 }),
+        borderColor: withTiming(isSelected ? colors.labels.primary : "#D1D1D6", { duration: DURATION_FAST, easing: EASE_OUT }),
+        borderWidth: withTiming(isSelected ? 2 : 1, { duration: DURATION_FAST, easing: EASE_OUT }),
     }));
 
     return (
         <Animated.View
-            entering={FadeInLeft.duration(220)
-                .delay(30 + index * 40)
-                .springify()
-                .damping(20)
-                .stiffness(220)}
+            entering={FadeInLeft.duration(DURATION_NORMAL + index * 25).delay(20 + index * 30).easing(EASE_OUT)}
             style={animatedStyle}
         >
             <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
@@ -54,26 +47,20 @@ const ColorOptionButton: React.FC<{
     onPress: () => void;
     index: number;
 }> = ({ item, isSelected, pulse, onPress, index }) => {
-    const scale = useSharedValue(1);
-
     const animatedStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: withSpring(1 + 0.03 * pulse.value, SPRING_CONFIG) }],
+        transform: [{ scale: withTiming(1 + 0.02 * pulse.value, { duration: DURATION_FAST, easing: EASE_OUT }) }],
     }));
 
     const containerStyle = useAnimatedStyle(() => ({
-        borderColor: withTiming(isSelected ? "#D1D1D6" : "transparent", { duration: 180 }),
-        padding: withSpring(isSelected ? 4 : 0, { damping: 18, stiffness: 200 }),
-        borderRadius: withSpring(isSelected ? 20 : 16, { damping: 18, stiffness: 200 }),
-        transform: [{ scale: withSpring(isSelected ? 1.02 : 1, SPRING_CONFIG) }],
+        borderColor: withTiming(isSelected ? "#D1D1D6" : "transparent", { duration: DURATION_FAST, easing: EASE_OUT }),
+        padding: withTiming(isSelected ? 4 : 0, { duration: DURATION_FAST, easing: EASE_OUT }),
+        borderRadius: withTiming(isSelected ? 20 : 16, { duration: DURATION_FAST, easing: EASE_OUT }),
+        transform: [{ scale: withTiming(isSelected ? 1.03 : 1, { duration: DURATION_FAST, easing: EASE_OUT }) }],
     }));
 
     return (
         <Animated.View
-            entering={FadeInLeft.duration(220)
-                .delay(100 + index * 35)
-                .springify()
-                .damping(20)
-                .stiffness(220)}
+            entering={FadeInLeft.duration(DURATION_NORMAL + index * 20).delay(60 + index * 25).easing(EASE_OUT)}
             style={animatedStyle}
         >
             <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="items-center justify-center gap-2">
@@ -82,7 +69,7 @@ const ColorOptionButton: React.FC<{
                         <Image source={item.image} style={{ width: 28, height: 45, top: 5 }} resizeMode="contain" />
                     </View>
                 </Animated.View>
-                <Animated.View entering={FadeIn.duration(180).delay(180 + index * 35)}>
+                <Animated.View entering={FadeIn.duration(200).delay(120 + index * 25).easing(EASE_OUT)}>
                     <BaseText type="Caption1" color={isSelected ? "labels.primary" : "labels.secondary"}>
                         {item.title}
                     </BaseText>
@@ -106,6 +93,51 @@ const STYLE_OPTIONS: MagicStyleOption[] = [
     { title: "Venier", resultType: "pred", imageUri: require("@/assets/images/tothShape/venier.png") },
 ];
 
+/** تنظیمات پیش‌فرض API پردازش دندان (مطابق راهنمای فنی) – همهٔ منطق Magic اینجا */
+export const MAGIC_API_SETTINGS = {
+    color_settings: {
+        saturation_scale: 0.4,
+        yellow_hue_range: [15, 45],
+        red_hue_range: [0, 15],
+        sat_range: [0, 255],
+        l_range: [0, 255],
+    },
+    texture_modes: {
+        Mode_A1: {
+            fade_power: 4.0,
+            center_offset: [0.0, 0.1],
+            stretch: [0.5, 0.8],
+            center_opacity: 0.5,
+            blend_opacity: 0.8,
+            mask_color: [92, 137, 170],
+        },
+        Mode_C1: {
+            fade_power: 6.0,
+            center_offset: [0.0, 0.2],
+            stretch: [0.5, 0.8],
+            center_opacity: 0.6,
+            blend_opacity: 0.8,
+            mask_color: [112, 158, 181],
+        },
+        Mode_D3: {
+            fade_power: 6.0,
+            center_offset: [0.0, 0.2],
+            stretch: [0.5, 0.6],
+            center_opacity: 0.5,
+            blend_opacity: 0.8,
+            mask_color: [101, 152, 184],
+        },
+        Mode_A2: {
+            fade_power: 4.0,
+            center_offset: [0.0, 0.3],
+            stretch: [0.5, 0.8],
+            center_opacity: 0.99,
+            blend_opacity: 0.7,
+            mask_color: [91, 137, 170],
+        },
+    },
+} as const;
+
 export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
     const [selectedColor, setSelectedColor] = useState<MagicColorOption>(COLOR_OPTIONS[0]);
     const [selectedStyle, setSelectedStyle] = useState<MagicStyleOption>(STYLE_OPTIONS[0]);
@@ -125,22 +157,27 @@ export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
             isFirstStyleMount.current = false;
             return;
         }
-        // Apple-style pulse animation
+        // نرم و بدون بانس: یک پالس ملایم با timing
         stylePulse.value = 0;
-        stylePulse.value = withSequence(withSpring(1, { damping: 12, stiffness: 400 }), withSpring(0, { damping: 14, stiffness: 200 }));
-        // Title fade animation on change
-        titleOpacity.value = withSequence(withTiming(0.6, { duration: 80 }), withTiming(1, { duration: 200 }));
+        stylePulse.value = withSequence(
+            withTiming(1, { duration: 120, easing: EASE_OUT }),
+            withTiming(0, { duration: 200, easing: EASE_OUT }),
+        );
+        titleOpacity.value = withSequence(
+            withTiming(0.7, { duration: 60, easing: EASE_OUT }),
+            withTiming(1, { duration: 180, easing: EASE_OUT }),
+        );
     }, [selectedStyle]);
 
     const titleAnimatedStyle = useAnimatedStyle(() => ({
         opacity: titleOpacity.value,
-        transform: [{ scale: interpolate(titleOpacity.value, [0.6, 1], [0.95, 1], Extrapolation.CLAMP) }],
+        transform: [{ scale: interpolate(titleOpacity.value, [0.7, 1], [0.97, 1], Extrapolation.CLAMP) }],
     }));
 
     return (
         <View className="gap-4 pb-2">
             {/* Title Badge */}
-            <Animated.View entering={FadeIn.duration(200).delay(20).springify().damping(22)} className="absolute left-0 right-0 -top-10 items-center justify-center z-10" pointerEvents="none">
+            <Animated.View entering={FadeIn.duration(220).delay(20).easing(EASE_OUT)} className="absolute left-0 right-0 -top-10 items-center justify-center z-10" pointerEvents="none">
                 <Animated.View style={titleAnimatedStyle} className="bg-white px-3 py-1.5 rounded-lg shadow-sm">
                     <BaseText type="Subhead" color="labels.primary">
                         {selectedStyle.title}

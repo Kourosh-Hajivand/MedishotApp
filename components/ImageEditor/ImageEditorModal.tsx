@@ -1,29 +1,47 @@
-import { BaseText } from "@/components";
+import { BaseButton, BaseText } from "@/components";
 import { AdjustChange, DrawingCanvas, EditorState, ImageChange, MagicChange, PenChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
+import { useMagicGenerateMutation } from "@/utils/hook/useMagicGenerate";
 import { useEditPatientMedia, useTempUpload, useUpdateMediaImage } from "@/utils/hook/useMedia";
 import { EditPatientMediaRequest, UpdateMediaImageRequest } from "@/utils/service/models/RequestModels";
 import { Button, Host, Text } from "@expo/ui/swift-ui";
-import axios from "axios";
 import { BlurView } from "expo-blur";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Dimensions, Modal, Image as RNImage, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { Easing, FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, FadeIn, FadeOut, interpolate, LinearTransition, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { Note } from "./ToolNote";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+const MAGIC_PROGRESS_DURATION_MS = 30000;
+// Border centerline: derived from box/border so SVG path sits exactly on border
+const MAGIC_BOX_SIZE = 220;
+const MAGIC_BORDER_RADIUS = 60;
+const MAGIC_BORDER_WIDTH = 3;
+const MAGIC_HALF_BORDER = MAGIC_BORDER_WIDTH / 2;
+const MAGIC_INNER_RADIUS = MAGIC_BORDER_RADIUS - MAGIC_HALF_BORDER;
+const MAGIC_MIN = MAGIC_HALF_BORDER;
+const MAGIC_MAX = MAGIC_BOX_SIZE - MAGIC_HALF_BORDER;
+const MAGIC_RING_PATH = `M ${MAGIC_BOX_SIZE / 2} ${MAGIC_MIN} L ${MAGIC_MAX - MAGIC_INNER_RADIUS} ${MAGIC_MIN} A ${MAGIC_INNER_RADIUS} ${MAGIC_INNER_RADIUS} 0 0 1 ${MAGIC_MAX} ${MAGIC_MIN + MAGIC_INNER_RADIUS} L ${MAGIC_MAX} ${MAGIC_MAX - MAGIC_INNER_RADIUS} A ${MAGIC_INNER_RADIUS} ${MAGIC_INNER_RADIUS} 0 0 1 ${MAGIC_MAX - MAGIC_INNER_RADIUS} ${MAGIC_MAX} L ${MAGIC_MIN + MAGIC_INNER_RADIUS} ${MAGIC_MAX} A ${MAGIC_INNER_RADIUS} ${MAGIC_INNER_RADIUS} 0 0 1 ${MAGIC_MIN} ${MAGIC_MAX - MAGIC_INNER_RADIUS} L ${MAGIC_MIN} ${MAGIC_MIN + MAGIC_INNER_RADIUS} A ${MAGIC_INNER_RADIUS} ${MAGIC_INNER_RADIUS} 0 0 1 ${MAGIC_MIN + MAGIC_INNER_RADIUS} ${MAGIC_MIN} L ${MAGIC_BOX_SIZE / 2} ${MAGIC_MIN} Z`;
+const MAGIC_RING_PATH_LENGTH = 4 * (MAGIC_MAX - MAGIC_MIN - 2 * MAGIC_INNER_RADIUS) + 2 * Math.PI * MAGIC_INNER_RADIUS;
+const MAGIC_DEBUG_RETRY = false;
+const MAGIC_SKIP_API_CALL = false;
 
 const { width, height } = Dimensions.get("window");
 const CANVAS_MAX_WIDTH = width;
 const CANVAS_MAX_HEIGHT = height * 0.55;
-const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+let magicRequestInFlight = false;
 
 const SNAPSHOT_PRECISION = 4;
 function roundForSnapshot(n: number): number {
@@ -526,10 +544,21 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [debugMode, setDebugMode] = useState(false);
     const [debugTouchPosition, setDebugTouchPosition] = useState<{ x: number; y: number } | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [magicCompleted, setMagicCompleted] = useState<{ success: boolean } | null>(null);
+    const [magicRetryCount, setMagicRetryCount] = useState(0);
     const hasRequestedRef = useRef(false);
     const exportViewRef = useRef<ViewShot | null>(null);
     const pendingNormalizedPenStrokesRef = useRef<EditorState["penStrokes"]>(null);
     const savedEditorSnapshotRef = useRef<string | null>(null);
+    const magicCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const magicCancelledRef = useRef(false);
+
+    const magicGenerateMutation = useMagicGenerateMutation();
+
+    // Magic loading progress: 0 → 80% over MAGIC_PROGRESS_DURATION_MS, then → 100% when API returns (green; red on error)
+    const magicProgressShared = useSharedValue(0);
+    const magicCompleteShared = useSharedValue(0);
+    const magicErrorShared = useSharedValue(0);
 
     // Pen tool states
     const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
@@ -668,11 +697,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         { name: "Magic", icon: "sparkles" as SymbolViewProps["name"], disabled: false },
         { name: "Pen", icon: "pencil.tip.crop.circle" as SymbolViewProps["name"], disabled: false },
     ];
-    const tools = showOnlyNote
-        ? allTools.filter((tool) => tool.name === "Note")
-        : showMagicTab
-          ? allTools
-          : allTools.filter((tool) => tool.name !== "Magic");
+    const tools = showOnlyNote ? allTools.filter((tool) => tool.name === "Note") : showMagicTab ? allTools : allTools.filter((tool) => tool.name !== "Magic");
 
     const handleToolPress = (tool: string) => {
         if (showOnlyNote && tool !== "Note") {
@@ -785,62 +810,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             console.error("Error converting image to base64:", error);
             return null;
         }
-    };
-
-    // ✅ ارسال به API
-    const sendImageToAPI = async (imageBase64: string) => {
-        const requestBody = {
-            image_base64: imageBase64,
-            color_settings: {
-                saturation_scale: 0.4,
-                yellow_hue_range: [15, 45],
-                red_hue_range: [0, 15],
-                sat_range: [0, 255],
-                l_range: [0, 255],
-            },
-            texture_modes: {
-                Mode_A1: {
-                    fade_power: 4.0,
-                    center_offset: [0.0, 0.1],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.5,
-                    blend_opacity: 0.8,
-                    mask_color: [92, 137, 170],
-                },
-                Mode_C1: {
-                    fade_power: 6.0,
-                    center_offset: [0.0, 0.2],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.6,
-                    blend_opacity: 0.8,
-                    mask_color: [112, 158, 181],
-                },
-                Mode_D3: {
-                    fade_power: 6.0,
-                    center_offset: [0.0, 0.2],
-                    stretch: [0.5, 0.6],
-                    center_opacity: 0.5,
-                    blend_opacity: 0.8,
-                    mask_color: [101, 152, 184],
-                },
-                Mode_A2: {
-                    fade_power: 4.0,
-                    center_offset: [0.0, 0.3],
-                    stretch: [0.5, 0.8],
-                    center_opacity: 0.99,
-                    blend_opacity: 0.7,
-                    mask_color: [91, 137, 170],
-                },
-            },
-        };
-
-        const { data } = await axios.post(API_URL, requestBody, {
-            headers: { "Content-Type": "application/json" },
-            timeout: 1800000,
-        });
-
-        console.log("✅ Response keys:", data);
-        return data;
     };
 
     useEffect(() => {
@@ -960,6 +929,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         const normalizedModeKey = modeKey.toLowerCase();
         const entries = Object.entries(resultImages);
 
+        // API جدید: کلیدها orig_Mode_A1, pred_Mode_A1
+        const newFormatKey = `${resultType}_${modeKey}`;
+        const newMatch = resultImages[newFormatKey];
+        if (newMatch) return newMatch;
+
+        // فرمت قدیمی
         const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
         const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
         if (directMatch?.[1]) return directMatch[1];
@@ -982,36 +957,116 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         setDisplayedImageUri(uri ?? null);
     };
 
+    // When Magic loading modal opens (or Retry): run progress 0 → 80% over MAGIC_PROGRESS_DURATION_MS
     useEffect(() => {
+        if (!isLoading) return;
+        magicProgressShared.value = 0;
+        magicCompleteShared.value = 0;
+        magicErrorShared.value = 0;
+        magicProgressShared.value = withTiming(0.8, { duration: MAGIC_PROGRESS_DURATION_MS, easing: Easing.linear });
+    }, [isLoading, magicRetryCount]);
+
+    useEffect(() => {
+        return () => {
+            if (magicCloseTimeoutRef.current) {
+                clearTimeout(magicCloseTimeoutRef.current);
+                magicCloseTimeoutRef.current = null;
+            }
+        };
+    }, []);
+
+    const MAGIC_FINISH_DURATION_MS = 1100;
+    const MAGIC_COMPLETED_HOLD_MS = 600;
+
+    const finishMagicLoading = useCallback((success: boolean) => {
+        if (!success) magicErrorShared.value = withTiming(1, { duration: MAGIC_FINISH_DURATION_MS, easing: Easing.out(Easing.cubic) });
+        magicProgressShared.value = withTiming(1, { duration: MAGIC_FINISH_DURATION_MS, easing: Easing.out(Easing.cubic) }, (finished) => {
+            if (finished) runOnJS(scheduleCloseMagicModal)(success);
+        });
+        magicCompleteShared.value = withTiming(1, { duration: MAGIC_FINISH_DURATION_MS, easing: Easing.out(Easing.cubic) });
+    }, []);
+
+    const scheduleCloseMagicModal = useCallback((success: boolean) => {
+        if (MAGIC_DEBUG_RETRY) {
+            setTimeout(() => setMagicCompleted({ success }), MAGIC_COMPLETED_HOLD_MS);
+            return;
+        }
+        if (!success) {
+            setTimeout(() => setMagicCompleted({ success: false }), MAGIC_COMPLETED_HOLD_MS);
+            return;
+        }
+        if (magicCloseTimeoutRef.current) clearTimeout(magicCloseTimeoutRef.current);
+        magicCloseTimeoutRef.current = setTimeout(() => {
+            magicCloseTimeoutRef.current = null;
+            setIsLoading(false);
+            magicProgressShared.value = 0;
+            magicCompleteShared.value = 0;
+            magicErrorShared.value = 0;
+            setMagicCompleted(null);
+        }, 450);
+    }, []);
+
+    const handleMagicCancel = useCallback(() => {
+        magicCancelledRef.current = true;
+        magicRequestInFlight = false;
+        hasRequestedRef.current = false;
+        setIsLoading(false);
+        setIsProcessing(false);
+        setMagicCompleted(null);
+        magicProgressShared.value = 0;
+        magicCompleteShared.value = 0;
+        magicErrorShared.value = 0;
+    }, []);
+
+    const handleMagicRetry = useCallback(() => {
+        setMagicCompleted(null);
+        hasRequestedRef.current = false;
+        magicProgressShared.value = 0;
+        magicCompleteShared.value = 0;
+        magicErrorShared.value = 0;
+        setMagicRetryCount((c) => c + 1);
+    }, []);
+
+    useEffect(() => {
+        if (!visible) {
+            magicRequestInFlight = false;
+            return;
+        }
         const processImage = async () => {
             if (!uri || !visible) return;
-            // Only process image for Magic tool - don't process if not on Magic tab
             if (activeTool !== "Magic") {
-                // Reset loading state if not on Magic tab
                 setIsLoading(false);
                 setIsProcessing(false);
                 return;
             }
-            if (hasRequestedRef.current) return;
+            if (magicRequestInFlight || hasRequestedRef.current) return;
+            magicRequestInFlight = true;
             hasRequestedRef.current = true;
+            magicCancelledRef.current = false;
             setIsProcessing(true);
             setIsLoading(true);
+            let success = false;
             try {
                 const imageBase64 = await convertImageToBase64(uri);
+                if (magicCancelledRef.current) return;
                 if (imageBase64) {
-                    const result = await sendImageToAPI(imageBase64);
+                    const result = await magicGenerateMutation.mutateAsync(imageBase64);
+                    if (magicCancelledRef.current) return;
                     setResultImages(result);
+                    success = true;
                 }
-            } catch (error) {
-                console.error("❌ Error processing image:", error);
+            } catch {
+                // Error shown in UI (red state + Retry); no Alert, no console
             } finally {
+                magicRequestInFlight = false;
+                if (magicCancelledRef.current) return;
                 setIsProcessing(false);
-                setIsLoading(false);
+                finishMagicLoading(success);
             }
         };
 
         processImage();
-    }, [uri, activeTool, visible]);
+    }, [uri, activeTool, visible, finishMagicLoading, magicRetryCount, magicGenerateMutation.mutateAsync]);
 
     const handleDone = useCallback(async () => {
         // Check if we have the required IDs based on template status
@@ -1247,28 +1302,149 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         }
     };
 
+    const magicRingAnimatedProps = useAnimatedProps(() => {
+        "worklet";
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const strokeColor = complete > 0.5 ? (isError ? "#FF3B30" : "#34C759") : "#6B4EAA";
+        return {
+            strokeDashoffset: MAGIC_RING_PATH_LENGTH * (1 - magicProgressShared.value),
+            stroke: strokeColor,
+        };
+    });
+
+    const magicBorderStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const color = "#D1D1D6";
+        return { borderColor: color };
+    }, []);
+
+    const magicGlowStyle = useAnimatedStyle(() => {
+        const p = magicProgressShared.value;
+        const opacity = interpolate(p, [0, 0.15, 0.5, 0.9], [0, 0.5, 0.8, 1]);
+        return { opacity };
+    }, []);
+
+    const magicToothStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const translateY = complete <= 0 ? 0 : interpolate(complete, [0, 0.5, 1], [0, -14, -28]);
+        const opacity = complete <= 0 ? 1 : interpolate(complete, [0, 0.4, 0.7], [1, 0.4, 0]);
+        return { transform: [{ translateY }], opacity };
+    }, []);
+
+    const magicIconCheckStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const opacity = complete > 0.3 && !isError ? interpolate(complete, [0.3, 0.65], [0, 1]) : 0;
+        const translateY = complete > 0.3 && !isError ? interpolate(complete, [0.3, 0.75], [24, 0]) : 24;
+        const scale = interpolate(complete, [0.3, 0.7], [0.85, 1]);
+        return { opacity, transform: [{ translateY }, { scale }] };
+    }, []);
+
+    const magicIconErrorStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const opacity = complete > 0.3 && isError ? interpolate(complete, [0.3, 0.65], [0, 1]) : 0;
+        const translateY = complete > 0.3 && isError ? interpolate(complete, [0.3, 0.75], [24, 0]) : 24;
+        const scale = interpolate(complete, [0.3, 0.7], [0.85, 1]);
+        return { opacity, transform: [{ translateY }, { scale }] };
+    }, []);
+
+    const magicGradientSuccessStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const opacity = complete > 0.3 && !isError ? interpolate(complete, [0.2, 0.6], [0, 1]) : 0;
+        return { opacity };
+    }, []);
+
+    const magicGradientErrorStyle = useAnimatedStyle(() => {
+        const complete = magicCompleteShared.value;
+        const isError = magicErrorShared.value > 0.5;
+        const opacity = complete > 0.3 && isError ? interpolate(complete, [0.2, 0.6], [0, 1]) : 0;
+        return { opacity };
+    }, []);
+
     return (
         <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen">
             <SafeAreaView style={styles.container}>
-                <Modal visible={isLoading} transparent animationType="fade">
+                <Modal visible={isLoading} transparent animationType="none">
                     <View className="w-full items-center justify-center flex-1 p-3">
                         <BlurView intensity={40} tint="dark" style={styles.blurOverlay} />
-                        <View className="w-full h-fit bg-white py-[60px] rounded-3xl items-center justify-center">
-                            <TouchableOpacity className="items-center justify-center gap-[50px]">
-                                <View style={{ borderColor: "#D1D1D6", padding: 10, borderRadius: 40 }} className="w-[220px] h-[220px] border rounded-2xl">
-                                    <View className="w-full h-full bg-[#4D4D4D] rounded-[35px] items-center justify-center">
-                                        <Image source={require("@/assets/images/tothColor/A1Big.png")} style={{ width: 80, height: 160, resizeMode: "contain", top: 15 }} resizeMode="contain" />
-                                    </View>
+                        <View className="w-full max-w-[340px] bg-white py-[60px] px-8 rounded-3xl items-center justify-center">
+                            <View className="items-center justify-center gap-5">
+                                <View className="w-[220px] h-[220px]">
+                                    <Animated.View style={[styles.magicBoxOuter, magicBorderStyle]}>
+                                        <View style={[StyleSheet.absoluteFill, { top: -3, left: -3 }]} pointerEvents="none">
+                                            <Svg width={220} height={220} viewBox="0 0 220 220">
+                                                <AnimatedPath d={MAGIC_RING_PATH} fill="none" strokeWidth={3} strokeLinecap="butt" strokeLinejoin="round" strokeDasharray={MAGIC_RING_PATH_LENGTH} animatedProps={magicRingAnimatedProps} />
+                                            </Svg>
+                                        </View>
+                                        <View style={styles.magicBoxInner}>
+                                            <Animated.View style={[StyleSheet.absoluteFill, styles.magicGlowWrap, magicGlowStyle]} pointerEvents="none">
+                                                <LinearGradient colors={["transparent", "rgba(107,78,170,0.35)", "rgba(107,78,170,0.7)", "rgba(107,78,170,0.5)"]} style={styles.magicGlow} />
+                                            </Animated.View>
+                                            <Animated.View style={[StyleSheet.absoluteFill, magicGradientSuccessStyle]} pointerEvents="none">
+                                                <Svg width="100%" height="100%" viewBox="0 0 200 200" style={StyleSheet.absoluteFill} preserveAspectRatio="xMidYMid slice">
+                                                    <Defs>
+                                                        <RadialGradient id="magicBeamGreen" cx="0.5" cy="1" r="1.2" gradientUnits="objectBoundingBox">
+                                                            <Stop offset="0" stopColor="#34C759" stopOpacity="0.95" />
+                                                            <Stop offset="0.35" stopColor="#34C759" stopOpacity="0.4" />
+                                                            <Stop offset="0.6" stopColor="#34C759" stopOpacity="0.1" />
+                                                            <Stop offset="1" stopColor="#4D4D4D" stopOpacity="0" />
+                                                        </RadialGradient>
+                                                    </Defs>
+                                                    <Rect x={0} y={0} width={200} height={200} fill="#4D4D4D" />
+                                                    <Rect x={0} y={0} width={200} height={200} fill="url(#magicBeamGreen)" />
+                                                </Svg>
+                                            </Animated.View>
+                                            <Animated.View style={[StyleSheet.absoluteFill, magicGradientErrorStyle]} pointerEvents="none">
+                                                <Svg width="100%" height="100%" viewBox="0 0 200 200" style={StyleSheet.absoluteFill} preserveAspectRatio="xMidYMid slice">
+                                                    <Defs>
+                                                        <RadialGradient id="magicBeamRed" cx="0.5" cy="1" r="1.2" gradientUnits="objectBoundingBox">
+                                                            <Stop offset="0" stopColor="#FF3B30" stopOpacity="0.95" />
+                                                            <Stop offset="0.35" stopColor="#FF3B30" stopOpacity="0.4" />
+                                                            <Stop offset="0.6" stopColor="#FF3B30" stopOpacity="0.1" />
+                                                            <Stop offset="1" stopColor="#4D4D4D" stopOpacity="0" />
+                                                        </RadialGradient>
+                                                    </Defs>
+                                                    <Rect x={0} y={0} width={200} height={200} fill="#4D4D4D" />
+                                                    <Rect x={0} y={0} width={200} height={200} fill="url(#magicBeamRed)" />
+                                                </Svg>
+                                            </Animated.View>
+                                            <Animated.View style={[styles.magicToothWrap, magicToothStyle]} pointerEvents="none">
+                                                <Image source={require("@/assets/images/tothColor/A1Big.png")} style={styles.magicToothImage} resizeMode="contain" />
+                                            </Animated.View>
+                                            <View style={styles.magicIconCenterWrap} pointerEvents="none">
+                                                <Animated.View style={[styles.magicIconCircle, styles.magicIconCheck, magicIconCheckStyle]}>
+                                                    <IconSymbol name="checkmark" size={36} color="#fff" weight="bold" />
+                                                </Animated.View>
+                                                <Animated.View style={[styles.magicIconCircle, styles.magicIconError, magicIconErrorStyle]}>
+                                                    <IconSymbol name="xmark" size={36} color="#fff" weight="bold" />
+                                                </Animated.View>
+                                            </View>
+                                        </View>
+                                    </Animated.View>
                                 </View>
-                                <View className="gap-0 items-center justify-center">
+                                <View className="gap-0 items-center justify-center w-full">
                                     <BaseText type="Title1" color="labels.primary">
-                                        Magic Happening...
+                                        {magicCompleted?.success === false ? "Something went wrong" : "Magic Happening..."}
                                     </BaseText>
                                     <BaseText type="Body" color="labels.secondary">
-                                        This may take a few minutes.
+                                        {magicCompleted?.success === false ? "Tap Retry to try again or Cancel to go back." : "This may take a few minutes."}
                                     </BaseText>
+                                    {magicCompleted?.success === false ? (
+                                        <View className="flex-col gap-2 top-5 w-[200px]">
+                                            <BaseButton label="Retry" onPress={handleMagicRetry} ButtonStyle="Filled" size="Medium" rounded={true} />
+                                            <BaseButton label="Cancel" onPress={handleMagicCancel} ButtonStyle="Tinted" size="Medium" rounded={true} />
+                                        </View>
+                                    ) : (
+                                        <View className="flex-col gap-2 top-5 w-[200px]">
+                                            <BaseButton label="Cancel" onPress={handleMagicCancel} ButtonStyle="Tinted" size="Medium" rounded={true} />
+                                        </View>
+                                    )}
                                 </View>
-                            </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 </Modal>
@@ -1463,6 +1639,127 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
+    },
+    magicBoxOuter: {
+        width: 220,
+        height: 220,
+        borderRadius: 60,
+        borderWidth: 3,
+
+        overflow: "visible",
+    },
+    magicBoxInner: {
+        flex: 1,
+        margin: 10,
+        borderRadius: 50,
+        backgroundColor: "#4D4D4D",
+        overflow: "hidden",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    magicGlowWrap: {
+        borderRadius: 35,
+        overflow: "hidden",
+    },
+    magicGlow: {
+        flex: 1,
+        width: "100%",
+        height: "100%",
+    },
+    magicToothWrap: {
+        position: "absolute",
+        alignItems: "center",
+        justifyContent: "center",
+        width: "100%",
+        height: "100%",
+    },
+    magicToothImage: {
+        width: 80,
+        height: 160,
+        marginTop: 15,
+    },
+    magicIconCenterWrap: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: 20,
+    },
+    magicIconCircle: {
+        position: "absolute",
+        width: 60,
+        height: 60,
+        borderRadius: 30,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    magicIconCheck: {
+        backgroundColor: "#34C759",
+    },
+    magicIconError: {
+        backgroundColor: "#FF3B30",
+    },
+    magicIconText: {
+        color: "#fff",
+        fontSize: 40,
+        fontWeight: "600",
+    },
+    magicErrorActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        marginTop: 20,
+    },
+    magicDebugActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    magicRetryButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        backgroundColor: "#6B4EAA",
+        borderRadius: 12,
+    },
+    magicRetryText: {
+        color: "#fff",
+        fontWeight: "600",
+    },
+    magicSimulateSuccessButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: "#34C759",
+        borderRadius: 12,
+    },
+    magicSimulateErrorButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: "#FF3B30",
+        borderRadius: 12,
+    },
+    magicSimulateErrorText: {
+        color: "#fff",
+        fontWeight: "600",
+    },
+    magicCloseButton: {
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        backgroundColor: "rgba(0,0,0,0.08)",
+        borderRadius: 12,
+    },
+    magicCloseText: {
+        color: "#000",
+        fontWeight: "600",
+    },
+    magicCancelButton: {
+        marginTop: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 24,
+        backgroundColor: "rgba(0,0,0,0.08)",
+        borderRadius: 12,
+    },
+    magicCancelText: {
+        color: "#000",
+        fontWeight: "600",
     },
     undoRedoContainer: {
         flexDirection: "row",

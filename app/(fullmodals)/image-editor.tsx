@@ -1,6 +1,7 @@
 import { BaseText } from "@/components";
 import { AdjustChange, ImageChange, MagicChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
+import { MAGIC_API_SETTINGS } from "@/components/ImageEditor/ToolMagic";
 import { Note } from "@/components/ImageEditor/ToolNote";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
@@ -24,7 +25,7 @@ const CANVAS_MAX_WIDTH = SCREEN_WIDTH;
 const CANVAS_MAX_HEIGHT = SCREEN_HEIGHT * 0.55;
 
 // Constants
-const API_URL = "https://o37fm6z14czkrl-8080.proxy.runpod.net/invocations";
+const API_URL = "https://0k6nu0kv35629q-5000.proxy.runpod.net/generate";
 const API_TIMEOUT_MS = 1800000; // 30 minutes
 const DEFAULT_IMAGE_URI = "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=900";
 
@@ -647,52 +648,13 @@ export default function ImageEditorScreen() {
         }
     }, []);
 
-    // ✅ ارسال به API
+    // ✅ ارسال به API – تنظیمات از تب Magic (ToolMagic.MAGIC_API_SETTINGS)
     const sendImageToAPI = useCallback(
         async (imageBase64: string) => {
             const requestBody = {
-                image_base64: imageBase64,
-                color_settings: {
-                    saturation_scale: 0.4,
-                    yellow_hue_range: [15, 45],
-                    red_hue_range: [0, 15],
-                    sat_range: [0, 255],
-                    l_range: [0, 255],
-                },
-                texture_modes: {
-                    Mode_A1: {
-                        fade_power: 4.0,
-                        center_offset: [0.0, 0.1],
-                        stretch: [0.5, 0.8],
-                        center_opacity: 0.5,
-                        blend_opacity: 0.8,
-                        mask_color: [92, 137, 170],
-                    },
-                    Mode_C1: {
-                        fade_power: 6.0,
-                        center_offset: [0.0, 0.2],
-                        stretch: [0.5, 0.8],
-                        center_opacity: 0.6,
-                        blend_opacity: 0.8,
-                        mask_color: [112, 158, 181],
-                    },
-                    Mode_D3: {
-                        fade_power: 6.0,
-                        center_offset: [0.0, 0.2],
-                        stretch: [0.5, 0.6],
-                        center_opacity: 0.5,
-                        blend_opacity: 0.8,
-                        mask_color: [101, 152, 184],
-                    },
-                    Mode_A2: {
-                        fade_power: 4.0,
-                        center_offset: [0.0, 0.3],
-                        stretch: [0.5, 0.8],
-                        center_opacity: 0.99,
-                        blend_opacity: 0.7,
-                        mask_color: [91, 137, 170],
-                    },
-                },
+                type: "teeth",
+                image: imageBase64,
+                settings: MAGIC_API_SETTINGS,
             };
 
             try {
@@ -700,7 +662,10 @@ export default function ImageEditorScreen() {
                     headers: { "Content-Type": "application/json" },
                     timeout: API_TIMEOUT_MS,
                 });
-                return data;
+                if (data?.status !== "success") {
+                    throw new Error(data?.message ?? "API did not return success");
+                }
+                return data.images ?? data;
             } catch (error) {
                 if (axios.isAxiosError(error)) {
                     if (error.code === "ECONNABORTED") {
@@ -728,6 +693,9 @@ export default function ImageEditorScreen() {
             if (!modeKey) return null;
             const normalizedModeKey = modeKey.toLowerCase();
             const entries = Object.entries(resultImages);
+
+            const newFormatKey = `${resultType}_${modeKey}`;
+            if (resultImages[newFormatKey]) return resultImages[newFormatKey];
 
             const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
             const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
