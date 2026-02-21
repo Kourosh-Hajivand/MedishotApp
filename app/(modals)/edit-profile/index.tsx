@@ -113,8 +113,10 @@ export default function EditProfileScreen() {
                         .filter((address) => address.value && address.value !== "[object Object]");
                     if (addressesData.length > 0) metadataObject.addresses = addressesData;
                     // Debug: what we send for addresses
-                    console.log("[EditProfile] addresses from form (raw):", JSON.stringify(formData.addresses, null, 2));
-                    console.log("[EditProfile] addresses to API:", JSON.stringify(addressesData, null, 2));
+                    if (__DEV__) {
+                        console.log("[EditProfile] addresses from form (raw):", JSON.stringify(formData.addresses, null, 2));
+                        console.log("[EditProfile] addresses to API:", JSON.stringify(addressesData, null, 2));
+                    }
                 }
 
                 if (formData.urls?.length > 0) {

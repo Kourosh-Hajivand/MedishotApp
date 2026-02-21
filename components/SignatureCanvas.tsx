@@ -124,7 +124,7 @@ export const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasPro
 
             // Save SVG to temporary file
             if (!FileSystem.documentDirectory) {
-                console.error("FileSystem.documentDirectory is not available");
+                if (__DEV__) console.error("FileSystem.documentDirectory is not available");
                 return null;
             }
 
@@ -140,7 +140,7 @@ export const SignatureCanvas = forwardRef<SignatureCanvasRef, SignatureCanvasPro
 
             return { base64, uri: tempUri };
         } catch (error) {
-            console.error("Error saving signature:", error);
+            if (__DEV__) console.error("Error saving signature:", error);
             return null;
         }
     };

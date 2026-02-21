@@ -18,9 +18,11 @@ export default function NotificationScreen() {
     const insets = useSafeAreaInsets();
     const { selectedPractice } = useProfileStore();
     const { data: practiceData } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
-    console.log("====================================");
-    console.log(practiceData?.data?.metadata);
-    console.log("====================================");
+    if (__DEV__) {
+        console.log("====================================");
+        console.log(practiceData?.data?.metadata);
+        console.log("====================================");
+    }
     // Parse metadata
     const metadata = useMemo(() => {
         if (!practiceData?.data?.metadata) return null;

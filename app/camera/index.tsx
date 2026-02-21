@@ -506,7 +506,7 @@ export default function CameraScreen() {
             try {
                 const isAvailable = await DeviceMotion.isAvailableAsync();
                 if (!isAvailable) {
-                    console.log("DeviceMotion not available");
+                    if (__DEV__) console.log("DeviceMotion not available");
                     return;
                 }
 
@@ -532,7 +532,7 @@ export default function CameraScreen() {
                     setLevelAngle(clampedAngle);
                 });
             } catch (error) {
-                console.log("DeviceMotion error:", error);
+                if (__DEV__) console.log("DeviceMotion error:", error);
             }
         };
 

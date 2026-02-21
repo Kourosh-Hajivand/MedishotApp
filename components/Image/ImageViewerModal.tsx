@@ -497,7 +497,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             });
         },
         (error) => {
-            console.error("Error bookmarking media:", error);
+            if (__DEV__) console.error("Error bookmarking media:", error);
             Alert.alert("Error", error.message || "Failed to bookmark image");
             const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
@@ -519,7 +519,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             });
         },
         (error) => {
-            console.error("Error unbookmarking media:", error);
+            if (__DEV__) console.error("Error unbookmarking media:", error);
             Alert.alert("Error", error.message || "Failed to unbookmark image");
             const currentImageUri = imagesList[displayIndex];
             setLocalBookmarkMap((prev) => {
@@ -538,7 +538,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             onClose();
         },
         (error) => {
-            console.error("Error archiving media:", error);
+            if (__DEV__) console.error("Error archiving media:", error);
             Alert.alert("Error", error.message || "Failed to archive image");
         },
     );
@@ -884,7 +884,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const message = `Patient photo${patientName ? ` - ${patientName}` : ""}\n\nImage link: ${currentImageUri}`;
             await Share.share({ message, url: currentImageUri });
         } catch (error: any) {
-            console.error("Error sharing image:", error);
+            if (__DEV__) console.error("Error sharing image:", error);
             if (error?.message !== "User did not share") {
                 Alert.alert("Error", "Failed to share image");
             }

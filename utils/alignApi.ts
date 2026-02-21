@@ -24,6 +24,13 @@ const LOG_TAG = "[AlignAPI]";
 
 const isReactNative = typeof Platform !== "undefined" && Platform.OS !== "web";
 
+function devLog(...args: unknown[]) {
+    if (__DEV__) console.log(...args);
+}
+function devWarn(...args: unknown[]) {
+    if (__DEV__) console.warn(...args);
+}
+
 /**
  * Build FormData with ref_image (before) and cur_image (after).
  * RN: download to cache and use { uri, name, type }. Web: fetch as Blob.
@@ -33,19 +40,19 @@ async function buildAlignFormData(beforeUrl: string, afterUrl: string): Promise<
     if (isReactNative) {
         const beforeUri = `${FileSystem.cacheDirectory}align_before_${Date.now()}.jpg`;
         const afterUri = `${FileSystem.cacheDirectory}align_after_${Date.now()}.jpg`;
-        console.log(`${LOG_TAG} downloading before`, beforeUrl);
-        console.log(`${LOG_TAG} downloading after`, afterUrl);
+        devLog(`${LOG_TAG} downloading before`, beforeUrl);
+        devLog(`${LOG_TAG} downloading after`, afterUrl);
         const [beforeRes, afterRes] = await Promise.all([
             FileSystem.downloadAsync(beforeUrl, beforeUri),
             FileSystem.downloadAsync(afterUrl, afterUri),
         ]);
-        console.log(`${LOG_TAG} download result`, { beforeStatus: beforeRes.status, afterStatus: afterRes.status, beforeUri, afterUri });
+        devLog(`${LOG_TAG} download result`, { beforeStatus: beforeRes.status, afterStatus: afterRes.status, beforeUri, afterUri });
         if (beforeRes.status !== 200 || afterRes.status !== 200) {
             throw new Error(`Failed to download images: before=${beforeRes.status} after=${afterRes.status}`);
         }
         (formData as any).append("ref_image", { uri: beforeUri, name: "before.jpg", type: "image/jpeg" });
         (formData as any).append("cur_image", { uri: afterUri, name: "after.jpg", type: "image/jpeg" });
-        console.log(`${LOG_TAG} FormData built, posting to API`);
+        devLog(`${LOG_TAG} FormData built, posting to API`);
     } else {
         const [beforeRes, afterRes] = await Promise.all([fetch(beforeUrl), fetch(afterUrl)]);
         if (!beforeRes.ok || !afterRes.ok) throw new Error("Failed to fetch images");
@@ -62,7 +69,7 @@ async function buildAlignFormData(beforeUrl: string, afterUrl: string): Promise<
  */
 export async function alignImages(beforeUrl: string, afterUrl: string): Promise<AlignApiResult> {
     const logPayload = { beforeUrl: beforeUrl?.slice?.(0, 60) + "...", afterUrl: afterUrl?.slice?.(0, 60) + "..." };
-    console.log(`${LOG_TAG} request start`, logPayload);
+    devLog(`${LOG_TAG} request start`, logPayload);
 
     try {
         const formData = await buildAlignFormData(beforeUrl, afterUrl);
@@ -76,10 +83,10 @@ export async function alignImages(beforeUrl: string, afterUrl: string): Promise<
         });
 
         const raw = await res.text();
-        console.log(`${LOG_TAG} response status=${res.status}`, { bodyLength: raw?.length, bodyPreview: raw?.slice?.(0, 120) });
+        devLog(`${LOG_TAG} response status=${res.status}`, { bodyLength: raw?.length, bodyPreview: raw?.slice?.(0, 120) });
 
         if (!res.ok) {
-            console.warn(`${LOG_TAG} request failed`, { status: res.status, body: raw?.slice?.(0, 200) });
+            devWarn(`${LOG_TAG} request failed`, { status: res.status, body: raw?.slice?.(0, 200) });
             return { success: false, error: `HTTP ${res.status}: ${raw?.slice(0, 100)}` };
         }
 
@@ -87,21 +94,21 @@ export async function alignImages(beforeUrl: string, afterUrl: string): Promise<
         try {
             data = JSON.parse(raw) as AlignApiResponse;
         } catch {
-            console.warn(`${LOG_TAG} invalid JSON`, { raw: raw?.slice(0, 200) });
+            devWarn(`${LOG_TAG} invalid JSON`, { raw: raw?.slice(0, 200) });
             return { success: false, error: "Invalid JSON response" };
         }
 
         const afterAligned = data?.afterAlignedCropped;
         if (!afterAligned || typeof afterAligned !== "string") {
-            console.warn(`${LOG_TAG} missing afterAlignedCropped`, { keys: data ? Object.keys(data) : [] });
+            devWarn(`${LOG_TAG} missing afterAlignedCropped`, { keys: data ? Object.keys(data) : [] });
             return { success: false, error: "Missing afterAlignedCropped in response" };
         }
 
-        console.log(`${LOG_TAG} success`, { afterAlignedLength: afterAligned.length });
+        devLog(`${LOG_TAG} success`, { afterAlignedLength: afterAligned.length });
         return { success: true, afterAlignedCropped: afterAligned };
     } catch (e) {
         const err = e instanceof Error ? e.message : String(e);
-        console.warn(`${LOG_TAG} error`, { error: err, ...logPayload });
+        devWarn(`${LOG_TAG} error`, { error: err, ...logPayload });
         return { success: false, error: err };
     }
 }

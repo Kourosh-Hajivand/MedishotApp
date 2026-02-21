@@ -50,7 +50,7 @@ export const AuthWithSocial = ({ isLogin }: { isLogin: boolean }) => {
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [AppleAuthentication.AppleAuthenticationScope.FULL_NAME, AppleAuthentication.AppleAuthenticationScope.EMAIL],
             });
-            console.log("credential", credential);
+            if (__DEV__) console.log("credential", credential);
             const fullName = credential.fullName;
             appleCallback({
                 identity_token: credential.identityToken || "",

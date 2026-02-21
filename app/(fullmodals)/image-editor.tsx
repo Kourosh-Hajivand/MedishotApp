@@ -784,7 +784,7 @@ export default function ImageEditorScreen() {
                         setImageAspectRatio(ratio);
                     },
                     (error) => {
-                        console.error("Error loading image dimensions:", error);
+                        if (__DEV__) console.error("Error loading image dimensions:", error);
                         // Fallback to 3:2 if error
                         setImageAspectRatio(3 / 2);
                     },

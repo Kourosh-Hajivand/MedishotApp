@@ -254,7 +254,7 @@ export default function ReviewScreen() {
 
     // Helper function to retry composite upload
     const retryCompositeUpload = useCallback((uri: string) => {
-        console.log(`Retrying composite upload (attempt ${compositeRetryCountRef.current + 1}/${MAX_COMPOSITE_RETRIES})`);
+        if (__DEV__) console.log(`Retrying composite upload (attempt ${compositeRetryCountRef.current + 1}/${MAX_COMPOSITE_RETRIES})`);
 
         setCompositePhoto((prev) => {
             if (prev) {
@@ -284,10 +284,10 @@ export default function ReviewScreen() {
 
             // Extract filename from TempUploadResponse
             const filename = data?.filename;
-            console.log("Composite upload success:", { filename, data });
+            if (__DEV__) console.log("Composite upload success:", { filename, data });
 
             if (!filename) {
-                console.log("No filename in response, setting error status");
+                if (__DEV__) console.log("No filename in response, setting error status");
                 setCompositePhoto((prev) => {
                     if (prev) {
                         return { ...prev, uploadStatus: "error" as const };
@@ -300,7 +300,7 @@ export default function ReviewScreen() {
             // Update composite photo with tempFilename using functional update
             setCompositePhoto((prev) => {
                 if (prev) {
-                    console.log("Setting composite tempFilename:", filename);
+                    if (__DEV__) console.log("Setting composite tempFilename:", filename);
                     return {
                         ...prev,
                         tempFilename: filename,
@@ -311,7 +311,7 @@ export default function ReviewScreen() {
             });
         },
         (error) => {
-            console.log("Composite upload error:", error);
+            if (__DEV__) console.log("Composite upload error:", error);
             compositeRetryCountRef.current++;
 
             // Retry if we haven't exceeded max retries
@@ -327,7 +327,7 @@ export default function ReviewScreen() {
                     return prev;
                 });
             } else {
-                console.log("Max retries reached for composite upload");
+                if (__DEV__) console.log("Max retries reached for composite upload");
                 // Update status to error after all retries failed
                 setCompositePhoto((prev) => {
                     if (prev) {
@@ -520,7 +520,7 @@ export default function ReviewScreen() {
 
         // Only check composite for templates with more than one ghost
         if (needsComposite && (!finalCompositePhoto || !finalCompositePhoto.tempFilename || finalCompositePhoto.uploadStatus !== "success")) {
-            console.log("Composite not ready:", {
+            if (__DEV__) console.log("Composite not ready:", {
                 exists: !!finalCompositePhoto,
                 tempFilename: finalCompositePhoto?.tempFilename,
                 uploadStatus: finalCompositePhoto?.uploadStatus,

@@ -39,6 +39,16 @@ const defaultPracticeSettings: PracticeSettings = {
     practiceSocialMedia: false,
 };
 
+function devLog(...args: unknown[]) {
+    if (__DEV__) devLog(...args);
+}
+function devWarn(...args: unknown[]) {
+    if (__DEV__) devWarn(...args);
+}
+function devError(...args: unknown[]) {
+    if (__DEV__) devError(...args);
+}
+
 export default function SignContractScreen() {
     const { patientId, templateId } = useLocalSearchParams<{ patientId: string; templateId: string }>();
     const insets = useSafeAreaInsets();
@@ -50,9 +60,9 @@ export default function SignContractScreen() {
     const { data: patientData, isLoading: isLoadingPatient } = useGetPatientById(patientId || "");
     const { data: practiceData, isLoading: isLoadingPractice } = useGetPracticeById(selectedPractice?.id || 0, !!selectedPractice?.id);
 
-    console.log("=============== THIS IS THE CONTRACT TEMPLATE=====================");
-    console.log(contractTemplate?.data);
-    console.log("====================================");
+    devLog("=============== THIS IS THE CONTRACT TEMPLATE=====================");
+    devLog(contractTemplate?.data);
+    devLog("====================================");
 
     const [signature, setSignature] = useState<string | null>(null);
     const [signatureUri, setSignatureUri] = useState<string | null>(null);
@@ -99,7 +109,7 @@ export default function SignContractScreen() {
 
     const { mutate: uploadSignature, isPending: isUploadingSignature } = useTempUpload(
         (response) => {
-            console.log("Upload response:", response);
+            devLog("Upload response:", response);
             // Handle both wrapped and unwrapped response structures
             const responseAny = response as any;
             // Try to get id first (from backend), then filename (Livewire temp filename)
@@ -109,19 +119,19 @@ export default function SignContractScreen() {
 
             if (isUploadingPDF && fileId) {
                 // If we're uploading PDF, submit contract data immediately
-                console.log("✅ PDF uploaded successfully, submitting contract with fileId:", fileId);
+                devLog("✅ PDF uploaded successfully, submitting contract with fileId:", fileId);
                 submitContractData(String(fileId));
                 setIsUploadingPDF(false);
             } else if (fileId) {
                 // Otherwise it's signature upload
-                console.log("Setting uploadedSignatureFilename:", fileId);
+                devLog("Setting uploadedSignatureFilename:", fileId);
                 setUploadedSignatureFilename(String(fileId));
             } else {
-                console.error("No id or filename in response:", response);
+                devError("No id or filename in response:", response);
             }
         },
         (error) => {
-            console.error("Upload error:", error);
+            devError("Upload error:", error);
             Alert.alert("Error", error.message || "Failed to upload file");
             setIsUploadingPDF(false);
         },
@@ -160,14 +170,14 @@ export default function SignContractScreen() {
     // Function to generate PDF
     const generateContractPDF = useCallback(async (): Promise<string | null> => {
         if (!contractViewRef.current) {
-            console.error("contractViewRef.current is null");
+            devError("contractViewRef.current is null");
             return null;
         }
 
         try {
             setIsGeneratingPDF(true);
             setIsCapturingView(true); // Show the view for capture
-            console.log("📸 Starting PDF capture...");
+            devLog("📸 Starting PDF capture...");
 
             // Wait for view to be visible and rendered
             await new Promise((resolve) => setTimeout(resolve, 500));
@@ -184,10 +194,10 @@ export default function SignContractScreen() {
                 snapshotContentContainer: false,
             });
 
-            console.log("✅ PDF captured successfully:", uri);
+            devLog("✅ PDF captured successfully:", uri);
             return uri;
         } catch (error) {
-            console.error("❌ Error generating PDF:", error);
+            devError("❌ Error generating PDF:", error);
             Alert.alert("Error", "Failed to generate contract PDF: " + (error instanceof Error ? error.message : String(error)));
             return null;
         } finally {
@@ -240,33 +250,33 @@ export default function SignContractScreen() {
                 },
             };
 
-            console.log("========================================");
-            console.log("📤 SUBMITTING CONTRACT REQUEST DATA:");
-            console.log("========================================");
-            console.log("patientId:", requestData.patientId);
-            console.log("contract_template_id:", requestData.data.contract_template_id);
-            console.log("signature_image:", requestData.data.signature_image);
-            console.log("contract_file:", requestData.data.contract_file);
-            console.log("body type:", typeof requestData.data.body);
-            console.log("body length:", requestData.data.body?.length || 0);
-            console.log("body content (raw):", requestData.data.body);
+            devLog("========================================");
+            devLog("📤 SUBMITTING CONTRACT REQUEST DATA:");
+            devLog("========================================");
+            devLog("patientId:", requestData.patientId);
+            devLog("contract_template_id:", requestData.data.contract_template_id);
+            devLog("signature_image:", requestData.data.signature_image);
+            devLog("contract_file:", requestData.data.contract_file);
+            devLog("body type:", typeof requestData.data.body);
+            devLog("body length:", requestData.data.body?.length || 0);
+            devLog("body content (raw):", requestData.data.body);
 
             // Try to parse and pretty print body if it's JSON
             if (requestData.data.body) {
                 try {
                     const parsedBody = JSON.parse(requestData.data.body);
-                    console.log("body content (parsed & formatted):");
-                    console.log(JSON.stringify(parsedBody, null, 2));
+                    devLog("body content (parsed & formatted):");
+                    devLog(JSON.stringify(parsedBody, null, 2));
                 } catch (e) {
-                    console.log("body is not JSON, showing as string:", requestData.data.body);
+                    devLog("body is not JSON, showing as string:", requestData.data.body);
                 }
             } else {
-                console.log("body is empty or undefined");
+                devLog("body is empty or undefined");
             }
 
-            console.log("Full requestData object:");
-            console.log(JSON.stringify(requestData, null, 2));
-            console.log("========================================");
+            devLog("Full requestData object:");
+            devLog(JSON.stringify(requestData, null, 2));
+            devLog("========================================");
 
             createContract(requestData);
         },
@@ -274,18 +284,18 @@ export default function SignContractScreen() {
     );
 
     const handleSubmit = useCallback(async () => {
-        console.log("=============handleSubmit CALLED=======================");
-        console.log("signature:", !!signature, "uploadedSignatureFilename:", uploadedSignatureFilename);
-        console.log("contractViewRef.current:", !!contractViewRef.current);
+        devLog("=============handleSubmit CALLED=======================");
+        devLog("signature:", !!signature, "uploadedSignatureFilename:", uploadedSignatureFilename);
+        devLog("contractViewRef.current:", !!contractViewRef.current);
 
         if (!signature || !uploadedSignatureFilename) {
-            console.log("❌ Validation failed - signature or uploadedSignatureFilename is missing");
+            devLog("❌ Validation failed - signature or uploadedSignatureFilename is missing");
             Alert.alert("Error", "Please sign the contract first");
             return;
         }
 
         if (!contractViewRef.current) {
-            console.log("❌ contractViewRef.current is null, waiting...");
+            devLog("❌ contractViewRef.current is null, waiting...");
             // Wait a bit and try again
             await new Promise((resolve) => setTimeout(resolve, 1000));
             if (!contractViewRef.current) {
@@ -296,16 +306,16 @@ export default function SignContractScreen() {
 
         try {
             // Generate PDF first
-            console.log("📄 Generating PDF...");
+            devLog("📄 Generating PDF...");
             const pdfUri = await generateContractPDF();
-            console.log("📄 PDF URI:", pdfUri);
+            devLog("📄 PDF URI:", pdfUri);
 
             if (!pdfUri) {
-                console.log("❌ PDF generation failed");
+                devLog("❌ PDF generation failed");
                 return; // Error already shown in generateContractPDF
             }
 
-            console.log("✅ PDF generated, uploading...");
+            devLog("✅ PDF generated, uploading...");
 
             // Upload PDF to temp storage immediately
             setIsUploadingPDF(true);
@@ -318,7 +328,7 @@ export default function SignContractScreen() {
             // Use temp upload for PDF - will trigger submitContractData in uploadSignature callback
             uploadSignature(pdfFile);
         } catch (error) {
-            console.error("❌ Error in handleSubmit:", error);
+            devError("❌ Error in handleSubmit:", error);
             Alert.alert("Error", "Failed to process contract: " + (error instanceof Error ? error.message : String(error)));
             setIsUploadingPDF(false);
         }
@@ -330,7 +340,7 @@ export default function SignContractScreen() {
 
     // Debug logging
     React.useEffect(() => {
-        console.log("📊 Signature state:", {
+        devLog("📊 Signature state:", {
             signature: !!signature,
             signatureUri: !!signatureUri,
             uploadedSignatureFilename,
@@ -419,7 +429,7 @@ export default function SignContractScreen() {
                 if (signatureDataUri.startsWith("data:")) {
                     const base64Data = signatureDataUri.split(",")[1];
                     if (!FileSystem.documentDirectory) {
-                        console.warn("documentDirectory not available, using data URI");
+                        devWarn("documentDirectory not available, using data URI");
                         setSignatureFileUri(null);
                     } else {
                         const fileUri = `${FileSystem.documentDirectory}signature_${Date.now()}.png`;
@@ -427,13 +437,13 @@ export default function SignContractScreen() {
                             encoding: FileSystem.EncodingType.Base64,
                         });
                         setSignatureFileUri(fileUri);
-                        console.log("✅ Signature saved to file:", fileUri);
+                        devLog("✅ Signature saved to file:", fileUri);
                     }
                 } else {
                     setSignatureFileUri(signatureDataUri);
                 }
             } catch (error) {
-                console.error("Error saving signature to file:", error);
+                devError("Error saving signature to file:", error);
                 // Fallback to data URI if file save fails
                 setSignatureFileUri(null);
             }
@@ -449,7 +459,7 @@ export default function SignContractScreen() {
 
                 uploadSignature(file);
             } catch (error) {
-                console.error("Error preparing signature for upload:", error);
+                devError("Error preparing signature for upload:", error);
                 Alert.alert("Error", "Failed to prepare signature for upload");
             }
         }
@@ -815,7 +825,7 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
                 signatureRef.current.undo();
             }
         } catch (error) {
-            console.error("Error in undo:", error);
+            devError("Error in undo:", error);
         }
     }, []);
 
@@ -825,7 +835,7 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
                 signatureRef.current.redo();
             }
         } catch (error) {
-            console.error("Error in redo:", error);
+            devError("Error in redo:", error);
         }
     }, []);
 
@@ -835,7 +845,7 @@ const SignatureModal = React.memo(function SignatureModal({ onSave, onCancel }: 
                 signatureRef.current.clearSignature();
             }
         } catch (error) {
-            console.error("Error in clear:", error);
+            devError("Error in clear:", error);
         }
     }, []);
 
@@ -1020,7 +1030,7 @@ const ContractPDFContent = React.memo(function ContractPDFContent({ template, pa
 
     // Debug: Log signatureUri
     React.useEffect(() => {
-        console.log("📝 ContractPDFContent - signatureUri:", signatureUri ? signatureUri.substring(0, 50) + "..." : "null");
+        devLog("📝 ContractPDFContent - signatureUri:", signatureUri ? signatureUri.substring(0, 50) + "..." : "null");
     }, [signatureUri]);
 
     return (

@@ -738,7 +738,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
 
             return imageUri;
         } catch (error) {
-            console.error("Error applying adjustments:", error);
+            if (__DEV__) console.error("Error applying adjustments:", error);
             return imageUri;
         }
     };
@@ -796,7 +796,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         try {
             if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {
                 if (!FileSystem.documentDirectory) {
-                    console.error("Document directory not available");
+                    if (__DEV__) console.error("Document directory not available");
                     return null;
                 }
                 const fileUri = FileSystem.documentDirectory + "temp_image.jpg";
@@ -815,7 +815,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 return base64;
             }
         } catch (error) {
-            console.error("Error converting image to base64:", error);
+            if (__DEV__) console.error("Error converting image to base64:", error);
             return null;
         }
     };
@@ -910,7 +910,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                         setImageAspectRatio(ratio);
                     },
                     (error) => {
-                        console.error("Error loading image dimensions:", error);
+                        if (__DEV__) console.error("Error loading image dimensions:", error);
                         // Fallback to 3:2 if error
                         setImageAspectRatio(3 / 2);
                     },
@@ -956,12 +956,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         if (resultImage) {
             const formatted = formatBase64ToDataUri(resultImage);
             if (formatted) {
-                console.log("🖼️ نمایش:", selection.colorTitle);
+                if (__DEV__) console.log("🖼️ نمایش:", selection.colorTitle);
                 setDisplayedImageUri(formatted);
                 return;
             }
         }
-        console.log("🖼️ نمایش:", "اصلی");
+        if (__DEV__) console.log("🖼️ نمایش:", "اصلی");
         setDisplayedImageUri(uri ?? null);
     };
 
@@ -1300,8 +1300,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         const commonProps = {
             imageUri,
             onChange: handleImageChange,
-            onApply: () => console.log("Apply changes"),
-            onCancel: () => console.log("Cancel changes"),
+            onApply: () => __DEV__ && console.log("Apply changes"),
+            onCancel: () => __DEV__ && console.log("Cancel changes"),
         };
 
         switch (activeTool) {

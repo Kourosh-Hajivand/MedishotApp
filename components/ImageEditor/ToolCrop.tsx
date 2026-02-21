@@ -57,7 +57,7 @@ export const ToolCrop: React.FC<ImageEditorToolProps> = ({ imageUri, onChange, o
                     cropHeight.value = CROP_CONTAINER_SIZE / aspectRatio;
                 }
             },
-            (error) => console.error("Error loading image:", error),
+            (error) => { if (__DEV__) console.error("Error loading image:", error); },
         );
     }, [imageUri]);
 
@@ -184,7 +184,7 @@ export const ToolCrop: React.FC<ImageEditorToolProps> = ({ imageUri, onChange, o
 
             onApply?.();
         } catch (error) {
-            console.error("Error applying crop:", error);
+            if (__DEV__) console.error("Error applying crop:", error);
         }
     };
 

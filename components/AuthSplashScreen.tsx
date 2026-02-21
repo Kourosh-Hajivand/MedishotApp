@@ -20,7 +20,7 @@ export function AuthSplashScreen({ onAuthReady }: AuthSplashScreenProps) {
     useEffect(() => {
         if (isAuthenticated === true && practiceList?.data && practiceList.data.length > 0 && !isPracticeListLoading && !hasLoadedPractice.current) {
             hasLoadedPractice.current = true;
-            loadProfileSelection(practiceList.data).catch(console.error);
+            loadProfileSelection(practiceList.data).catch((e) => { if (__DEV__) console.error(e); });
         }
     }, [isAuthenticated, practiceList, isPracticeListLoading]);
 

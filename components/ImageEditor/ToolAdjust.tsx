@@ -155,14 +155,16 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
             // Add offset to adjust for proper centering (based on debug: +20 needed)
             const scrollToX = itemCenterX - screenWidth / 2 + 20;
 
-            console.log("=== Scroll Debug ===");
-            console.log("Item ID:", id);
-            console.log("layout.x:", layout.x);
-            console.log("layout.width:", layout.width);
-            console.log("screenWidth:", screenWidth);
-            console.log("itemCenterX:", itemCenterX);
-            console.log("scrollToX (calculated):", scrollToX);
-            console.log("scrollToX (final):", Math.max(0, scrollToX));
+            if (__DEV__) {
+                console.log("=== Scroll Debug ===");
+                console.log("Item ID:", id);
+                console.log("layout.x:", layout.x);
+                console.log("layout.width:", layout.width);
+                console.log("screenWidth:", screenWidth);
+                console.log("itemCenterX:", itemCenterX);
+                console.log("scrollToX (calculated):", scrollToX);
+                console.log("scrollToX (final):", Math.max(0, scrollToX));
+            }
 
             isScrolling.current = true;
             scrollViewRef.current.scrollTo({ x: Math.max(0, scrollToX), animated: true });
@@ -185,12 +187,14 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
                 const screenWidth = Dimensions.get("window").width;
                 const itemCenterX = layout.x + layout.width / 2;
                 const visibleCenterX = offsetX + screenWidth / 2;
-                console.log("=== Scroll Position Debug ===");
-                console.log("Current scroll offsetX:", offsetX);
-                console.log("Screen width:", screenWidth);
-                console.log("Visible center X:", visibleCenterX);
-                console.log("Item center X:", itemCenterX);
-                console.log("Difference:", visibleCenterX - itemCenterX);
+                if (__DEV__) {
+                    console.log("=== Scroll Position Debug ===");
+                    console.log("Current scroll offsetX:", offsetX);
+                    console.log("Screen width:", screenWidth);
+                    console.log("Visible center X:", visibleCenterX);
+                    console.log("Item center X:", itemCenterX);
+                    console.log("Difference:", visibleCenterX - itemCenterX);
+                }
             }
         }
 

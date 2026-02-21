@@ -89,7 +89,7 @@ export const ShareCompositionView = React.memo<ShareCompositionViewProps>(functi
                             resizeMode="contain"
                             onLoad={onImageLoad}
                             onError={() => {
-                                console.error("Failed to load share composition image");
+                                if (__DEV__) console.error("Failed to load share composition image");
                                 onImageLoad();
                             }}
                         />

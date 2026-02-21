@@ -35,7 +35,7 @@ export default function CheckoutScreen() {
             router.dismiss();
         },
         (error) => {
-            console.error("Checkout cancel error:", error);
+            if (__DEV__) console.error("Checkout cancel error:", error);
             router.dismiss();
         },
     );

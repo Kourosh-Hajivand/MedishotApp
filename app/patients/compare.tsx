@@ -86,7 +86,7 @@ export default function BeforeAfterCompareScreen() {
     // Align API: only for "Front Face Smile" or "Front Face". Store result by pair key (beforeUrl|afterUrl) so index switch shows correct image.
     useEffect(() => {
         if (pairs.length === 0) {
-            console.log(`${LOG_TAG} pairs.length=0, skip align`);
+            if (__DEV__) console.log(`${LOG_TAG} pairs.length=0, skip align`);
             return;
         }
         setAlignedAfterByKey((prev) => {
@@ -97,7 +97,7 @@ export default function BeforeAfterCompareScreen() {
             });
             return next;
         });
-        console.log(`${LOG_TAG} align effect run`, { pairsCount: pairs.length, pairs: pairs.map((p, i) => ({ i, templateName: p.templateName, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl })) });
+        if (__DEV__) console.log(`${LOG_TAG} align effect run`, { pairsCount: pairs.length, pairs: pairs.map((p, i) => ({ i, templateName: p.templateName, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl })) });
         let cancelled = false;
         const run = async () => {
             for (let i = 0; i < pairs.length; i++) {
@@ -106,18 +106,18 @@ export default function BeforeAfterCompareScreen() {
                 const name = p.templateName?.trim();
                 const shouldAlign = name && ALIGN_TEMPLATE_NAMES.includes(name as (typeof ALIGN_TEMPLATE_NAMES)[number]);
                 if (!shouldAlign || !p.beforeUrl || !p.afterUrl) {
-                    console.log(`${LOG_TAG} pair[${i}] skip align`, { templateName: name ?? "—", hasBefore: !!p.beforeUrl, hasAfter: !!p.afterUrl });
+                    if (__DEV__) console.log(`${LOG_TAG} pair[${i}] skip align`, { templateName: name ?? "—", hasBefore: !!p.beforeUrl, hasAfter: !!p.afterUrl });
                     continue;
                 }
                 const pairKey = `${p.beforeUrl}|${p.afterUrl}`;
-                console.log(`${LOG_TAG} pair[${i}] calling alignImages`, { templateName: name, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl });
+                if (__DEV__) console.log(`${LOG_TAG} pair[${i}] calling alignImages`, { templateName: name, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl });
                 const result = await alignImages(p.beforeUrl, p.afterUrl);
                 if (cancelled) return;
                 if (result.success) {
-                    console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), afterAlignedLength: result.afterAlignedCropped?.length });
+                    if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), afterAlignedLength: result.afterAlignedCropped?.length });
                     setAlignedAfterByKey((prev) => ({ ...prev, [pairKey]: result.afterAlignedCropped }));
                 } else {
-                    console.log(`${LOG_TAG} pair[${i}] align fail`, { error: "error" in result ? result.error : "" });
+                    if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align fail`, { error: "error" in result ? result.error : "" });
                 }
             }
         };
