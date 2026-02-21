@@ -808,8 +808,8 @@ export default function ReviewScreen() {
                         }))}
                         layoutPattern={layoutPattern}
                         containerWidth={width}
-                        padding={5}
-                        gap={5}
+                        padding={10}
+                        gap={10}
                         showDebugLabels={false}
                         onLayoutReady={() => {
                             setCompositeLayoutReady(true);

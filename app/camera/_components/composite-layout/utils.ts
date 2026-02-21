@@ -71,23 +71,25 @@ export const getCompositeLayoutStyle = (
 
     switch (layoutPattern) {
         case "left-tall": {
+            // Right column 8px shorter so it aligns with left tall image height
+            const rightColumnTotalH = innerH - 8;
             const rightW = (innerW - gap) / 2;
-            const rightH = (innerH - gap) / 2;
-            const rightCellW = Math.min(rightW, rightH / R);
-            const rightCellH = rightCellW * R;
+            const rightCellH = (rightColumnTotalH - gap) / 2;
+            const rightCellW = Math.min(rightW, rightCellH / R);
+            const rightCellHFinal = rightCellW * R;
             const leftW = innerW - gap - rightCellW;
             const leftH = Math.min(innerH, leftW * R);
             const leftCellW = leftH / R;
             const leftCellH = leftH;
             const leftTop = padding + (innerH - leftCellH) / 2;
-            // Calculate total width and center the entire layout
             const totalWidth = leftCellW + gap + rightCellW;
             const startX = padding + (innerW - totalWidth) / 2;
             if (index === 0) return { position: pos, left: startX, top: leftTop, width: leftCellW, height: leftCellH };
-            const r1Top = padding + (innerH - 2 * rightCellH - gap) / 2;
+            const rightTotalH = 2 * rightCellHFinal + gap;
+            const r1Top = padding + (innerH - rightTotalH) / 2;
             const rightLeft = startX + leftCellW + gap;
-            if (index === 1) return { position: pos, left: rightLeft, top: r1Top, width: rightCellW, height: rightCellH };
-            return { position: pos, left: rightLeft, top: r1Top + rightCellH + gap, width: rightCellW, height: rightCellH };
+            if (index === 1) return { position: pos, left: rightLeft, top: r1Top, width: rightCellW, height: rightCellHFinal };
+            return { position: pos, left: rightLeft, top: r1Top + rightCellHFinal + gap, width: rightCellW, height: rightCellHFinal };
         }
         case "top-wide": {
             const topH = (innerH - gap) / 2;
@@ -106,20 +108,23 @@ export const getCompositeLayoutStyle = (
             return { position: pos, left: botStartX + botCellW + gap, top: botTop, width: botCellW, height: botCellH };
         }
         case "right-tall": {
+            // Left column 8px shorter so it aligns with right tall image height
+            const leftColumnTotalH = innerH - 8;
             const leftW = (innerW - gap) / 2;
-            const leftH = (innerH - gap) / 2;
-            const leftCellW = Math.min(leftW, leftH / R);
-            const leftCellH = leftCellW * R;
+            const leftCellH = (leftColumnTotalH - gap) / 2;
+            const leftCellW = Math.min(leftW, leftCellH / R);
+            const leftCellHFinal = leftCellW * R;
             const rightW = innerW - gap - leftCellW;
             const rightH = Math.min(innerH, rightW * R);
             const rightCellW = rightH / R;
             const rightCellH = rightH;
             const rightTop = padding + (innerH - rightCellH) / 2;
-            // Calculate total width and center the entire layout
             const totalWidth = leftCellW + gap + rightCellW;
             const startX = padding + (innerW - totalWidth) / 2;
-            if (index === 0) return { position: pos, left: startX, top: padding + (innerH - 2 * leftCellH - gap) / 2, width: leftCellW, height: leftCellH };
-            if (index === 1) return { position: pos, left: startX, top: padding + (innerH - 2 * leftCellH - gap) / 2 + leftCellH + gap, width: leftCellW, height: leftCellH };
+            const leftTotalH = 2 * leftCellHFinal + gap;
+            const leftTop = padding + (innerH - leftTotalH) / 2;
+            if (index === 0) return { position: pos, left: startX, top: leftTop, width: leftCellW, height: leftCellHFinal };
+            if (index === 1) return { position: pos, left: startX, top: leftTop + leftCellHFinal + gap, width: leftCellW, height: leftCellHFinal };
             return { position: pos, left: startX + leftCellW + gap, top: rightTop, width: rightCellW, height: rightCellH };
         }
         case "top-two": {
