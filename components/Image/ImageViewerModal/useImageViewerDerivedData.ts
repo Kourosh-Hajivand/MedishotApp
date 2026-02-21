@@ -510,11 +510,11 @@ export function useImageViewerDerivedData({
             };
         }
 
-        // For composite child images: show adjust but not compare; Magic only for Full Teeth-Open / Front Face Smile
+        // For composite child images: show adjust only if caller allowed (e.g. hide in album)
         if (isCompositeChild) {
             return {
                 showBookmark: bookmark,
-                showEdit: true,
+                showEdit: edit,
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
@@ -540,8 +540,8 @@ export function useImageViewerDerivedData({
 
         // For single image with template (template without original_media): show compare and adjust; Magic only for magic templates
         const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
-        // وقتی ورق می‌زنیم روی تصاویر composite، اگر به هر دلیل نقشه‌ها این تصویر را پیدا نکنند، حداقل Adjust را نشان بده (تا ایکون‌ها هاید نشوند)
-        const forceShowEditWhenFromTemplate = isFromTemplate && !edit && !shouldShowCompare;
+        // وقتی ورق می‌زنیم روی تصاویر composite و caller اجازه داده، در صورت خالی بودن بقیه حداقل Adjust نشان بده
+        const forceShowEditWhenFromTemplate = edit && isFromTemplate && !shouldShowCompare;
         return {
             showBookmark: bookmark,
             showEdit: edit || forceShowEditWhenFromTemplate,
