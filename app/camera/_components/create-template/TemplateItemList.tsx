@@ -1,3 +1,4 @@
+import { BaseText } from "@/components";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import colors from "@/theme/colors";
 import { Image } from "expo-image";
@@ -112,6 +113,9 @@ const TemplateItemCard: React.FC<{
                     </Animated.View>
                 </View>
             </View>
+            <BaseText type="Caption1" weight={500} color="labels.secondary" numberOfLines={1} style={styles.itemName}>
+                {item.name}
+            </BaseText>
         </TouchableOpacity>
     );
 };
@@ -140,12 +144,17 @@ const styles = StyleSheet.create({
     },
     card: {
         width: 102,
-        height: 102,
+        alignItems: "center",
+    },
+    itemName: {
+        marginTop: 6,
+        textAlign: "center",
+        maxWidth: 102,
     },
     cardSelected: {},
     itemContainer: {
-        width: "100%",
-        height: "100%",
+        width: 102,
+        height: 102,
         borderRadius: 16,
         backgroundColor: "white",
         justifyContent: "center",

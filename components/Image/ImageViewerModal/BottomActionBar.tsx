@@ -76,29 +76,34 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                     {(showNote || showEdit || showCompare || showMagic) && (
                         <HStack alignment="center" modifiers={bottomActionModifiers as any}>
                             {showNote && (
-                                <TouchableOpacity onPress={onNotePress} className="w-[44px] h-[44px]  items-center justify-center">
+                                <TouchableOpacity onPress={onNotePress} style={styles.slotTouchable}>
                                     <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} style={{ bottom: -2, left: 8 }} />
                                 </TouchableOpacity>
                             )}
                             {showMagic && (
-                                <TouchableOpacity onPress={onMagicPress} className="w-[44px] h-[44px] relative items-center justify-center">
-                                    <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} style={{ bottom: -1, left: 4 }} />
+                                <TouchableOpacity onPress={onMagicPress} style={styles.slotTouchable}>
+                                    <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} style={{ bottom: -1, left: -4 }} />
                                 </TouchableOpacity>
                             )}
-                            {showCompare && (
-                                <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} className="w-[44px] h-[44px] relative items-center justify-center">
-                                    <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} style={{ bottom: -2 }} />
-                                    {!currentImageHasAfter && enableTakeAfterTemplate && (
-                                        <View style={{ position: "absolute", top: 10, right: 4, backgroundColor: MINT_COLOR, borderRadius: 8, minWidth: 14, height: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
-                                            <IconSymbol name="plus" size={10} color={colors.system.white as any} />
-                                        </View>
+                            {/* یک اسلات ثابت برای Compare و Edit تا موقعیت نپرند (کامپوزیت vs تک‌تصویر) */}
+                            {(showCompare || showEdit) && (
+                                <View style={styles.fixedSlot}>
+                                    {showCompare && (
+                                        <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={styles.slotTouchable}>
+                                            <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                            {!currentImageHasAfter && enableTakeAfterTemplate && (
+                                                <View style={{ position: "absolute", top: 10, right: 4, backgroundColor: MINT_COLOR, borderRadius: 8, minWidth: 14, height: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
+                                                    <IconSymbol name="plus" size={10} color={colors.system.white as any} />
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
                                     )}
-                                </TouchableOpacity>
-                            )}
-                            {showEdit && (
-                                <TouchableOpacity onPress={onAdjustPress} className="w-[44px] h-[44px] relative items-center justify-center">
-                                    <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
-                                </TouchableOpacity>
+                                    {showEdit && (
+                                        <TouchableOpacity onPress={onAdjustPress} style={styles.slotTouchable}>
+                                            <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             )}
                         </HStack>
                     )}
@@ -146,8 +151,24 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
     );
 });
 
+const SLOT_SIZE = 44;
+
 const styles = StyleSheet.create({
     actionButtonsContainer: {
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    fixedSlot: {
+        flexDirection: "row",
+        width: SLOT_SIZE,
+        height: SLOT_SIZE,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+    },
+    slotTouchable: {
+        width: SLOT_SIZE,
+        height: SLOT_SIZE,
         alignItems: "center",
         justifyContent: "center",
     },
