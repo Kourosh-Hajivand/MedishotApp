@@ -8,6 +8,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 const ALIGN_API_URL = "https://4lir324-mfa.hf.space/api/align";
+/** توکن پابلیک برای دسترسی به HF Space (محدود به این API) */
 const ALIGN_API_TOKEN = "Bearer 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";
 
 export interface AlignApiResponse {
