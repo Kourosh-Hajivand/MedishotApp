@@ -2,6 +2,7 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { alignImages } from "@/utils/alignApi";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -9,6 +10,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const ALIGN_TEMPLATE_NAMES = ["Front Face Smile", "Front Face"] as const;
+const LOG_TAG = "[CompareAlign]";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -29,6 +33,7 @@ interface ComparePair {
     afterUrl: string;
     beforeDate?: string;
     afterDate?: string;
+    templateName?: string;
 }
 
 export default function BeforeAfterCompareScreen() {
@@ -73,8 +78,54 @@ export default function BeforeAfterCompareScreen() {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [viewMode, setViewMode] = useState<ViewMode>("horizontal");
     const [contentHeight, setContentHeight] = useState(0);
+    // Key by "beforeUrl|afterUrl" so switching index or pair always shows the correct aligned image for that pair
+    const [alignedAfterByKey, setAlignedAfterByKey] = useState<Record<string, string>>({});
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const isProgrammaticScrollRef = useRef(false);
+
+    // Align API: only for "Front Face Smile" or "Front Face". Store result by pair key (beforeUrl|afterUrl) so index switch shows correct image.
+    useEffect(() => {
+        if (pairs.length === 0) {
+            console.log(`${LOG_TAG} pairs.length=0, skip align`);
+            return;
+        }
+        setAlignedAfterByKey((prev) => {
+            const next: Record<string, string> = {};
+            pairs.forEach((p) => {
+                const key = `${p.beforeUrl}|${p.afterUrl}`;
+                if (prev[key]) next[key] = prev[key];
+            });
+            return next;
+        });
+        console.log(`${LOG_TAG} align effect run`, { pairsCount: pairs.length, pairs: pairs.map((p, i) => ({ i, templateName: p.templateName, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl })) });
+        let cancelled = false;
+        const run = async () => {
+            for (let i = 0; i < pairs.length; i++) {
+                if (cancelled) return;
+                const p = pairs[i];
+                const name = p.templateName?.trim();
+                const shouldAlign = name && ALIGN_TEMPLATE_NAMES.includes(name as (typeof ALIGN_TEMPLATE_NAMES)[number]);
+                if (!shouldAlign || !p.beforeUrl || !p.afterUrl) {
+                    console.log(`${LOG_TAG} pair[${i}] skip align`, { templateName: name ?? "—", hasBefore: !!p.beforeUrl, hasAfter: !!p.afterUrl });
+                    continue;
+                }
+                const pairKey = `${p.beforeUrl}|${p.afterUrl}`;
+                console.log(`${LOG_TAG} pair[${i}] calling alignImages`, { templateName: name, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl });
+                const result = await alignImages(p.beforeUrl, p.afterUrl);
+                if (cancelled) return;
+                if (result.success) {
+                    console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), afterAlignedLength: result.afterAlignedCropped?.length });
+                    setAlignedAfterByKey((prev) => ({ ...prev, [pairKey]: result.afterAlignedCropped }));
+                } else {
+                    console.log(`${LOG_TAG} pair[${i}] align fail`, { error: "error" in result ? result.error : "" });
+                }
+            }
+        };
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [pairs]);
 
     // Badge bottom for horizontal mode: image is 3:2 contain, so image height = (SCREEN_WIDTH/2)*2/3; badge sits on image bottom
     const halfWidth = SCREEN_WIDTH / 2;
@@ -122,7 +173,9 @@ export default function BeforeAfterCompareScreen() {
 
     const pair = pairs[currentIndex];
     const before = pair?.beforeUrl ?? "";
-    const after = pair?.afterUrl ?? "";
+    const afterOriginal = pair?.afterUrl ?? "";
+    const pairKey = before && afterOriginal ? `${before}|${afterOriginal}` : "";
+    const afterDisplay = pairKey && alignedAfterByKey[pairKey] ? alignedAfterByKey[pairKey] : afterOriginal;
 
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -134,7 +187,7 @@ export default function BeforeAfterCompareScreen() {
         setViewMode(mode);
     }, []);
 
-    if (pairs.length === 0 || !before || !after) {
+    if (pairs.length === 0 || !before || !afterOriginal) {
         return (
             <View style={[styles.container, styles.containerWhite, { paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -191,7 +244,7 @@ export default function BeforeAfterCompareScreen() {
                         }}
                     >
                         <View style={styles.halfHorizontal}>
-                            <Image source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <Image key={`before-${pairKey}`} source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
                             <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, { bottom: badgeBottomHorizontal }]}>
                                 <BaseText type="Caption1" weight="600" color="labels.primary">
                                     Before
@@ -204,7 +257,7 @@ export default function BeforeAfterCompareScreen() {
                             </View>
                         </View>
                         <View style={styles.halfHorizontal}>
-                            <Image source={{ uri: after }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <Image key={`after-${pairKey}`} source={{ uri: afterDisplay }} style={StyleSheet.absoluteFill} contentFit="contain" />
                             <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, { bottom: badgeBottomHorizontal }]}>
                                 <BaseText type="Caption1" weight="600" color="system.blue">
                                     After
@@ -219,9 +272,9 @@ export default function BeforeAfterCompareScreen() {
                     </View>
                 )}
 
-                {isSplitLine && <BeforeAfterSplitLine beforeUrl={before} afterUrl={after} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
+                {isSplitLine && <BeforeAfterSplitLine key={`split-${pairKey}`} beforeUrl={before} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
 
-                {isSlider && <BeforeAfterSliderOpacity beforeUrl={before} afterUrl={after} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
+                {isSlider && <BeforeAfterSliderOpacity key={`slider-${pairKey}`} beforeUrl={before} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
             </View>
 
             {/* Thumbnail strip (like ImageViewerModal) – above tab bar, show even for single pair so layout is consistent */}
@@ -337,13 +390,13 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl, beforeDate, afterDate }: { 
         <View style={styles.splitLineContainer}>
             {/* Left: before image (no labels inside – they get clipped when divider moves) */}
             <Animated.View style={[styles.splitLineLeft, leftWidthStyle]}>
-                <Image source={{ uri: beforeUrl }} style={styles.splitLineImageFull} contentFit="contain" />
+                <Image key={beforeUrl} source={{ uri: beforeUrl }} style={styles.splitLineImageFull} contentFit="contain" />
             </Animated.View>
 
             {/* Right: after image */}
             <Animated.View style={[styles.splitLineRight, rightLeftStyle]}>
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]}>
-                    <Image source={{ uri: afterUrl }} style={styles.splitLineImageFull} contentFit="contain" />
+                    <Image key={afterUrl} source={{ uri: afterUrl }} style={styles.splitLineImageFull} contentFit="contain" />
                 </Animated.View>
             </Animated.View>
 
@@ -417,9 +470,9 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }
         <View style={styles.sliderContainer}>
             {/* Top: image area (no badges on image) */}
             <View style={styles.sliderImageArea}>
-                <Image source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                <Image key={beforeUrl} source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">
-                    <Image source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                    <Image key={afterUrl} source={{ uri: afterUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 </Animated.View>
             </View>
 

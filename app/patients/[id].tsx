@@ -11,7 +11,7 @@ import { e164ToDisplay } from "@/utils/helper/phoneUtils";
 import { useCreatePatientDocument, useGetPatientActivities, useGetPatientById, useGetPatientDocuments, useGetPracticeById } from "@/utils/hook";
 import { useDeletePatientMedia, useGetPatientMedia, useGetTrashMedia, useTempUpload, useUploadPatientMedia } from "@/utils/hook/useMedia";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import { PatientMedia, PatientMediaImage, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
+import { PatientDocument, PatientMedia, PatientMediaImage, PatientMediaWithTemplate } from "@/utils/service/models/ResponseModels";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -80,6 +80,23 @@ export default function PatientDetailsScreen() {
             Alert.alert("Error", error.message || "Failed to create document");
         },
     );
+
+    // ID tab: show patient.id_card as first item, then documents list (avoid duplicate by id)
+    const idTabDocuments = useMemo((): PatientDocument[] => {
+        const docs = documentsData?.data ?? [];
+        const idCard = patient?.data?.id_card;
+        if (!idCard?.url) return docs;
+        const idCardDoc: PatientDocument = {
+            id: idCard.id,
+            patient_id: Number(id) || 0,
+            type: "id_card",
+            image: idCard.url,
+            created_at: patient?.data?.updated_at ?? "",
+            updated_at: patient?.data?.updated_at ?? "",
+        };
+        const rest = docs.filter((d) => d.id !== idCard.id);
+        return [idCardDoc, ...rest];
+    }, [patient?.data?.id_card, patient?.data?.updated_at, patient?.data?.id, id, documentsData?.data]);
 
     // Switch to tab when `tab` param is provided (e.g. after signing a consent)
     useEffect(() => {
@@ -1021,7 +1038,7 @@ export default function PatientDetailsScreen() {
                             </View>
                         )}
                         {activeTab === 1 && <ConsentTabContent patientId={id} />}
-                        {activeTab === 2 && <IDTabContent documents={documentsData?.data || []} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} patientId={id} practice={practice} metadata={metadata} />}
+                        {activeTab === 2 && <IDTabContent documents={idTabDocuments} isLoading={isLoadingDocuments} error={documentsError} isError={isDocumentsError} onRetry={refetchDocuments} patientId={id} practice={practice} metadata={metadata} />}
                         {activeTab === 3 && <ActivitiesTabContent activities={activitiesData?.data || []} isLoading={isLoadingActivities} error={activitiesError} isError={isActivitiesError} onRetry={refetchActivities} />}
                     </View>
                 );
@@ -1052,7 +1069,7 @@ export default function PatientDetailsScreen() {
             isPatientMediaError,
             patientMediaError,
             refetchPatientMedia,
-            documentsData?.data,
+            idTabDocuments,
             isLoadingDocuments,
             documentsError,
             isDocumentsError,

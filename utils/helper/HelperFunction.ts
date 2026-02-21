@@ -64,6 +64,23 @@ export function normalizeUSPhoneToE164(value: string) {
 }
 
 /**
+ * Convert ALL CAPS / uppercase text to Title Case (first letter of each word capital, rest lowercase).
+ * Used for OCR output from ID cards (e.g. "CARDHOLDER" -> "Cardholder", "ANYTOWN, CA" -> "Anytown, Ca").
+ */
+export function toTitleCase(value: string | undefined | null): string {
+    if (value == null || value.trim() === "") return "";
+    return value
+        .trim()
+        .split(/\s+/)
+        .map((word) => {
+            if (word.length === 0) return word;
+            if (word.length === 1) return word.toUpperCase();
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(" ");
+}
+
+/**
  * Normalize website URL to always have https:// prefix
  * @param url - The website URL (with or without protocol)
  * @returns URL with https:// prefix, or empty string if input is empty
@@ -324,6 +341,18 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
     const emailPattern = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/;
     const emailMatch = ocrText.match(emailPattern);
     if (emailMatch) data.email = emailMatch[1];
+
+    // Normalize text fields from OCR ALL CAPS to Title Case (only first letter capital)
+    if (data.firstName) data.firstName = toTitleCase(data.firstName);
+    if (data.lastName) data.lastName = toTitleCase(data.lastName);
+    if (data.addressStreet) data.addressStreet = toTitleCase(data.addressStreet);
+    if (data.addressCity) data.addressCity = toTitleCase(data.addressCity);
+    if (data.addressStreet || data.addressCity || data.addressState || data.addressZip) {
+        const parts = [data.addressStreet, data.addressCity, data.addressState, data.addressZip].filter(Boolean);
+        data.address = parts.join(", ");
+    } else if (data.address) {
+        data.address = toTitleCase(data.address);
+    }
 
     return data;
 }

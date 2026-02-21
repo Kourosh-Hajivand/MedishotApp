@@ -671,7 +671,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const currentImageUri = imagesList[displayIndex];
         if (!rawMediaData?.length || !patientId) return;
 
-        const pairs: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string }[] = [];
+        const pairs: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string; templateName?: string }[] = [];
         let currentPairIndex = 0;
         type ImageCell = NonNullable<RawMediaData["images"]>[number];
         let beforeImages: ImageCell[] | null = null;
@@ -735,7 +735,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const afterUrl = afterImages[i].image?.url;
             const beforeDate = (beforeImages[i] as any).created_at;
             const afterDate = (afterImages[i] as any).created_at;
-            if (beforeUrl && afterUrl) pairs.push({ beforeUrl, afterUrl, beforeDate, afterDate });
+            const templateName = (beforeImages[i] as any).gost?.name ?? (afterImages[i] as any).gost?.name;
+            if (beforeUrl && afterUrl) pairs.push({ beforeUrl, afterUrl, beforeDate, afterDate, templateName });
         }
 
         if (pairs.length === 0) {

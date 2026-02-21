@@ -120,7 +120,7 @@ export const IDTabContent: React.FC<IDTabContentProps> = React.memo(({ documents
                     {/* Footer - Type and Date */}
                     <View style={styles.cardFooter}>
                         <BaseText type="Subhead" weight="600" color="labels.primary" style={styles.cardType}>
-                            {item.type || "ID Document"}
+                            {"ID Document"}
                         </BaseText>
                         <BaseText type="Caption1" weight="400" color="labels.secondary" style={styles.cardDate}>
                             {getRelativeTime(item.created_at)}
