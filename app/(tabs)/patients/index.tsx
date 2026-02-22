@@ -284,7 +284,7 @@ export default function PatientsScreen() {
 
         const sorted = [...rawPatients];
 
-        // Sort by Name or Date
+        // Sort by Name, Chart Number, or Date
         if (sortBy === "date") {
             // Sort by created_at (newest first by default, or oldest first if nameOrder is "asc")
             sorted.sort((a, b) => {
@@ -292,6 +292,16 @@ export default function PatientsScreen() {
                 const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
                 // If nameOrder is "asc", show oldest first; otherwise show newest first
                 return nameOrder === "asc" ? dateA - dateB : dateB - dateA;
+            });
+        } else if (sortBy === "chartNumber") {
+            // Sort by chart_number (numeric). Missing/invalid → end of list. nameOrder "asc" = low→high, "desc" = high→low
+            sorted.sort((a, b) => {
+                const numA = typeof a.chart_number === "number" ? a.chart_number : typeof a.chart_number === "string" ? parseInt(a.chart_number, 10) : NaN;
+                const numB = typeof b.chart_number === "number" ? b.chart_number : typeof b.chart_number === "string" ? parseInt(b.chart_number, 10) : NaN;
+                const valA = Number.isFinite(numA) ? numA : Infinity;
+                const valB = Number.isFinite(numB) ? numB : Infinity;
+                if (nameOrder === "desc") return valB - valA; // high → low
+                return valA - valB; // low → high (asc)
             });
         } else {
             // Sort by Name (default)
@@ -335,8 +345,8 @@ export default function PatientsScreen() {
     const renderSectionHeader = useCallback(
         (info: { section: { title: string; data: readonly Patient[] } }) => {
             const { title } = info.section;
-            // Hide header when sorting by date (title is "All")
-            if (sortBy === "date" && title === "All") {
+            // Hide header when sorting by date or chart number (title is "All")
+            if ((sortBy === "date" || sortBy === "chartNumber") && title === "All") {
                 return null;
             }
             return (
@@ -354,8 +364,8 @@ export default function PatientsScreen() {
     const groupedPatients = useMemo(() => {
         if (!currentPatients || currentPatients.length === 0) return {};
 
-        if (sortBy === "date") {
-            // When sorting by date, use a single section with all patients
+        if (sortBy === "date" || sortBy === "chartNumber") {
+            // When sorting by date or chart number, use a single section with all patients
             return { All: currentPatients };
         } else {
             // When sorting by name, group by first letter
@@ -405,8 +415,8 @@ export default function PatientsScreen() {
     const sections = useMemo(() => {
         const keys = Object.keys(filteredGroupedPatients);
 
-        // If sorting by date, return single section
-        if (sortBy === "date") {
+        // If sorting by date or chart number, return single section
+        if (sortBy === "date" || sortBy === "chartNumber") {
             return keys.map((key) => ({
                 title: key,
                 data: filteredGroupedPatients[key],
@@ -424,8 +434,8 @@ export default function PatientsScreen() {
     }, [filteredGroupedPatients, sortBy]);
 
     const alphabetWithHash = useMemo(() => {
-        // Hide alphabet sidebar when sorting by date
-        if (sortBy === "date") return [];
+        // Hide alphabet sidebar when sorting by date or chart number
+        if (sortBy === "date" || sortBy === "chartNumber") return [];
         return sections.some((s) => s.title === "#") ? [...alphabet, "#"] : alphabet;
     }, [sections, sortBy]);
 

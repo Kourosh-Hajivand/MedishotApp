@@ -57,12 +57,11 @@ import { IconSymbol } from "../ui/icon-symbol";
 import { ViewerActionsConfig } from "./GalleryWithMenu";
 import { BottomActionBar } from "./ImageViewerModal/BottomActionBar";
 import { HeaderBar } from "./ImageViewerModal/HeaderBar";
-import { ImageViewerItem } from "./ImageViewerModal/ImageViewerItem";
 import { ImageCarousel } from "./ImageViewerModal/ImageCarousel";
+import { ImageViewerItem } from "./ImageViewerModal/ImageViewerItem";
 import { NotesOverlay } from "./ImageViewerModal/NotesOverlay";
 import { NotesPanelContainer } from "./ImageViewerModal/NotesPanelContainer";
 import { ShareCompositionView } from "./ImageViewerModal/ShareCompositionView";
-import { ThumbnailItem } from "./ImageViewerModal/ThumbnailItem";
 import { ThumbnailStrip } from "./ImageViewerModal/ThumbnailStrip";
 import { useImageViewerDerivedData } from "./ImageViewerModal/useImageViewerDerivedData";
 
@@ -200,15 +199,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
     const {
         imagesList,
-        maps: {
-            imageUrlToMediaIdMapInternal,
-            imageUrlToBookmarkMapInternal,
-            imageUrlToCreatedAtMapInternal,
-            imageUrlToMediaImageIdMapInternal,
-            imageUrlToHasTemplateMapInternal,
-            imageUrlToOriginalUriMapInternal,
-            imageUrlToEditorStateMapInternal,
-        },
+        maps: { imageUrlToMediaIdMapInternal, imageUrlToBookmarkMapInternal, imageUrlToCreatedAtMapInternal, imageUrlToMediaImageIdMapInternal, imageUrlToHasTemplateMapInternal, imageUrlToOriginalUriMapInternal, imageUrlToEditorStateMapInternal },
         derived: {
             currentTaker,
             currentCreatedAt,
@@ -534,7 +525,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     const { mutate: archiveMedia } = useDeletePatientMedia(
         () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            Alert.alert("Success", "Image archived successfully");
             onClose();
         },
         (error) => {
@@ -582,7 +572,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             bookmarkMedia(mediaId);
         }
     };
-
 
     React.useEffect(() => {
         if (notesPanelVisible && notesForCurrentImage.length > 0) {
@@ -1163,31 +1152,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const gestures = createGestures(index);
             const isCurrentImage = index === displayIndex;
             const isLoading = imageLoadingStates.get(index) ?? false;
-            return (
-                <ImageViewerItem
-                    item={item}
-                    index={index}
-                    imageSize={imageSize}
-                    gestures={gestures}
-                    isCurrentImage={isCurrentImage}
-                    imageAnimatedStyle={imageAnimatedStyle}
-                    isLoading={isLoading}
-                    onLoadStart={() => handleImageLoadStart(index)}
-                    onLoad={(e) => handleImageLoad(index, e)}
-                    onError={() => handleImageError(index)}
-                />
-            );
+            return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
         },
-        [
-            displayIndex,
-            imageSizes,
-            imageLoadingStates,
-            imageAnimatedStyle,
-            createGestures,
-            handleImageLoadStart,
-            handleImageLoad,
-            handleImageError,
-        ],
+        [displayIndex, imageSizes, imageLoadingStates, imageAnimatedStyle, createGestures, handleImageLoadStart, handleImageLoad, handleImageError],
     );
 
     const headerOpacity = useSharedValue(1);
@@ -1308,28 +1275,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             />
 
                             {/* Note markers on image when notes panel open */}
-                            <NotesOverlay
-                                notesPanelVisible={notesPanelVisible}
-                                notesForCurrentImage={notesForCurrentImage}
-                                imageSizes={imageSizes}
-                                displayIndex={displayIndex}
-                                imageAnimatedStyle={imageAnimatedStyle}
-                                selectedNoteId={selectedNoteId}
-                                onSelectNote={setSelectedNoteId}
-                            />
+                            <NotesOverlay notesPanelVisible={notesPanelVisible} notesForCurrentImage={notesForCurrentImage} imageSizes={imageSizes} displayIndex={displayIndex} imageAnimatedStyle={imageAnimatedStyle} selectedNoteId={selectedNoteId} onSelectNote={setSelectedNoteId} />
 
                             {/* Image Carousel */}
-                            <ImageCarousel
-                                flatListRef={flatListRef as any}
-                                width={width}
-                                imagePageWidth={IMAGE_PAGE_WIDTH}
-                                data={imagesList}
-                                initialIndex={initialIndex}
-                                onScroll={handleScroll}
-                                onMomentumScrollEnd={handleMomentumScrollEnd}
-                                renderItem={renderImageItem}
-                                scrollEnabled={!isZoomed}
-                            />
+                            <ImageCarousel flatListRef={flatListRef as any} width={width} imagePageWidth={IMAGE_PAGE_WIDTH} data={imagesList} initialIndex={initialIndex} onScroll={handleScroll} onMomentumScrollEnd={handleMomentumScrollEnd} renderItem={renderImageItem} scrollEnabled={!isZoomed} />
 
                             {/* Bottom Bar: content always pinned to bottom so no layout jump when closing notes */}
                             <Animated.View style={[styles.bottomBar, { paddingBottom: (insets.bottom || 0) + 0 }, { minHeight: notesPanelVisible || isNotesClosing ? Math.min(height * 0.45, 320) : BOTTOM_BAR_CONTENT_HEIGHT }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>

@@ -1,8 +1,8 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
-import { getRelativeTime } from "@/utils/helper/dateUtils";
 import { alignImages } from "@/utils/alignApi";
+import { getRelativeTime } from "@/utils/helper/dateUtils";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -468,7 +468,6 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }
 
     return (
         <View style={styles.sliderContainer}>
-            {/* Top: image area (no badges on image) */}
             <View style={styles.sliderImageArea}>
                 <Image key={beforeUrl} source={{ uri: beforeUrl }} style={StyleSheet.absoluteFill} contentFit="contain" />
                 <Animated.View style={[StyleSheet.absoluteFill, afterImageStyle]} pointerEvents="none">

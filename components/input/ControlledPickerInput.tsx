@@ -17,7 +17,7 @@ interface PickerInputProps<T extends FieldValues> {
     disabled?: boolean;
 }
 
-// Store callbacks globally
+// Store callbacks globally (for date and gender selection)
 const pickerCallbacks: { [key: string]: (value: string) => void } = {};
 
 export function ControlledPickerInput<T extends FieldValues>({ control, name, label, type, placeholder, error, noBorder = false, disabled = false }: PickerInputProps<T>) {
@@ -61,7 +61,7 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
 
                 return (
                     <>
-                        {/* دکمه ورودی */}
+                        {/* Input button */}
                         <TouchableOpacity
                             onPress={handlePress}
                             activeOpacity={0.7}
@@ -80,7 +80,7 @@ export function ControlledPickerInput<T extends FieldValues>({ control, name, la
                             </BaseText>
                         </TouchableOpacity>
 
-                        {/* خطا */}
+                        {/* Error */}
                         {!!error && (
                             <BaseText type="Caption2" color="system.red" className="my-2 ml-4">
                                 {error}

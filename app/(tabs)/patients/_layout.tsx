@@ -97,8 +97,7 @@ export default function PatientsLayout() {
         }
 
         const selectedId = currentState.selectedPractice?.id;
-        const normalizedSelected =
-            typeof selectedId === "number" ? selectedId : typeof selectedId === "string" && /^\d+$/.test(selectedId) ? parseInt(selectedId, 10) : selectedId;
+        const normalizedSelected = typeof selectedId === "number" ? selectedId : typeof selectedId === "string" && /^\d+$/.test(selectedId) ? parseInt(selectedId, 10) : selectedId;
         const isValidPractice = practiceList.data.some((p) => (typeof p.id === "number" ? p.id : parseInt(String(p.id), 10)) === normalizedSelected);
         if (!isValidPractice) {
             loadProfileSelection(practiceList.data);
@@ -121,7 +120,7 @@ export default function PatientsLayout() {
         return (
             <BottomSheetModalProvider>
                 <ErrorState
-                    title="خطا در بارگذاری Practice List"
+                    title="Failed to load practices. Please try again."
                     message={displayMessage}
                     onRetry={() => {
                         refetchPracticeList();
@@ -156,6 +155,9 @@ export default function PatientsLayout() {
                                             <Submenu button={<Button systemImage="arrow.up.arrow.down">Sort By</Button>}>
                                                 <Button systemImage="textformat.abc" onPress={() => router.setParams({ sortBy: "name" })}>
                                                     Name
+                                                </Button>
+                                                <Button systemImage="number" onPress={() => router.setParams({ sortBy: "chartNumber" })}>
+                                                    Chart Number
                                                 </Button>
                                                 <Button systemImage="calendar" onPress={() => router.setParams({ sortBy: "date" })}>
                                                     Date

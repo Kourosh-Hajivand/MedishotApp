@@ -2,15 +2,15 @@ import { BaseText, ErrorState } from "@/components";
 import { ImageSkeleton } from "@/components/skeleton/ImageSkeleton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
-import { useGetPracticeTemplates } from "@/utils/hook/usePractice";
+import { useDeletePracticeTemplate, useGetPracticeTemplates } from "@/utils/hook/usePractice";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
 import { PracticeTemplate, Template, TemplateCell, TemplateGost } from "@/utils/service/models/ResponseModels";
-import { Button, Host } from "@expo/ui/swift-ui";
+import { Button, ContextMenu, Host } from "@expo/ui/swift-ui";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { FadeInDown, Layout, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LayoutPattern } from "./_components/create-template/types";
@@ -166,6 +166,10 @@ export default function TemplateSelectScreen() {
     // Fetch practice templates (Custom Templates)
     const { data: practiceTemplatesData, isLoading: isLoadingPracticeTemplates, error: practiceTemplatesError, isError: isPracticeTemplatesError, refetch: refetchPracticeTemplates } = useGetPracticeTemplates(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
+    const { mutate: deleteTemplate } = useDeletePracticeTemplate(undefined, (error) => {
+        Alert.alert("Error", error?.message || "Failed to delete template");
+    });
+
     // Convert API templates to TemplateType
     const globalTemplates: TemplateType[] = useMemo(() => {
         if (!globalTemplatesData?.data) return [];
@@ -224,7 +228,7 @@ export default function TemplateSelectScreen() {
                                         gostImageUrl = (gost.gost_image as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 // Handle image - can be object with url or string
                                 let imageUrl: string | null = null;
                                 if (gost.image) {
@@ -234,7 +238,7 @@ export default function TemplateSelectScreen() {
                                         imageUrl = (gost.image as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 // Handle icon - can be object with url or string
                                 let iconUrl: string | null = null;
                                 if (gost.icon) {
@@ -244,7 +248,7 @@ export default function TemplateSelectScreen() {
                                         iconUrl = (gost.icon as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 return {
                                     gostId: String(gost.id),
                                     // gost_image.url for overlay center
@@ -325,7 +329,7 @@ export default function TemplateSelectScreen() {
                                         gostImageUrl = (gost.gost_image as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 // Handle image - can be object with url or string
                                 let imageUrl: string | null = null;
                                 if (gost.image) {
@@ -335,7 +339,7 @@ export default function TemplateSelectScreen() {
                                         imageUrl = (gost.image as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 // Handle icon - can be object with url or string
                                 let iconUrl: string | null = null;
                                 if (gost.icon) {
@@ -345,7 +349,7 @@ export default function TemplateSelectScreen() {
                                         iconUrl = (gost.icon as { url?: string }).url || null;
                                     }
                                 }
-                                
+
                                 return {
                                     gostId: String(gost.id),
                                     // gost_image.url for overlay center
@@ -407,18 +411,24 @@ export default function TemplateSelectScreen() {
         return [...practiceTemplates, ...customTemplates];
     }, [practiceTemplates, customTemplates]);
 
-    const handleTemplateSelect = useCallback((templateId: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        if (selectedTemplate === templateId) {
-            setSelectedTemplate(null);
-        } else {
-            setSelectedTemplate(templateId);
-        }
-    }, [selectedTemplate]);
+    const handleTemplateSelect = useCallback(
+        (templateId: string) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (selectedTemplate === templateId) {
+                setSelectedTemplate(null);
+            } else {
+                setSelectedTemplate(templateId);
+            }
+        },
+        [selectedTemplate],
+    );
 
-    const isTemplateSelected = useCallback((templateId: string) => {
-        return selectedTemplate === templateId;
-    }, [selectedTemplate]);
+    const isTemplateSelected = useCallback(
+        (templateId: string) => {
+            return selectedTemplate === templateId;
+        },
+        [selectedTemplate],
+    );
 
     const handleCreateCustomTemplate = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -459,12 +469,41 @@ export default function TemplateSelectScreen() {
         router.back();
     };
 
-    const renderTemplateItem = useCallback(({ item, index }: { item: TemplateType; index: number }) => {
-        const isSelected = isTemplateSelected(item.id);
-        const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
+    const handleDeleteTemplate = useCallback(
+        (item: TemplateType) => {
+            const practiceId = selectedPractice?.id;
+            const templateId = (item.templateData as PracticeTemplate)?.id ?? parseInt(item.id.replace("practice-", ""), 10);
+            if (typeof practiceId !== "number" || !Number.isFinite(templateId)) return;
 
-        return (
-            <Animated.View key={item.id} entering={FadeInDown.delay(index * 50).springify()} layout={Layout.springify()}>
+            const pid = practiceId;
+            const tid = templateId;
+
+            Alert.alert("Delete Template", "Are you sure you want to delete this template?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () =>
+                        deleteTemplate(
+                            { practiceId: pid, templateId: tid },
+                            {
+                                onSuccess: () => {
+                                    setCustomTemplates((prev) => prev.filter((t) => (t.templateData as PracticeTemplate)?.id !== tid && t.id !== `practice-${tid}`));
+                                },
+                            },
+                        ),
+                },
+            ]);
+        },
+        [selectedPractice?.id, deleteTemplate],
+    );
+
+    const renderTemplateItem = useCallback(
+        ({ item, index }: { item: TemplateType; index: number }) => {
+            const isSelected = isTemplateSelected(item.id);
+            const layoutPattern = item.layoutPattern || "left-right"; // Default fallback
+
+            const cardContent = (
                 <TouchableOpacity style={[styles.templateCard, isSelected && styles.templateCardSelected]} onPress={() => handleTemplateSelect(item.id)} activeOpacity={0.8}>
                     <View style={[styles.templateImageContainer, isSelected && styles.templateImageContainerSelected]}>
                         {/* Preview of ghost items inside template - using actual ghost images with layout pattern */}
@@ -487,9 +526,29 @@ export default function TemplateSelectScreen() {
                         </View>
                     </View>
                 </TouchableOpacity>
-            </Animated.View>
-        );
-    }, [selectedTemplate, handleTemplateSelect]);
+            );
+
+            return (
+                <Animated.View key={item.id} entering={FadeInDown.delay(index * 50).springify()} layout={Layout.springify()} style={item.isCustom ? styles.templateCardWrapper : undefined}>
+                    {item.isCustom ? (
+                        <Host style={styles.templateCardHost}>
+                            <ContextMenu activationMethod="longPress">
+                                <ContextMenu.Items>
+                                    <Button systemImage="trash" role="destructive" onPress={() => handleDeleteTemplate(item)}>
+                                        Delete Template
+                                    </Button>
+                                </ContextMenu.Items>
+                                <ContextMenu.Trigger>{cardContent}</ContextMenu.Trigger>
+                            </ContextMenu>
+                        </Host>
+                    ) : (
+                        cardContent
+                    )}
+                </Animated.View>
+            );
+        },
+        [selectedTemplate, handleTemplateSelect, handleDeleteTemplate],
+    );
 
     return (
         <View style={[styles.container, { paddingTop: 0 }]}>
@@ -515,7 +574,11 @@ export default function TemplateSelectScreen() {
                     <View style={styles.loadingContainer}>
                         <ErrorState
                             title="Failed to load templates"
-                            message={(globalTemplatesError instanceof Error ? globalTemplatesError.message : ((globalTemplatesError as unknown as { message?: string })?.message || "")) || (practiceTemplatesError instanceof Error ? practiceTemplatesError.message : ((practiceTemplatesError as unknown as { message?: string })?.message || "")) || "Failed to load templates. Please try again."}
+                            message={
+                                (globalTemplatesError instanceof Error ? globalTemplatesError.message : (globalTemplatesError as unknown as { message?: string })?.message || "") ||
+                                (practiceTemplatesError instanceof Error ? practiceTemplatesError.message : (practiceTemplatesError as unknown as { message?: string })?.message || "") ||
+                                "Failed to load templates. Please try again."
+                            }
                             onRetry={() => {
                                 if (isGlobalTemplatesError) refetchGlobalTemplates();
                                 if (isPracticeTemplatesError) refetchPracticeTemplates();
@@ -556,7 +619,7 @@ export default function TemplateSelectScreen() {
 
                 {/* Loading State for Ready Templates */}
                 {isLoadingGlobalTemplates && !isGlobalTemplatesError && (
-                    <>
+                    <View style={{ width: "100%", height: "100%" }}>
                         <View style={styles.sectionHeader}>
                             <BaseText type="Headline" weight={600} color="labels.primary">
                                 Ready Templates
@@ -583,7 +646,7 @@ export default function TemplateSelectScreen() {
                                     </View>
                                 ))}
                         </View>
-                    </>
+                    </View>
                 )}
 
                 {/* Ready Templates Section */}
@@ -695,6 +758,13 @@ const styles = StyleSheet.create({
         justifyContent: "space-between",
         gap: 10,
         marginBottom: 16,
+    },
+    templateCardWrapper: {
+        width: TEMPLATE_SIZE,
+    },
+    templateCardHost: {
+        width: TEMPLATE_SIZE,
+        height: TEMPLATE_SIZE,
     },
     templateCard: {
         width: TEMPLATE_SIZE,

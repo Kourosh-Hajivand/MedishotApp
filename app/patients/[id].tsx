@@ -417,7 +417,6 @@ export default function PatientDetailsScreen() {
     // Archive media mutation
     const { mutate: archiveMedia, isPending: isArchiving } = useDeletePatientMedia(
         () => {
-            Alert.alert("Success", "Image archived successfully");
             refetchPatientMedia();
             refetchTrashMedia();
         },

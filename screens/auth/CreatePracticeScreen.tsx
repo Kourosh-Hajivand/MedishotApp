@@ -40,6 +40,7 @@ const schema = z.object({
     street: z.string().min(1, "Street is required"),
     address: z.string().min(1, "Address is required"),
     zipCode: z.string().min(1, "Zip Code is required"),
+    initChartNumber: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -79,6 +80,7 @@ export const CreatePracticeScreen: React.FC = () => {
             phoneNumber: "",
             email: "",
             specialty: practiceType?.title || "",
+            initChartNumber: "1000",
             street: "",
             address: "",
             zipCode: "",
@@ -179,7 +181,7 @@ export const CreatePracticeScreen: React.FC = () => {
 
             const createData = {
                 name: data.practiceName,
-                init_chart_number: 1000,
+                init_chart_number: Number(data.initChartNumber) || 1000,
                 metadata: JSON.stringify({
                     website: normalizeWebsiteUrl(data.website),
                     phone: normalizeUSPhoneToDashedFormat(data.phoneNumber),

@@ -122,7 +122,7 @@ export default function Index() {
         return (
             <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
                 <ErrorState
-                    title="خطا در بارگذاری Practice List"
+                    title="Failed to load practices. Please try again."
                     message={errorMessage}
                     onRetry={() => {
                         refetchPracticeList();

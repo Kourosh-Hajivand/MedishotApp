@@ -8,8 +8,8 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 const ALIGN_API_URL = "https://4lir324-mfa.hf.space/api/align";
-/** توکن پابلیک برای دسترسی به HF Space (محدود به این API) */
-const ALIGN_API_TOKEN = "Bearer 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";
+/** از env؛ در EAS: Expo Dashboard → Project → Environment variables (production) با نام EXPO_PUBLIC_ALIGN_API_TOKEN */
+const ALIGN_API_TOKEN = process.env.EXPO_PUBLIC_ALIGN_API_TOKEN ? `Bearer ${process.env.EXPO_PUBLIC_ALIGN_API_TOKEN}` : "";
 
 export interface AlignApiResponse {
     beforeCropped?: string;
@@ -74,11 +74,12 @@ export async function alignImages(beforeUrl: string, afterUrl: string): Promise<
     try {
         const formData = await buildAlignFormData(beforeUrl, afterUrl);
 
+        const headers: Record<string, string> = {};
+        if (ALIGN_API_TOKEN) headers.Authorization = ALIGN_API_TOKEN;
+
         const res = await fetch(ALIGN_API_URL, {
             method: "POST",
-            headers: {
-                Authorization: ALIGN_API_TOKEN,
-            },
+            headers,
             body: formData,
         });
 

@@ -4,14 +4,14 @@ import axios from "axios";
 const MAGIC_API_URL = "https://medical-api.alipour.me/generate";
 const MAGIC_REQUEST_TIMEOUT_MS = 180000;
 
-/** پاسخ خام API پردازش دندان */
+/** Raw API response for teeth processing */
 export interface MagicGenerateApiResponse {
     status: string;
     images?: Record<string, string>;
     message?: string;
 }
 
-/** پارامترهای درخواست (برای تایپ‌سازی) */
+/** Request parameters (for typing) */
 export interface MagicGenerateRequest {
     type: "teeth";
     image: string;
@@ -19,9 +19,9 @@ export interface MagicGenerateRequest {
 }
 
 /**
- * ارسال تصویر به API Magic و دریافت تصاویر پردازش‌شده.
- * با ارسال signal می‌توان درخواست را با AbortController لغو کرد.
- * خطاها داخل سرویس هندل می‌شوند و به صورت Error پرتاب می‌شوند.
+ * Send image to Magic API and receive processed images.
+ * By sending a signal, the request can be canceled with AbortController.
+ * Errors are handled inside the service and thrown as Error.
  */
 export async function magicGenerate(imageBase64: string, settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS, signal?: AbortSignal): Promise<Record<string, string>> {
     const requestBody: MagicGenerateRequest = {
@@ -45,7 +45,7 @@ export async function magicGenerate(imageBase64: string, settings: typeof MAGIC_
         return images;
     } catch (error) {
         if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
-            throw error; // لغو توسط کاربر – همان خطا را پرتاب کن
+            throw error; // Canceled by user – throw the same error
         }
         if (axios.isAxiosError(error)) {
             const message = error.response?.data?.message ?? error.message ?? "Magic API request failed";
