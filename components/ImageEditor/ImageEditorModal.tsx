@@ -734,7 +734,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 return originalImageUri || imageUri;
             }
 
+            // exposure و brightness هر دو روی روشنایی؛ برای فیلتر نهایی ترکیب می‌شن
+            const exposure = adjustments.exposure !== undefined ? adjustments.exposure / 100 : 0;
             const brightness = adjustments.brightness !== undefined ? adjustments.brightness / 100 : 0;
+            const _effectiveBrightness = exposure + brightness;
 
             return imageUri;
         } catch (error) {
@@ -1153,6 +1156,15 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     data: { editor },
                 };
                 const payload = { mediaImageId, data: requestData };
+                if (__DEV__) {
+                    console.log("[ImageEditor] updateMediaImage payload:", {
+                        mediaImageId: payload.mediaImageId,
+                        edited_image: typeof requestData.edited_image === "string" ? requestData.edited_image : "[File/Blob]",
+                        notes: requestData.notes != null ? (requestData.notes.length > 80 ? requestData.notes.slice(0, 80) + "…" : requestData.notes) : undefined,
+                        data_keys: requestData.data ? Object.keys(requestData.data) : [],
+                        editor: requestData.data?.editor,
+                    });
+                }
                 await updateMediaImageAsync(payload);
             } else {
                 // Use editMedia for non-template images
@@ -1165,6 +1177,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     data: JSON.stringify({ editor }),
                 };
                 const payload = { mediaId, data: requestData };
+                if (__DEV__) {
+                    console.log("[ImageEditor] editPatientMedia payload:", {
+                        mediaId: payload.mediaId,
+                        media: typeof requestData.media === "string" ? requestData.media : "[File]",
+                        notes: requestData.notes != null ? (Array.isArray(requestData.notes) ? requestData.notes.length : String(requestData.notes).length) : undefined,
+                        data_length: typeof requestData.data === "string" ? requestData.data.length : 0,
+                    });
+                }
                 await editPatientMediaAsync(payload);
             }
             onSaveSuccess?.();

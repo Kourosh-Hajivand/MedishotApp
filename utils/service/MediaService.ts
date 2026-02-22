@@ -235,6 +235,18 @@ const MediaService = {
                 formData.append("data", JSON.stringify(payload.data));
             }
 
+            if (__DEV__) {
+                const edited = payload.edited_image;
+                const dataStr = payload.data != null ? JSON.stringify(payload.data) : "";
+                console.log("[MediaService] updateMediaImage request body:", {
+                    mediaImageId,
+                    edited_image: typeof edited === "string" ? edited : edited instanceof File ? { name: edited.name, size: edited.size, type: edited.type } : "[Blob]",
+                    notes: payload.notes != null ? (payload.notes.length > 100 ? payload.notes.slice(0, 100) + "…" : payload.notes) : undefined,
+                    data_length: dataStr.length,
+                    data_preview: dataStr.length > 200 ? dataStr.slice(0, 200) + "…" : dataStr,
+                });
+            }
+
             const response: AxiosResponse<UpdateMediaImageResponse> = await axiosInstance.post(baseUrl + updateMediaImage(mediaImageId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });

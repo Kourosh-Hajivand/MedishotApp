@@ -52,18 +52,24 @@ export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adj
             <Image source={source} style={StyleSheet.absoluteFill} contentFit={contentFit} onLoad={handleLoad} />
             {adjustments && (
                 <>
-                    {/* Brightness */}
-                    {adjustments.brightness !== undefined && adjustments.brightness !== 0 && (
-                        <View
-                            style={[
-                                StyleSheet.absoluteFill,
-                                {
-                                    backgroundColor: adjustments.brightness > 0 ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.8)",
-                                    opacity: Math.abs(adjustments.brightness) / 200,
-                                },
-                            ]}
-                        />
-                    )}
+                    {/* Exposure + Brightness (هر دو روی روشنایی اثر می‌ذارن) */}
+                    {(() => {
+                        const exposure = adjustments.exposure ?? 0;
+                        const brightness = adjustments.brightness ?? 0;
+                        const combined = exposure + brightness;
+                        if (combined === 0) return null;
+                        return (
+                            <View
+                                style={[
+                                    StyleSheet.absoluteFill,
+                                    {
+                                        backgroundColor: combined > 0 ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.8)",
+                                        opacity: Math.abs(combined) / 200,
+                                    },
+                                ]}
+                            />
+                        );
+                    })()}
                     {/* Contrast */}
                     {adjustments.contrast !== undefined && adjustments.contrast !== 0 && (
                         <LinearGradient

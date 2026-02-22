@@ -7,6 +7,7 @@ export interface ImageChange {
 }
 
 export interface AdjustChange {
+    exposure?: number;
     brightness?: number;
     contrast?: number;
     saturation?: number;

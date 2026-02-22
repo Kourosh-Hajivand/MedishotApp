@@ -262,8 +262,9 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
         const newValues = { ...adjustmentValues, [selectedAdjustment]: value };
         setAdjustmentValues(newValues);
 
-        // Convert to AdjustChange format
+        // Convert to AdjustChange format (exposure and brightness جدا تا هیچ‌کدوم دیگری را overwrite نکنند)
         const adjustChange: AdjustChange = {
+            exposure: newValues.exposure,
             brightness: newValues.brightness,
             contrast: newValues.contrast,
             saturation: newValues.saturation,
@@ -271,11 +272,6 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
             highlights: newValues.highlights,
             shadows: newValues.shadows,
         };
-
-        // Map exposure to brightness for now (or handle separately)
-        if (newValues.exposure !== undefined) {
-            adjustChange.brightness = newValues.exposure;
-        }
 
         onChange({
             type: "adjust",
@@ -380,6 +376,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
         onChange({
             type: "adjust",
             data: {
+                exposure: 0,
                 brightness: 0,
                 contrast: 0,
                 saturation: 0,
