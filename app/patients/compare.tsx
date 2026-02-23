@@ -4,6 +4,7 @@ import colors from "@/theme/colors";
 import { useTempUpload, useUploadPatientMedia } from "@/utils/hook/useMedia";
 import { alignImages } from "@/utils/alignApi";
 import { getShortDate } from "@/utils/helper/dateUtils";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -93,6 +94,8 @@ export default function BeforeAfterCompareScreen() {
     // Key by "beforeUrl|afterUrl" so switching index or pair always shows the correct aligned images for that pair
     const [alignedBeforeByKey, setAlignedBeforeByKey] = useState<Record<string, string>>({});
     const [alignedAfterByKey, setAlignedAfterByKey] = useState<Record<string, string>>({});
+    /** Pair keys currently waiting for align API response; show loading overlay for that pair. */
+    const [aligningPairKeys, setAligningPairKeys] = useState<Record<string, boolean>>({});
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const isProgrammaticScrollRef = useRef(false);
     const compositeShotRef = useRef<ViewShot>(null);
@@ -147,14 +150,22 @@ export default function BeforeAfterCompareScreen() {
                     continue;
                 }
                 const pairKey = `${p.beforeUrl}|${p.afterUrl}`;
+                setAligningPairKeys((prev) => ({ ...prev, [pairKey]: true }));
                 if (__DEV__) console.log(`${LOG_TAG} pair[${i}] calling alignImages`, { templateName: name, beforeUrl: p.beforeUrl, afterUrl: p.afterUrl });
-                const result = await alignImages(p.beforeUrl, p.afterUrl);
+                let result: Awaited<ReturnType<typeof alignImages>> | undefined;
+                try {
+                    result = await alignImages(p.beforeUrl, p.afterUrl);
+                } catch (e) {
+                    if (__DEV__) console.warn(`${LOG_TAG} pair[${i}] align threw`, e);
+                } finally {
+                    if (!cancelled) setAligningPairKeys((prev) => ({ ...prev, [pairKey]: false }));
+                }
                 if (cancelled) return;
-                if (result.success) {
+                if (result?.success) {
                     if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), beforeAlignedLength: result.beforeAlignedCropped?.length, afterAlignedLength: result.afterAlignedCropped?.length });
                     if (result.beforeAlignedCropped) setAlignedBeforeByKey((prev) => ({ ...prev, [pairKey]: result.beforeAlignedCropped! }));
                     setAlignedAfterByKey((prev) => ({ ...prev, [pairKey]: result.afterAlignedCropped }));
-                } else {
+                } else if (result) {
                     if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align fail`, { error: "error" in result ? result.error : "" });
                 }
             }
@@ -213,6 +224,7 @@ export default function BeforeAfterCompareScreen() {
     const beforeOriginal = pair?.beforeUrl ?? "";
     const afterOriginal = pair?.afterUrl ?? "";
     const pairKey = beforeOriginal && afterOriginal ? `${beforeOriginal}|${afterOriginal}` : "";
+    const isAligningCurrentPair = pairKey ? aligningPairKeys[pairKey] === true : false;
     const beforeDisplay = pairKey && alignedBeforeByKey[pairKey] ? alignedBeforeByKey[pairKey] : beforeOriginal;
     const afterDisplay = pairKey && alignedAfterByKey[pairKey] ? alignedAfterByKey[pairKey] : afterOriginal;
 
@@ -413,6 +425,18 @@ export default function BeforeAfterCompareScreen() {
 
             {/* Content: full space; horizontal = two halves with contain (own ratio), fill above tab */}
             <View style={[styles.content, styles.contentWhite]}>
+                {/* Loading overlay while align API is in progress for current pair */}
+                {isAligningCurrentPair && (
+                    <View style={styles.alignLoadingOverlay} pointerEvents="none">
+                        <BlurView intensity={60} tint="light" style={StyleSheet.absoluteFill} />
+                        <View style={styles.alignLoadingBox}>
+                            <ActivityIndicator size="large" color={colors.system.blue as any} />
+                            <BaseText type="Footnote" weight="500" color="labels.secondary" style={styles.alignLoadingText}>
+                                Aligning...
+                            </BaseText>
+                        </View>
+                    </View>
+                )}
                 {/* {isVertical && (
                     <View style={styles.verticalSplit}>
                         <View style={styles.halfVertical}>
@@ -921,6 +945,33 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     contentWhite: {},
+    alignLoadingOverlay: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 5,
+        overflow: "hidden",
+    },
+    alignLoadingBox: {
+        backgroundColor: colors.system.white,
+        paddingHorizontal: 24,
+        paddingVertical: 20,
+        borderRadius: 16,
+        alignItems: "center",
+        gap: 12,
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    alignLoadingText: {
+        marginTop: 0,
+    },
     splitLineContainer: {
         flex: 1,
         position: "relative",
