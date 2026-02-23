@@ -61,8 +61,13 @@ function AddonCard({ displayName, pricePerUnit, description, initialQuantity, on
                     {description}
                 </BaseText>
                 <View style={addonStyles.stepper}>
-                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setQuantity((q) => Math.max(0, q - 1))} activeOpacity={0.7}>
-                        <IconSymbol name="minus" size={18} color={colors.system.black} />
+                    <TouchableOpacity
+                        style={addonStyles.stepperButton}
+                        onPress={() => setQuantity((q) => Math.max(initialQuantity, q - 1))}
+                        activeOpacity={0.7}
+                        disabled={quantity <= initialQuantity}
+                    >
+                        <IconSymbol name="minus" size={18} color={quantity <= initialQuantity ? colors.labels.tertiary : colors.system.black} />
                     </TouchableOpacity>
                     <View style={addonStyles.stepperCenter}>
                         <BaseText type="Body" weight="500" color="labels.primary">
@@ -76,7 +81,7 @@ function AddonCard({ displayName, pricePerUnit, description, initialQuantity, on
             </View>
             {/* فوتر مثل کارت پلن: گرادیان + دکمه */}
             <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={addonStyles.footer}>
-                <BaseButton label="Purchase Now" onPress={handlePurchase} ButtonStyle="Filled" size="Medium" rounded style={addonStyles.purchaseButton} disabled={disabled} />
+                <BaseButton label="Purchase Now" onPress={handlePurchase} ButtonStyle="Filled" size="Medium" rounded style={addonStyles.purchaseButton} disabled={disabled || quantity <= initialQuantity} />
             </LinearGradient>
         </View>
     );
@@ -388,11 +393,17 @@ export default function SubscriptionScreen() {
         }
     };
 
-    // Monthly / Yearly / Add-ons (یک سگمنت: Monthly | Yearly | Add-ons)
+    // تب Add-ons فقط وقتی نمایش داده می‌شود که پلن فعلی (از subscription/status) addon داشته باشد
+    const hasAddonsTab = (currentPlan?.addons?.length ?? 0) > 0;
     const [billingTab, setBillingTab] = useState(0); // 0 = Monthly, 1 = Yearly, 2 = Add-ons
-    const billingTabOptions = ["Monthly", "Yearly", "Add-ons"];
+    const billingTabOptions = hasAddonsTab ? ["Monthly", "Yearly", "Add-ons"] : ["Monthly", "Yearly"];
 
-    // Add-ons: from current plan or default list (for display + API addon_key)
+    // اگر پلن addon نداشت و کاربر روی Add-ons بود، برگرد به Monthly
+    React.useEffect(() => {
+        if (!hasAddonsTab && billingTab === 2) setBillingTab(0);
+    }, [hasAddonsTab, billingTab]);
+
+    // Add-ons: فقط از current_plan (از API subscription/status) — نمایش نام/قیمت/توضیح از مپ زیر
     const ADDON_DISPLAY: Record<string, { displayName: string; pricePerUnit: number; description: string }> = {
         additional_doctor: {
             displayName: "Additional Doctor",
@@ -404,27 +415,21 @@ export default function SubscriptionScreen() {
             pricePerUnit: 5,
             description: "You can purchase additional doctors to expand your practice team.",
         },
+        patient: {
+            displayName: "Additional Patient",
+            pricePerUnit: 5,
+            description: "You can purchase additional patient slots for your practice.",
+        },
     };
     const addonsList = useMemo(() => {
         const fromPlan = (currentPlan?.addons ?? []) as PlanAddon[];
-        if (fromPlan.length > 0) {
-            return fromPlan.map((a) => ({
-                addon_key: a.addon_key,
-                included_quantity: a.included_quantity,
-                displayName: ADDON_DISPLAY[a.addon_key]?.displayName ?? a.addon_key.replace(/_/g, " "),
-                pricePerUnit: ADDON_DISPLAY[a.addon_key]?.pricePerUnit ?? 0,
-                description: ADDON_DISPLAY[a.addon_key]?.description ?? "",
-            }));
-        }
-        return [
-            {
-                addon_key: "additional_doctor",
-                included_quantity: 0,
-                displayName: "Additional Doctor",
-                pricePerUnit: 5,
-                description: "You can purchase additional doctors to expand your practice team.",
-            },
-        ];
+        return fromPlan.map((a) => ({
+            addon_key: a.addon_key,
+            included_quantity: a.included_quantity ?? 0,
+            displayName: ADDON_DISPLAY[a.addon_key]?.displayName ?? a.addon_key.replace(/_/g, " "),
+            pricePerUnit: ADDON_DISPLAY[a.addon_key]?.pricePerUnit ?? 0,
+            description: ADDON_DISPLAY[a.addon_key]?.description ?? "",
+        }));
     }, [currentPlan?.addons]);
 
     // Filter plans by billing interval (فقط برای Monthly/Yearly؛ Add-ons تب جداگانه است)
