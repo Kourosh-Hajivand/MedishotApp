@@ -493,19 +493,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 />
             );
         },
-        [
-            imageLoadingStates,
-            layoutValues,
-            numColumns,
-            menuItems,
-            handleImagePress,
-            imageUrlToBookmarkMap,
-            imageUrlToIsAfterMap,
-            imageUrlToHasAfterMap,
-            showBookmark,
-            showCompareBadgeOnThumbnails,
-            handleImageLoadState,
-        ],
+        [imageLoadingStates, layoutValues, numColumns, menuItems, handleImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmark, showCompareBadgeOnThumbnails, handleImageLoadState],
     );
 
     const renderItem = useCallback(
