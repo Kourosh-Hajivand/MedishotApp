@@ -256,6 +256,9 @@ interface GalleryWithMenuProps {
     onNotePress?: (imageUri: string) => void;
     /** در البوم false بگذار تا آیکون before/after روی thumbnailها نشان داده نشود */
     showCompareBadgeOnThumbnails?: boolean;
+    /** بعد از Save ادیت: فقط همین یورای یک‌بار رفرش شود */
+    imageRefreshKey?: number;
+    imageSavedUri?: string | null;
 }
 
 const { width } = Dimensions.get("window");
@@ -282,12 +285,15 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     enableTakeAfterTemplate = false,
     onNotePress,
     showCompareBadgeOnThumbnails = true,
+    imageRefreshKey,
+    imageSavedUri,
 }) => {
     const { showBookmark = true, showEdit = true, showArchive = true, showShare = true, showMagic = false, showNote = false, showCompare = false } = actions;
     const [numColumns, setNumColumns] = useState(initialColumns);
     const [viewerVisible, setViewerVisible] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [viewerImagesList, setViewerImagesList] = useState<string[]>([]);
+    const [selectedUriWhenOpened, setSelectedUriWhenOpened] = useState<string | null>(null);
     const scale = useSharedValue(1);
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
 
@@ -333,27 +339,26 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return { gap, itemWidth };
     }, [numColumns, width]);
 
-    // Create a map from original_media URL to all images (original_media + template images) for viewer
+    // Map composite URL -> list of display URLs (edited_image ?? image per cell, edited_media ?? original_media for composite)
     const originalMediaToAllImagesMap = useMemo(() => {
         const map = new Map<string, string[]>();
         if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
 
         rawMediaData.forEach((media: RawMediaData) => {
-            // Only process media with template
-            if (media.template && media.original_media?.url) {
-                const allImages: string[] = [media.original_media.url]; // Start with original_media
+            if (!media.template || !media.original_media?.url) return;
+            const editedComposite = (media as { edited_media?: { url?: string } }).edited_media?.url;
+            const displayComposite = editedComposite ?? media.original_media.url;
+            const allImages: string[] = [displayComposite];
 
-                // Add all template images
-                if (media.images && Array.isArray(media.images)) {
-                    media.images.forEach((img: any) => {
-                        if (img.image?.url) {
-                            allImages.push(img.image.url);
-                        }
-                    });
-                }
-
-                map.set(media.original_media.url, allImages);
+            if (media.images && Array.isArray(media.images)) {
+                media.images.forEach((img: any) => {
+                    const displayUrl = img.edited_image?.url ?? img.image?.url;
+                    if (displayUrl) allImages.push(displayUrl);
+                });
             }
+
+            map.set(media.original_media.url, allImages);
+            if (editedComposite) map.set(editedComposite, allImages);
         });
 
         return map;
@@ -369,27 +374,23 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 const isAfter = media.is_after === true;
                 const hasAfter = media.has_after === true;
 
-                // Add original_media to maps
+                const editedComposite = (media as { edited_media?: { url?: string } }).edited_media?.url;
                 if (media.original_media?.url) {
                     if (isAfter) {
                         isAfterMap.set(media.original_media.url, true);
+                        if (editedComposite) isAfterMap.set(editedComposite, true);
                     }
                     if (hasAfter) {
                         hasAfterMap.set(media.original_media.url, true);
+                        if (editedComposite) hasAfterMap.set(editedComposite, true);
                     }
                 }
-
-                // Add template images to maps
                 if (media.images && Array.isArray(media.images)) {
                     media.images.forEach((img: any) => {
-                        const imageUrl = img.image?.url;
-                        if (imageUrl) {
-                            if (isAfter) {
-                                isAfterMap.set(imageUrl, true);
-                            }
-                            if (hasAfter) {
-                                hasAfterMap.set(imageUrl, true);
-                            }
+                        const url = img.edited_image?.url ?? img.image?.url;
+                        if (url) {
+                            if (isAfter) isAfterMap.set(url, true);
+                            if (hasAfter) hasAfterMap.set(url, true);
                         }
                     });
                 }
@@ -436,6 +437,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
 
             const index = imagesToShow.indexOf(uri);
             if (index !== -1) {
+                setSelectedUriWhenOpened(uri);
                 setViewerImagesList(imagesToShow);
                 setSelectedIndex(index);
                 setViewerVisible(true);
@@ -443,6 +445,16 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         },
         [onImagePress, originalMediaToAllImagesMap, allImages],
     );
+
+    // وقتی دیتا بعد از refetch (مثلاً بعد از Save ادیت) آپدیت شد، لیست ویور را با لیست جدید همگام کن تا نسخهٔ ادیت‌شده همان لحظه دیده شود
+    useEffect(() => {
+        if (!viewerVisible || !selectedUriWhenOpened) return;
+        const expanded = originalMediaToAllImagesMap?.get(selectedUriWhenOpened);
+        const newList = expanded || allImages;
+        setViewerImagesList(newList);
+        const idx = newList.indexOf(selectedUriWhenOpened);
+        if (idx >= 0) setSelectedIndex(idx);
+    }, [viewerVisible, selectedUriWhenOpened, allImages, originalMediaToAllImagesMap]);
 
     const handleImageLoadState = useCallback((uri: string, state: "start" | "load" | "error") => {
         setImageLoadingStates((prev) => {
@@ -522,6 +534,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     const viewerOnClose = useCallback(() => {
         setViewerVisible(false);
         setViewerImagesList([]);
+        setSelectedUriWhenOpened(null);
     }, []);
 
     const viewerActions = useMemo(
@@ -591,6 +604,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 practice={practice}
                 metadata={metadata}
                 enableTakeAfterTemplate={enableTakeAfterTemplate}
+                imageRefreshKey={imageRefreshKey}
+                imageSavedUri={imageSavedUri}
             />
         </GestureHandlerRootView>
     );

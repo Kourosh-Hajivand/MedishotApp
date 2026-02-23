@@ -548,7 +548,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [magicRetryCount, setMagicRetryCount] = useState(0);
     const hasRequestedRef = useRef(false);
     const exportViewRef = useRef<ViewShot | null>(null);
-    const pendingNormalizedPenStrokesRef = useRef<EditorState["penStrokes"]>(null);
+    // Pen strokes are stored in normalized coords (0–1) so they stay correct when layout changes (tab switch / resize)
     const savedEditorSnapshotRef = useRef<string | null>(null);
     const magicCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const magicCancelledRef = useRef(false);
@@ -561,12 +561,24 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const magicCompleteShared = useSharedValue(0);
     const magicErrorShared = useSharedValue(0);
 
-    // Pen tool states
+    // Pen tool: state in normalized coords (0–1); convert to pixels only for DrawingCanvas so tab switch/resize doesn't break position
     const [penStrokes, setPenStrokes] = useState<Stroke[]>([]);
     const [penStrokesHistory, setPenStrokesHistory] = useState<Stroke[][]>([[]]);
     const [penHistoryIndex, setPenHistoryIndex] = useState(0);
     const [selectedPenColor, setSelectedPenColor] = useState("#FF3B30");
     const [selectedStrokeWidth, setSelectedStrokeWidth] = useState(4);
+
+    const penStrokesPixels = useMemo(() => {
+        const w = imageContainerLayout.width;
+        const h = imageContainerLayout.height;
+        if (!penStrokes.length || w <= 0 || h <= 0) return [];
+        return penStrokes.map((s) => ({
+            id: s.id,
+            path: s.path.map((p) => ({ x: p.x * w, y: p.y * h })),
+            color: s.color,
+            width: s.width,
+        }));
+    }, [penStrokes, imageContainerLayout.width, imageContainerLayout.height]);
 
     // Undo/Redo handlers for pen
     const canUndo = penHistoryIndex > 0;
@@ -779,21 +791,30 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         }
     };
 
-    // Handle pen strokes change from DrawingCanvas
-    const handlePenStrokesChange = (strokes: Stroke[]) => {
-        setPenStrokes(strokes);
-
-        // Update history - remove any redo states after current index
-        const newHistory = penStrokesHistory.slice(0, penHistoryIndex + 1);
-        newHistory.push(strokes);
-        setPenStrokesHistory(newHistory);
-        setPenHistoryIndex(newHistory.length - 1);
-
-        setImageChanges((prev) => {
-            const filtered = prev.filter((c) => c.type !== "pen");
-            return [...filtered, { type: "pen", data: { strokes } }];
-        });
-    };
+    // Handle pen strokes from DrawingCanvas (pixels) → store normalized so layout/tab change doesn't break position
+    const handlePenStrokesChange = useCallback(
+        (strokesPx: Stroke[]) => {
+            const w = imageContainerLayout.width;
+            const h = imageContainerLayout.height;
+            if (w <= 0 || h <= 0) return;
+            const normalized: Stroke[] = strokesPx.map((s) => ({
+                id: s.id,
+                path: s.path.map((p) => ({ x: p.x / w, y: p.y / h })),
+                color: s.color,
+                width: s.width,
+            }));
+            setPenStrokes(normalized);
+            const newHistory = penStrokesHistory.slice(0, penHistoryIndex + 1);
+            newHistory.push(normalized);
+            setPenStrokesHistory(newHistory);
+            setPenHistoryIndex(newHistory.length - 1);
+            setImageChanges((prev) => {
+                const filtered = prev.filter((c) => c.type !== "pen");
+                return [...filtered, { type: "pen", data: { strokes: normalized } }];
+            });
+        },
+        [imageContainerLayout.width, imageContainerLayout.height, penStrokesHistory, penHistoryIndex],
+    );
 
     const convertImageToBase64 = async (imageUri: string): Promise<string | null> => {
         try {
@@ -836,7 +857,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 setPenStrokesHistory([[]]);
                 setPenHistoryIndex(0);
                 setMagicSelection(null);
-                pendingNormalizedPenStrokesRef.current = null;
                 savedEditorSnapshotRef.current = null;
             }
             if (initialEditorState?.lastActiveTool) {
@@ -859,13 +879,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         if (initialEditorState.adjustments != null) setAdjustmentValues(initialEditorState.adjustments);
         if (initialEditorState.notes?.length) setNotes(initialEditorState.notes as Note[]);
         if (initialEditorState.penStrokes?.length) {
-            if (initialEditorState.editorVersion === 1) {
-                pendingNormalizedPenStrokesRef.current = initialEditorState.penStrokes;
-            } else {
-                setPenStrokes(initialEditorState.penStrokes as Stroke[]);
-                setPenStrokesHistory([[], initialEditorState.penStrokes as Stroke[]]);
-                setPenHistoryIndex(1);
-            }
+            const strokes = initialEditorState.penStrokes as Stroke[];
+            setPenStrokes(strokes);
+            setPenStrokesHistory([[], strokes]);
+            setPenHistoryIndex(1);
         }
         if (initialEditorState.magic) {
             setMagicSelection({
@@ -875,26 +892,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             });
         }
     }, [visible, initialEditorState]);
-
-    useEffect(() => {
-        const pending = pendingNormalizedPenStrokesRef.current;
-        const w = imageContainerLayout.width;
-        const h = imageContainerLayout.height;
-        if (!visible || !pending?.length || w <= 0 || h <= 0) return;
-        const inPixels: Stroke[] = pending.map((s) => ({
-            id: s.id,
-            path: s.path.map((p) => ({
-                x: roundForSnapshot(p.x) * w,
-                y: roundForSnapshot(p.y) * h,
-            })),
-            color: s.color,
-            width: s.width,
-        }));
-        pendingNormalizedPenStrokesRef.current = null;
-        setPenStrokes(inPixels);
-        setPenStrokesHistory([[], inPixels]);
-        setPenHistoryIndex(1);
-    }, [visible, imageContainerLayout.width, imageContainerLayout.height]);
 
     // Get image dimensions and calculate aspect ratio (fallback if onLoad doesn't fire)
     useEffect(() => {
@@ -1126,15 +1123,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             if (!filename) throw new Error("Temp upload did not return filename");
 
             const apiNotes = notes.filter((n) => n.text.trim()).map((n) => ({ text: n.text.trim(), x: n.x * w, y: n.y * h }));
-            // Normalize pen paths (0–1), rounded for stable restore and comparison
+            // penStrokes are already normalized (0–1); round for stable API payload
             const normalizedPenStrokes =
-                penStrokes.length && w > 0 && h > 0
+                penStrokes.length > 0
                     ? penStrokes.map((s) => ({
                           id: s.id,
-                          path: s.path.map((p) => ({
-                              x: roundForSnapshot(p.x / w),
-                              y: roundForSnapshot(p.y / h),
-                          })),
+                          path: s.path.map((p) => ({ x: roundForSnapshot(p.x), y: roundForSnapshot(p.y) })),
                           color: s.color,
                           width: s.width,
                       }))
@@ -1198,16 +1192,11 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     }, [mediaId, mediaImageId, hasTemplate, activeTool, imageContainerLayout.width, imageContainerLayout.height, notes, adjustmentValues, penStrokes, magicSelection, tempUploadAsync, editPatientMediaAsync, updateMediaImageAsync, onClose, onSaveSuccess]);
 
     const currentEditorSnapshot = useMemo(() => {
-        const w = imageContainerLayout.width;
-        const h = imageContainerLayout.height;
         const normalizedPenStrokes =
-            penStrokes.length && w > 0 && h > 0
+            penStrokes.length > 0
                 ? penStrokes.map((s) => ({
                       id: s.id,
-                      path: s.path.map((p) => ({
-                          x: roundForSnapshot(p.x / w),
-                          y: roundForSnapshot(p.y / h),
-                      })),
+                      path: s.path.map((p) => ({ x: roundForSnapshot(p.x), y: roundForSnapshot(p.y) })),
                       color: s.color,
                       width: s.width,
                   }))
@@ -1221,7 +1210,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             lastActiveTool: activeTool,
         };
         return normalizeEditorSnapshot(state);
-    }, [imageContainerLayout.width, imageContainerLayout.height, adjustmentValues, notes, penStrokes, magicSelection, activeTool]);
+    }, [adjustmentValues, notes, penStrokes, magicSelection, activeTool]);
 
     const hasUnsavedChanges = savedEditorSnapshotRef.current === null || currentEditorSnapshot !== savedEditorSnapshotRef.current;
 
@@ -1546,7 +1535,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                             setImageAspectRatio(ratio);
                                         }}
                                     />
-                                    <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokes} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
+                                    <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokesPixels} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
                                 </ViewShot>
 
                                 {/* Note Markers outside ViewShot – هنگام زوم مخفی می‌شوند */}

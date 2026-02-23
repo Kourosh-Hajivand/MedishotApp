@@ -3,8 +3,9 @@ import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import { headerHeight } from "@/constants/theme";
 import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
-import { useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSwapSubscription } from "@/utils/hook";
+import { useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSwapSubscription, useUpdateAddonLimit } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
+import type { PlanAddon } from "@/utils/service/models/ResponseModels";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -12,6 +13,156 @@ import React, { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import RNAnimated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const ADDON_BLUE = "#007AFF";
+const ADDON_BLUE_BG = "rgba(0, 122, 255, 0.1)";
+
+interface AddonCardProps {
+    addonKey: string;
+    displayName: string;
+    pricePerUnit: number;
+    description: string;
+    initialQuantity: number;
+    onPurchase: (quantity: number) => void;
+    disabled?: boolean;
+}
+
+function AddonCard({ displayName, pricePerUnit, description, initialQuantity, onPurchase, disabled }: AddonCardProps) {
+    const [quantity, setQuantity] = useState(initialQuantity);
+    const gradientColors: [string, string, string, string, string] = ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"];
+    const planColor = ADDON_BLUE;
+
+    const handlePurchase = () => {
+        onPurchase(quantity);
+    };
+
+    return (
+        <View style={addonStyles.card}>
+            <View style={addonStyles.cardInner}>
+                {/* هدر مثل کارت پلن: عنوان آبی + قیمت داخل پیل */}
+                <View style={addonStyles.planHeaderWrapper}>
+                    <View style={styles.planHeaderContent}>
+                        <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
+                            <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
+                                {displayName}
+                            </BaseText>
+                            <View className="flex-row items-center gap-1">
+                                <BaseText type="Title3" weight="600" style={{ color: planColor }}>
+                                    ${pricePerUnit}
+                                </BaseText>
+                                <BaseText type="Body" weight="400" style={{ color: planColor }}>
+                                    per doctor
+                                </BaseText>
+                            </View>
+                        </LinearGradient>
+                    </View>
+                </View>
+                <BaseText type="Body" weight="400" color="labels.primary" style={addonStyles.description}>
+                    {description}
+                </BaseText>
+                <View style={addonStyles.stepper}>
+                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setQuantity((q) => Math.max(0, q - 1))} activeOpacity={0.7}>
+                        <IconSymbol name="minus" size={18} color={colors.system.black} />
+                    </TouchableOpacity>
+                    <View style={addonStyles.stepperCenter}>
+                        <BaseText type="Body" weight="500" color="labels.primary">
+                            {quantity}
+                        </BaseText>
+                    </View>
+                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setQuantity((q) => q + 1)} activeOpacity={0.7}>
+                        <IconSymbol name="plus" size={18} color={colors.system.black} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+            {/* فوتر مثل کارت پلن: گرادیان + دکمه */}
+            <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={addonStyles.footer}>
+                <BaseButton label="Purchase Now" onPress={handlePurchase} ButtonStyle="Filled" size="Medium" rounded style={addonStyles.purchaseButton} disabled={disabled} />
+            </LinearGradient>
+        </View>
+    );
+}
+
+const addonStyles = StyleSheet.create({
+    card: {
+        backgroundColor: "#ffffff",
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#f2f2f7",
+        overflow: "hidden",
+        marginBottom: spacing["4"],
+    },
+    planHeaderWrapper: {
+        gap: spacing["3"], // 12px - gap between header gradient and annual badge
+    },
+    planHeaderContent: {
+        position: "relative",
+    },
+    planHeaderGradient: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: spacing["2"], // 8px
+        paddingVertical: spacing["1"], // 4px
+        borderRadius: 8,
+        minHeight: 33,
+    },
+    cardInner: {
+        padding: spacing["4"],
+        gap: spacing["2.5"],
+    },
+    headerRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    pricePill: {
+        backgroundColor: ADDON_BLUE_BG,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    description: {
+        fontSize: 17,
+        lineHeight: 28,
+        letterSpacing: -0.43,
+        marginBottom: 0,
+    },
+    stepper: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#F9F9F9",
+        borderRadius: 99,
+        overflow: "hidden",
+        minHeight: 36,
+        padding: 4,
+    },
+    stepperButton: {
+        height: 35,
+        flex: 1,
+        maxWidth: 120,
+        backgroundColor: "white",
+        alignItems: "center",
+        justifyContent: "center",
+        borderRadius: 99,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    stepperCenter: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: 40,
+    },
+    footer: {
+        padding: spacing["4"],
+    },
+    purchaseButton: {
+        width: "100%",
+    },
+});
 
 export default function SubscriptionScreen() {
     const insets = useSafeAreaInsets();
@@ -169,14 +320,21 @@ export default function SubscriptionScreen() {
             Alert.alert("Success", "Your subscription plan has been updated successfully.", [
                 {
                     text: "OK",
-                    onPress: () => {
-                        // Refresh subscription status - query will auto-refresh
-                    },
+                    onPress: () => {},
                 },
             ]);
         },
         (error) => {
             Alert.alert("Error", error?.message || "Failed to update subscription. Please try again.");
+        },
+    );
+
+    const { mutate: updateAddonLimit, isPending: isUpdatingAddon } = useUpdateAddonLimit(
+        () => {
+            Alert.alert("Success", "Add-on updated successfully.");
+        },
+        (error) => {
+            Alert.alert("Error", error?.message || "Failed to update add-on.");
         },
     );
 
@@ -230,13 +388,48 @@ export default function SubscriptionScreen() {
         }
     };
 
-    // Monthly / Yearly tab state
-    const [billingTab, setBillingTab] = useState(0); // 0 = Monthly, 1 = Yearly
-    const billingTabOptions = ["Monthly", "Yearly"];
+    // Monthly / Yearly / Add-ons (یک سگمنت: Monthly | Yearly | Add-ons)
+    const [billingTab, setBillingTab] = useState(0); // 0 = Monthly, 1 = Yearly, 2 = Add-ons
+    const billingTabOptions = ["Monthly", "Yearly", "Add-ons"];
 
-    // Filter plans by billing interval and exclude current plan
+    // Add-ons: from current plan or default list (for display + API addon_key)
+    const ADDON_DISPLAY: Record<string, { displayName: string; pricePerUnit: number; description: string }> = {
+        additional_doctor: {
+            displayName: "Additional Doctor",
+            pricePerUnit: 5,
+            description: "You can purchase additional doctors to expand your practice team.",
+        },
+        doctor: {
+            displayName: "Additional Doctor",
+            pricePerUnit: 5,
+            description: "You can purchase additional doctors to expand your practice team.",
+        },
+    };
+    const addonsList = useMemo(() => {
+        const fromPlan = (currentPlan?.addons ?? []) as PlanAddon[];
+        if (fromPlan.length > 0) {
+            return fromPlan.map((a) => ({
+                addon_key: a.addon_key,
+                included_quantity: a.included_quantity,
+                displayName: ADDON_DISPLAY[a.addon_key]?.displayName ?? a.addon_key.replace(/_/g, " "),
+                pricePerUnit: ADDON_DISPLAY[a.addon_key]?.pricePerUnit ?? 0,
+                description: ADDON_DISPLAY[a.addon_key]?.description ?? "",
+            }));
+        }
+        return [
+            {
+                addon_key: "additional_doctor",
+                included_quantity: 0,
+                displayName: "Additional Doctor",
+                pricePerUnit: 5,
+                description: "You can purchase additional doctors to expand your practice team.",
+            },
+        ];
+    }, [currentPlan?.addons]);
+
+    // Filter plans by billing interval (فقط برای Monthly/Yearly؛ Add-ons تب جداگانه است)
     const filteredPlans = useMemo(() => {
-        if (!plansData?.data) return [];
+        if (!plansData?.data || billingTab === 2) return [];
         const interval = billingTab === 0 ? "monthly" : "yearly";
         return plansData.data.filter((plan) => {
             if (plan.id === currentPlan?.id) return false;
@@ -417,7 +610,7 @@ export default function SubscriptionScreen() {
                 </View>
             </View>
 
-            {/* Premium Plans Section */}
+            {/* Premium Plans Section + Monthly / Yearly / Add-ons سگمنت */}
             <View style={styles.premiumSection}>
                 <BaseText type="Body" weight="400" color="labels.primary" style={styles.premiumTitle} align="center">
                     Access More With{" "}
@@ -426,7 +619,6 @@ export default function SubscriptionScreen() {
                     </BaseText>
                 </BaseText>
 
-                {/* Monthly / Yearly Segmented Picker */}
                 <View style={styles.billingTabContainer}>
                     <Host matchContents style={{ flex: 1 }}>
                         <Picker
@@ -441,70 +633,100 @@ export default function SubscriptionScreen() {
                     </Host>
                 </View>
 
-                {/* Plan Cards with Animation */}
-                {filteredPlans.map((plan, index) => {
-                    const planColor = getPlanColor(plan.name);
-                    const features = getPlanFeatures(plan);
-                    const planPrice = plan.price;
-                    const planBillingInterval = plan.billing_interval || "monthly";
+                {billingTab !== 2 && (
+                    <>
+                        {/* Plan Cards with Animation */}
+                        {filteredPlans.map((plan, index) => {
+                            const planColor = getPlanColor(plan.name);
+                            const features = getPlanFeatures(plan);
+                            const planPrice = plan.price;
+                            const planBillingInterval = plan.billing_interval || "monthly";
 
-                    // Create gradient background for plan header
-                    const gradientColors: [string, string, string, string, string] =
-                        planColor === colors.system.blue
-                            ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
-                            : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
+                            // Create gradient background for plan header
+                            const gradientColors: [string, string, string, string, string] =
+                                planColor === colors.system.blue
+                                    ? ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"]
+                                    : ["rgba(175, 82, 222, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(175, 82, 222, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(175, 82, 222, 0.08)"];
 
-                    return (
-                        <RNAnimated.View
-                            key={`${billingTab}-${plan.id}`}
-                            entering={FadeInDown.duration(400)
-                                .delay(index * 120)
-                                .springify()}
-                        >
-                            <View style={styles.planCard}>
-                                <View style={styles.planCardInner}>
-                                    {/* Plan Header */}
-                                    <View style={styles.planHeaderWrapper}>
-                                        <View style={styles.planHeaderContent}>
-                                            <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
-                                                <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
-                                                    {plan.name}
-                                                </BaseText>
-                                                <BaseText type="Title3" weight="600" style={{ color: planColor }}>
-                                                    {formatPrice(planPrice, plan.currency, planBillingInterval)}
-                                                </BaseText>
-                                            </LinearGradient>
-                                        </View>
-                                    </View>
-
-                                    {/* Plan Features */}
-                                    <View style={styles.planFeatures}>
-                                        {features.map((feature, fIndex) => (
-                                            <View key={fIndex} style={styles.featureItemContainer}>
-                                                <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
-                                                <BaseText type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
-                                                    {" " + feature}
-                                                </BaseText>
+                            return (
+                                <RNAnimated.View
+                                    key={`${billingTab}-${plan.id}`}
+                                    entering={FadeInDown.duration(400)
+                                        .delay(index * 120)
+                                        .springify()}
+                                >
+                                    <View style={styles.planCard}>
+                                        <View style={styles.planCardInner}>
+                                            {/* Plan Header */}
+                                            <View style={styles.planHeaderWrapper}>
+                                                <View style={styles.planHeaderContent}>
+                                                    <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
+                                                        <BaseText type="Title3" weight="600" style={{ color: planColor, flex: 1 }} className="capitalize">
+                                                            {plan.name}
+                                                        </BaseText>
+                                                        <BaseText type="Title3" weight="600" style={{ color: planColor }}>
+                                                            {formatPrice(planPrice, plan.currency, planBillingInterval)}
+                                                        </BaseText>
+                                                    </LinearGradient>
+                                                </View>
                                             </View>
-                                        ))}
+
+                                            {/* Plan Features */}
+                                            <View style={styles.planFeatures}>
+                                                {features.map((feature, fIndex) => (
+                                                    <View key={fIndex} style={styles.featureItemContainer}>
+                                                        <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
+                                                        <BaseText type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                            {" " + feature}
+                                                        </BaseText>
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </View>
+
+                                        {/* Purchase Button */}
+                                        <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
+                                            <BaseButton label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
+                                        </LinearGradient>
                                     </View>
-                                </View>
+                                </RNAnimated.View>
+                            );
+                        })}
 
-                                {/* Purchase Button */}
-                                <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={styles.planFooter}>
-                                    <BaseButton label={subscriptionDataObj.has_subscription && subscriptionDataObj.is_active ? "Change Plan" : "Purchase Now"} onPress={() => handlePurchase(plan.id)} ButtonStyle="Filled" size="Medium" rounded style={styles.purchaseButton} disabled={isCreatingCheckout || isSwapping} />
-                                </LinearGradient>
+                        {filteredPlans.length === 0 && (
+                            <View style={{ paddingVertical: 32, alignItems: "center" }}>
+                                <BaseText type="Body" weight="400" color="labels.secondary">
+                                    No {billingTab === 0 ? "monthly" : "yearly"} plans available
+                                </BaseText>
                             </View>
-                        </RNAnimated.View>
-                    );
-                })}
+                        )}
+                    </>
+                )}
 
-                {filteredPlans.length === 0 && (
-                    <View style={{ paddingVertical: 32, alignItems: "center" }}>
-                        <BaseText type="Body" weight="400" color="labels.secondary">
-                            No {billingTab === 0 ? "monthly" : "yearly"} plans available
-                        </BaseText>
-                    </View>
+                {billingTab === 2 && (
+                    <>
+                        {addonsList.map((addon, index) => (
+                            <AddonCard
+                                key={addon.addon_key}
+                                addonKey={addon.addon_key}
+                                displayName={addon.displayName}
+                                pricePerUnit={addon.pricePerUnit}
+                                description={addon.description}
+                                initialQuantity={addon.included_quantity}
+                                onPurchase={(quantity) => {
+                                    if (selectedPractice?.id) {
+                                        updateAddonLimit({
+                                            practiceId: selectedPractice.id,
+                                            data: { addon_key: addon.addon_key, quantity },
+                                        });
+                                    } else {
+                                        Alert.alert("Error", "No practice selected.");
+                                    }
+                                }}
+                                disabled={isUpdatingAddon}
+                            />
+                        ))}
+                    </>
                 )}
             </View>
         </ScrollView>

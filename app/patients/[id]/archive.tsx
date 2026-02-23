@@ -57,31 +57,25 @@ export default function PatientArchiveScreen() {
 
             const dateData = imagesByDate.get(dateKey)!;
 
-            // If media has a template, only show original_media in gallery (not individual images)
             if (media.template && media.original_media?.url) {
-                dateData.images.push({ url: media.original_media.url, timestamp: sectionTimestamp });
-            }
-            // If media has images array (template media without original_media, or non-template)
-            else if (media.images && Array.isArray(media.images) && media.images.length > 0) {
+                const displayUrl = media.edited_media?.url ?? media.original_media.url;
+                dateData.images.push({ url: displayUrl, timestamp: sectionTimestamp });
+            } else if (media.images && Array.isArray(media.images) && media.images.length > 0) {
                 media.images.forEach((imageItem: any) => {
-                    if (imageItem.image?.url) {
+                    const displayUrl = imageItem.edited_image?.url ?? imageItem.image?.url;
+                    if (displayUrl) {
                         const imgTimestamp = imageItem.created_at ? new Date(imageItem.created_at).getTime() : sectionTimestamp;
-                        dateData.images.push({ url: imageItem.image.url, timestamp: imgTimestamp });
+                        dateData.images.push({ url: displayUrl, timestamp: imgTimestamp });
                     }
                 });
-            }
-            // Fallback to old structure for backward compatibility
-            else {
-                let imageUrl: string | undefined;
-                if (media.url) {
-                    imageUrl = media.url;
-                } else if (media.image?.url) {
-                    imageUrl = media.image.url;
-                } else if (media.original_media?.url) {
-                    imageUrl = media.original_media.url;
-                }
-                if (imageUrl) {
-                    dateData.images.push({ url: imageUrl, timestamp: sectionTimestamp });
+            } else {
+                const displayUrl =
+                    media.edited_media?.url ??
+                    media.url ??
+                    media.image?.url ??
+                    media.original_media?.url;
+                if (displayUrl) {
+                    dateData.images.push({ url: displayUrl, timestamp: sectionTimestamp });
                 }
             }
         });
@@ -114,45 +108,34 @@ export default function PatientArchiveScreen() {
             const patientMediaId = media.id; // This is the patient_media_id needed for restore
             const isBookmarked = media.is_bookmarked ?? false;
 
-            // If media has a template and original_media, add it first (this is what shows in gallery)
             if (media.template && media.original_media?.url) {
-                const createdAt = media.created_at || media.updated_at;
+                const displayUrl = media.edited_media?.url ?? media.original_media.url;
                 items.push({
-                    url: media.original_media.url,
+                    url: displayUrl,
                     mediaId: patientMediaId,
                     isBookmarked,
-                    createdAt,
+                    createdAt: media.created_at || media.updated_at,
                 });
             }
-
-            // Extract image URLs from media.images array
             if (media.images && Array.isArray(media.images) && media.images.length > 0) {
                 media.images.forEach((imageItem: any) => {
-                    const imageUrl = imageItem.image?.url;
-                    if (imageUrl) {
-                        // Use image's created_at or fallback to media's created_at
-                        const createdAt = imageItem.created_at || media.created_at || media.updated_at;
+                    const displayUrl = imageItem.edited_image?.url ?? imageItem.image?.url;
+                    if (displayUrl) {
                         items.push({
-                            url: imageUrl,
+                            url: displayUrl,
                             mediaId: patientMediaId,
                             isBookmarked,
-                            createdAt,
+                            createdAt: imageItem.created_at || media.created_at || media.updated_at,
                         });
                     }
                 });
             }
-            // Fallback to old structure for backward compatibility
             else if (!media.template) {
-                // Only process if no template (template case already handled above)
-                let imageUrl: string | undefined;
-                if (media.url) {
-                    imageUrl = media.url;
-                } else if (media.image?.url) {
-                    imageUrl = media.image.url;
-                } else if (media.original_media?.url) {
-                    imageUrl = media.original_media.url;
-                }
-
+                const imageUrl =
+                    media.edited_media?.url ??
+                    media.url ??
+                    media.image?.url ??
+                    media.original_media?.url;
                 if (imageUrl) {
                     const createdAt = media.created_at || media.updated_at;
                     items.push({

@@ -279,7 +279,8 @@ export interface EditPatientMediaRequest {
 
 export interface UpdateMediaImageRequest {
     edited_image?: File | string; // File or Livewire temp filename
-    notes?: string; // max 5000 characters
+    /** آرایه نوت‌ها یا رشته JSON آن؛ بک‌اند آرایه انتظار دارد (notes[i][text], notes[i][x], notes[i][y]) */
+    notes?: EditPatientMediaNote[] | string;
     data?: Record<string, any>; // Custom JSON data (e.g. brightness, contrast)
 }
 

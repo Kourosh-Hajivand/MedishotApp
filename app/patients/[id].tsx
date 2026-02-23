@@ -111,6 +111,8 @@ export default function PatientDetailsScreen() {
     const [imageEditorVisible, setImageEditorVisible] = useState(false);
     const [imageEditorUri, setImageEditorUri] = useState<string | undefined>();
     const [imageEditorTool, setImageEditorTool] = useState<string | undefined>();
+    const [imageRefreshKey, setImageRefreshKey] = useState(0);
+    const [imageSavedUri, setImageSavedUri] = useState<string | null>(null);
 
     // Calculate age from birth_date
     const patientAge = useMemo(() => {
@@ -141,55 +143,61 @@ export default function PatientDetailsScreen() {
             const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: add original_media AND all template images to map
                 const templateMedia = media as PatientMediaWithTemplate;
+                const editedComposite = (templateMedia as { edited_media?: { url?: string } }).edited_media?.url;
                 if (templateMedia.original_media?.url) {
                     map.set(templateMedia.original_media.url, mediaId);
+                    if (editedComposite) map.set(editedComposite, mediaId);
                 }
-                // Always add all template images to map (even if original_media exists)
                 if (Array.isArray(templateMedia.images)) {
                     templateMedia.images.forEach((imageItem: any) => {
-                        if (imageItem.image?.url) {
-                            map.set(imageItem.image.url, mediaId);
-                        }
+                        if (imageItem.image?.url) map.set(imageItem.image.url, mediaId);
+                        if (imageItem.edited_image?.url) map.set(imageItem.edited_image.url, mediaId);
                     });
                 }
             } else {
-                // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
-                if (patientMedia.original_media?.url) {
-                    map.set(patientMedia.original_media.url, mediaId);
-                } else if (patientMedia.media?.url) {
-                    map.set(patientMedia.media.url, mediaId);
-                }
+                if (patientMedia.original_media?.url) map.set(patientMedia.original_media.url, mediaId);
+                if (patientMedia.edited_media?.url) map.set(patientMedia.edited_media.url, mediaId);
+                if (patientMedia.media?.url) map.set(patientMedia.media.url, mediaId);
             }
         });
 
         return map;
     }, [patientMediaData?.data]);
 
-    // Map image URL -> editor state (from media.data) for restoring edits when opening editor
+    // Map image URL -> editor state (per-image data for template, media.data for non-template) for opening editor
     const imageUrlToEditorStateMap = useMemo(() => {
         const map = new Map<string, EditorState>();
         if (!patientMediaData?.data || !Array.isArray(patientMediaData.data)) return map;
 
         patientMediaData.data.forEach((media: PatientMedia | PatientMediaWithTemplate) => {
-            const editorState = parseEditorStateFromMediaData((media as { data?: unknown }).data);
-            if (!editorState) return;
-
             const isTemplateMedia = "template" in media && "images" in media && media.template != null;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
                 const templateMedia = media as PatientMediaWithTemplate;
-                if (templateMedia.original_media?.url) map.set(templateMedia.original_media.url, editorState);
+                const mediaEditorState = parseEditorStateFromMediaData((media as { data?: unknown }).data);
+                if (templateMedia.original_media?.url) {
+                    if (mediaEditorState) map.set(templateMedia.original_media.url, mediaEditorState);
+                    const editedComposite = (templateMedia as { edited_media?: { url?: string } }).edited_media?.url;
+                    if (editedComposite && mediaEditorState) map.set(editedComposite, mediaEditorState);
+                }
                 templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
                     const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
-                    if (imageUrl) map.set(imageUrl, editorState);
+                    const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
+                    const itemState = parseEditorStateFromMediaData((imageItem as { data?: unknown }).data);
+                    if (itemState) {
+                        if (imageUrl) map.set(imageUrl, itemState);
+                        if (editedUrl) map.set(editedUrl, itemState);
+                    }
                 });
             } else {
                 const patientMedia = media as PatientMedia;
+                const editorState = parseEditorStateFromMediaData((media as { data?: unknown }).data);
+                if (!editorState) return;
                 if (patientMedia.original_media?.url) map.set(patientMedia.original_media.url, editorState);
-                else if (patientMedia.media?.url) map.set(patientMedia.media.url, editorState);
+                if (patientMedia.edited_media?.url) map.set(patientMedia.edited_media.url, editorState);
+                if (patientMedia.media?.url) map.set(patientMedia.media.url, editorState);
             }
         });
 
@@ -210,11 +218,12 @@ export default function PatientDetailsScreen() {
                 const orig = templateMedia.original_media?.url;
                 if (orig) map.set(orig, orig);
                 if ((templateMedia as { edited_media?: { url?: string } }).edited_media?.url && orig) map.set((templateMedia as { edited_media: { url: string } }).edited_media.url, orig);
+                // هر سلول تمپلیت: اورجینال = همان image آن سلول (قبل از ادیت)، نه کامپوزیت
                 templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
                     const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
                     const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
-                    if (imageUrl) map.set(imageUrl, orig ?? imageUrl);
-                    if (editedUrl) map.set(editedUrl, orig ?? imageUrl ?? editedUrl);
+                    if (imageUrl) map.set(imageUrl, imageUrl);
+                    if (editedUrl) map.set(editedUrl, imageUrl ?? editedUrl);
                 });
             } else {
                 const patientMedia = media as PatientMedia;
@@ -315,21 +324,18 @@ export default function PatientDetailsScreen() {
                 if (templateMedia.original_media?.url) {
                     map.set(templateMedia.original_media.url, isBookmarked);
                 } else if (Array.isArray(templateMedia.images)) {
-                    // If no original_media, add all individual images to bookmark map
                     templateMedia.images.forEach((imageItem: any) => {
-                        if (imageItem.image?.url) {
-                            map.set(imageItem.image.url, isBookmarked);
-                        }
+                        if (imageItem.image?.url) map.set(imageItem.image.url, isBookmarked);
+                        if (imageItem.edited_image?.url) map.set(imageItem.edited_image.url, isBookmarked);
                     });
                 }
+                const editedComposite = (templateMedia as { edited_media?: { url?: string } }).edited_media?.url;
+                if (editedComposite) map.set(editedComposite, isBookmarked);
             } else {
-                // PatientMedia: use original_media or media
                 const patientMedia = media as PatientMedia;
-                if (patientMedia.original_media?.url) {
-                    map.set(patientMedia.original_media.url, isBookmarked);
-                } else if (patientMedia.media?.url) {
-                    map.set(patientMedia.media.url, isBookmarked);
-                }
+                if (patientMedia.original_media?.url) map.set(patientMedia.original_media.url, isBookmarked);
+                if (patientMedia.edited_media?.url) map.set(patientMedia.edited_media.url, isBookmarked);
+                if (patientMedia.media?.url) map.set(patientMedia.media.url, isBookmarked);
             }
         });
 
@@ -366,26 +372,26 @@ export default function PatientDetailsScreen() {
             const isTemplateMedia = "template" in media && "images" in media && media.template !== null && media.template !== undefined;
 
             if (isTemplateMedia && Array.isArray(media.images)) {
-                // PatientMediaWithTemplate: show original_media if exists, otherwise show individual images
+                // PatientMediaWithTemplate: show composite (edited_media ?? original_media) or individual images with edited_image priority
                 const templateMedia = media as PatientMediaWithTemplate;
+                const editedComposite = (templateMedia as { edited_media?: { url?: string } }).edited_media?.url;
                 if (templateMedia.original_media?.url) {
-                    dateImages.push({ url: templateMedia.original_media.url, timestamp });
+                    dateImages.push({ url: editedComposite ?? templateMedia.original_media.url, timestamp });
                 } else if (Array.isArray(templateMedia.images)) {
-                    // If no original_media, show all individual images
                     templateMedia.images.forEach((imageItem: any) => {
-                        if (imageItem.image?.url) {
+                        const displayUrl = imageItem.edited_image?.url ?? imageItem.image?.url;
+                        if (displayUrl) {
                             const imgTimestamp = imageItem.created_at ? new Date(imageItem.created_at).getTime() : timestamp;
-                            dateImages.push({ url: imageItem.image.url, timestamp: imgTimestamp });
+                            dateImages.push({ url: displayUrl, timestamp: imgTimestamp });
                         }
                     });
                 }
             } else {
-                // PatientMedia: use original_media or media
+                // PatientMedia: edited_media ?? original_media ?? media
                 const patientMedia = media as PatientMedia;
-                if (patientMedia.original_media?.url) {
-                    dateImages.push({ url: patientMedia.original_media.url, timestamp });
-                } else if (patientMedia.media?.url) {
-                    dateImages.push({ url: patientMedia.media.url, timestamp });
+                const displayUrl = patientMedia.edited_media?.url ?? patientMedia.original_media?.url ?? patientMedia.media?.url;
+                if (displayUrl) {
+                    dateImages.push({ url: displayUrl, timestamp });
                 }
             }
         });
@@ -1016,6 +1022,8 @@ export default function PatientDetailsScreen() {
                                     practice={practice}
                                     metadata={metadata}
                                     enableTakeAfterTemplate
+                                    imageRefreshKey={imageRefreshKey}
+                                    imageSavedUri={imageSavedUri}
                                 />
                             ))}
                         {activeTab === 0 && (archivedData?.data?.length ?? 0) > 0 && (
@@ -1143,15 +1151,22 @@ export default function PatientDetailsScreen() {
             />
             <ImageEditorModal
                 visible={imageEditorVisible}
-                uri={imageEditorUri}
-                originalUri={imageEditorUri ? imageUrlToOriginalUriMap.get(imageEditorUri) : undefined}
+                uri={imageEditorUri ? (imageUrlToOriginalUriMap.get(imageEditorUri) ?? imageEditorUri) : undefined}
+                originalUri={imageEditorUri ? (imageUrlToOriginalUriMap.get(imageEditorUri) ?? imageEditorUri) : undefined}
                 initialTool={imageEditorTool}
                 mediaId={imageEditorUri ? imageUrlToMediaIdMap.get(imageEditorUri) : undefined}
                 mediaImageId={imageEditorUri ? imageUrlToMediaImageIdMap.get(imageEditorUri) : undefined}
                 hasTemplate={imageEditorUri ? imageUrlToHasTemplateMap.get(imageEditorUri) : undefined}
                 initialEditorState={imageEditorUri ? imageUrlToEditorStateMap.get(imageEditorUri) : undefined}
-                onClose={() => setImageEditorVisible(false)}
-                onSaveSuccess={() => refetchPatientMedia()}
+                onClose={() => {
+                    setImageEditorVisible(false);
+                    setImageSavedUri(null);
+                }}
+                onSaveSuccess={() => {
+                    refetchPatientMedia();
+                    setImageRefreshKey((k) => k + 1);
+                    setImageSavedUri(imageEditorUri ?? null);
+                }}
             />
         </View>
     );

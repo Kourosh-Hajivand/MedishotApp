@@ -126,71 +126,53 @@ export function useImageViewerDerivedData({
                 // Check if this is a composite (has original_media, template, and images)
                 const isComposite = !!(media.original_media?.url && hasTemplate && media.images?.length);
 
-                // Add original_media to maps if it exists (composite template)
+                const editedCompositeUrl = (media as { edited_media?: { url?: string } }).edited_media?.url;
                 if (media.original_media?.url) {
-                    if (taker) {
-                        takerMap.set(media.original_media.url, {
-                            first_name: taker.first_name,
-                            last_name: taker.last_name,
-                        });
-                    }
-                    if (createdAt) {
-                        createdAtMap.set(media.original_media.url, createdAt);
-                    }
+                    const setTakerCreated = (url: string) => {
+                        if (taker) takerMap.set(url, { first_name: taker.first_name, last_name: taker.last_name });
+                        if (createdAt) createdAtMap.set(url, createdAt);
+                    };
+                    setTakerCreated(media.original_media.url);
+                    if (editedCompositeUrl) setTakerCreated(editedCompositeUrl);
                     if (hasTemplate) {
                         isOriginalMediaMap.set(media.original_media.url, true);
+                        if (editedCompositeUrl) isOriginalMediaMap.set(editedCompositeUrl, true);
                         if (hideTakeAfter) {
                             hideTakeAfterMap.set(media.original_media.url, true);
+                            if (editedCompositeUrl) hideTakeAfterMap.set(editedCompositeUrl, true);
                         }
                         if (noBeforeAfter) {
                             originalNoBeforeAfterMap.set(media.original_media.url, true);
+                            if (editedCompositeUrl) originalNoBeforeAfterMap.set(editedCompositeUrl, true);
                         }
                     }
-                    // Mark as composite if it has template and images
                     if (isComposite) {
                         isCompositeMap.set(media.original_media.url, true);
+                        if (editedCompositeUrl) isCompositeMap.set(editedCompositeUrl, true);
                     }
                 }
 
-                // Template but no original_media (single photo with template, e.g. id 190): treat first image as primary for Take After
                 const hasTemplateNoOriginal = hasTemplate && !media.original_media?.url && media.images?.length;
-                const primaryTemplateImageUrl = hasTemplateNoOriginal ? media.images?.[0]?.image?.url : null;
 
-                // Add all template images to maps
                 if (media.images && Array.isArray(media.images)) {
-                    media.images.forEach((img: any) => {
-                        const imageUrl = img.image?.url;
-                        if (imageUrl) {
-                            if (taker) {
-                                takerMap.set(imageUrl, {
-                                    first_name: taker.first_name,
-                                    last_name: taker.last_name,
-                                });
-                            }
-                            const imgCreatedAt = img.created_at || createdAt;
-                            if (imgCreatedAt) {
-                                createdAtMap.set(imageUrl, imgCreatedAt);
-                            }
-                            // First image when template has no original_media = same logic as composite (Take After, etc.)
-                            if (primaryTemplateImageUrl && imageUrl === primaryTemplateImageUrl) {
-                                isOriginalMediaMap.set(imageUrl, true);
-                                if (hideTakeAfter) {
-                                    hideTakeAfterMap.set(imageUrl, true);
-                                }
-                                if (noBeforeAfter) {
-                                    originalNoBeforeAfterMap.set(imageUrl, true);
-                                }
-                            } else {
-                                isOriginalMediaMap.set(imageUrl, false);
-                                if (hideTakeAfter) {
-                                    hideTakeAfterMap.set(imageUrl, true);
-                                }
-                            }
-                            // Mark template images as part of composite if parent is composite
-                            if (isComposite) {
-                                isCompositeMap.set(imageUrl, true);
-                            }
+                    media.images.forEach((img: any, idx: number) => {
+                        const displayUrl = img.edited_image?.url ?? img.image?.url;
+                        if (!displayUrl) return;
+                        if (taker) {
+                            takerMap.set(displayUrl, { first_name: taker.first_name, last_name: taker.last_name });
                         }
+                        const imgCreatedAt = img.created_at || createdAt;
+                        if (imgCreatedAt) createdAtMap.set(displayUrl, imgCreatedAt);
+                        const isFirstTemplateImage = hasTemplateNoOriginal && idx === 0;
+                        if (isFirstTemplateImage) {
+                            isOriginalMediaMap.set(displayUrl, true);
+                            if (hideTakeAfter) hideTakeAfterMap.set(displayUrl, true);
+                            if (noBeforeAfter) originalNoBeforeAfterMap.set(displayUrl, true);
+                        } else {
+                            isOriginalMediaMap.set(displayUrl, false);
+                            if (hideTakeAfter) hideTakeAfterMap.set(displayUrl, true);
+                        }
+                        if (isComposite) isCompositeMap.set(displayUrl, true);
                     });
                 }
             });
@@ -206,27 +188,36 @@ export function useImageViewerDerivedData({
         };
     }, [rawMediaData]);
 
-    // Map image URL -> editor state (from media.data) for restoring edits when opening editor
+    // Map image URL -> editor state (per-image data for template cells, media.data for composite/non-template)
     const imageUrlToEditorStateMapInternal = React.useMemo(() => {
         const map = new Map<string, ReturnType<typeof parseEditorStateFromMediaData>>();
         if (!rawMediaData || !Array.isArray(rawMediaData)) return map;
 
         rawMediaData.forEach((media: RawMediaData) => {
-            const data = (media as { data?: unknown }).data;
-            const editorState = parseEditorStateFromMediaData(data);
-            if (!editorState) return;
+            const mediaData = (media as { data?: unknown }).data;
+            const mediaState = parseEditorStateFromMediaData(mediaData);
 
             if (media.original_media?.url) {
-                map.set(media.original_media.url, editorState);
+                if (mediaState) map.set(media.original_media.url, mediaState);
+                const editedComposite = (media as { edited_media?: { url?: string } }).edited_media?.url;
+                if (editedComposite && mediaState) map.set(editedComposite, mediaState);
             }
             if (media.images?.length) {
-                media.images.forEach((img: { image?: { url?: string } | null }) => {
-                    if (img.image?.url) map.set(img.image.url, editorState);
+                media.images.forEach((img: { image?: { url?: string } | null; edited_image?: { url?: string } | null; data?: unknown }) => {
+                    const itemState = parseEditorStateFromMediaData(img.data);
+                    if (itemState) {
+                        if (img.image?.url) map.set(img.image.url, itemState);
+                        if (img.edited_image?.url) map.set(img.edited_image.url, itemState);
+                    }
                 });
             }
             const simpleMedia = media as { media?: { url?: string } };
-            if (simpleMedia.media?.url) {
-                map.set(simpleMedia.media.url, editorState);
+            if (simpleMedia.media?.url && mediaState) {
+                map.set(simpleMedia.media.url, mediaState);
+            }
+            const editedMedia = media as { edited_media?: { url?: string } };
+            if (editedMedia.edited_media?.url && mediaState) {
+                map.set(editedMedia.edited_media.url, mediaState);
             }
         });
 
@@ -242,10 +233,11 @@ export function useImageViewerDerivedData({
             if (media.original_media?.url) map.set(media.original_media.url, media.original_media.url);
             const withEdited = media as { edited_media?: { url?: string } };
             if (withEdited.edited_media?.url && orig) map.set(withEdited.edited_media.url, orig);
+            // هر سلول تمپلیت: اورجینال = همان image آن سلول، نه کامپوزیت
             if (media.images?.length) {
                 media.images.forEach((img: { image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
-                    if (img.image?.url) map.set(img.image.url, orig ?? img.image.url);
-                    if (img.edited_image?.url) map.set(img.edited_image.url, orig ?? img.image?.url ?? img.edited_image.url);
+                    if (img.image?.url) map.set(img.image.url, img.image.url);
+                    if (img.edited_image?.url) map.set(img.edited_image.url, img.image?.url ?? img.edited_image.url);
                 });
             }
             const simpleMedia = media as { media?: { url?: string } };

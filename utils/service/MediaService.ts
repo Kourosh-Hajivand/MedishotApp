@@ -220,7 +220,7 @@ const MediaService = {
         }
     },
 
-    // Update patient media image (notes, data, edited_image)
+    // Update patient media image (notes as array: notes[i][text], notes[i][x], notes[i][y] — مثل editPatientMedia)
     updateMediaImage: async (mediaImageId: string | number, payload: UpdateMediaImageRequest): Promise<UpdateMediaImageResponse> => {
         try {
             const formData = new FormData();
@@ -229,7 +229,20 @@ const MediaService = {
                 formData.append("edited_image", payload.edited_image as File | Blob);
             }
             if (payload.notes != null) {
-                formData.append("notes", payload.notes);
+                const notesArray: EditPatientMediaNote[] = Array.isArray(payload.notes)
+                    ? payload.notes
+                    : (() => {
+                          try {
+                              return JSON.parse(payload.notes as string) as EditPatientMediaNote[];
+                          } catch {
+                              return [];
+                          }
+                      })();
+                notesArray.forEach((note, i) => {
+                    formData.append(`notes[${i}][text]`, String(note.text ?? ""));
+                    formData.append(`notes[${i}][x]`, String(Number(note.x)));
+                    formData.append(`notes[${i}][y]`, String(Number(note.y)));
+                });
             }
             if (payload.data != null) {
                 formData.append("data", JSON.stringify(payload.data));
@@ -238,10 +251,13 @@ const MediaService = {
             if (__DEV__) {
                 const edited = payload.edited_image;
                 const dataStr = payload.data != null ? JSON.stringify(payload.data) : "";
+                const notesArray = payload.notes != null
+                    ? (Array.isArray(payload.notes) ? payload.notes : (() => { try { return JSON.parse(payload.notes as string); } catch { return []; } })())
+                    : [];
                 console.log("[MediaService] updateMediaImage request body:", {
                     mediaImageId,
                     edited_image: typeof edited === "string" ? edited : edited instanceof File ? { name: edited.name, size: edited.size, type: edited.type } : "[Blob]",
-                    notes: payload.notes != null ? (payload.notes.length > 100 ? payload.notes.slice(0, 100) + "…" : payload.notes) : undefined,
+                    notesCount: notesArray.length,
                     data_length: dataStr.length,
                     data_preview: dataStr.length > 200 ? dataStr.slice(0, 200) + "…" : dataStr,
                 });

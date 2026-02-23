@@ -158,6 +158,9 @@ interface ImageViewerModalProps {
     enableTakeAfterTemplate?: boolean;
     /** Callback when note icon is pressed (optional; showNote in actions must be true to show icon) */
     onNotePress?: (imageUri: string) => void;
+    /** فقط برای همین یورای که ادیت و Save شده یک‌بار cache-bust شود (نه هر عکسی که فعلی است) */
+    imageRefreshKey?: number;
+    imageSavedUri?: string | null;
 }
 
 export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
@@ -180,6 +183,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     metadata,
     enableTakeAfterTemplate = false,
     onNotePress,
+    imageRefreshKey,
+    imageSavedUri,
 }) => {
     const { profile: me } = useAuth();
     const router = useRouter();
@@ -1176,9 +1181,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const gestures = createGestures(index);
             const isCurrentImage = index === displayIndex;
             const isLoading = FORCE_LOADING_FOR_TEST || (imageLoadingStates.get(index) ?? false);
-            return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
+            const displayUri = imageRefreshKey != null && imageSavedUri != null && item === imageSavedUri ? `${item}${item.includes("?") ? "&" : "?"}refresh=${imageRefreshKey}` : item;
+            return <ImageViewerItem item={displayUri} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
         },
-        [displayIndex, imageSizes, imageLoadingStates, imageAnimatedStyle, createGestures, handleImageLoadStart, handleImageLoad, handleImageError],
+        [displayIndex, imageSizes, imageLoadingStates, imageAnimatedStyle, imageRefreshKey, imageSavedUri, createGestures, handleImageLoadStart, handleImageLoad, handleImageError],
     );
 
     const headerOpacity = useSharedValue(1);
@@ -1382,8 +1388,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
             <ImageEditorModal
                 visible={imageEditorVisible}
-                uri={imageEditorUri}
-                originalUri={imageEditorUri ? imageUrlToOriginalUriMapInternal.get(imageEditorUri) : undefined}
+                uri={imageEditorUri ? (imageUrlToOriginalUriMapInternal.get(imageEditorUri) ?? imageEditorUri) : undefined}
+                originalUri={imageEditorUri ? (imageUrlToOriginalUriMapInternal.get(imageEditorUri) ?? imageEditorUri) : undefined}
                 initialTool={imageEditorTool}
                 mediaId={imageEditorUri ? imageUrlToMediaIdMapInternal.get(imageEditorUri) : undefined}
                 mediaImageId={imageEditorUri ? imageUrlToMediaImageIdMapInternal.get(imageEditorUri) : undefined}
