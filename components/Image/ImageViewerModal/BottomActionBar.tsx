@@ -73,40 +73,58 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                         </HStack>
                     )}
                     {(showNote || showEdit || showCompare || showMagic) && <Spacer />}
-                    {(showNote || showEdit || showCompare || showMagic) && (
-                        <HStack alignment="center" modifiers={bottomActionModifiers as any}>
-                            {showNote && (
-                                <TouchableOpacity onPress={onNotePress} style={styles.slotTouchable}>
-                                    <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} style={{ bottom: -2, left: 8 }} />
-                                </TouchableOpacity>
-                            )}
-                            {showMagic && (
-                                <TouchableOpacity onPress={onMagicPress} style={styles.slotTouchable}>
-                                    <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} style={{ bottom: -1, left: -4 }} />
-                                </TouchableOpacity>
-                            )}
-                            {/* یک اسلات ثابت برای Compare و Edit تا موقعیت نپرند (کامپوزیت vs تک‌تصویر) */}
-                            {(showCompare || showEdit) && (
-                                <View style={styles.fixedSlot}>
-                                    {showCompare && (
-                                        <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={styles.slotTouchable}>
-                                            <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} style={{ bottom: -2 }} />
-                                            {!currentImageHasAfter && enableTakeAfterTemplate && (
-                                                <View style={{ position: "absolute", top: 10, right: 4, backgroundColor: MINT_COLOR, borderRadius: 8, minWidth: 14, height: 14, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 }}>
-                                                    <IconSymbol name="plus" size={10} color={colors.system.white as any} />
+                    {(showNote || showEdit || showCompare || showMagic) &&
+                        (() => {
+                            const count = (showNote ? 1 : 0) + (showMagic ? 1 : 0) + (showCompare ? 1 : 0) + (showEdit ? 1 : 0);
+                            const centerGroupWidth = count * SLOT_SIZE + (count - 1) * SLOT_GAP;
+                            return (
+                                <HStack alignment="center" modifiers={bottomActionModifiers as any}>
+                                    <View style={[styles.centerGroupRoot, { width: centerGroupWidth, height: SLOT_SIZE }]}>
+                                        {showNote && (
+                                            <TouchableOpacity onPress={onNotePress} style={[styles.slotTouchable, { backgroundColor: DEBUG.note }]}>
+                                                <View style={styles.slotIconWrap}>
+                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                                        <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} />
+                                                    </View>
                                                 </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    )}
-                                    {showEdit && (
-                                        <TouchableOpacity onPress={onAdjustPress} style={styles.slotTouchable}>
-                                            <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} style={{ bottom: -2 }} />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            )}
-                        </HStack>
-                    )}
+                                            </TouchableOpacity>
+                                        )}
+                                        {showMagic && (
+                                            <TouchableOpacity onPress={onMagicPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.magic }]}>
+                                                <View style={styles.slotIconWrap}>
+                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                                        <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                        )}
+                                        {showCompare && (
+                                            <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.compareEdit }]}>
+                                                <View style={styles.slotIconWrap}>
+                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                                        <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} />
+                                                    </View>
+                                                </View>
+                                                {!currentImageHasAfter && enableTakeAfterTemplate && (
+                                                    <View style={styles.compareBadge}>
+                                                        <IconSymbol name="plus" size={10} color={colors.system.white as any} />
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        )}
+                                        {showEdit && (
+                                            <TouchableOpacity onPress={onAdjustPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.adjust }]}>
+                                                <View style={styles.slotIconWrap}>
+                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                                        <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} />
+                                                    </View>
+                                                </View>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                </HStack>
+                            );
+                        })()}
                     {showBookmark && <Spacer />}
                     {showBookmark && (
                         <HStack
@@ -151,25 +169,56 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
     );
 });
 
-const SLOT_SIZE = 44;
+const SLOT_SIZE = 48;
+const SLOT_GAP = 1;
+
+const DEBUG = {
+    note: "rgba(0, 200, 83, 0)",
+    magic: "rgba(33, 150, 243, 0)",
+    compareEdit: "rgba(255, 152, 0, 0)",
+    adjust: "rgba(0, 255, 255, 0)",
+};
 
 const styles = StyleSheet.create({
     actionButtonsContainer: {
         alignItems: "center",
         justifyContent: "center",
     },
-    fixedSlot: {
+    centerGroupRoot: {
         flexDirection: "row",
-        width: SLOT_SIZE,
-        height: SLOT_SIZE,
         alignItems: "center",
         justifyContent: "center",
-        gap: 4,
+        gap: SLOT_GAP,
     },
     slotTouchable: {
         width: SLOT_SIZE,
         height: SLOT_SIZE,
+        position: "relative",
+        overflow: "hidden",
+    },
+    slotIconWrap: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
         alignItems: "center",
         justifyContent: "center",
+    },
+    slotIconBox: {
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    compareBadge: {
+        position: "absolute",
+        top: 10,
+        right: 4,
+        backgroundColor: MINT_COLOR,
+        borderRadius: 8,
+        minWidth: 14,
+        height: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 2,
     },
 });

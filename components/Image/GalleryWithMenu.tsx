@@ -8,8 +8,7 @@ import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
-import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { ImageViewerModal } from "./ImageViewerModal";
 
 type GalleryImageItemProps = {
@@ -127,7 +126,6 @@ const GalleryImageItem: React.FC<GalleryImageItemProps> = React.memo(({ uri, ind
                 style={{
                     width: itemWidth,
                     height: itemWidth,
-                    marginRight: index < numColumns - 1 ? gap : 0,
                     overflow: "hidden",
                 }}
             >
@@ -263,6 +261,8 @@ interface GalleryWithMenuProps {
 
 const { width } = Dimensions.get("window");
 
+const GALLERY_GAP = 2;
+
 export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     images,
     sections,
@@ -294,7 +294,6 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [viewerImagesList, setViewerImagesList] = useState<string[]>([]);
     const [selectedUriWhenOpened, setSelectedUriWhenOpened] = useState<string | null>(null);
-    const scale = useSharedValue(1);
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
 
     // Fetch patient data if patientId is provided (for ImageViewerModal)
@@ -333,7 +332,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     }, [imageSections, numColumns]);
 
     const layoutValues = useMemo(() => {
-        const gap = 1;
+        const gap = GALLERY_GAP;
         const totalGap = (numColumns - 1) * gap;
         const itemWidth = (width - totalGap) / numColumns;
         return { gap, itemWidth };
@@ -411,26 +410,6 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     const allImagesExpanded = useMemo(() => {
         return allImages.flatMap((uri) => originalMediaToAllImagesMap.get(uri) ?? [uri]);
     }, [allImages, originalMediaToAllImagesMap]);
-
-    const pinchGesture = useMemo(
-        () =>
-            Gesture.Pinch()
-                .onUpdate((e) => {
-                    scale.value = e.scale;
-                })
-                .onEnd(() => {
-                    const s = scale.value;
-                    runOnJS(() => {
-                        if (s > 1.2 && numColumns > minColumns) {
-                            setNumColumns(numColumns - 1);
-                        } else if (s < 0.8 && numColumns < maxColumns) {
-                            setNumColumns(numColumns + 1);
-                        }
-                    })();
-                    scale.value = 1;
-                }),
-        [numColumns, minColumns, maxColumns],
-    );
 
     const handleImagePress = useCallback(
         (uri: string) => {
@@ -554,24 +533,20 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     }
 
     return (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-            <GestureDetector gesture={pinchGesture}>
-                <Animated.View style={{ flex: 1 }}>
-                    <SectionList
-                        sections={sectionsWithRows}
-                        key={numColumns}
-                        renderItem={renderItem}
-                        renderSectionHeader={renderSectionHeader}
-                        keyExtractor={(item) => item.id}
-                        stickySectionHeadersEnabled={false}
-                        removeClippedSubviews={false}
-                        contentContainerStyle={styles.sectionListContent}
-                        initialNumToRender={8}
-                        maxToRenderPerBatch={6}
-                        windowSize={7}
-                    />
-                </Animated.View>
-            </GestureDetector>
+        <View style={{ flex: 1, backgroundColor: colors.system.gray6 }}>
+            <SectionList
+                sections={sectionsWithRows}
+                key={numColumns}
+                renderItem={renderItem}
+                renderSectionHeader={renderSectionHeader}
+                keyExtractor={(item) => item.id}
+                stickySectionHeadersEnabled={false}
+                removeClippedSubviews={false}
+                contentContainerStyle={styles.sectionListContent}
+                initialNumToRender={8}
+                maxToRenderPerBatch={6}
+                windowSize={7}
+            />
 
             <ImageViewerModal
                 visible={viewerVisible}
@@ -594,7 +569,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 imageRefreshKey={imageRefreshKey}
                 imageSavedUri={imageSavedUri}
             />
-        </GestureHandlerRootView>
+        </View>
     );
 };
 
@@ -626,10 +601,12 @@ const styles = StyleSheet.create({
     },
     sectionListContent: {
         paddingBottom: 16,
+        backgroundColor: "red",
     },
     rowContainer: {
         flexDirection: "row",
-        marginBottom: 0.5,
+        gap: GALLERY_GAP,
+        marginBottom: GALLERY_GAP,
     },
     bookmarkIcon: {
         position: "absolute",

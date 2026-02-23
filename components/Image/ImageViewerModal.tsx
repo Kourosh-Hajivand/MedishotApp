@@ -1236,13 +1236,18 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }, [showNote, showEdit, showCompare, showMagic]);
 
     const bottomActionWidth = React.useMemo(() => {
-        return bottomActionCount === 0 ? containerSize : bottomActionCount === 1 ? containerSize : 44 * bottomActionCount + 12 * (bottomActionCount - 1);
+        const SLOT = 48;
+        const GAP = 1;
+        const PADDING_H = 24;
+        if (bottomActionCount === 0) return containerSize + 12;
+        if (bottomActionCount === 1) return SLOT + PADDING_H;
+        return SLOT * bottomActionCount + GAP * (bottomActionCount - 1) + PADDING_H;
     }, [bottomActionCount, containerSize]);
 
     // Memoize modifiers to prevent re-rendering glass effect
     const bottomActionModifiers = React.useMemo(() => {
         return [
-            padding({ all: 0 }),
+            padding({ horizontal: 12 }),
             frame({
                 height: containerSize,
                 alignment: "center",

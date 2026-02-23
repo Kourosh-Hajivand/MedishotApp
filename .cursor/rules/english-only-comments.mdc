@@ -1,0 +1,21 @@
+---
+description: All comments and explanations must be in English only
+alwaysApply: true
+---
+
+# English-Only Comments & Documentation
+
+- **Comments**: Write all code comments, JSDoc, and inline explanations in **English only**. No Persian/Farsi in comments.
+- **Documentation**: README, docblocks, commit messages, and any written explanations in the codebase must be in **English**.
+- **Variable/function names**: Keep in English (already standard). No Persian in identifiers.
+- **User-facing copy** (e.g. UI labels, error messages shown to users) can follow product/locale requirements separately; this rule applies to **developer-facing** text only (comments, docs, explanations).
+
+Example:
+
+```typescript
+// ✅ GOOD
+// Fetches patient list and invalidates cache on success
+
+// ❌ BAD — do not use non-English (e.g. Farsi, Arabic, etc.) in comments
+// fetches and invalidates cache
+```
