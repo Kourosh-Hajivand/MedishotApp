@@ -403,10 +403,14 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         };
     }, [rawMediaData]);
 
-    // Flatten all images for the viewer modal (gallery view - only original_media for template media)
     const allImages = useMemo(() => {
         return imageSections.flatMap((section) => section.data);
     }, [imageSections]);
+
+    // لیست گسترش‌یافته: هر کامپوزیت به [کامپوزیت + سلول‌ها] باز می‌شود تا با تپ روی هر عکس (کامپوزیت یا نه) کاربر با سوایپ همه را ببیند
+    const allImagesExpanded = useMemo(() => {
+        return allImages.flatMap((uri) => originalMediaToAllImagesMap.get(uri) ?? [uri]);
+    }, [allImages, originalMediaToAllImagesMap]);
 
     const pinchGesture = useMemo(
         () =>
@@ -432,9 +436,8 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         (uri: string) => {
             if (onImagePress) onImagePress(uri);
 
-            const expandedImages = originalMediaToAllImagesMap?.get(uri);
-            const imagesToShow = expandedImages || allImages;
-
+            const compositeList = originalMediaToAllImagesMap?.get(uri);
+            const imagesToShow = compositeList ?? allImagesExpanded;
             const index = imagesToShow.indexOf(uri);
             if (index !== -1) {
                 setSelectedUriWhenOpened(uri);
@@ -443,18 +446,17 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 setViewerVisible(true);
             }
         },
-        [onImagePress, originalMediaToAllImagesMap, allImages],
+        [onImagePress, originalMediaToAllImagesMap, allImagesExpanded],
     );
 
-    // وقتی دیتا بعد از refetch (مثلاً بعد از Save ادیت) آپدیت شد، لیست ویور را با لیست جدید همگام کن تا نسخهٔ ادیت‌شده همان لحظه دیده شود
     useEffect(() => {
         if (!viewerVisible || !selectedUriWhenOpened) return;
-        const expanded = originalMediaToAllImagesMap?.get(selectedUriWhenOpened);
-        const newList = expanded || allImages;
+        const compositeList = originalMediaToAllImagesMap?.get(selectedUriWhenOpened);
+        const newList = compositeList ?? allImagesExpanded;
         setViewerImagesList(newList);
         const idx = newList.indexOf(selectedUriWhenOpened);
         if (idx >= 0) setSelectedIndex(idx);
-    }, [viewerVisible, selectedUriWhenOpened, allImages, originalMediaToAllImagesMap]);
+    }, [viewerVisible, selectedUriWhenOpened, allImagesExpanded, originalMediaToAllImagesMap]);
 
     const handleImageLoadState = useCallback((uri: string, state: "start" | "load" | "error") => {
         setImageLoadingStates((prev) => {
@@ -464,13 +466,10 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         });
     }, []);
 
-    // Get images to show in viewer (use viewerImagesList if set, otherwise allImages)
     const viewerImages = useMemo(() => {
-        if (viewerImagesList.length > 0) {
-            return viewerImagesList;
-        }
-        return allImages;
-    }, [viewerImagesList, allImages]);
+        if (viewerImagesList.length > 0) return viewerImagesList;
+        return allImagesExpanded;
+    }, [viewerImagesList, allImagesExpanded]);
 
     const renderImageItem = useCallback(
         (uri: string, index: number) => {
