@@ -101,3 +101,11 @@ export const formatDate = (dateString: string, format: string = "MMMM D, YYYY"):
 
     return date.format(format);
 };
+
+/**
+ * تاریخ دقیق و خوانا برای داکیومنت/بج (مثلاً "12 Feb 2024") – روزی که عکس گرفته شده.
+ * فرمت: روز ماه سال، سال کامل، بدون ابهام.
+ */
+export const getShortDate = (dateString: string): string => {
+    return formatDate(dateString, "D MMM YYYY");
+};

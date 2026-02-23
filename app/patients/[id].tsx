@@ -941,7 +941,7 @@ export default function PatientDetailsScreen() {
 
             if (item.key === "content") {
                 return (
-                    <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: colors.system.white }}>
+                    <View style={{ flex: 1, minHeight: (screenHeight - 150) / 2, backgroundColor: activeTab === 0 ? colors.system.gray6 : colors.system.white }}>
                         {activeTab === 0 &&
                             (isPatientMediaError ? (
                                 <ErrorState message={patientMediaError instanceof Error ? patientMediaError.message : (patientMediaError as { message?: string })?.message || "Failed to load media"} onRetry={refetchPatientMedia} title="Failed to load media" />

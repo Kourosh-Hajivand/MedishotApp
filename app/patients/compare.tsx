@@ -2,7 +2,7 @@ import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
 import { alignImages } from "@/utils/alignApi";
-import { getRelativeTime } from "@/utils/helper/dateUtils";
+import { getShortDate } from "@/utils/helper/dateUtils";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -251,7 +251,7 @@ export default function BeforeAfterCompareScreen() {
                                 </BaseText>
                                 {pair?.beforeDate ? (
                                     <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
-                                        {getRelativeTime(pair.beforeDate)}
+                                        {getShortDate(pair.beforeDate)}
                                     </BaseText>
                                 ) : null}
                             </View>
@@ -264,7 +264,7 @@ export default function BeforeAfterCompareScreen() {
                                 </BaseText>
                                 {pair?.afterDate ? (
                                     <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
-                                        {getRelativeTime(pair.afterDate)}
+                                        {getShortDate(pair.afterDate)}
                                     </BaseText>
                                 ) : null}
                             </View>
@@ -408,7 +408,7 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl, beforeDate, afterDate }: { 
                     </BaseText>
                     {beforeDate ? (
                         <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
-                            {getRelativeTime(beforeDate)}
+                            {getShortDate(beforeDate)}
                         </BaseText>
                     ) : null}
                 </Animated.View>
@@ -418,7 +418,7 @@ function BeforeAfterSplitLine({ beforeUrl, afterUrl, beforeDate, afterDate }: { 
                     </BaseText>
                     {afterDate ? (
                         <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
-                            {getRelativeTime(afterDate)}
+                            {getShortDate(afterDate)}
                         </BaseText>
                     ) : null}
                 </Animated.View>
@@ -484,7 +484,7 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }
                         </BaseText>
                         {beforeDate ? (
                             <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.sliderBoxDate}>
-                                {getRelativeTime(beforeDate)}
+                                {getShortDate(beforeDate)}
                             </BaseText>
                         ) : null}
                     </View>
@@ -508,7 +508,7 @@ function BeforeAfterSliderOpacity({ beforeUrl, afterUrl, beforeDate, afterDate }
                         </BaseText>
                         {afterDate ? (
                             <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.sliderBoxDate}>
-                                {getRelativeTime(afterDate)}
+                                {getShortDate(afterDate)}
                             </BaseText>
                         ) : null}
                     </View>
