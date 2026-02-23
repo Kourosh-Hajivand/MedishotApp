@@ -691,6 +691,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
 
         const pairs: { beforeUrl: string; afterUrl: string; beforeDate?: string; afterDate?: string; templateName?: string }[] = [];
         let currentPairIndex = 0;
+        let beforeCompositeUrl: string | null = null;
+        let afterCompositeUrl: string | null = null;
+        let beforeCompositeDate: string | undefined;
+        let afterCompositeDate: string | undefined;
+        let openedFromComposite = false;
         type ImageCell = NonNullable<RawMediaData["images"]>[number];
         let beforeImages: ImageCell[] | null = null;
         let afterImages: ImageCell[] | null = null;
@@ -698,10 +703,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         // Find the single before/after set that contains the current image (only pass that set to compare)
         for (const media of rawMediaData) {
             if (media.has_after && media.after_media?.images?.length && media.images?.length) {
+                const beforeComp = (media as { edited_media?: { url?: string } }).edited_media?.url ?? media.original_media?.url;
+                const afterComp = (media.after_media as { edited_media?: { url?: string } })?.edited_media?.url ?? media.after_media?.original_media?.url;
+                beforeCompositeDate = media.created_at;
+                afterCompositeDate = (media.after_media as { created_at?: string })?.created_at;
                 if (media.original_media?.url === currentImageUri) {
                     beforeImages = media.images;
                     afterImages = media.after_media.images;
                     currentPairIndex = 0;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
+                    openedFromComposite = true;
                     break;
                 }
                 const beforeIdx = media.images.findIndex((img: any) => img.image?.url === currentImageUri);
@@ -709,12 +721,17 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     beforeImages = media.images;
                     afterImages = media.after_media.images;
                     currentPairIndex = beforeIdx;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
                     break;
                 }
                 if (media.after_media.original_media?.url === currentImageUri) {
                     beforeImages = media.images;
                     afterImages = media.after_media.images;
                     currentPairIndex = 0;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
+                    openedFromComposite = true;
                     break;
                 }
                 const afterIdx = media.after_media.images.findIndex((img: any) => img.image?.url === currentImageUri);
@@ -722,14 +739,23 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     beforeImages = media.images;
                     afterImages = media.after_media.images;
                     currentPairIndex = afterIdx;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
                     break;
                 }
             }
             if (media.is_after && media.before_media?.images?.length && media.images?.length) {
+                const beforeComp = (media.before_media as { edited_media?: { url?: string } })?.edited_media?.url ?? media.before_media?.original_media?.url;
+                const afterComp = (media as { edited_media?: { url?: string } }).edited_media?.url ?? media.original_media?.url;
+                beforeCompositeDate = (media.before_media as { created_at?: string })?.created_at;
+                afterCompositeDate = media.created_at;
                 if (media.original_media?.url === currentImageUri) {
                     beforeImages = media.before_media.images;
                     afterImages = media.images;
                     currentPairIndex = 0;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
+                    openedFromComposite = true;
                     break;
                 }
                 const afterIdx = media.images.findIndex((img: any) => img.image?.url === currentImageUri);
@@ -737,6 +763,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                     beforeImages = media.before_media.images;
                     afterImages = media.images;
                     currentPairIndex = afterIdx;
+                    beforeCompositeUrl = beforeComp ?? null;
+                    afterCompositeUrl = afterComp ?? null;
                     break;
                 }
             }
@@ -747,6 +775,18 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             return;
         }
 
+        // First item: composite before/after side by side (when both composite URLs exist)
+        if (beforeCompositeUrl && afterCompositeUrl) {
+            pairs.push({
+                beforeUrl: beforeCompositeUrl,
+                afterUrl: afterCompositeUrl,
+                beforeDate: beforeCompositeDate,
+                afterDate: afterCompositeDate,
+                templateName: "Composite",
+            });
+        }
+
+        // Sub-items: individual template cell pairs
         const len = Math.min(beforeImages.length, afterImages.length);
         for (let i = 0; i < len; i++) {
             const beforeUrl = beforeImages[i].image?.url;
@@ -762,6 +802,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             return;
         }
 
+        // Index 0 = composite pair; 1+ = sub-item pairs. Open on composite if user was on composite, else on the matching sub-item.
+        const compareIndex = beforeCompositeUrl && afterCompositeUrl
+            ? (openedFromComposite ? 0 : 1 + currentPairIndex)
+            : currentPairIndex;
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onClose();
         setTimeout(() => {
@@ -770,7 +815,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 params: {
                     patientId: String(patientId),
                     pairsJson: encodeURIComponent(JSON.stringify(pairs)),
-                    currentIndex: String(currentPairIndex),
+                    currentIndex: String(compareIndex),
                 },
             });
         }, 100);

@@ -17,7 +17,7 @@ export interface AlignApiResponse {
 }
 
 export type AlignApiResult =
-    | { success: true; afterAlignedCropped: string }
+    | { success: true; beforeAlignedCropped?: string; afterAlignedCropped: string }
     | { success: false; error: string };
 
 const LOG_TAG = "[AlignAPI]";
@@ -104,9 +104,18 @@ export async function alignImages(beforeUrl: string, afterUrl: string): Promise<
             devWarn(`${LOG_TAG} missing afterAlignedCropped`, { keys: data ? Object.keys(data) : [] });
             return { success: false, error: "Missing afterAlignedCropped in response" };
         }
+        const beforeCropped = typeof data?.beforeCropped === "string" ? data.beforeCropped : undefined;
 
-        devLog(`${LOG_TAG} success`, { afterAlignedLength: afterAligned.length });
-        return { success: true, afterAlignedCropped: afterAligned };
+        // Log the images returned from align API (data URL or URL string)
+        const previewAfter = afterAligned.slice(0, 80) + (afterAligned.length > 80 ? "…" : "");
+        devLog(`${LOG_TAG} success — align API returned images:`, {
+            afterLength: afterAligned.length,
+            afterPreview: previewAfter,
+            beforeLength: beforeCropped?.length ?? 0,
+            ...(afterAligned.length <= 500 ? { afterFull: afterAligned } : {}),
+            ...(beforeCropped && beforeCropped.length <= 500 ? { beforeFull: beforeCropped } : {}),
+        });
+        return { success: true, beforeAlignedCropped: beforeCropped, afterAlignedCropped: afterAligned };
     } catch (e) {
         const err = e instanceof Error ? e.message : String(e);
         devWarn(`${LOG_TAG} error`, { error: err, ...logPayload });

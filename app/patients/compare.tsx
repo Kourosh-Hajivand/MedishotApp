@@ -87,7 +87,8 @@ export default function BeforeAfterCompareScreen() {
     const [currentIndex, setCurrentIndex] = useState(initialIndex);
     const [viewMode, setViewMode] = useState<ViewMode>("horizontal");
     const [contentHeight, setContentHeight] = useState(0);
-    // Key by "beforeUrl|afterUrl" so switching index or pair always shows the correct aligned image for that pair
+    // Key by "beforeUrl|afterUrl" so switching index or pair always shows the correct aligned images for that pair
+    const [alignedBeforeByKey, setAlignedBeforeByKey] = useState<Record<string, string>>({});
     const [alignedAfterByKey, setAlignedAfterByKey] = useState<Record<string, string>>({});
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const isProgrammaticScrollRef = useRef(false);
@@ -101,12 +102,20 @@ export default function BeforeAfterCompareScreen() {
         afterWidth: number;
     } | null>(null);
 
-    // Align API: only for "Front Face Smile" or "Front Face". Store result by pair key (beforeUrl|afterUrl) so index switch shows correct image.
+    // Align API: only for "Front Face Smile" or "Front Face". Store both before/after aligned by pair key (beforeUrl|afterUrl).
     useEffect(() => {
         if (pairs.length === 0) {
             if (__DEV__) console.log(`${LOG_TAG} pairs.length=0, skip align`);
             return;
         }
+        setAlignedBeforeByKey((prev) => {
+            const next: Record<string, string> = {};
+            pairs.forEach((p) => {
+                const key = `${p.beforeUrl}|${p.afterUrl}`;
+                if (prev[key]) next[key] = prev[key];
+            });
+            return next;
+        });
         setAlignedAfterByKey((prev) => {
             const next: Record<string, string> = {};
             pairs.forEach((p) => {
@@ -132,7 +141,8 @@ export default function BeforeAfterCompareScreen() {
                 const result = await alignImages(p.beforeUrl, p.afterUrl);
                 if (cancelled) return;
                 if (result.success) {
-                    if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), afterAlignedLength: result.afterAlignedCropped?.length });
+                    if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align ok`, { pairKey: pairKey.slice(0, 50), beforeAlignedLength: result.beforeAlignedCropped?.length, afterAlignedLength: result.afterAlignedCropped?.length });
+                    if (result.beforeAlignedCropped) setAlignedBeforeByKey((prev) => ({ ...prev, [pairKey]: result.beforeAlignedCropped! }));
                     setAlignedAfterByKey((prev) => ({ ...prev, [pairKey]: result.afterAlignedCropped }));
                 } else {
                     if (__DEV__) console.log(`${LOG_TAG} pair[${i}] align fail`, { error: "error" in result ? result.error : "" });
@@ -190,13 +200,14 @@ export default function BeforeAfterCompareScreen() {
     );
 
     const pair = pairs[currentIndex];
-    const before = pair?.beforeUrl ?? "";
+    const beforeOriginal = pair?.beforeUrl ?? "";
     const afterOriginal = pair?.afterUrl ?? "";
-    const pairKey = before && afterOriginal ? `${before}|${afterOriginal}` : "";
+    const pairKey = beforeOriginal && afterOriginal ? `${beforeOriginal}|${afterOriginal}` : "";
+    const beforeDisplay = pairKey && alignedBeforeByKey[pairKey] ? alignedBeforeByKey[pairKey] : beforeOriginal;
     const afterDisplay = pairKey && alignedAfterByKey[pairKey] ? alignedAfterByKey[pairKey] : afterOriginal;
 
     useEffect(() => {
-        if (!before || !afterDisplay) {
+        if (!beforeDisplay || !afterDisplay) {
             setCompositeSizes(null);
             return;
         }
@@ -220,7 +231,7 @@ export default function BeforeAfterCompareScreen() {
         };
 
         RNImage.getSize(
-            before,
+            beforeDisplay,
             (w, h) => {
                 if (cancelled) return;
                 beforeW = w;
@@ -248,7 +259,7 @@ export default function BeforeAfterCompareScreen() {
         return () => {
             cancelled = true;
         };
-    }, [before, afterDisplay]);
+    }, [beforeDisplay, afterDisplay]);
 
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -265,13 +276,13 @@ export default function BeforeAfterCompareScreen() {
     const { mutateAsync: uploadMediaAsync } = useUploadPatientMedia();
 
     const handleSaveComposite = useCallback(() => {
-        if (!patientId || !pair || !before || !afterDisplay) {
+        if (!patientId || !pair || !beforeDisplay || !afterDisplay) {
             Alert.alert("Error", "Patient not found. Cannot save composite.");
             return;
         }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setPendingCapture(true);
-    }, [patientId, pair, before, afterDisplay]);
+    }, [patientId, pair, beforeDisplay, afterDisplay]);
 
     useEffect(() => {
         const ref = compositeShotRef.current;
@@ -311,7 +322,7 @@ export default function BeforeAfterCompareScreen() {
         return () => clearTimeout(t);
     }, [pendingCapture, patientId, tempUploadAsync, uploadMediaAsync]);
 
-    if (pairs.length === 0 || !before || !afterOriginal) {
+    if (pairs.length === 0 || !beforeOriginal || !afterOriginal) {
         return (
             <View style={[styles.container, styles.containerWhite, { paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -354,7 +365,7 @@ export default function BeforeAfterCompareScreen() {
                 {/* {isVertical && (
                     <View style={styles.verticalSplit}>
                         <View style={styles.halfVertical}>
-                            <Image source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="cover" />
+                            <Image source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit="cover" />
                             <View style={[styles.label, styles.labelBeforePill]}>
                                 <BaseText type="Caption1" weight="600" color="labels.secondary">Before</BaseText>
                             </View>
@@ -369,7 +380,7 @@ export default function BeforeAfterCompareScreen() {
                 )} */}
 
                 {/* Off-screen composite: one common height, proportional widths = no white space, labels in place. */}
-                {before &&
+                {beforeDisplay &&
                     afterDisplay &&
                     (() => {
                         const cw = compositeSizes?.totalWidth ?? COMPOSITE_FALLBACK_WIDTH;
@@ -380,7 +391,7 @@ export default function BeforeAfterCompareScreen() {
                             <ViewShot ref={compositeShotRef} style={[styles.compositeCaptureRoot, { width: cw, height: ch }]} options={{ format: "jpg", quality: 0.9 }}>
                                 <View style={[styles.compositeCaptureRow, { width: cw, height: ch }]}>
                                     <View style={[styles.compositeCaptureHalf, { width: halfBefore, height: ch }]}>
-                                        <Image key={`cap-before-${pairKey}`} source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                                        <Image key={`cap-before-${pairKey}`} source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit="contain" />
                                         <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, styles.compositeCaptureLabel]}>
                                             <BaseText type="Caption1" weight="600" color="labels.primary">
                                                 Before
@@ -419,7 +430,7 @@ export default function BeforeAfterCompareScreen() {
                         }}
                     >
                         <View style={styles.halfHorizontal}>
-                            <Image key={`before-${pairKey}`} source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                            <Image key={`before-${pairKey}`} source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit="contain" />
                             <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, { bottom: badgeBottomHorizontal }]}>
                                 <BaseText type="Caption1" weight="600" color="labels.primary">
                                     Before
@@ -447,9 +458,9 @@ export default function BeforeAfterCompareScreen() {
                     </View>
                 )}
 
-                {isSplitLine && <BeforeAfterSplitLine key={`split-${pairKey}`} beforeUrl={before} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
+                {isSplitLine && <BeforeAfterSplitLine key={`split-${pairKey}`} beforeUrl={beforeDisplay} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
 
-                {isSlider && <BeforeAfterSliderOpacity key={`slider-${pairKey}`} beforeUrl={before} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
+                {isSlider && <BeforeAfterSliderOpacity key={`slider-${pairKey}`} beforeUrl={beforeDisplay} afterUrl={afterDisplay} beforeDate={pair?.beforeDate} afterDate={pair?.afterDate} />}
             </View>
 
             {/* Thumbnail strip (like ImageViewerModal) – above tab bar, show even for single pair so layout is consistent */}
