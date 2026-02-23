@@ -9,7 +9,7 @@ import { Image } from "expo-image";
 import * as ImageManipulator from "expo-image-manipulator";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Dimensions, Image as RNImage, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Image as RNImage, Modal, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
@@ -24,6 +24,9 @@ const COMPOSITE_EXPORT_HEIGHT = 400;
 const COMPOSITE_FALLBACK_WIDTH = 800;
 const COMPOSITE_FALLBACK_HALF = COMPOSITE_FALLBACK_WIDTH / 2;
 const COMPOSITE_FALLBACK_HEIGHT = 400;
+// Vertical composite for save: before on top, after below; each image keeps its aspect ratio.
+const COMPOSITE_VERTICAL_WIDTH = 800;
+const COMPOSITE_VERTICAL_LABEL_HEIGHT = 52;
 
 // Thumbnail strip layout (like ImageViewerModal)
 const THUMB_PADDING = SCREEN_WIDTH / 2 - 22;
@@ -93,13 +96,20 @@ export default function BeforeAfterCompareScreen() {
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const isProgrammaticScrollRef = useRef(false);
     const compositeShotRef = useRef<ViewShot>(null);
+    const compositeVerticalShotRef = useRef<ViewShot>(null);
     const [isSavingComposite, setIsSavingComposite] = useState(false);
     const [pendingCapture, setPendingCapture] = useState(false);
+    /** When saving: true = capture vertical (composite pair), false = capture horizontal (sub-item pairs). */
+    const saveAsVerticalRef = useRef(false);
     const [compositeSizes, setCompositeSizes] = useState<{
         totalWidth: number;
         totalHeight: number;
         beforeWidth: number;
         afterWidth: number;
+        beforeImageW: number;
+        beforeImageH: number;
+        afterImageW: number;
+        afterImageH: number;
     } | null>(null);
 
     // Align API: only for "Front Face Smile" or "Front Face". Store both before/after aligned by pair key (beforeUrl|afterUrl).
@@ -227,6 +237,10 @@ export default function BeforeAfterCompareScreen() {
                 totalHeight: H,
                 beforeWidth: bw,
                 afterWidth: aw,
+                beforeImageW: beforeW,
+                beforeImageH: beforeH,
+                afterImageW: afterW,
+                afterImageH: afterH,
             });
         };
 
@@ -261,6 +275,39 @@ export default function BeforeAfterCompareScreen() {
         };
     }, [beforeDisplay, afterDisplay]);
 
+    // Vertical composite dimensions. Two images stacked (no gap); labels absolute at bottom of each image. Composite: square blocks; others: aspect ratio.
+    const verticalCompositeSizes = useMemo(() => {
+        const width = COMPOSITE_VERTICAL_WIDTH;
+        const isCompositePair = pair?.templateName === "Composite";
+        if (isCompositePair) {
+            const blockH = width;
+            return {
+                width,
+                beforeHeight: blockH,
+                afterHeight: blockH,
+                totalHeight: blockH * 2,
+            };
+        }
+        if (!compositeSizes?.beforeImageW || !compositeSizes?.beforeImageH || !compositeSizes?.afterImageW || !compositeSizes?.afterImageH) {
+            const fallbackH = 400;
+            return {
+                width,
+                beforeHeight: fallbackH,
+                afterHeight: fallbackH,
+                totalHeight: fallbackH * 2,
+            };
+        }
+        const { beforeImageW, beforeImageH, afterImageW, afterImageH } = compositeSizes;
+        const beforeHeight = Math.round(width * (beforeImageH / beforeImageW));
+        const afterHeight = Math.round(width * (afterImageH / afterImageW));
+        return {
+            width,
+            beforeHeight,
+            afterHeight,
+            totalHeight: beforeHeight + afterHeight,
+        };
+    }, [compositeSizes, pair?.templateName]);
+
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.back();
@@ -281,12 +328,16 @@ export default function BeforeAfterCompareScreen() {
             return;
         }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const isCompositePair = pair.templateName === "Composite";
+        saveAsVerticalRef.current = isCompositePair;
         setPendingCapture(true);
     }, [patientId, pair, beforeDisplay, afterDisplay]);
 
     useEffect(() => {
-        const ref = compositeShotRef.current;
-        if (!pendingCapture || !ref) return;
+        if (!pendingCapture) return;
+        const useVertical = saveAsVerticalRef.current;
+        const ref = useVertical ? compositeVerticalShotRef.current : compositeShotRef.current;
+        if (!ref) return;
         const t = setTimeout(async () => {
             setPendingCapture(false);
             setIsSavingComposite(true);
@@ -421,6 +472,43 @@ export default function BeforeAfterCompareScreen() {
                         );
                     })()}
 
+                {/* Off-screen vertical composite for save: before on top, after below; each image keeps its aspect ratio. */}
+                {beforeDisplay &&
+                    afterDisplay &&
+                    (() => {
+                        const { width: vW, beforeHeight: vBeforeH, afterHeight: vAfterH, totalHeight: vTotalH } = verticalCompositeSizes;
+                        const isCompositePair = pair?.templateName === "Composite";
+                        const imageFit = isCompositePair ? "cover" : "contain";
+                        return (
+                            <ViewShot
+                                ref={compositeVerticalShotRef}
+                                style={[styles.compositeCaptureRoot, { width: vW, height: vTotalH }]}
+                                options={{ format: "jpg", quality: 0.9 }}
+                            >
+                                <View style={[styles.compositeVerticalColumn, { width: vW, height: vTotalH, backgroundColor: colors.system.white }]}>
+                                    <View style={[styles.compositeVerticalImageBlock, { width: vW, height: vBeforeH }]}>
+                                        <Image key={`vcap-before-${pairKey}`} source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
+                                        <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, styles.compositeVerticalLabelOverlay]}>
+                                            <BaseText type="Caption1" weight="600" color="labels.primary">Before</BaseText>
+                                            {pair?.beforeDate ? (
+                                                <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.beforeDate)}</BaseText>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                    <View style={[styles.compositeVerticalImageBlock, { width: vW, height: vAfterH }]}>
+                                        <Image key={`vcap-after-${pairKey}`} source={{ uri: afterDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
+                                        <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, styles.compositeVerticalLabelOverlay]}>
+                                            <BaseText type="Caption1" weight="600" color="system.blue">After</BaseText>
+                                            {pair?.afterDate ? (
+                                                <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.afterDate)}</BaseText>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                </View>
+                            </ViewShot>
+                        );
+                    })()}
+
                 {isHorizontal && (
                     <View
                         style={styles.horizontalSplit}
@@ -523,6 +611,57 @@ export default function BeforeAfterCompareScreen() {
                     </View>
                 </View>
             </View>
+
+            {/* Save preview modal (test) – commented out; save runs directly on Save tap. */}
+            {/* <Modal visible={savePreviewModalVisible} transparent animationType="fade" onRequestClose={handleCancelSavePreview}>
+                <Pressable style={styles.savePreviewModalBackdrop} onPress={handleCancelSavePreview}>
+                    <Pressable style={[styles.savePreviewModalContent, { paddingBottom: insets.bottom + 16 }]} onPress={(e) => e.stopPropagation()}>
+                        <View style={styles.savePreviewModalPreview}>
+                            {(() => {
+                                const vW = verticalCompositeSizes.width;
+                                const vTotalH = verticalCompositeSizes.totalHeight;
+                                const vBeforeH = verticalCompositeSizes.beforeHeight;
+                                const vAfterH = verticalCompositeSizes.afterHeight;
+                                const previewWidth = SCREEN_WIDTH - 32;
+                                const previewTotalHeight = vTotalH > 0 ? (previewWidth * vTotalH) / vW : previewWidth;
+                                const previewBeforeH = vTotalH > 0 ? Math.round((previewTotalHeight * vBeforeH) / vTotalH) : Math.round(previewTotalHeight / 2);
+                                const previewAfterH = Math.round(previewTotalHeight - previewBeforeH);
+                                const imageFit = pair?.templateName === "Composite" ? "cover" : "contain";
+                                return (
+                                    <>
+                                        <View style={[styles.savePreviewModalImageBlock, { width: previewWidth, height: previewBeforeH }]}>
+                                            <Image key={`preview-before-${pairKey}`} source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
+                                            <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, styles.savePreviewModalLabelOverlay]}>
+                                                <BaseText type="Caption1" weight="600" color="labels.primary">Before</BaseText>
+                                                {pair?.beforeDate ? (
+                                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.beforeDate)}</BaseText>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                        <View style={[styles.savePreviewModalImageBlock, { width: previewWidth, height: previewAfterH }]}>
+                                            <Image key={`preview-after-${pairKey}`} source={{ uri: afterDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
+                                            <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, styles.savePreviewModalLabelOverlay]}>
+                                                <BaseText type="Caption1" weight="600" color="system.blue">After</BaseText>
+                                                {pair?.afterDate ? (
+                                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.afterDate)}</BaseText>
+                                                ) : null}
+                                            </View>
+                                        </View>
+                                    </>
+                                );
+                            })()}
+                        </View>
+                        <View style={[styles.savePreviewModalActions, { marginTop: 16 }]}>
+                            <TouchableOpacity style={styles.savePreviewModalButtonSecondary} onPress={handleCancelSavePreview} activeOpacity={0.8}>
+                                <BaseText type="Body" weight="600" color="labels.primary">Cancel</BaseText>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.savePreviewModalButtonPrimary} onPress={handleConfirmSaveComposite} activeOpacity={0.8}>
+                                <BaseText type="Body" weight="600" color="system.white">OK</BaseText>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Pressable>
+            </Modal> */}
         </View>
     );
 }
@@ -911,6 +1050,92 @@ const styles = StyleSheet.create({
     compositeCaptureLabel: {
         bottom: 10,
         left: 10,
+    },
+    compositeVerticalColumn: {
+        flexDirection: "column",
+    },
+    compositeVerticalImageBlock: {
+        position: "relative",
+        overflow: "hidden",
+    },
+    compositeVerticalLabelRow: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        justifyContent: "center",
+        gap: 2,
+    },
+    compositeVerticalLabelRowSingle: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    compositeVerticalLabelCell: {
+        flex: 1,
+        gap: 2,
+    },
+    compositeVerticalLabelOverlay: {
+        position: "absolute",
+        bottom: 10,
+        left: 10,
+    },
+    savePreviewModalBackdrop: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 16,
+    },
+    savePreviewModalContent: {
+        width: "100%",
+        maxWidth: SCREEN_WIDTH - 32,
+        backgroundColor: "transparent",
+        alignItems: "center",
+    },
+    savePreviewModalPreview: {
+        width: "100%",
+        backgroundColor: "transparent",
+        overflow: "hidden",
+        alignSelf: "stretch",
+    },
+    savePreviewModalImageBlock: {
+        width: "100%",
+        position: "relative",
+        overflow: "hidden",
+    },
+    savePreviewModalLabelOverlay: {
+        position: "absolute",
+        bottom: 8,
+        left: 8,
+    },
+    savePreviewModalLabelRow: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: "transparent",
+        gap: 2,
+    },
+    savePreviewModalLabelRowSingle: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    savePreviewModalActions: {
+        flexDirection: "row",
+        gap: 12,
+        justifyContent: "flex-end",
+    },
+    savePreviewModalButtonSecondary: {
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        borderRadius: 12,
+        backgroundColor: colors.system.gray5,
+    },
+    savePreviewModalButtonPrimary: {
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        backgroundColor: colors.system.blue,
     },
     horizontalSplit: {
         flex: 1,
