@@ -400,7 +400,7 @@ export default function SubscriptionScreen() {
         if (!hasAddonsTab && billingTab === 2) setBillingTab(0);
     }, [hasAddonsTab, billingTab]);
 
-    // Add-ons: title, description, price from current_plan.addons[]; currentTotalLimit from owned_addons (same addon_key) or included_quantity
+    // Add-ons: currentTotalLimit = owned_addons (same addon_key).total_limit when present; else first-time → use included_quantity so limit = extra + included_quantity
     const addonsList = useMemo(() => {
         const fromPlan = (currentPlan?.addons ?? []) as PlanAddon[];
         return fromPlan.map((a) => {
@@ -409,7 +409,8 @@ export default function SubscriptionScreen() {
             const displayName = a.title || a.addon_key.replace(/_/g, " ");
             const description = a.description || "";
             const owned = ownedAddons.find((o) => o.addon_key === a.addon_key);
-            const currentTotalLimit = owned != null ? owned.total_limit : (a.included_quantity ?? 0);
+            const hasOwnedTotal = owned != null && owned.total_limit != null;
+            const currentTotalLimit = hasOwnedTotal ? owned!.total_limit : (a.included_quantity ?? 0);
             return {
                 addon_key: a.addon_key,
                 included_quantity: a.included_quantity ?? 0,
