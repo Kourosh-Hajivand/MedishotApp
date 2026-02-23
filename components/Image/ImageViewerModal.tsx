@@ -9,13 +9,15 @@ import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { startTransition, useRef, useState } from "react";
-import { Alert, Dimensions, InteractionManager, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, InteractionManager, Modal, Platform, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ViewShot, { captureRef } from "react-native-view-shot";
 
 const { width, height } = Dimensions.get("window");
+
+const FORCE_LOADING_FOR_TEST = false;
 
 // Gap between main carousel images (px)
 const IMAGE_GAP = 8;
@@ -219,6 +221,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     } = derivedData;
 
     const insets = useSafeAreaInsets();
+    /** When modal opens, insets can be 0 for one frame then update → bottom bar "jumps". Use onShow + fallback so layout is stable from first paint. */
+    const [bottomBarLayoutReady, setBottomBarLayoutReady] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const isProgrammaticScroll = useSharedValue(false);
     const [controlsVisible, setControlsVisible] = useState(true);
@@ -327,6 +331,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Reset index when modal closes; sync thumbnail and displayIndex when modal opens
     React.useEffect(() => {
         if (!visible) {
+            setBottomBarLayoutReady(false);
             setDisplayIndex(initialIndex);
             setNotesPanelVisible(false);
             setIsNotesClosing(false);
@@ -1170,7 +1175,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             const imageSize = imageSizes[index] ?? { width, height };
             const gestures = createGestures(index);
             const isCurrentImage = index === displayIndex;
-            const isLoading = imageLoadingStates.get(index) ?? false;
+            const isLoading = FORCE_LOADING_FOR_TEST || (imageLoadingStates.get(index) ?? false);
             return <ImageViewerItem item={item} index={index} imageSize={imageSize} gestures={gestures} isCurrentImage={isCurrentImage} imageAnimatedStyle={imageAnimatedStyle} isLoading={isLoading} onLoadStart={() => handleImageLoadStart(index)} onLoad={(e) => handleImageLoad(index, e)} onError={() => handleImageError(index)} />;
         },
         [displayIndex, imageSizes, imageLoadingStates, imageAnimatedStyle, createGestures, handleImageLoadStart, handleImageLoad, handleImageError],
@@ -1245,8 +1250,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         ];
     }, [containerSize, bottomActionWidth]);
 
+    /** Stable bottom inset from first frame: avoid 0 → real value jump that makes bottom bar "lag" down. */
+    const effectiveBottomInset = bottomBarLayoutReady ? insets.bottom : Platform.select({ ios: 34, default: 0 });
+
     return (
-        <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen">
+        <Modal visible={visible} transparent={false} animationType="slide" presentationStyle="fullScreen" onShow={() => setBottomBarLayoutReady(true)}>
             <GestureHandlerRootView style={styles.container}>
                 <View style={styles.container}>
                     <GestureDetector gesture={dismissPanGesture}>
@@ -1300,7 +1308,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                             <ImageCarousel flatListRef={flatListRef as any} width={width} imagePageWidth={IMAGE_PAGE_WIDTH} data={imagesList} initialIndex={initialIndex} onScroll={handleScroll} onMomentumScrollEnd={handleMomentumScrollEnd} renderItem={renderImageItem} scrollEnabled={!isZoomed} />
 
                             {/* Bottom Bar: content always pinned to bottom so no layout jump when closing notes */}
-                            <Animated.View style={[styles.bottomBar, { paddingBottom: (insets.bottom || 0) + 0 }, { minHeight: notesPanelVisible || isNotesClosing ? Math.min(height * 0.45, 320) : BOTTOM_BAR_CONTENT_HEIGHT }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
+                            <Animated.View style={[styles.bottomBar, { paddingBottom: effectiveBottomInset }, notesPanelVisible || isNotesClosing ? { minHeight: Math.min(height * 0.45, 320) } : { height: BOTTOM_BAR_CONTENT_HEIGHT + effectiveBottomInset }, bottomBarAnimatedStyle, !controlsVisible && styles.hidden]}>
                                 <Animated.View style={[styles.bottomBarContentPinnedToBottom, bottomBarContentAnimatedStyle]} pointerEvents={notesPanelVisible ? "none" : "auto"}>
                                     {/* Thumbnail Gallery */}
                                     <ThumbnailStrip
