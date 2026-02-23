@@ -7,20 +7,18 @@ import { Image } from "expo-image";
 export interface ThumbnailItemProps {
     imageUri: string;
     index: number;
-    isActive: boolean;
-    onPress: () => void;
+    onPress: (index: number) => void;
     scrollProgress: ReturnType<typeof useSharedValue<number>>;
     currentIndexShared: ReturnType<typeof useSharedValue<number>>;
     isLoading?: boolean;
-    onLoadStart?: () => void;
-    onLoad?: () => void;
-    onError?: () => void;
+    onLoadStart?: (uri: string) => void;
+    onLoad?: (uri: string) => void;
+    onError?: (uri: string) => void;
 }
 
 const ThumbnailItemComponent: React.FC<ThumbnailItemProps> = ({
     imageUri,
     index,
-    isActive,
     onPress,
     scrollProgress,
     currentIndexShared,
@@ -84,16 +82,16 @@ const ThumbnailItemComponent: React.FC<ThumbnailItemProps> = ({
         setShowSkeleton(false);
     };
 
-    const handleLoadStart = () => {
+    const handleLoadStart = React.useCallback(() => {
         if (!hasLoadedRef.current) {
             setShowSkeleton(true);
             thumbnailOpacity.value = 0;
             thumbnailSkeletonOpacity.value = 1;
         }
-        onLoadStart?.();
-    };
+        onLoadStart?.(imageUri);
+    }, [imageUri, onLoadStart]);
 
-    const handleLoad = () => {
+    const handleLoad = React.useCallback(() => {
         hasLoadedRef.current = true;
         thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
             if (finished) {
@@ -101,10 +99,10 @@ const ThumbnailItemComponent: React.FC<ThumbnailItemProps> = ({
             }
         });
         thumbnailOpacity.value = withTiming(1, { duration: 300 });
-        onLoad?.();
-    };
+        onLoad?.(imageUri);
+    }, [imageUri, onLoad]);
 
-    const handleError = () => {
+    const handleError = React.useCallback(() => {
         hasLoadedRef.current = true;
         thumbnailSkeletonOpacity.value = withTiming(0, { duration: 300 }, (finished) => {
             if (finished) {
@@ -112,11 +110,15 @@ const ThumbnailItemComponent: React.FC<ThumbnailItemProps> = ({
             }
         });
         thumbnailOpacity.value = withTiming(1, { duration: 300 });
-        onError?.();
-    };
+        onError?.(imageUri);
+    }, [imageUri, onError]);
+
+    const handlePress = React.useCallback(() => {
+        onPress(index);
+    }, [index, onPress]);
 
     return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
             <Animated.View style={[styles.thumbnail, animatedThumbnailStyle]}>
                 {showSkeleton && (
                     <Animated.View style={[styles.thumbnailSkeletonContainer, skeletonOpacityStyle]}>
@@ -131,7 +133,16 @@ const ThumbnailItemComponent: React.FC<ThumbnailItemProps> = ({
     );
 };
 
-export const ThumbnailItem = React.memo(ThumbnailItemComponent);
+function thumbnailItemPropsAreEqual(prev: ThumbnailItemProps, next: ThumbnailItemProps): boolean {
+    return (
+        prev.imageUri === next.imageUri &&
+        prev.index === next.index &&
+        prev.scrollProgress === next.scrollProgress &&
+        prev.currentIndexShared === next.currentIndexShared
+    );
+}
+
+export const ThumbnailItem = React.memo(ThumbnailItemComponent, thumbnailItemPropsAreEqual);
 
 const styles = StyleSheet.create({
     thumbnail: {

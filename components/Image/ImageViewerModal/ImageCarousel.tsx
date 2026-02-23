@@ -16,7 +16,11 @@ export interface ImageCarouselProps {
     onMomentumScrollEnd: (event: any) => void;
     renderItem: (info: { item: string; index: number }) => React.ReactElement;
     scrollEnabled: boolean;
+    /** For short lists, render all items up front so sliding to composite/original doesn't mount mid-scroll */
+    initialNumToRender?: number;
 }
+
+const MAX_INITIAL_RENDER_FOR_SMOOTH_SCROLL = 12;
 
 export const ImageCarousel = React.memo<ImageCarouselProps>(function ImageCarousel({
     flatListRef,
@@ -28,7 +32,10 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(function ImageCarous
     onMomentumScrollEnd,
     renderItem,
     scrollEnabled,
+    initialNumToRender: initialNumToRenderProp,
 }) {
+    const initialNumToRender =
+        initialNumToRenderProp ?? Math.max(1, Math.min(data.length, MAX_INITIAL_RENDER_FOR_SMOOTH_SCROLL));
     return (
         <Animated.FlatList
             ref={flatListRef}
@@ -45,7 +52,7 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(function ImageCarous
             scrollEventThrottle={16}
             showsHorizontalScrollIndicator={false}
             renderItem={renderItem}
-            ItemSeparatorComponent={() => <View style={{ width: IMAGE_GAP }} />}
+            ItemSeparatorComponent={ItemSeparator}
             getItemLayout={(_, index) => ({
                 length: width,
                 offset: index * imagePageWidth,
@@ -54,9 +61,11 @@ export const ImageCarousel = React.memo<ImageCarouselProps>(function ImageCarous
             scrollEnabled={scrollEnabled}
             bounces={false}
             removeClippedSubviews={false}
-            maxToRenderPerBatch={3}
-            windowSize={5}
-            initialNumToRender={3}
+            maxToRenderPerBatch={4}
+            windowSize={7}
+            initialNumToRender={initialNumToRender}
         />
     );
 });
+
+const ItemSeparator = () => <View style={{ width: IMAGE_GAP }} />;

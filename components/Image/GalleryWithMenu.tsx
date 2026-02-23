@@ -6,14 +6,13 @@ import type { Practice } from "@/utils/service/models/ResponseModels";
 import { ButtonRole } from "@expo/ui/swift-ui";
 import { Image } from "expo-image";
 import { SymbolViewProps } from "expo-symbols";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Dimensions, SectionList, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { ImageViewerModal } from "./ImageViewerModal";
 
-// Separate component for image item to properly use hooks
-const GalleryImageItem: React.FC<{
+type GalleryImageItemProps = {
     uri: string;
     index: number;
     itemWidth: number;
@@ -27,10 +26,10 @@ const GalleryImageItem: React.FC<{
     showBookmarkBadge?: boolean;
     showCompareBadgeOnThumbnails?: boolean;
     isLoading: boolean;
-    onLoadStart: () => void;
-    onLoad: () => void;
-    onError: () => void;
-}> = ({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmarkBadge = true, showCompareBadgeOnThumbnails = true, isLoading, onLoadStart, onLoad, onError }) => {
+    onLoadState: (uri: string, state: "start" | "load" | "error") => void;
+};
+
+const GalleryImageItem: React.FC<GalleryImageItemProps> = React.memo(({ uri, index, itemWidth, gap, numColumns, menuItems, onImagePress, imageUrlToBookmarkMap, imageUrlToIsAfterMap, imageUrlToHasAfterMap, showBookmarkBadge = true, showCompareBadgeOnThumbnails = true, isLoading, onLoadState }) => {
     // Use local shared values for opacity animation per image
     const imageOpacityShared = useSharedValue(isLoading ? 0 : 1);
     const skeletonOpacityShared = useSharedValue(isLoading ? 1 : 0);
@@ -54,23 +53,23 @@ const GalleryImageItem: React.FC<{
         opacity: imageOpacityShared.value,
     }));
 
-    const handleImageLoadStart = () => {
+    const handleImageLoadStart = useCallback(() => {
         imageOpacityShared.value = 0;
         skeletonOpacityShared.value = 1;
-        onLoadStart();
-    };
+        onLoadState(uri, "start");
+    }, [uri, onLoadState]);
 
-    const handleImageLoad = () => {
+    const handleImageLoad = useCallback(() => {
         skeletonOpacityShared.value = withTiming(0, { duration: 300 });
         imageOpacityShared.value = withTiming(1, { duration: 300 });
-        onLoad();
-    };
+        onLoadState(uri, "load");
+    }, [uri, onLoadState]);
 
-    const handleImageError = () => {
+    const handleImageError = useCallback(() => {
         skeletonOpacityShared.value = withTiming(0, { duration: 300 });
         imageOpacityShared.value = withTiming(1, { duration: 300 });
-        onError();
-    };
+        onLoadState(uri, "error");
+    }, [uri, onLoadState]);
 
     return (
         <View style={{ width: itemWidth, height: itemWidth }}>
@@ -162,7 +161,9 @@ const GalleryImageItem: React.FC<{
             </TouchableOpacity>
         </View>
     );
-};
+});
+
+GalleryImageItem.displayName = "GalleryImageItem";
 
 interface MenuItem {
     icon: SymbolViewProps["name"];
@@ -288,12 +289,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [viewerImagesList, setViewerImagesList] = useState<string[]>([]);
     const scale = useSharedValue(1);
-    // Track loading state for each image in gallery
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<string, boolean>>(new Map());
-    // Animated opacity values for smooth transitions - use a single shared value approach
-    // Instead of per-image shared values, we'll use animated styles with conditional rendering
-    const defaultImageOpacity = useSharedValue(0);
-    const defaultSkeletonOpacity = useSharedValue(1);
 
     // Fetch patient data if patientId is provided (for ImageViewerModal)
     // Note: ImageViewerModal will fetch patient data itself using patientId
@@ -411,38 +407,50 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return imageSections.flatMap((section) => section.data);
     }, [imageSections]);
 
-    const pinchGesture = Gesture.Pinch()
-        .onUpdate((e) => {
-            scale.value = e.scale;
-        })
-        .onEnd(() => {
-            const s = scale.value;
-            runOnJS(() => {
-                if (s > 1.2 && numColumns > minColumns) {
-                    setNumColumns(numColumns - 1);
-                } else if (s < 0.8 && numColumns < maxColumns) {
-                    setNumColumns(numColumns + 1);
-                }
-            })();
-            scale.value = 1;
+    const pinchGesture = useMemo(
+        () =>
+            Gesture.Pinch()
+                .onUpdate((e) => {
+                    scale.value = e.scale;
+                })
+                .onEnd(() => {
+                    const s = scale.value;
+                    runOnJS(() => {
+                        if (s > 1.2 && numColumns > minColumns) {
+                            setNumColumns(numColumns - 1);
+                        } else if (s < 0.8 && numColumns < maxColumns) {
+                            setNumColumns(numColumns + 1);
+                        }
+                    })();
+                    scale.value = 1;
+                }),
+        [numColumns, minColumns, maxColumns],
+    );
+
+    const handleImagePress = useCallback(
+        (uri: string) => {
+            if (onImagePress) onImagePress(uri);
+
+            const expandedImages = originalMediaToAllImagesMap?.get(uri);
+            const imagesToShow = expandedImages || allImages;
+
+            const index = imagesToShow.indexOf(uri);
+            if (index !== -1) {
+                setViewerImagesList(imagesToShow);
+                setSelectedIndex(index);
+                setViewerVisible(true);
+            }
+        },
+        [onImagePress, originalMediaToAllImagesMap, allImages],
+    );
+
+    const handleImageLoadState = useCallback((uri: string, state: "start" | "load" | "error") => {
+        setImageLoadingStates((prev) => {
+            const next = new Map(prev);
+            next.set(uri, state === "start");
+            return next;
         });
-
-    const handleImagePress = (uri: string) => {
-        if (onImagePress) onImagePress(uri);
-
-        // Check if this is original_media of a template - if so, use expanded images
-        const expandedImages = originalMediaToAllImagesMap?.get(uri);
-        const imagesToShow = expandedImages || allImages;
-
-        // Find the index of the clicked image in the imagesToShow array
-        const index = imagesToShow.indexOf(uri);
-        if (index !== -1) {
-            // Set the images list for viewer and the selected index
-            setViewerImagesList(imagesToShow);
-            setSelectedIndex(index);
-            setViewerVisible(true);
-        }
-    };
+    }, []);
 
     // Get images to show in viewer (use viewerImagesList if set, otherwise allImages)
     const viewerImages = useMemo(() => {
@@ -452,66 +460,55 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return allImages;
     }, [viewerImagesList, allImages]);
 
-    const renderImageItem = (uri: string, index: number) => {
-        const isLoading = imageLoadingStates.get(uri) ?? true; // Default to loading
+    const renderImageItem = useCallback(
+        (uri: string, index: number) => {
+            const isLoading = imageLoadingStates.get(uri) ?? true;
+            return (
+                <GalleryImageItem
+                    uri={uri}
+                    index={index}
+                    itemWidth={layoutValues.itemWidth}
+                    gap={layoutValues.gap}
+                    numColumns={numColumns}
+                    menuItems={menuItems}
+                    onImagePress={handleImagePress}
+                    imageUrlToBookmarkMap={imageUrlToBookmarkMap}
+                    imageUrlToIsAfterMap={imageUrlToIsAfterMap}
+                    imageUrlToHasAfterMap={imageUrlToHasAfterMap}
+                    showBookmarkBadge={showBookmark}
+                    showCompareBadgeOnThumbnails={showCompareBadgeOnThumbnails}
+                    isLoading={isLoading}
+                    onLoadState={handleImageLoadState}
+                />
+            );
+        },
+        [
+            imageLoadingStates,
+            layoutValues,
+            numColumns,
+            menuItems,
+            handleImagePress,
+            imageUrlToBookmarkMap,
+            imageUrlToIsAfterMap,
+            imageUrlToHasAfterMap,
+            showBookmark,
+            showCompareBadgeOnThumbnails,
+            handleImageLoadState,
+        ],
+    );
 
-        const handleImageLoadStart = () => {
-            setImageLoadingStates((prev) => {
-                const newMap = new Map(prev);
-                newMap.set(uri, true);
-                return newMap;
-            });
-        };
-
-        const handleImageLoad = () => {
-            setImageLoadingStates((prev) => {
-                const newMap = new Map(prev);
-                newMap.set(uri, false);
-                return newMap;
-            });
-        };
-
-        const handleImageError = () => {
-            setImageLoadingStates((prev) => {
-                const newMap = new Map(prev);
-                newMap.set(uri, false);
-                return newMap;
-            });
-        };
-
-        return (
-            <GalleryImageItem
-                uri={uri}
-                index={index}
-                itemWidth={layoutValues.itemWidth}
-                gap={layoutValues.gap}
-                numColumns={numColumns}
-                menuItems={menuItems}
-                onImagePress={handleImagePress}
-                imageUrlToBookmarkMap={imageUrlToBookmarkMap}
-                imageUrlToIsAfterMap={imageUrlToIsAfterMap}
-                imageUrlToHasAfterMap={imageUrlToHasAfterMap}
-                showBookmarkBadge={showBookmark}
-                showCompareBadgeOnThumbnails={showCompareBadgeOnThumbnails}
-                isLoading={isLoading}
-                onLoadStart={handleImageLoadStart}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-            />
-        );
-    };
-
-    const renderItem = ({ item, index }: { item: ImageRow; index: number }) => {
-        return (
+    const renderItem = useCallback(
+        ({ item }: { item: ImageRow; index: number }) => (
             <View style={styles.rowContainer}>
                 {item.items.map((uri, itemIndex) => (
                     <React.Fragment key={uri}>{renderImageItem(uri, itemIndex)}</React.Fragment>
                 ))}
             </View>
-        );
-    };
+        ),
+        [renderImageItem],
+    );
 
-    const renderSectionHeader = ({ section }: { section: { title: string; data: ImageRow[] } }) => {
+    const renderSectionHeader = useCallback(({ section }: { section: { title: string; data: ImageRow[] } }) => {
         if (!section.title) return null;
         return (
             <View style={styles.sectionHeader}>
@@ -520,7 +517,26 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 </BaseText>
             </View>
         );
-    };
+    }, []);
+
+    const viewerOnClose = useCallback(() => {
+        setViewerVisible(false);
+        setViewerImagesList([]);
+    }, []);
+
+    const viewerActions = useMemo(
+        () => ({
+            showBookmark,
+            showEdit,
+            showArchive,
+            showShare,
+            showRestore: !!onRestore,
+            showMagic,
+            showNote,
+            showCompare,
+        }),
+        [showBookmark, showEdit, showArchive, showShare, onRestore, showMagic, showNote, showCompare],
+    );
 
     // Show empty state if no images
     if (!imageSections || imageSections.length === 0 || allImages.length === 0) {
@@ -541,7 +557,19 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         <GestureHandlerRootView style={{ flex: 1 }}>
             <GestureDetector gesture={pinchGesture}>
                 <Animated.View style={{ flex: 1 }}>
-                    <SectionList sections={sectionsWithRows} key={numColumns} renderItem={renderItem} renderSectionHeader={renderSectionHeader} keyExtractor={(item) => item.id} stickySectionHeadersEnabled={false} removeClippedSubviews={false} contentContainerStyle={styles.sectionListContent} />
+                    <SectionList
+                        sections={sectionsWithRows}
+                        key={numColumns}
+                        renderItem={renderItem}
+                        renderSectionHeader={renderSectionHeader}
+                        keyExtractor={(item) => item.id}
+                        stickySectionHeadersEnabled={false}
+                        removeClippedSubviews={false}
+                        contentContainerStyle={styles.sectionListContent}
+                        initialNumToRender={8}
+                        maxToRenderPerBatch={6}
+                        windowSize={7}
+                    />
                 </Animated.View>
             </GestureDetector>
 
@@ -549,10 +577,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 visible={viewerVisible}
                 images={viewerImages}
                 initialIndex={selectedIndex}
-                onClose={() => {
-                    setViewerVisible(false);
-                    setViewerImagesList([]); // Reset viewer images list when closing
-                }}
+                onClose={viewerOnClose}
                 mediaData={mediaData}
                 imageUrlToMediaIdMap={imageUrlToMediaIdMap}
                 imageUrlToBookmarkMap={imageUrlToBookmarkMap}
@@ -560,16 +585,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
                 patientId={patientId}
                 rawMediaData={rawMediaData}
                 description={description}
-                actions={{
-                    showBookmark,
-                    showEdit,
-                    showArchive,
-                    showShare,
-                    showRestore: !!onRestore,
-                    showMagic,
-                    showNote,
-                    showCompare,
-                }}
+                actions={viewerActions}
                 onRestore={onRestore}
                 onNotePress={onNotePress}
                 practice={practice}

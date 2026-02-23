@@ -8,8 +8,8 @@ import type { Practice } from "@/utils/service/models/ResponseModels";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
-import { Alert, Dimensions, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { startTransition, useRef, useState } from "react";
+import { Alert, Dimensions, InteractionManager, Modal, Image as RNImage, Share, StyleSheet, TouchableOpacity, View } from "react-native";
 import { FlatList, Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedReaction, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -236,7 +236,6 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Track loading state for each image
     const [imageLoadingStates, setImageLoadingStates] = useState<Map<number, boolean>>(new Map());
     // Track loading state for thumbnail images
-    const [thumbnailLoadingStates, setThumbnailLoadingStates] = useState<Map<string, boolean>>(new Map());
     // Share composition: when practice + metadata provided, compose header + image + footer for share
     const [isSharingComposition, setIsSharingComposition] = useState(false);
     const [shareCompositionImageUri, setShareCompositionImageUri] = useState<string | null>(null);
@@ -310,6 +309,19 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
             scrollThumbnailToPosition(index);
         },
         [scrollThumbnailToPosition],
+    );
+
+    const onThumbnailPress = React.useCallback(
+        (index: number) => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            scrollProgress.value = 0;
+            isProgrammaticScroll.value = true;
+            thumbnailScrollX.value = getThumbnailScrollXForPage(index, imagesList.length);
+            currentIndexShared.value = index;
+            setDisplayIndex(index);
+            flatListRef.current?.scrollToIndex({ index, animated: true });
+        },
+        [imagesList.length],
     );
 
     // Reset index when modal closes; sync thumbnail and displayIndex when modal opens
@@ -439,14 +451,22 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         [imagesList.length],
     );
 
-    // Sync currentIndexShared -> displayIndex during scroll so bottom bar/header update immediately, not only on momentum end
+    // Defer by one frame so scroll/decode finish before React re-render (fixes lag when landing on composite)
+    const syncDisplayIndex = React.useCallback(
+        (idx: number) => {
+            const clamped = Math.max(0, Math.min(Math.round(idx), imagesList.length - 1));
+            requestAnimationFrame(() => {
+                startTransition(() => setDisplayIndex(clamped));
+            });
+        },
+        [imagesList.length],
+    );
     useAnimatedReaction(
         () => currentIndexShared.value,
         (idx) => {
-            const clamped = Math.max(0, Math.min(Math.round(idx), imagesList.length - 1));
-            runOnJS(setDisplayIndex)(clamped);
+            runOnJS(syncDisplayIndex)(idx);
         },
-        [imagesList.length],
+        [syncDisplayIndex],
     );
 
     const handleMomentumScrollEnd = (event: any) => {
@@ -464,8 +484,11 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         const validIndex = Math.max(0, Math.min(index, imagesList.length - 1));
 
         scrollProgress.value = withTiming(0, { duration: 200 });
-        setDisplayIndex(validIndex);
         currentIndexShared.value = validIndex;
+        // Defer until after scroll animation so composite image decode doesn't compete with re-render
+        InteractionManager.runAfterInteractions(() => {
+            startTransition(() => setDisplayIndex(validIndex));
+        });
     };
 
     const handleEditPress = () => {
@@ -540,18 +563,14 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
     }, [imageUrlToBookmarkMap, visible]);
 
-    // Initialize loading states when modal opens or images change
-    // Main images: no loading state (no white skeleton on open) – only thumbnails show loading
+    // Initialize main image loading states when modal opens or images change (thumbnails manage their own loading)
     React.useEffect(() => {
         if (visible) {
             const initialLoadingStates = new Map<number, boolean>();
-            const initialThumbnailLoadingStates = new Map<string, boolean>();
-            imagesList.forEach((imageUri, index) => {
+            imagesList.forEach((_, index) => {
                 initialLoadingStates.set(index, false);
-                initialThumbnailLoadingStates.set(imageUri, true);
             });
             setImageLoadingStates(initialLoadingStates);
-            setThumbnailLoadingStates(initialThumbnailLoadingStates);
         }
     }, [visible, imagesList.length]);
 
@@ -1289,40 +1308,9 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                                         thumbnailStripWidth={thumbnailStripWidth}
                                         thumbnailStripAnimatedStyle={thumbnailStripAnimatedStyle}
                                         imagesList={imagesList}
-                                        displayIndex={displayIndex}
                                         currentIndexShared={currentIndexShared}
                                         scrollProgress={scrollProgress}
-                                        thumbnailLoadingStates={thumbnailLoadingStates}
-                                        onThumbnailLoadStart={(imageUri) => {
-                                            setThumbnailLoadingStates((prev) => {
-                                                const newMap = new Map(prev);
-                                                newMap.set(imageUri, true);
-                                                return newMap;
-                                            });
-                                        }}
-                                        onThumbnailLoad={(imageUri) => {
-                                            setThumbnailLoadingStates((prev) => {
-                                                const newMap = new Map(prev);
-                                                newMap.set(imageUri, false);
-                                                return newMap;
-                                            });
-                                        }}
-                                        onThumbnailError={(imageUri) => {
-                                            setThumbnailLoadingStates((prev) => {
-                                                const newMap = new Map(prev);
-                                                newMap.set(imageUri, false);
-                                                return newMap;
-                                            });
-                                        }}
-                                        onThumbnailPress={(index) => {
-                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                                            scrollProgress.value = 0;
-                                            isProgrammaticScroll.value = true;
-                                            thumbnailScrollX.value = getThumbnailScrollXForPage(index, imagesList.length);
-                                            currentIndexShared.value = index;
-                                            setDisplayIndex(index);
-                                            flatListRef.current?.scrollToIndex({ index, animated: true });
-                                        }}
+                                        onThumbnailPress={onThumbnailPress}
                                         isZoomed={isZoomed}
                                         notesPanelVisible={notesPanelVisible}
                                         thumbPadding={THUMB_PADDING}
