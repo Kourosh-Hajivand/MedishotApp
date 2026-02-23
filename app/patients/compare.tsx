@@ -1,20 +1,29 @@
 import { BaseText } from "@/components";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import colors from "@/theme/colors";
+import { useTempUpload, useUploadPatientMedia } from "@/utils/hook/useMedia";
 import { alignImages } from "@/utils/alignApi";
 import { getShortDate } from "@/utils/helper/dateUtils";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
+import * as ImageManipulator from "expo-image-manipulator";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Dimensions, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Dimensions, Image as RNImage, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
 import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ViewShot, { captureRef } from "react-native-view-shot";
 
 const ALIGN_TEMPLATE_NAMES = ["Front Face Smile", "Front Face"] as const;
 const LOG_TAG = "[CompareAlign]";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+// Composite export: one common height, widths proportional to image aspect ratios = no white space, images touch.
+const COMPOSITE_EXPORT_HEIGHT = 400;
+const COMPOSITE_FALLBACK_WIDTH = 800;
+const COMPOSITE_FALLBACK_HALF = COMPOSITE_FALLBACK_WIDTH / 2;
+const COMPOSITE_FALLBACK_HEIGHT = 400;
 
 // Thumbnail strip layout (like ImageViewerModal)
 const THUMB_PADDING = SCREEN_WIDTH / 2 - 22;
@@ -82,6 +91,15 @@ export default function BeforeAfterCompareScreen() {
     const [alignedAfterByKey, setAlignedAfterByKey] = useState<Record<string, string>>({});
     const thumbnailScrollRef = useRef<ScrollView>(null);
     const isProgrammaticScrollRef = useRef(false);
+    const compositeShotRef = useRef<ViewShot>(null);
+    const [isSavingComposite, setIsSavingComposite] = useState(false);
+    const [pendingCapture, setPendingCapture] = useState(false);
+    const [compositeSizes, setCompositeSizes] = useState<{
+        totalWidth: number;
+        totalHeight: number;
+        beforeWidth: number;
+        afterWidth: number;
+    } | null>(null);
 
     // Align API: only for "Front Face Smile" or "Front Face". Store result by pair key (beforeUrl|afterUrl) so index switch shows correct image.
     useEffect(() => {
@@ -177,6 +195,61 @@ export default function BeforeAfterCompareScreen() {
     const pairKey = before && afterOriginal ? `${before}|${afterOriginal}` : "";
     const afterDisplay = pairKey && alignedAfterByKey[pairKey] ? alignedAfterByKey[pairKey] : afterOriginal;
 
+    useEffect(() => {
+        if (!before || !afterDisplay) {
+            setCompositeSizes(null);
+            return;
+        }
+        let cancelled = false;
+        let beforeW: number | null = null;
+        let beforeH: number | null = null;
+        let afterW: number | null = null;
+        let afterH: number | null = null;
+
+        const trySet = () => {
+            if (cancelled || beforeW == null || beforeH == null || afterW == null || afterH == null) return;
+            const H = COMPOSITE_EXPORT_HEIGHT;
+            const bw = Math.round(H * (beforeW / beforeH));
+            const aw = Math.round(H * (afterW / afterH));
+            setCompositeSizes({
+                totalWidth: bw + aw,
+                totalHeight: H,
+                beforeWidth: bw,
+                afterWidth: aw,
+            });
+        };
+
+        RNImage.getSize(
+            before,
+            (w, h) => {
+                if (cancelled) return;
+                beforeW = w;
+                beforeH = h;
+                trySet();
+            },
+            () => {
+                if (cancelled) return;
+                setCompositeSizes(null);
+            },
+        );
+        RNImage.getSize(
+            afterDisplay,
+            (w, h) => {
+                if (cancelled) return;
+                afterW = w;
+                afterH = h;
+                trySet();
+            },
+            () => {
+                if (cancelled) return;
+                setCompositeSizes(null);
+            },
+        );
+        return () => {
+            cancelled = true;
+        };
+    }, [before, afterDisplay]);
+
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         router.back();
@@ -186,6 +259,57 @@ export default function BeforeAfterCompareScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setViewMode(mode);
     }, []);
+
+    // ذخیره کامپوزیت: کپچر → آپلود موقت → ارسال به مدیا بیمار
+    const { mutateAsync: tempUploadAsync } = useTempUpload();
+    const { mutateAsync: uploadMediaAsync } = useUploadPatientMedia();
+
+    const handleSaveComposite = useCallback(() => {
+        if (!patientId || !pair || !before || !afterDisplay) {
+            Alert.alert("Error", "Patient not found. Cannot save composite.");
+            return;
+        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setPendingCapture(true);
+    }, [patientId, pair, before, afterDisplay]);
+
+    useEffect(() => {
+        const ref = compositeShotRef.current;
+        if (!pendingCapture || !ref) return;
+        const t = setTimeout(async () => {
+            setPendingCapture(false);
+            setIsSavingComposite(true);
+            try {
+                const capturedUri = await captureRef(ref as any, {
+                    format: "jpg",
+                    quality: 0.9,
+                    result: "tmpfile",
+                });
+                const { uri } = await ImageManipulator.manipulateAsync(capturedUri, [], {
+                    compress: 0.88,
+                    format: ImageManipulator.SaveFormat.JPEG,
+                });
+                const file = { uri, type: "image/jpeg", name: "compare-composite.jpg" };
+                const tempRes = await tempUploadAsync(file);
+                const filename = (tempRes as { data?: { filename?: string }; filename?: string })?.data?.filename ?? (tempRes as { filename?: string })?.filename;
+                if (!filename) {
+                    Alert.alert("Error", "Upload failed. Please try again.");
+                    return;
+                }
+                await uploadMediaAsync({
+                    patientId,
+                    data: { media: filename, type: "image", data: { source: "compare" } },
+                });
+                Alert.alert("Saved", "Comparison image has been saved to the patient.");
+            } catch (e) {
+                if (__DEV__) console.warn(`${LOG_TAG} composite capture/upload failed:`, e);
+                Alert.alert("Error", e instanceof Error ? e.message : "Failed to save comparison. Please try again.");
+            } finally {
+                setIsSavingComposite(false);
+            }
+        }, 450);
+        return () => clearTimeout(t);
+    }, [pendingCapture, patientId, tempUploadAsync, uploadMediaAsync]);
 
     if (pairs.length === 0 || !before || !afterOriginal) {
         return (
@@ -209,10 +333,19 @@ export default function BeforeAfterCompareScreen() {
 
     return (
         <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.system.gray6 }]}>
-            {/* Header: light gray, back left, page indicator 1/4 right */}
+            {/* Header: light gray, back left, Save right */}
             <View style={[styles.header, styles.headerLightGray, { paddingTop: insets.top }]}>
                 <TouchableOpacity onPress={handleBack} style={styles.backButtonCircle} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                     <IconSymbol name="chevron.left" size={24} color={colors.system.black as any} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleSaveComposite} style={[styles.saveButton, isSavingComposite && styles.saveButtonDisabled]} disabled={isSavingComposite} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                    {isSavingComposite ? (
+                        <ActivityIndicator size="small" color={colors.system.blue as any} />
+                    ) : (
+                        <BaseText type="Body" weight="600" color="system.blue">
+                            Save
+                        </BaseText>
+                    )}
                 </TouchableOpacity>
             </View>
 
@@ -235,10 +368,52 @@ export default function BeforeAfterCompareScreen() {
                     </View>
                 )} */}
 
+                {/* Off-screen composite: one common height, proportional widths = no white space, labels in place. */}
+                {before &&
+                    afterDisplay &&
+                    (() => {
+                        const cw = compositeSizes?.totalWidth ?? COMPOSITE_FALLBACK_WIDTH;
+                        const ch = compositeSizes?.totalHeight ?? COMPOSITE_FALLBACK_HEIGHT;
+                        const halfBefore = compositeSizes?.beforeWidth ?? COMPOSITE_FALLBACK_HALF;
+                        const halfAfter = compositeSizes?.afterWidth ?? COMPOSITE_FALLBACK_HALF;
+                        return (
+                            <ViewShot ref={compositeShotRef} style={[styles.compositeCaptureRoot, { width: cw, height: ch }]} options={{ format: "jpg", quality: 0.9 }}>
+                                <View style={[styles.compositeCaptureRow, { width: cw, height: ch }]}>
+                                    <View style={[styles.compositeCaptureHalf, { width: halfBefore, height: ch }]}>
+                                        <Image key={`cap-before-${pairKey}`} source={{ uri: before }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                                        <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, styles.compositeCaptureLabel]}>
+                                            <BaseText type="Caption1" weight="600" color="labels.primary">
+                                                Before
+                                            </BaseText>
+                                            {pair?.beforeDate ? (
+                                                <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                                                    {getShortDate(pair.beforeDate)}
+                                                </BaseText>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                    <View style={[styles.compositeCaptureHalf, { width: halfAfter, height: ch }]}>
+                                        <Image key={`cap-after-${pairKey}`} source={{ uri: afterDisplay }} style={StyleSheet.absoluteFill} contentFit="contain" />
+                                        <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, styles.compositeCaptureLabel]}>
+                                            <BaseText type="Caption1" weight="600" color="system.blue">
+                                                After
+                                            </BaseText>
+                                            {pair?.afterDate ? (
+                                                <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>
+                                                    {getShortDate(pair.afterDate)}
+                                                </BaseText>
+                                            ) : null}
+                                        </View>
+                                    </View>
+                                </View>
+                            </ViewShot>
+                        );
+                    })()}
+
                 {isHorizontal && (
                     <View
                         style={styles.horizontalSplit}
-                        onLayout={(e) => {
+                        onLayout={(e: { nativeEvent: { layout: { height: number } } }) => {
                             const h = e.nativeEvent.layout.height;
                             if (h > 0) setContentHeight(h);
                         }}
@@ -571,6 +746,23 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
+
+    saveButton: {
+        height: 44,
+        borderRadius: 22,
+        paddingHorizontal: 16,
+        backgroundColor: colors.system.white,
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: colors.system.black,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    saveButtonDisabled: {
+        opacity: 0.7,
+    },
     headerPageIndicator: {
         minWidth: 44,
         textAlign: "right",
@@ -689,6 +881,25 @@ const styles = StyleSheet.create({
         flex: 1,
         position: "relative",
         overflow: "hidden",
+    },
+    compositeCaptureRoot: {
+        position: "absolute",
+        left: -9999,
+        top: 0,
+        overflow: "hidden",
+        backgroundColor: colors.system.white,
+    },
+    compositeCaptureRow: {
+        flexDirection: "row",
+        // width/height از اینجا حذف شد؛ از اینجا به‌صورت inline بر اساس compositeSizes ست می‌شود
+    },
+    compositeCaptureHalf: {
+        position: "relative",
+        overflow: "hidden",
+    },
+    compositeCaptureLabel: {
+        bottom: 10,
+        left: 10,
     },
     horizontalSplit: {
         flex: 1,
