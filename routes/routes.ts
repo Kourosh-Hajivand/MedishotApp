@@ -31,6 +31,9 @@ export const routes = {
         list: () => "practises",
         create: () => "practises",
         getById: (id: string | number) => `practises/${id}`,
+        /** PUT practises/{id} - OpenAPI update practice (multipart/form-data) */
+        put: (id: string | number) => `practises/${id}`,
+        /** POST practises/{id}/update - alternative update practice */
         update: (id: string | number) => `practises/${id}/update`,
         delete: (id: string | number) => `practises/${id}`,
 

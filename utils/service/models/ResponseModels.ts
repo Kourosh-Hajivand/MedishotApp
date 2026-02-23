@@ -491,6 +491,10 @@ export interface PlanFeature {
 export interface PlanAddon {
     id: number;
     addon_key: string;
+    title?: string | null;
+    description?: string | null;
+    stripe_price_id?: string;
+    price?: string;
     included_quantity: number;
 }
 
@@ -533,6 +537,16 @@ export interface CurrentPlanResponse {
     data: Plan;
 }
 
+export interface OwnedAddon {
+    addon_key: string;
+    title: string | null;
+    description: string | null;
+    stripe_price_id?: string;
+    included_quantity: number;
+    extra_quantity: number;
+    total_limit: number;
+}
+
 export interface SubscriptionStatus {
     // Standard subscription status structure
     subscribed?: boolean;
@@ -547,6 +561,7 @@ export interface SubscriptionStatus {
     is_active?: boolean;
     is_on_grace_period?: boolean;
     is_on_trial?: boolean;
+    owned_addons?: OwnedAddon[];
     limits?: {
         current_doctor_count?: number;
         doctor_limit?: number;

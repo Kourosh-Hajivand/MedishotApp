@@ -301,7 +301,7 @@ export interface SwapSubscriptionDto {
 
 export interface UpdateAddonLimitDto {
     addon_key: string;
-    quantity: number;
+    limit: number;
 }
 
 export interface CheckoutDto {

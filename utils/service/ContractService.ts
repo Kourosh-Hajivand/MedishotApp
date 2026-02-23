@@ -12,12 +12,20 @@ const {
 export const ContractService = {
     // ============= Contract Templates =============
 
-    // Get all active contract templates
-    getContractTemplates: async (patientId?: string | number): Promise<ContractTemplateListResponse> => {
+    // Get all active contract templates (OpenAPI: optional patient_id, category)
+    getContractTemplates: async (paramsOrPatientId?: { patient_id?: string | number; category?: string } | string | number): Promise<ContractTemplateListResponse> => {
         try {
             const url = baseUrl + listTemplates();
-            const params = patientId ? { patient_id: patientId } : undefined;
-            const response: AxiosResponse<ContractTemplateListResponse> = await axiosInstance.get(url, { params });
+            const queryParams: Record<string, string | number> = {};
+            if (paramsOrPatientId != null) {
+                if (typeof paramsOrPatientId === "object" && !Array.isArray(paramsOrPatientId)) {
+                    if (paramsOrPatientId.patient_id != null) queryParams.patient_id = paramsOrPatientId.patient_id;
+                    if (paramsOrPatientId.category != null) queryParams.category = paramsOrPatientId.category;
+                } else {
+                    queryParams.patient_id = paramsOrPatientId;
+                }
+            }
+            const response: AxiosResponse<ContractTemplateListResponse> = await axiosInstance.get(url, { params: Object.keys(queryParams).length ? queryParams : undefined });
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

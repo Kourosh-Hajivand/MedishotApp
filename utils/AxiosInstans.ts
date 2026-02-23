@@ -8,7 +8,7 @@ import { AuthService } from "./service/AuthService";
 
 const axiosInstance = axios.create({
     baseURL: routes.baseUrl,
-    timeout: 30000, // 30 ثانیه timeout برای تمام requests
+    timeout: 30000,
 });
 
 // Flag to prevent multiple redirects to error page

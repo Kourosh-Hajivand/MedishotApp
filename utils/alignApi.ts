@@ -8,7 +8,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import { Platform } from "react-native";
 
 const ALIGN_API_URL = "https://4lir324-mfa.hf.space/api/align";
-/** از env؛ در EAS: Expo Dashboard → Project → Environment variables (production) با نام EXPO_PUBLIC_ALIGN_API_TOKEN */
+/** Set in env; in EAS: Expo Dashboard → Project → Environment variables (e.g. EXPO_PUBLIC_ALIGN_API_TOKEN) */
 const ALIGN_API_TOKEN = process.env.EXPO_PUBLIC_ALIGN_API_TOKEN ? `Bearer ${process.env.EXPO_PUBLIC_ALIGN_API_TOKEN}` : "";
 
 export interface AlignApiResponse {

@@ -5,7 +5,7 @@ import { spacing } from "@/styles/spaces";
 import colors from "@/theme/colors";
 import { useCreateCheckout, useGetPlans, useGetSubscriptionStatus, useSwapSubscription, useUpdateAddonLimit } from "@/utils/hook";
 import { useProfileStore } from "@/utils/hook/useProfileStore";
-import type { PlanAddon } from "@/utils/service/models/ResponseModels";
+import type { OwnedAddon, PlanAddon } from "@/utils/service/models/ResponseModels";
 import { Host, Picker } from "@expo/ui/swift-ui";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -20,26 +20,27 @@ const ADDON_BLUE_BG = "rgba(0, 122, 255, 0.1)";
 interface AddonCardProps {
     addonKey: string;
     displayName: string;
+    priceDisplay: string;
     pricePerUnit: number;
     description: string;
-    initialQuantity: number;
-    onPurchase: (quantity: number) => void;
+    currentTotalLimit: number;
+    onPurchase: (limit: number) => void;
     disabled?: boolean;
 }
 
-function AddonCard({ displayName, pricePerUnit, description, initialQuantity, onPurchase, disabled }: AddonCardProps) {
-    const [quantity, setQuantity] = useState(initialQuantity);
+function AddonCard({ displayName, priceDisplay, pricePerUnit, description, currentTotalLimit, onPurchase, disabled }: AddonCardProps) {
+    // UI shows extra quantity from 0; backend receives limit = extraQuantity + currentTotalLimit (from owned_addons.total_limit for same addon_key, else plan included_quantity)
+    const [extraQuantity, setExtraQuantity] = useState(0);
     const gradientColors: [string, string, string, string, string] = ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"];
     const planColor = ADDON_BLUE;
 
     const handlePurchase = () => {
-        onPurchase(quantity);
+        onPurchase(extraQuantity + currentTotalLimit);
     };
 
     return (
         <View style={addonStyles.card}>
             <View style={addonStyles.cardInner}>
-                {/* هدر مثل کارت پلن: عنوان آبی + قیمت داخل پیل */}
                 <View style={addonStyles.planHeaderWrapper}>
                     <View style={styles.planHeaderContent}>
                         <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} locations={[0, 0.39696, 0.63453, 0.79751, 1]} style={styles.planHeaderGradient}>
@@ -48,11 +49,13 @@ function AddonCard({ displayName, pricePerUnit, description, initialQuantity, on
                             </BaseText>
                             <View className="flex-row items-center gap-1">
                                 <BaseText type="Title3" weight="600" style={{ color: planColor }}>
-                                    ${pricePerUnit}
+                                    {pricePerUnit === 0 ? "Free" : `$${priceDisplay}`}
                                 </BaseText>
-                                <BaseText type="Body" weight="400" style={{ color: planColor }}>
-                                    per doctor
-                                </BaseText>
+                                {pricePerUnit > 0 && (
+                                    <BaseText type="Body" weight="400" style={{ color: planColor }}>
+                                        per unit
+                                    </BaseText>
+                                )}
                             </View>
                         </LinearGradient>
                     </View>
@@ -61,27 +64,22 @@ function AddonCard({ displayName, pricePerUnit, description, initialQuantity, on
                     {description}
                 </BaseText>
                 <View style={addonStyles.stepper}>
-                    <TouchableOpacity
-                        style={addonStyles.stepperButton}
-                        onPress={() => setQuantity((q) => Math.max(initialQuantity, q - 1))}
-                        activeOpacity={0.7}
-                        disabled={quantity <= initialQuantity}
-                    >
-                        <IconSymbol name="minus" size={18} color={quantity <= initialQuantity ? colors.labels.tertiary : colors.system.black} />
+                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setExtraQuantity((q) => Math.max(0, q - 1))} activeOpacity={0.7} disabled={extraQuantity <= 0}>
+                        <IconSymbol name="minus" size={18} color={extraQuantity <= 0 ? colors.labels.tertiary : colors.system.black} />
                     </TouchableOpacity>
                     <View style={addonStyles.stepperCenter}>
                         <BaseText type="Body" weight="500" color="labels.primary">
-                            {quantity}
+                            {extraQuantity}
                         </BaseText>
                     </View>
-                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setQuantity((q) => q + 1)} activeOpacity={0.7}>
+                    <TouchableOpacity style={addonStyles.stepperButton} onPress={() => setExtraQuantity((q) => q + 1)} activeOpacity={0.7}>
                         <IconSymbol name="plus" size={18} color={colors.system.black} />
                     </TouchableOpacity>
                 </View>
             </View>
-            {/* فوتر مثل کارت پلن: گرادیان + دکمه */}
+
             <LinearGradient colors={["#ffffff", "#f9f9f9"]} start={{ x: 0, y: 1 }} end={{ x: 0, y: 0 }} style={addonStyles.footer}>
-                <BaseButton label="Purchase Now" onPress={handlePurchase} ButtonStyle="Filled" size="Medium" rounded style={addonStyles.purchaseButton} disabled={disabled || quantity <= initialQuantity} />
+                <BaseButton label="Purchase Now" onPress={handlePurchase} ButtonStyle="Filled" size="Medium" rounded style={addonStyles.purchaseButton} disabled={disabled || extraQuantity <= 0} />
             </LinearGradient>
         </View>
     );
@@ -175,8 +173,6 @@ export default function SubscriptionScreen() {
     const { data: plansData, isLoading: isLoadingPlans } = useGetPlans(!!selectedPractice?.id);
     const { data: subscriptionData, isLoading: isLoadingSubscription } = useGetSubscriptionStatus(selectedPractice?.id ?? 0, !!selectedPractice?.id);
 
-    // Get current subscription - handle multiple possible response structures
-    // Priority: current_subscription (from practice detail) > current_plan (new API) > plan (old API) > direct data
     const subscriptionDataObj = subscriptionData?.data || {};
     const currentSubscription = subscriptionDataObj.current_subscription || subscriptionDataObj;
 
@@ -196,6 +192,7 @@ export default function SubscriptionScreen() {
     // Get current plan - handle multiple possible response structures
     // Priority: current_plan (new API) > current_subscription.plan > plan (old API)
     const currentPlan = subscriptionDataObj.current_plan || currentSubscription?.plan || subscriptionDataObj.plan || null;
+    const ownedAddons = (subscriptionDataObj.owned_addons ?? []) as OwnedAddon[];
 
     // Get plan color based on plan name
     const getPlanColor = (planName: string) => {
@@ -334,8 +331,10 @@ export default function SubscriptionScreen() {
         },
     );
 
+    const [addonResetKey, setAddonResetKey] = useState(0);
     const { mutate: updateAddonLimit, isPending: isUpdatingAddon } = useUpdateAddonLimit(
         () => {
+            setAddonResetKey((k) => k + 1);
             Alert.alert("Success", "Add-on updated successfully.");
         },
         (error) => {
@@ -393,46 +392,36 @@ export default function SubscriptionScreen() {
         }
     };
 
-    // تب Add-ons فقط وقتی نمایش داده می‌شود که پلن فعلی (از subscription/status) addon داشته باشد
     const hasAddonsTab = (currentPlan?.addons?.length ?? 0) > 0;
     const [billingTab, setBillingTab] = useState(0); // 0 = Monthly, 1 = Yearly, 2 = Add-ons
     const billingTabOptions = hasAddonsTab ? ["Monthly", "Yearly", "Add-ons"] : ["Monthly", "Yearly"];
 
-    // اگر پلن addon نداشت و کاربر روی Add-ons بود، برگرد به Monthly
     React.useEffect(() => {
         if (!hasAddonsTab && billingTab === 2) setBillingTab(0);
     }, [hasAddonsTab, billingTab]);
 
-    // Add-ons: فقط از current_plan (از API subscription/status) — نمایش نام/قیمت/توضیح از مپ زیر
-    const ADDON_DISPLAY: Record<string, { displayName: string; pricePerUnit: number; description: string }> = {
-        additional_doctor: {
-            displayName: "Additional Doctor",
-            pricePerUnit: 5,
-            description: "You can purchase additional doctors to expand your practice team.",
-        },
-        doctor: {
-            displayName: "Additional Doctor",
-            pricePerUnit: 5,
-            description: "You can purchase additional doctors to expand your practice team.",
-        },
-        patient: {
-            displayName: "Additional Patient",
-            pricePerUnit: 5,
-            description: "You can purchase additional patient slots for your practice.",
-        },
-    };
+    // Add-ons: title, description, price from current_plan.addons[]; currentTotalLimit from owned_addons (same addon_key) or included_quantity
     const addonsList = useMemo(() => {
         const fromPlan = (currentPlan?.addons ?? []) as PlanAddon[];
-        return fromPlan.map((a) => ({
-            addon_key: a.addon_key,
-            included_quantity: a.included_quantity ?? 0,
-            displayName: ADDON_DISPLAY[a.addon_key]?.displayName ?? a.addon_key.replace(/_/g, " "),
-            pricePerUnit: ADDON_DISPLAY[a.addon_key]?.pricePerUnit ?? 0,
-            description: ADDON_DISPLAY[a.addon_key]?.description ?? "",
-        }));
-    }, [currentPlan?.addons]);
+        return fromPlan.map((a) => {
+            const priceStr = typeof a.price === "string" ? a.price : String(a.price ?? "0");
+            const priceNum = parseFloat(priceStr) || 0;
+            const displayName = a.title || a.addon_key.replace(/_/g, " ");
+            const description = a.description || "";
+            const owned = ownedAddons.find((o) => o.addon_key === a.addon_key);
+            const currentTotalLimit = owned != null ? owned.total_limit : (a.included_quantity ?? 0);
+            return {
+                addon_key: a.addon_key,
+                included_quantity: a.included_quantity ?? 0,
+                currentTotalLimit,
+                displayName,
+                priceDisplay: priceStr,
+                pricePerUnit: priceNum,
+                description,
+            };
+        });
+    }, [currentPlan?.addons, ownedAddons]);
 
-    // Filter plans by billing interval (فقط برای Monthly/Yearly؛ Add-ons تب جداگانه است)
     const filteredPlans = useMemo(() => {
         if (!plansData?.data || billingTab === 2) return [];
         const interval = billingTab === 0 ? "monthly" : "yearly";
@@ -489,7 +478,6 @@ export default function SubscriptionScreen() {
         );
     }
 
-    // Get current plan price - use exactly as received from API
     const currentPlanPrice = currentPlan?.price || 0;
     const currentPlanBillingInterval = currentPlan?.billing_interval || "monthly";
     const currentPlanFeatures = currentPlan ? getPlanFeatures(currentPlan) : [];
@@ -600,6 +588,23 @@ export default function SubscriptionScreen() {
                                             </View>
                                         ))}
                                     </View>
+                                    {/* Owned addons (included + extra) */}
+                                    {ownedAddons.length > 0 && (
+                                        <View style={styles.planFeatures}>
+                                            {ownedAddons.map((oa) => {
+                                                const label = oa.title?.trim() || oa.addon_key.replace(/_/g, " ");
+                                                const extra = oa.extra_quantity > 0 ? `+${oa.extra_quantity} extra` : ` (${oa.included_quantity} included)`;
+                                                return (
+                                                    <View key={oa.addon_key} style={styles.featureItemContainer}>
+                                                        <IconSymbol name="plus" size={16} color={colors.labels.tertiary} />
+                                                        <BaseText type="Body" weight="400" color="labels.primary" style={styles.featureItem}>
+                                                            {" " + label + ": " + extra}
+                                                        </BaseText>
+                                                    </View>
+                                                );
+                                            })}
+                                        </View>
+                                    )}
                                 </View>
                             </Animated.View>
                         );
@@ -712,17 +717,18 @@ export default function SubscriptionScreen() {
                     <>
                         {addonsList.map((addon, index) => (
                             <AddonCard
-                                key={addon.addon_key}
+                                key={`${addon.addon_key}-${addonResetKey}`}
                                 addonKey={addon.addon_key}
                                 displayName={addon.displayName}
+                                priceDisplay={addon.priceDisplay}
                                 pricePerUnit={addon.pricePerUnit}
                                 description={addon.description}
-                                initialQuantity={addon.included_quantity}
-                                onPurchase={(quantity) => {
+                                currentTotalLimit={addon.currentTotalLimit}
+                                onPurchase={(limit) => {
                                     if (selectedPractice?.id) {
                                         updateAddonLimit({
                                             practiceId: selectedPractice.id,
-                                            data: { addon_key: addon.addon_key, quantity },
+                                            data: { addon_key: addon.addon_key, limit },
                                         });
                                     } else {
                                         Alert.alert("Error", "No practice selected.");

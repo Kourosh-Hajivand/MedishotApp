@@ -2,13 +2,29 @@ import axios, { AxiosResponse } from "axios";
 import { routes } from "../../routes/routes";
 import axiosInstance from "../AxiosInstans";
 import { AddMemberDto, CreatePracticeDto, CreateTagDto, CreateTemplateDto, TransferOwnershipDto, UpdateMemberDto, UpdateMemberRoleDto, UpdatePracticeDto, UpdateTagDto, UpdateTemplateDto } from "./models/RequestModels";
-import { ApiResponse, Member, NextChartNumberResponse, PatientContractListResponse, PatientsCountResponse, PracticeActivitiesResponse, PracticeDetailResponse, PracticeListResponse, PracticeMembersResponse, PracticeTagResponse, PracticeTagsResponse, PracticeTemplateResponse, PracticeTemplatesResponse, RecentlyPhotosResponse } from "./models/ResponseModels";
+import {
+    ApiResponse,
+    Member,
+    NextChartNumberResponse,
+    PatientContractListResponse,
+    PatientsCountResponse,
+    PracticeActivitiesResponse,
+    PracticeDetailResponse,
+    PracticeListResponse,
+    PracticeMembersResponse,
+    PracticeTagResponse,
+    PracticeTagsResponse,
+    PracticeTemplateResponse,
+    PracticeTemplatesResponse,
+    RecentlyPhotosResponse,
+} from "./models/ResponseModels";
 
 const {
     practises: {
         list,
         create,
         getById,
+        put: putPractice,
         update,
         delete: deletePractice,
         getMembers,
@@ -104,7 +120,7 @@ export const PracticeService = {
         }
     },
 
-    // Update practice (POST practises/{id}/update)
+    // Update practice (POST practises/{id}/update - OpenAPI also allows PUT practises/{id})
     updatePractice: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
         try {
             const formData = new FormData();
@@ -120,6 +136,33 @@ export const PracticeService = {
                 }
             }
             const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.post(update(practiceId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to update practice");
+            }
+            throw error;
+        }
+    },
+
+    // Update practice via PUT (OpenAPI: PUT practises/{id} multipart/form-data)
+    updatePracticePut: async (practiceId: number, data: UpdatePracticeDto): Promise<PracticeDetailResponse> => {
+        try {
+            const formData = new FormData();
+            formData.append("name", data.name);
+            if (data.metadata) formData.append("metadata", data.metadata);
+            if (data.email) formData.append("email", data.email);
+            if (data.init_chart_number != null) formData.append("init_chart_number", String(data.init_chart_number));
+            if (data.image != null) {
+                if (typeof data.image === "string") {
+                    formData.append("image", data.image);
+                } else {
+                    formData.append("image", data.image);
+                }
+            }
+            const response: AxiosResponse<PracticeDetailResponse> = await axiosInstance.put(putPractice(practiceId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -201,7 +244,7 @@ export const PracticeService = {
         }
     },
 
-    // Update unregistered member information
+    // Update unregistered member (POST .../members/{memberId}/update - OpenAPI alternative)
     updateMember: async (practiceId: number, memberId: string | number, data: UpdateMemberDto): Promise<ApiResponse<any>> => {
         try {
             const formData = new FormData();
@@ -233,6 +276,31 @@ export const PracticeService = {
             }
 
             const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.post(updateMember(practiceId, memberId), formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+            return response.data;
+        } catch (error) {
+            if (axios.isAxiosError(error) && error.response) {
+                throw new Error(error.response.data.message || "Failed to update member");
+            }
+            throw error;
+        }
+    },
+
+    // Update unregistered member via PUT (OpenAPI: PUT .../members/{memberId}/activities)
+    updateMemberPut: async (practiceId: number, memberId: string | number, data: UpdateMemberDto): Promise<ApiResponse<any>> => {
+        try {
+            const formData = new FormData();
+            if (data.first_name) formData.append("first_name", data.first_name);
+            if (data.last_name) formData.append("last_name", data.last_name);
+            if (data.email) formData.append("email", data.email);
+            if (data.birth_date) formData.append("birth_date", data.birth_date);
+            if (data.gender) formData.append("gender", data.gender);
+            if (data.metadata) formData.append("metadata", data.metadata);
+            if (data.profile_photo) {
+                formData.append("profile_photo", typeof data.profile_photo === "string" ? data.profile_photo : data.profile_photo);
+            }
+            const response: AxiosResponse<ApiResponse<any>> = await axiosInstance.put(getMemberActivities(practiceId, memberId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
@@ -419,10 +487,10 @@ export const PracticeService = {
         }
     },
 
-    // Update practice tag
+    // Update practice tag (OpenAPI: PUT)
     updateTag: async (practiceId: number, tagId: number, data: UpdateTagDto): Promise<PracticeTagResponse> => {
         try {
-            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.post(updateTag(practiceId, tagId), data);
+            const response: AxiosResponse<PracticeTagResponse> = await axiosInstance.put(getTag(practiceId, tagId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {
@@ -486,10 +554,10 @@ export const PracticeService = {
         }
     },
 
-    // Update practice template
+    // Update practice template (OpenAPI: PUT)
     updateTemplate: async (practiceId: number, templateId: number, data: UpdateTemplateDto): Promise<PracticeTemplateResponse> => {
         try {
-            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.post(updateTemplate(practiceId, templateId), data);
+            const response: AxiosResponse<PracticeTemplateResponse> = await axiosInstance.put(updateTemplate(practiceId, templateId), data);
             return response.data;
         } catch (error) {
             if (axios.isAxiosError(error) && error.response) {

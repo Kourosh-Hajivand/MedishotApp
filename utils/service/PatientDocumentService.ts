@@ -104,7 +104,7 @@ export const PatientDocumentService = {
                 }
             }
 
-            const response: AxiosResponse<PatientDocumentDetailResponse> = await axiosInstance.post(updateDocument(practiseId, patientId, documentId), formData, {
+            const response: AxiosResponse<PatientDocumentDetailResponse> = await axiosInstance.put(updateDocument(practiseId, patientId, documentId), formData, {
                 headers: { "Content-Type": "multipart/form-data" },
             });
             return response.data;
