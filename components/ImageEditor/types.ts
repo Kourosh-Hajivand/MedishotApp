@@ -67,6 +67,8 @@ export interface ImageEditorToolProps {
     onCancel?: () => void;
     /** Optional flag for tools that support original/result preview (e.g. Magic). */
     isPreviewOriginal?: boolean;
+    /** Saved Magic selection (modeKey + resultType) to preselect style and color when reopening. */
+    initialMagic?: { modeKey: string; resultType: "orig" | "pred" };
     notes?: Array<{
         id: string;
         x: number;

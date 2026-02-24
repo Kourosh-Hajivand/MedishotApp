@@ -101,12 +101,35 @@ const STYLE_OPTIONS: MagicStyleOption[] = [
     { title: "Venier", resultType: "pred", imageUri: require("@/assets/images/tothShape/venier.png") },
 ];
 
-export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange, isPreviewOriginal }) => {
-    const [selectedColor, setSelectedColor] = useState<MagicColorOption>(COLOR_OPTIONS[0]);
-    const [selectedStyle, setSelectedStyle] = useState<MagicStyleOption>(STYLE_OPTIONS[0]);
+export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange, isPreviewOriginal, initialMagic }) => {
+    const appliedInitialMagicRef = useRef(false);
+    const [selectedColor, setSelectedColor] = useState<MagicColorOption>(() => {
+        if (initialMagic) {
+            const found = COLOR_OPTIONS.find((c) => c.modeKey === initialMagic.modeKey);
+            if (found) return found;
+        }
+        return COLOR_OPTIONS[0];
+    });
+    const [selectedStyle, setSelectedStyle] = useState<MagicStyleOption>(() => {
+        if (initialMagic) {
+            const found = STYLE_OPTIONS.find((s) => s.resultType === initialMagic.resultType);
+            if (found) return found;
+        }
+        return STYLE_OPTIONS[0];
+    });
     const stylePulse = useSharedValue(0);
     const isFirstStyleMount = useRef(true);
     const titleOpacity = useSharedValue(1);
+
+    // Apply saved magic selection when it becomes available (e.g. after async load).
+    useEffect(() => {
+        if (!initialMagic || appliedInitialMagicRef.current) return;
+        appliedInitialMagicRef.current = true;
+        const color = COLOR_OPTIONS.find((c) => c.modeKey === initialMagic.modeKey);
+        const style = STYLE_OPTIONS.find((s) => s.resultType === initialMagic.resultType);
+        if (color) setSelectedColor(color);
+        if (style) setSelectedStyle(style);
+    }, [initialMagic]);
 
     useEffect(() => {
         onChange({

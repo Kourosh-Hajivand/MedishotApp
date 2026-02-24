@@ -1415,7 +1415,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             case "Note":
                 return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
-                return <ToolMagic {...commonProps} isPreviewOriginal={isMagicPreviewOriginal} />;
+                return <ToolMagic {...commonProps} isPreviewOriginal={isMagicPreviewOriginal} initialMagic={initialEditorState?.magic} />;
             case "Pen":
                 return <ToolPen {...commonProps} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onColorChange={setSelectedPenColor} onStrokeWidthChange={setSelectedStrokeWidth} />;
             default:
