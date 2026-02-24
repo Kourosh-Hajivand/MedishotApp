@@ -459,7 +459,16 @@ export function useImageViewerDerivedData({
     // 3. Composite original_media: note, like, compare (no adjust)
     // 4. Composite child images: note, like, adjust (no compare)
     const effectiveActions = React.useMemo(() => {
-        const { showShare: share = true, showRestore: restore = false, showArchive: archive = true, showBookmark: bookmark = true, showNote: note = false, showCompare: compare = false, showEdit: edit = true } = actions;
+        const {
+            showShare: share = true,
+            showRestore: restore = false,
+            showArchive: archive = true,
+            showBookmark: bookmark = true,
+            showNote: note = false,
+            showCompare: compare = false,
+            showEdit: edit = true,
+            showMagic: magicAllowed = false,
+        } = actions;
 
         // Get current image info directly from maps
         let isCompositeOriginal = false;
@@ -510,7 +519,7 @@ export function useImageViewerDerivedData({
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
-                showMagic: isCurrentImageMagicTemplate,
+                showMagic: magicAllowed && isCurrentImageMagicTemplate,
                 showNote: note,
                 showCompare: false,
             };
@@ -524,7 +533,7 @@ export function useImageViewerDerivedData({
                 showArchive: archive,
                 showShare: share,
                 showRestore: restore,
-                showMagic: isCurrentImageMagicTemplate,
+                showMagic: magicAllowed && isCurrentImageMagicTemplate,
                 showNote: note,
                 showCompare: false, // Hide compare for single images without template
             };
@@ -534,16 +543,16 @@ export function useImageViewerDerivedData({
         const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
         // وقتی ورق می‌زنیم روی تصاویر composite و caller اجازه داده، در صورت خالی بودن بقیه حداقل Adjust نشان بده
         const forceShowEditWhenFromTemplate = edit && isFromTemplate && !shouldShowCompare;
-        return {
-            showBookmark: bookmark,
-            showEdit: edit || forceShowEditWhenFromTemplate,
-            showArchive: archive,
-            showShare: share,
-            showRestore: restore,
-            showMagic: isCurrentImageMagicTemplate,
-            showNote: note,
-            showCompare: shouldShowCompare,
-        };
+            return {
+                showBookmark: bookmark,
+                showEdit: edit || forceShowEditWhenFromTemplate,
+                showArchive: archive,
+                showShare: share,
+                showRestore: restore,
+                showMagic: magicAllowed && isCurrentImageMagicTemplate,
+                showNote: note,
+                showCompare: shouldShowCompare,
+            };
     }, [displayIndex, imagesList, imageUrlToIsCompositeMap, imageUrlToIsOriginalMediaMap, imageUrlToHasTemplateMapInternal, rawMediaData, actions, isCurrentImageMagicTemplate]);
 
     // Notes from media.data.editor.notes for current image (for notes panel)

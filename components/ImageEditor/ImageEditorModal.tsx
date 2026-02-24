@@ -527,6 +527,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         colorTitle: string;
         styleTitle: string;
     } | null>(null);
+    const [isMagicPreviewOriginal, setIsMagicPreviewOriginal] = useState(false);
     const [displayedImageUri, setDisplayedImageUri] = useState<string | null>(null);
     const [originalImageUri, setOriginalImageUri] = useState<string | null>(null);
     const [adjustmentValues, setAdjustmentValues] = useState<AdjustChange | null>(null);
@@ -671,6 +672,36 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         });
     };
 
+    const toggleMagicPreview = useCallback(() => {
+        if (activeTool !== "Magic") return;
+
+        // If we don't have any magic result yet, just toggle between original and current
+        const hasResults = resultImages && Object.keys(resultImages).length > 0;
+
+        if (!hasResults || !magicSelection) {
+            const original = originalImageUri ?? uri ?? null;
+            if (!original) return;
+
+            if (!isMagicPreviewOriginal) {
+                setDisplayedImageUri(original);
+                setIsMagicPreviewOriginal(true);
+            } else {
+                setDisplayedImageUri(uri ?? null);
+                setIsMagicPreviewOriginal(false);
+            }
+            return;
+        }
+
+        if (!isMagicPreviewOriginal) {
+            const original = originalImageUri ?? uri ?? null;
+            if (!original) return;
+            setDisplayedImageUri(original);
+            setIsMagicPreviewOriginal(true);
+        } else {
+            updateDisplayedImageFromResult(magicSelection);
+        }
+    }, [activeTool, magicSelection, isMagicPreviewOriginal, originalImageUri, uri, resultImages]);
+
     // Memoize gestures
     const composedGesture = useMemo(() => {
         const pinch = Gesture.Pinch()
@@ -683,12 +714,17 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             });
 
         const tap = Gesture.Tap()
-            .enabled(activeTool === "Note")
+            .enabled(activeTool === "Note" || activeTool === "Magic")
             .onEnd((event) => {
-                runOnJS(addNoteCallback)(event.x, event.y);
+                if (activeTool === "Note") {
+                    runOnJS(addNoteCallback)(event.x, event.y);
+                } else if (activeTool === "Magic") {
+                    runOnJS(toggleMagicPreview)();
+                }
             });
 
         const doubleTap = Gesture.Tap()
+            .enabled(__DEV__ && activeTool === "Note")
             .numberOfTaps(2)
             .onEnd(() => {
                 runOnJS(() => {
@@ -697,7 +733,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             });
 
         return Gesture.Exclusive(tap, pinch, doubleTap);
-    }, [activeTool, imageContainerLayout, scale]);
+    }, [activeTool, addNoteCallback, scale, toggleMagicPreview]);
 
     const animatedImageStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
@@ -845,30 +881,44 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     };
 
     useEffect(() => {
-        if (visible) {
-            hasRequestedRef.current = false;
-            setDisplayedImageUri(uri ?? null);
-            setOriginalImageUri(uri ?? null);
-            setImageAspectRatio(null);
-            if (!initialEditorState) {
-                setAdjustmentValues(null);
-                setNotes([]);
-                setPenStrokes([]);
-                setPenStrokesHistory([[]]);
-                setPenHistoryIndex(0);
-                setMagicSelection(null);
-                savedEditorSnapshotRef.current = null;
-            }
-            if (initialEditorState?.lastActiveTool) {
-                const t = initialEditorState.lastActiveTool;
-                setActiveTool(t === "Magic" && !showMagicTab ? "Adjust" : t);
-            } else if (initialTool) {
-                setActiveTool(initialTool === "Magic" && !showMagicTab ? "Adjust" : initialTool);
-            } else if (!showMagicTab) {
-                setActiveTool("Adjust");
-            }
+        if (!visible) return;
+        if (__DEV__) {
+            console.log("[MagicDebug] modal opened/updated", {
+                uri,
+                initialTool,
+                lastActiveTool: initialEditorState?.lastActiveTool,
+                showMagicTab,
+            });
+        }
+        hasRequestedRef.current = false;
+        setDisplayedImageUri(uri ?? null);
+        setOriginalImageUri(uri ?? null);
+        setImageAspectRatio(null);
+        if (!initialEditorState) {
+            setAdjustmentValues(null);
+            setNotes([]);
+            setPenStrokes([]);
+            setPenStrokesHistory([[]]);
+            setPenHistoryIndex(0);
+            setMagicSelection(null);
+            savedEditorSnapshotRef.current = null;
+        }
+        if (initialEditorState?.lastActiveTool) {
+            const t = initialEditorState.lastActiveTool;
+            setActiveTool(t === "Magic" && !showMagicTab ? "Adjust" : t);
+        } else if (initialTool) {
+            setActiveTool(initialTool === "Magic" && !showMagicTab ? "Adjust" : initialTool);
+        } else if (!showMagicTab) {
+            setActiveTool("Adjust");
         }
     }, [uri, initialTool, visible, initialEditorState, showMagicTab]);
+
+    useEffect(() => {
+        if (!visible) return;
+        if (__DEV__) {
+            console.log("[MagicDebug] activeTool changed", { activeTool, showMagicTab });
+        }
+    }, [activeTool, visible, showMagicTab]);
 
     useEffect(() => {
         if (!visible || !initialEditorState) {
@@ -956,13 +1006,13 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         if (resultImage) {
             const formatted = formatBase64ToDataUri(resultImage);
             if (formatted) {
-                if (__DEV__) console.log("🖼️ نمایش:", selection.colorTitle);
                 setDisplayedImageUri(formatted);
+                setIsMagicPreviewOriginal(false);
                 return;
             }
         }
-        if (__DEV__) console.log("🖼️ نمایش:", "اصلی");
         setDisplayedImageUri(uri ?? null);
+        setIsMagicPreviewOriginal(false);
     };
 
     // When Magic loading modal opens (or Retry): run progress 0 → 80% over MAGIC_PROGRESS_DURATION_MS
@@ -1048,12 +1098,32 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         }
         const processImage = async () => {
             if (!uri || !visible) return;
+            if (__DEV__) {
+                console.log("[MagicDebug] processImage enter", {
+                    uriPresent: !!uri,
+                    activeTool,
+                    visible,
+                    magicRequestInFlight,
+                    hasRequested: hasRequestedRef.current,
+                });
+            }
             if (activeTool !== "Magic") {
-                setIsLoading(false);
-                setIsProcessing(false);
+                // Only clear loading state if no request is in flight and none has been requested yet
+                if (!magicRequestInFlight && !hasRequestedRef.current) {
+                    setIsLoading(false);
+                    setIsProcessing(false);
+                }
                 return;
             }
-            if (magicRequestInFlight || hasRequestedRef.current) return;
+            if (magicRequestInFlight || hasRequestedRef.current) {
+                if (__DEV__) {
+                    console.log("[MagicDebug] skip processImage (inFlight or requested)", {
+                        magicRequestInFlight,
+                        hasRequested: hasRequestedRef.current,
+                    });
+                }
+                return;
+            }
             magicRequestInFlight = true;
             hasRequestedRef.current = true;
             magicCancelledRef.current = false;
@@ -1066,6 +1136,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 const imageBase64 = await convertImageToBase64(uri);
                 if (magicCancelledRef.current) return;
                 if (imageBase64) {
+                    if (__DEV__) {
+                        console.log("[MagicDebug] calling magicGenerateMutation");
+                    }
                     const result = await magicGenerateMutation.mutateAsync({
                         imageBase64,
                         signal: controller.signal,
@@ -1081,6 +1154,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 magicRequestInFlight = false;
                 if (magicCancelledRef.current) return;
                 setIsProcessing(false);
+                if (__DEV__) {
+                    console.log("[MagicDebug] processImage finished", { success });
+                }
                 finishMagicLoading(success);
             }
         };
@@ -1339,7 +1415,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             case "Note":
                 return <ToolNote {...commonProps} notes={notes} activeNoteId={activeNoteId} onActiveNoteChange={setActiveNoteId} />;
             case "Magic":
-                return <ToolMagic {...commonProps} />;
+                return <ToolMagic {...commonProps} isPreviewOriginal={isMagicPreviewOriginal} />;
             case "Pen":
                 return <ToolPen {...commonProps} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onColorChange={setSelectedPenColor} onStrokeWidthChange={setSelectedStrokeWidth} />;
             default:

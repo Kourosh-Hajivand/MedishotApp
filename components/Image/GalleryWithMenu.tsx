@@ -601,7 +601,6 @@ const styles = StyleSheet.create({
     },
     sectionListContent: {
         paddingBottom: 16,
-        backgroundColor: "red",
     },
     rowContainer: {
         flexDirection: "row",

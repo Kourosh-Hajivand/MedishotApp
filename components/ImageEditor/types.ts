@@ -65,6 +65,8 @@ export interface ImageEditorToolProps {
     onChange: (change: ImageChange) => void;
     onApply?: () => void;
     onCancel?: () => void;
+    /** Optional flag for tools that support original/result preview (e.g. Magic). */
+    isPreviewOriginal?: boolean;
     notes?: Array<{
         id: string;
         x: number;

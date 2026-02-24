@@ -1447,7 +1447,8 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 initialEditorState={imageEditorUri ? (imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined) : undefined}
                 onClose={() => setImageEditorVisible(false)}
                 showOnlyNote={imageEditorTool === "Note" && isCurrentImageCompositeOriginal}
-                showMagicTab={isCurrentImageMagicTemplate}
+                // اگر از BottomActionBar دکمه Magic را زده باشیم، حتی اگر isCurrentImageMagicTemplate false باشد، تب Magic را نشان بده
+                showMagicTab={isCurrentImageMagicTemplate || imageEditorTool === "Magic"}
             />
         </Modal>
     );

@@ -1,4 +1,3 @@
-import { MAGIC_API_SETTINGS } from "@/components/ImageEditor/ToolMagic";
 import { magicGenerate } from "@/utils/service/MagicService";
 import { useMutation, UseMutationResult } from "@tanstack/react-query";
 
@@ -18,7 +17,6 @@ export function useMagicGenerateMutation(): UseMutationResult<
     MagicGenerateMutationVariables
 > {
     return useMutation({
-        mutationFn: ({ imageBase64, signal }: MagicGenerateMutationVariables) =>
-            magicGenerate(imageBase64, MAGIC_API_SETTINGS, signal),
+        mutationFn: ({ imageBase64, signal }: MagicGenerateMutationVariables) => magicGenerate(imageBase64, signal),
     });
 }

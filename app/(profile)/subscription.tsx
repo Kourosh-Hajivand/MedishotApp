@@ -29,8 +29,8 @@ interface AddonCardProps {
 }
 
 function AddonCard({ displayName, priceDisplay, pricePerUnit, description, currentTotalLimit, onPurchase, disabled }: AddonCardProps) {
-    // UI shows extra quantity from 0; backend receives limit = extraQuantity + currentTotalLimit (from owned_addons.total_limit for same addon_key, else plan included_quantity)
-    const [extraQuantity, setExtraQuantity] = useState(0);
+    // UI shows extra quantity from 1; backend receives limit = extraQuantity + currentTotalLimit (from owned_addons.total_limit for same addon_key, else plan included_quantity)
+    const [extraQuantity, setExtraQuantity] = useState(1);
     const gradientColors: [string, string, string, string, string] = ["rgba(0, 122, 255, 0.08)", "rgba(199, 199, 199, 0.08)", "rgba(0, 122, 255, 0.08)", "rgba(165, 165, 165, 0.08)", "rgba(0, 122, 255, 0.08)"];
     const planColor = ADDON_BLUE;
 

@@ -1,7 +1,6 @@
 import { BaseText } from "@/components";
 import { AdjustChange, ImageChange, MagicChange, ToolAdjust, /* ToolCrop */ ToolMagic, ToolNote, ToolPen } from "@/components/ImageEditor";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
-import { MAGIC_API_SETTINGS } from "@/components/ImageEditor/ToolMagic";
 import { Note } from "@/components/ImageEditor/ToolNote";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
 import colors from "@/theme/colors.shared";
@@ -14,7 +13,7 @@ import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
 import { SymbolViewProps } from "expo-symbols";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Dimensions, Image as RNImage, Modal, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Alert, Dimensions, Modal, Image as RNImage, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 
@@ -648,39 +647,34 @@ export default function ImageEditorScreen() {
         }
     }, []);
 
-    // ✅ ارسال به API – تنظیمات از تب Magic (ToolMagic.MAGIC_API_SETTINGS)
-    const sendImageToAPI = useCallback(
-        async (imageBase64: string) => {
-            const requestBody = {
-                type: "teeth",
-                image: imageBase64,
-                settings: MAGIC_API_SETTINGS,
-            };
+    const sendImageToAPI = useCallback(async (imageBase64: string) => {
+        const requestBody = {
+            type: "teeth",
+            image: imageBase64,
+        };
 
-            try {
-                const { data } = await axios.post(API_URL, requestBody, {
-                    headers: { "Content-Type": "application/json" },
-                    timeout: API_TIMEOUT_MS,
-                });
-                if (data?.status !== "success") {
-                    throw new Error(data?.message ?? "API did not return success");
-                }
-                return data.images ?? data;
-            } catch (error) {
-                if (axios.isAxiosError(error)) {
-                    if (error.code === "ECONNABORTED") {
-                        Alert.alert("Error", "Request timed out. The image processing is taking too long. Please try again.");
-                    } else {
-                        Alert.alert("Error", error.response?.data?.message || "Failed to process image. Please try again.");
-                    }
-                } else {
-                    Alert.alert("Error", "An unexpected error occurred. Please try again.");
-                }
-                throw error;
+        try {
+            const { data } = await axios.post(API_URL, requestBody, {
+                headers: { "Content-Type": "application/json" },
+                timeout: API_TIMEOUT_MS,
+            });
+            if (data?.status !== "success") {
+                throw new Error(data?.message ?? "API did not return success");
             }
-        },
-        [],
-    );
+            return data.images ?? data;
+        } catch (error) {
+            if (axios.isAxiosError(error)) {
+                if (error.code === "ECONNABORTED") {
+                    Alert.alert("Error", "Request timed out. The image processing is taking too long. Please try again.");
+                } else {
+                    Alert.alert("Error", error.response?.data?.message || "Failed to process image. Please try again.");
+                }
+            } else {
+                Alert.alert("Error", "An unexpected error occurred. Please try again.");
+            }
+            throw error;
+        }
+    }, []);
 
     const formatBase64ToDataUri = useCallback((value: string) => {
         if (!value) return null;
@@ -870,7 +864,7 @@ export default function ImageEditorScreen() {
     // Use actual imageWrapper height to fill available space, with smart fallback
     const dynamicImageContainerStyle = useMemo(() => {
         const aspectRatio = imageAspectRatio ?? 3 / 2; // Fallback to 3:2 if not loaded yet
-        
+
         // Use actual wrapper dimensions if available, otherwise use screen dimensions
         const availableHeight = imageWrapperLayout.height > 0 ? imageWrapperLayout.height : CANVAS_MAX_HEIGHT;
         const availableWidth = imageWrapperLayout.width > 0 ? imageWrapperLayout.width : CANVAS_MAX_WIDTH;
@@ -934,7 +928,7 @@ export default function ImageEditorScreen() {
 
             <View style={styles.canvasContainer}>
                 <GestureDetector gesture={composedGesture}>
-                    <Animated.View 
+                    <Animated.View
                         style={[styles.imageWrapper, animatedImageStyle]}
                         onLayout={(event) => {
                             const { width, height } = event.nativeEvent.layout;
@@ -948,10 +942,10 @@ export default function ImageEditorScreen() {
                                 setImageContainerLayout({ width, height, x, y });
                             }}
                         >
-                            <FilteredImage 
-                                source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }} 
-                                style={styles.image} 
-                                adjustments={adjustmentValues} 
+                            <FilteredImage
+                                source={{ uri: displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI }}
+                                style={styles.image}
+                                adjustments={adjustmentValues}
                                 contentFit="contain"
                                 onLoad={(event) => {
                                     const ratio = event.width / event.height;
@@ -962,35 +956,15 @@ export default function ImageEditorScreen() {
                             {/* Note Markers Overlay */}
                             {activeTool === "Note" &&
                                 notes.map((note, index) => (
-                                    <NoteMarker
-                                        key={note.id}
-                                        note={note}
-                                        index={index}
-                                        containerWidth={imageContainerLayout.width}
-                                        containerHeight={imageContainerLayout.height}
-                                        onMove={handleMoveNote}
-                                        onSelect={setActiveNoteId}
-                                        onDragStart={handleDragStart}
-                                        onDragUpdate={handleDragUpdate}
-                                        onDragEnd={handleDragEnd}
-                                    />
+                                    <NoteMarker key={note.id} note={note} index={index} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} onMove={handleMoveNote} onSelect={setActiveNoteId} onDragStart={handleDragStart} onDragUpdate={handleDragUpdate} onDragEnd={handleDragEnd} />
                                 ))}
                         </View>
                     </Animated.View>
                 </GestureDetector>
-                
+
                 {/* Magnifier - rendered at canvasContainer level to appear above everything */}
                 {activeTool === "Note" && magnifierState.visible && (
-                    <NoteMagnifier
-                        visible={magnifierState.visible}
-                        x={magnifierState.x}
-                        y={magnifierState.y}
-                        imageUri={displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI}
-                        containerX={imageContainerLayout.x}
-                        containerY={imageContainerLayout.y}
-                        containerWidth={imageContainerLayout.width}
-                        containerHeight={imageContainerLayout.height}
-                    />
+                    <NoteMagnifier visible={magnifierState.visible} x={magnifierState.x} y={magnifierState.y} imageUri={displayedImageUri ?? uri ?? DEFAULT_IMAGE_URI} containerX={imageContainerLayout.x} containerY={imageContainerLayout.y} containerWidth={imageContainerLayout.width} containerHeight={imageContainerLayout.height} />
                 )}
 
                 {/* Debug Overlay */}

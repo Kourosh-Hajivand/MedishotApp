@@ -69,11 +69,7 @@ export default function PatientArchiveScreen() {
                     }
                 });
             } else {
-                const displayUrl =
-                    media.edited_media?.url ??
-                    media.url ??
-                    media.image?.url ??
-                    media.original_media?.url;
+                const displayUrl = media.edited_media?.url ?? media.url ?? media.image?.url ?? media.original_media?.url;
                 if (displayUrl) {
                     dateData.images.push({ url: displayUrl, timestamp: sectionTimestamp });
                 }
@@ -129,13 +125,8 @@ export default function PatientArchiveScreen() {
                         });
                     }
                 });
-            }
-            else if (!media.template) {
-                const imageUrl =
-                    media.edited_media?.url ??
-                    media.url ??
-                    media.image?.url ??
-                    media.original_media?.url;
+            } else if (!media.template) {
+                const imageUrl = media.edited_media?.url ?? media.url ?? media.image?.url ?? media.original_media?.url;
                 if (imageUrl) {
                     const createdAt = media.created_at || media.updated_at;
                     items.push({
@@ -219,6 +210,9 @@ export default function PatientArchiveScreen() {
                     actions={{
                         showBookmark: false,
                         showEdit: false,
+                        showMagic: false,
+                        showNote: false,
+                        showCompare: false,
                         showArchive: false,
                         showShare: true,
                         showRestore: true,

@@ -1,4 +1,3 @@
-import { MAGIC_API_SETTINGS } from "@/components/ImageEditor/ToolMagic";
 import axios from "axios";
 
 const MAGIC_API_URL = "https://medical-api.alipour.me/generate";
@@ -15,7 +14,6 @@ export interface MagicGenerateApiResponse {
 export interface MagicGenerateRequest {
     type: "teeth";
     image: string;
-    settings: typeof MAGIC_API_SETTINGS;
 }
 
 /**
@@ -23,11 +21,10 @@ export interface MagicGenerateRequest {
  * By sending a signal, the request can be canceled with AbortController.
  * Errors are handled inside the service and thrown as Error.
  */
-export async function magicGenerate(imageBase64: string, settings: typeof MAGIC_API_SETTINGS = MAGIC_API_SETTINGS, signal?: AbortSignal): Promise<Record<string, string>> {
+export async function magicGenerate(imageBase64: string, signal?: AbortSignal): Promise<Record<string, string>> {
     const requestBody: MagicGenerateRequest = {
         type: "teeth",
         image: imageBase64,
-        settings,
     };
 
     try {

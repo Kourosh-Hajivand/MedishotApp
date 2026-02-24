@@ -28,7 +28,9 @@ const StyleOptionButton: React.FC<{
 
     return (
         <Animated.View
-            entering={FadeInLeft.duration(DURATION_NORMAL + index * 25).delay(20 + index * 30).easing(EASE_OUT)}
+            entering={FadeInLeft.duration(DURATION_NORMAL + index * 25)
+                .delay(20 + index * 30)
+                .easing(EASE_OUT)}
             style={animatedStyle}
         >
             <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
@@ -60,7 +62,9 @@ const ColorOptionButton: React.FC<{
 
     return (
         <Animated.View
-            entering={FadeInLeft.duration(DURATION_NORMAL + index * 20).delay(60 + index * 25).easing(EASE_OUT)}
+            entering={FadeInLeft.duration(DURATION_NORMAL + index * 20)
+                .delay(60 + index * 25)
+                .easing(EASE_OUT)}
             style={animatedStyle}
         >
             <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="items-center justify-center gap-2">
@@ -69,7 +73,11 @@ const ColorOptionButton: React.FC<{
                         <Image source={item.image} style={{ width: 28, height: 45, top: 5 }} resizeMode="contain" />
                     </View>
                 </Animated.View>
-                <Animated.View entering={FadeIn.duration(200).delay(120 + index * 25).easing(EASE_OUT)}>
+                <Animated.View
+                    entering={FadeIn.duration(200)
+                        .delay(120 + index * 25)
+                        .easing(EASE_OUT)}
+                >
                     <BaseText type="Caption1" color={isSelected ? "labels.primary" : "labels.secondary"}>
                         {item.title}
                     </BaseText>
@@ -93,52 +101,7 @@ const STYLE_OPTIONS: MagicStyleOption[] = [
     { title: "Venier", resultType: "pred", imageUri: require("@/assets/images/tothShape/venier.png") },
 ];
 
-/** تنظیمات پیش‌فرض API پردازش دندان (مطابق راهنمای فنی) – همهٔ منطق Magic اینجا */
-export const MAGIC_API_SETTINGS = {
-    color_settings: {
-        saturation_scale: 0.4,
-        yellow_hue_range: [15, 45],
-        red_hue_range: [0, 15],
-        sat_range: [0, 255],
-        l_range: [0, 255],
-    },
-    texture_modes: {
-        Mode_A1: {
-            fade_power: 4.0,
-            center_offset: [0.0, 0.1],
-            stretch: [0.5, 0.8],
-            center_opacity: 0.5,
-            blend_opacity: 0.8,
-            mask_color: [92, 137, 170],
-        },
-        Mode_C1: {
-            fade_power: 6.0,
-            center_offset: [0.0, 0.2],
-            stretch: [0.5, 0.8],
-            center_opacity: 0.6,
-            blend_opacity: 0.8,
-            mask_color: [112, 158, 181],
-        },
-        Mode_D3: {
-            fade_power: 6.0,
-            center_offset: [0.0, 0.2],
-            stretch: [0.5, 0.6],
-            center_opacity: 0.5,
-            blend_opacity: 0.8,
-            mask_color: [101, 152, 184],
-        },
-        Mode_A2: {
-            fade_power: 4.0,
-            center_offset: [0.0, 0.3],
-            stretch: [0.5, 0.8],
-            center_opacity: 0.99,
-            blend_opacity: 0.7,
-            mask_color: [91, 137, 170],
-        },
-    },
-} as const;
-
-export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
+export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange, isPreviewOriginal }) => {
     const [selectedColor, setSelectedColor] = useState<MagicColorOption>(COLOR_OPTIONS[0]);
     const [selectedStyle, setSelectedStyle] = useState<MagicStyleOption>(STYLE_OPTIONS[0]);
     const stylePulse = useSharedValue(0);
@@ -159,14 +122,8 @@ export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
         }
         // نرم و بدون بانس: یک پالس ملایم با timing
         stylePulse.value = 0;
-        stylePulse.value = withSequence(
-            withTiming(1, { duration: 120, easing: EASE_OUT }),
-            withTiming(0, { duration: 200, easing: EASE_OUT }),
-        );
-        titleOpacity.value = withSequence(
-            withTiming(0.7, { duration: 60, easing: EASE_OUT }),
-            withTiming(1, { duration: 180, easing: EASE_OUT }),
-        );
+        stylePulse.value = withSequence(withTiming(1, { duration: 120, easing: EASE_OUT }), withTiming(0, { duration: 200, easing: EASE_OUT }));
+        titleOpacity.value = withSequence(withTiming(0.7, { duration: 60, easing: EASE_OUT }), withTiming(1, { duration: 180, easing: EASE_OUT }));
     }, [selectedStyle]);
 
     const titleAnimatedStyle = useAnimatedStyle(() => ({
@@ -180,7 +137,7 @@ export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange }) => {
             <Animated.View entering={FadeIn.duration(220).delay(20).easing(EASE_OUT)} className="absolute left-0 right-0 -top-10 items-center justify-center z-10" pointerEvents="none">
                 <Animated.View style={titleAnimatedStyle} className="bg-white px-3 py-1.5 rounded-lg shadow-sm">
                     <BaseText type="Subhead" color="labels.primary">
-                        {selectedStyle.title}
+                        {isPreviewOriginal ? `Preview (Before)` : selectedStyle.title}
                     </BaseText>
                 </Animated.View>
             </Animated.View>
