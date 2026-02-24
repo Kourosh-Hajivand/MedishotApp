@@ -16,6 +16,10 @@ export const blurValue = new Animated.Value(0);
 
 const MODAL_PUSH_DELAY_MS = 450;
 
+// Persist across unmount/remount (e.g. Strict Mode or nav) so we only push each modal once per session
+let hasPushedCompleteProfileThisSession = false;
+let hasPushedSelectRoleThisSession = false;
+
 export default function PatientsLayout() {
     const { logout: handleLogout, isAuthenticated, profile, isProfileLoading } = useAuth();
     const { data: practiceList, isLoading: isPracticeListLoading, isFetching: isPracticeListFetching, error: practiceListError, refetch: refetchPracticeList } = useGetPracticeList(isAuthenticated === true);
@@ -26,14 +30,21 @@ export default function PatientsLayout() {
     // If there's an error, we'll still allow modal navigation (user can create practice)
     const hasNoPractice = !practiceList?.data?.length && !isPracticeListLoading;
 
-    const hasPushedCompleteProfileModal = useRef(false);
-    const hasPushedPracticeModal = useRef(false);
+    // Reset session flags when profile/practice state changes so future sessions can show modals again
+    useEffect(() => {
+        if (profile?.first_name && profile?.last_name) {
+            hasPushedCompleteProfileThisSession = false;
+        }
+        if (practiceList?.data && practiceList.data.length > 0) {
+            hasPushedSelectRoleThisSession = false;
+        }
+    }, [profile?.first_name, profile?.last_name, practiceList?.data?.length]);
 
     useEffect(() => {
         if (!isAuthenticated || isProfileLoading) return;
         if (!profile || (profile.first_name && profile.last_name)) return;
-        if (hasPushedCompleteProfileModal.current) return;
-        hasPushedCompleteProfileModal.current = true;
+        if (hasPushedCompleteProfileThisSession) return;
+        hasPushedCompleteProfileThisSession = true;
         const id = setTimeout(() => {
             router.push({ pathname: "/(auth)/completeProfile", params: { requireCompleteProfile: "1" } });
         }, MODAL_PUSH_DELAY_MS);
@@ -42,13 +53,10 @@ export default function PatientsLayout() {
 
     useEffect(() => {
         if (!isAuthenticated || !profile || isProfileLoading || hasIncompleteProfile) return;
-        // Don't push modal if practice list is still loading or if we already have practices
         if (isPracticeListLoading) return;
         if (practiceList?.data && practiceList.data.length > 0) return;
-        // Even if there's an error, we should still allow user to create practice
-        // But we'll show the error state separately
-        if (hasPushedPracticeModal.current) return;
-        hasPushedPracticeModal.current = true;
+        if (hasPushedSelectRoleThisSession) return;
+        hasPushedSelectRoleThisSession = true;
         const id = setTimeout(() => {
             router.push({ pathname: "/(auth)/select-role", params: { requirePractice: "1" } });
         }, MODAL_PUSH_DELAY_MS);

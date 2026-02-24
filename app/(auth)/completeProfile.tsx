@@ -10,7 +10,7 @@ import React, { useCallback, useLayoutEffect, useRef } from "react";
 import { UseFormHandleSubmit } from "react-hook-form";
 import { Alert } from "react-native";
 
-interface ProfileFormRef {
+interface ProfileFormRef { 
     handleSubmit: UseFormHandleSubmit<ProfileFormData>;
     getFormData: () => {
         formData: ProfileFormData;
@@ -127,7 +127,9 @@ export default function CompleteProfile() {
         });
     }, [navigation, handleNext, isUpdating, requireCompleteProfile]);
 
-    return <ProfileFormScreen mode="create" initialData={profile ?? null} title="Complete Your Profile" subtitle="Start by completing your profile." onFormReady={handleFormReady} />;
+    // Do not pre-fill name from Apple/backend so the user must enter it themselves
+    const initialDataWithoutName = profile ? { ...profile, first_name: null, last_name: null } : null;
+    return <ProfileFormScreen mode="create" initialData={initialDataWithoutName} title="Complete Your Profile" subtitle="Start by completing your profile." onFormReady={handleFormReady} />;
 }
 
 CompleteProfile.displayName = "CompleteProfile";

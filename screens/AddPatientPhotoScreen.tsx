@@ -769,32 +769,39 @@ export const AddPatientPhotoScreen: React.FC = () => {
             if (!isEditMode) {
                 // Set error messages for dynamic fields
                 if (!hasValidPhone) {
-                    setPhoneError("A valid phone number is required");
+                    setPhoneError("Please enter at least one valid phone number.");
                 } else setPhoneError("");
+
                 if (!hasValidEmail) {
-                    setEmailError("A valid email address is required (e.g. name@example.com)");
+                    setEmailError("Please enter at least one valid email address (e.g., name@example.com).");
                 } else setEmailError("");
+
                 if (!hasValidAddress) {
-                    setAddressError("An address with at least a street or city is required");
+                    setAddressError("Please provide at least one address (street or city is required).");
                 } else setAddressError("");
+
                 const missing: string[] = [];
-                if (firstName?.trim() === "") missing.push("First Name");
-                if (lastName?.trim() === "") missing.push("Last Name");
-                if (!hasValidPhone) missing.push("at least one phone number");
-                if (!hasValidEmail) missing.push("at least one email");
-                if (!hasValidAddress) missing.push("at least one address");
-                Alert.alert("Required Fields", `Please fill in all required fields: ${missing.join(", ")}.`);
+
+                if (firstName?.trim() === "") missing.push("First name");
+                if (lastName?.trim() === "") missing.push("Last name");
+                if (!hasValidPhone) missing.push("a valid phone number");
+                if (!hasValidEmail) missing.push("a valid email address");
+                if (!hasValidAddress) missing.push("an address");
+
+                Alert.alert("Missing Required Information", `Please complete the following required fields: ${missing.join(", ")}.`);
             } else {
                 const missing: string[] = [];
-                if (firstName?.trim() === "") missing.push("First Name");
-                if (lastName?.trim() === "") missing.push("Last Name");
+
+                if (firstName?.trim() === "") missing.push("First name");
+                if (lastName?.trim() === "") missing.push("Last name");
+
                 if (missing.length > 0) {
-                    Alert.alert("Required Fields", `Please fill in: ${missing.join(", ")}.`);
+                    Alert.alert("Missing Required Information", `${missing.join(", ")}.`);
                 }
             }
+
             return;
         }
-
         // Clear errors if valid
         setPhoneError("");
         setEmailError("");

@@ -1277,6 +1277,24 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         }
     }, [mediaId, mediaImageId, hasTemplate, originalUri, uri, tempUploadAsync, editPatientMediaAsync, updateMediaImageAsync, onClose, onSaveSuccess]);
 
+    const handleConfirmRevert = useCallback(() => {
+        Alert.alert(
+            "Revert changes?",
+            "This will discard all edits and restore the original image. Do you want to continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Revert",
+                    style: "destructive",
+                    onPress: () => {
+                        // Revert all edits and save immediately
+                        void handleRevert();
+                    },
+                },
+            ],
+        );
+    }, [handleRevert]);
+
     // Calculate dynamic image container style based on aspect ratio
     // Use actual imageWrapper height to fill available space, with smart fallback
     const dynamicImageContainerStyle = useMemo(() => {
@@ -1501,7 +1519,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                             height: isSaving || !hasUnsavedChanges ? 44 : 40,
                         }}
                     >
-                        <Button variant="glassProminent" color={!hasUnsavedChanges ? "#E53935" : "#FFCC00"} onPress={hasUnsavedChanges ? handleDone : handleRevert} disabled={isSaving}>
+                        <Button
+                            variant="glassProminent"
+                            color={!hasUnsavedChanges ? "#E53935" : "#FFCC00"}
+                            onPress={hasUnsavedChanges ? handleDone : handleConfirmRevert}
+                            disabled={isSaving}
+                        >
                             <Text color={!hasUnsavedChanges ? "white" : "black"}>{isSaving ? "Saving…" : hasUnsavedChanges ? "Done" : "Revert"}</Text>
                         </Button>
                     </Host>

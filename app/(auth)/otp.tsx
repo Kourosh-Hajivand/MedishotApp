@@ -64,7 +64,8 @@ export default function OTPScreen() {
             if (hasCompletedProfile) {
                 router.push("/(auth)/select-role");
             } else {
-                router.push("/(auth)/completeProfile");
+                // Let AuthGuard + patients/_layout handle incomplete profile modal navigation
+                router.replace("/(tabs)/patients");
             }
         },
         (error) => {

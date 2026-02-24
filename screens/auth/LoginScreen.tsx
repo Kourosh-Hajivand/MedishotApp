@@ -83,11 +83,8 @@ export const LoginScreen: React.FC = () => {
             queryClient.invalidateQueries({ queryKey: [QueryKeys.profile] });
             const hasCompletedProfile = response.data.people.first_name && response.data.people.last_name;
 
-            if (!hasCompletedProfile) {
-                router.replace("/(auth)/completeProfile");
-            } else {
-                router.replace("/(tabs)/patients");
-            }
+            // Always go to tabs; patients/_layout + AuthGuard will open the correct modal (completeProfile / select-role)
+            router.replace("/(tabs)/patients");
         },
         (error) => {
             Alert.alert("Error", error?.message || "Failed to login. Please try again.");
