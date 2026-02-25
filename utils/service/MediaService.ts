@@ -220,7 +220,7 @@ const MediaService = {
         }
     },
 
-    // Update patient media image (notes as array: notes[i][text], notes[i][x], notes[i][y] — مثل editPatientMedia)
+    // Update patient media image (notes as array: notes[i][text], notes[i][x], notes[i][y] — same as editPatientMedia)
     updateMediaImage: async (mediaImageId: string | number, payload: UpdateMediaImageRequest): Promise<UpdateMediaImageResponse> => {
         try {
             const formData = new FormData();

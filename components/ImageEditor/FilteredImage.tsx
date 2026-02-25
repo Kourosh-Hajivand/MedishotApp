@@ -52,7 +52,7 @@ export const FilteredImage: React.FC<FilteredImageProps> = ({ source, style, adj
             <Image source={source} style={StyleSheet.absoluteFill} contentFit={contentFit} onLoad={handleLoad} />
             {adjustments && (
                 <>
-                    {/* Exposure + Brightness (هر دو روی روشنایی اثر می‌ذارن) */}
+                    {/* Exposure + Brightness (both affect brightness) */}
                     {(() => {
                         const exposure = adjustments.exposure ?? 0;
                         const brightness = adjustments.brightness ?? 0;

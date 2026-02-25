@@ -158,7 +158,7 @@ interface ImageViewerModalProps {
     enableTakeAfterTemplate?: boolean;
     /** Callback when note icon is pressed (optional; showNote in actions must be true to show icon) */
     onNotePress?: (imageUri: string) => void;
-    /** فقط برای همین یورای که ادیت و Save شده یک‌بار cache-bust شود (نه هر عکسی که فعلی است) */
+    /** Cache-bust only for the URI that was edited and saved (not every currently displayed image) */
     imageRefreshKey?: number;
     imageSavedUri?: string | null;
 }
@@ -1445,7 +1445,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
                 initialEditorState={imageEditorUri ? (imageUrlToEditorStateMapInternal.get(imageEditorUri) ?? undefined) : undefined}
                 onClose={() => setImageEditorVisible(false)}
                 showOnlyNote={imageEditorTool === "Note" && isCurrentImageCompositeOriginal}
-                // اگر از BottomActionBar دکمه Magic را زده باشیم، حتی اگر isCurrentImageMagicTemplate false باشد، تب Magic را نشان بده
+                // If Magic was tapped from BottomActionBar, show Magic tab even when isCurrentImageMagicTemplate is false
                 showMagicTab={isCurrentImageMagicTemplate || imageEditorTool === "Magic"}
             />
         </Modal>

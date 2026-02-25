@@ -279,7 +279,7 @@ export interface EditPatientMediaRequest {
 
 export interface UpdateMediaImageRequest {
     edited_image?: File | string; // File or Livewire temp filename
-    /** آرایه نوت‌ها یا رشته JSON آن؛ بک‌اند آرایه انتظار دارد (notes[i][text], notes[i][x], notes[i][y]) */
+    /** Notes array or its JSON string; backend expects array (notes[i][text], notes[i][x], notes[i][y]) */
     notes?: EditPatientMediaNote[] | string;
     data?: Record<string, any>; // Custom JSON data (e.g. brightness, contrast)
 }

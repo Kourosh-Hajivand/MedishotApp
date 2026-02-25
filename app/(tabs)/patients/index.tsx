@@ -372,7 +372,7 @@ export default function PatientsScreen() {
             return currentPatients.reduce(
                 (acc: Record<string, Patient[]>, patient: Patient) => {
                     const firstChar = patient.full_name?.[0]?.toUpperCase();
-                    // اگر حرف اول وجود نداشته باشد یا در A-Z نباشد، آن را به بخش "#" اضافه کن
+                    // If no first letter or not in A-Z, add to "#" section
                     const letter = firstChar && alphabet.includes(firstChar) ? firstChar : "#";
                     if (!acc[letter]) acc[letter] = [];
                     acc[letter].push(patient);

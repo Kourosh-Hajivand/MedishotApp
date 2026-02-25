@@ -107,7 +107,7 @@ export const ProfileFormScreen: React.FC<ProfileFormProps> = ({ mode, initialDat
     const uploadedFilenameRef = React.useRef<string | null>(null); // Ref to always have latest value
     const [hasImageChanged, setHasImageChanged] = useState(false); // Track if image was changed/selected
 
-    // Refs برای فیلدهای متنی
+    // Refs for text fields
     const firstNameRef = useRef<TextInput>(null);
     const lastNameRef = useRef<TextInput>(null);
 

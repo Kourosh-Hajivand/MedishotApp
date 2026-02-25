@@ -24,14 +24,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
     const insets = useSafeAreaInsets();
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
-    // مقادیر انیمیشن
+    // Animation values
     const scale = useSharedValue(1);
     const translateX = useSharedValue(0);
     const translateY = useSharedValue(0);
     const opacity = useSharedValue(0);
     const backdropOpacity = useSharedValue(0);
 
-    // انیمیشن modal
+    // Modal animation
     React.useEffect(() => {
         if (visible) {
             opacity.value = withSpring(1, { damping: 20, stiffness: 90 });
@@ -48,9 +48,9 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
         }
     }, [visible]);
 
-    // محاسبه ابعاد تصویر
+    // Compute image dimensions
     const handleImageLoad = (event: any) => {
-        // expo-image ممکن است format های مختلفی داشته باشد
+        // expo-image may provide different event formats
         let width = 0;
         let height = 0;
 
@@ -77,12 +77,12 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
 
             setImageSize({ width: displayWidth, height: displayHeight });
         } else {
-            // اگر ابعاد مشخص نشد، از ابعاد پیش‌فرض استفاده کن
+            // If dimensions unknown, use default
             setImageSize({ width: SCREEN_WIDTH, height: SCREEN_HEIGHT });
         }
     };
 
-    // Gesture برای zoom و pan
+    // Gesture for zoom and pan
     const savedScale = useSharedValue(1);
     const savedTranslateX = useSharedValue(0);
     const savedTranslateY = useSharedValue(0);
@@ -117,7 +117,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
         })
         .onEnd(() => {
             if (scale.value > 1 && imageSize.width > 0 && imageSize.height > 0) {
-                // محدود کردن حرکت به محدوده تصویر
+                // Clamp pan to image bounds
                 const scaledWidth = imageSize.width * scale.value;
                 const scaledHeight = imageSize.height * scale.value;
                 const maxTranslateX = Math.max(0, (scaledWidth - SCREEN_WIDTH) / 2);
@@ -135,7 +135,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
                     translateY.value = withSpring(0);
                 }
             } else {
-                // اگر scale = 1 باشد، reset به مرکز
+                // If scale = 1, reset to center
                 translateX.value = withSpring(0);
                 translateY.value = withSpring(0);
             }
@@ -158,7 +158,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
         doubleTapGesture
     );
 
-    // استایل انیمیشن تصویر
+    // Image animation style
     const imageAnimatedStyle = useAnimatedStyle(() => {
         return {
             transform: [
@@ -169,14 +169,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
         };
     });
 
-    // استایل انیمیشن backdrop
+    // Backdrop animation style
     const backdropAnimatedStyle = useAnimatedStyle(() => {
         return {
             opacity: backdropOpacity.value,
         };
     });
 
-    // استایل انیمیشن محتوا
+    // Content animation style
     const contentAnimatedStyle = useAnimatedStyle(() => {
         return {
             opacity: opacity.value,
@@ -221,7 +221,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ visible, imageUri, onC
                         </Animated.View>
                     </GestureDetector>
 
-                    {/* دکمه بستن */}
+                    {/* Close button */}
                     <Pressable style={[styles.closeButton, { top: insets.top + 16 }]} onPress={handleClose}>
                         <View style={styles.closeButtonInner}>
                             <MaterialIcons name="close" size={24} color="#FFFFFF" />

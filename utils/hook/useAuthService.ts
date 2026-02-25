@@ -8,18 +8,16 @@ import { getTokens } from "../helper/tokenStorage";
 // ============= Query Hooks (GET) =============
 
 export const useGetMe = (enabled: boolean = true, tokens?: { accessToken: string | null; refreshToken: string | null }): UseQueryResult<MeResponse, Error> => {
-    // همیشه از query استفاده کن تا از cache بهره ببریم
-    // اما اگر tokens پاس داده شده، از آن استفاده کن
+    // Use query for cache; if tokens passed in, use those
     const tokensQuery = useQuery({
         queryKey: [QueryKeys.tokens],
         queryFn: getTokens,
     });
 
-    // اگر tokens به عنوان parameter پاس داده شده، از آن استفاده کن
-    // در غیر این صورت از query result استفاده کن
+    // If tokens passed as param, use them; otherwise use query result
     const finalTokens = tokens || tokensQuery.data;
     const isAuthenticated = !!finalTokens?.accessToken;
-    // اگر tokens پاس داده شده، نیازی به wait کردن برای tokens query نیست
+    // If tokens passed, no need to wait for tokens query
     const isTokensLoading = !tokens && tokensQuery.isLoading;
 
     return useQuery({
@@ -27,17 +25,17 @@ export const useGetMe = (enabled: boolean = true, tokens?: { accessToken: string
         queryFn: () => AuthService.me(),
         enabled: isAuthenticated && enabled && !isTokensLoading,
         retry: (failureCount, error) => {
-            // اگر 401 یا 403 باشد، retry نکن
+            // Do not retry on 401 or 403
             const axiosError = error as AxiosError;
             const status = axiosError?.response?.status;
             if (status === 401 || status === 403) {
                 return false;
             }
-            return failureCount < 1; // فقط یک بار retry کن
+            return failureCount < 1; // Retry once only
         },
-        retryDelay: 1000, // 1 ثانیه delay بین retry ها
-        staleTime: 5 * 60 * 1000, // 5 دقیقه
-        gcTime: 10 * 60 * 1000, // 10 دقیقه (قبلاً cacheTime)
+        retryDelay: 1000, // 1s delay between retries
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
     });
 };
 

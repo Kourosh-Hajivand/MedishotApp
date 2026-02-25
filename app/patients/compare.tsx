@@ -330,7 +330,7 @@ export default function BeforeAfterCompareScreen() {
         setViewMode(mode);
     }, []);
 
-    // ذخیره کامپوزیت: کپچر → آپلود موقت → ارسال به مدیا بیمار
+    // Save composite: capture → temp upload → send to patient media
     const { mutateAsync: tempUploadAsync } = useTempUpload();
     const { mutateAsync: uploadMediaAsync } = useUploadPatientMedia();
 
@@ -1092,7 +1092,7 @@ const styles = StyleSheet.create({
     },
     compositeCaptureRow: {
         flexDirection: "row",
-        // width/height از اینجا حذف شد؛ از اینجا به‌صورت inline بر اساس compositeSizes ست می‌شود
+        // width/height removed from here; set inline from compositeSizes
     },
     compositeCaptureHalf: {
         position: "relative",

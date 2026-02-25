@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
         borderColor: MINT_COLOR,
         borderWidth: 1,
         backgroundColor: colors.system.white,
-        margin: -1, // جبران کردن فضای border اضافی برای جلوگیری از پرش
+        margin: -1, // Compensate for extra border space to prevent jump
     },
     templatePreview: {
         width: "100%",

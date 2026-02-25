@@ -27,7 +27,7 @@ export const LabelSelectionModal = ({ visible, onClose, options, selectedLabel, 
 
     const translateY = slideAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [300, 0], // از پایین بیاد بالا
+        outputRange: [300, 0], // From bottom to top
     });
 
     return (

@@ -143,7 +143,7 @@ export const ToolMagic: React.FC<ImageEditorToolProps> = ({ onChange, isPreviewO
             isFirstStyleMount.current = false;
             return;
         }
-        // نرم و بدون بانس: یک پالس ملایم با timing
+        // Soft no-bounce: gentle pulse with timing
         stylePulse.value = 0;
         stylePulse.value = withSequence(withTiming(1, { duration: 120, easing: EASE_OUT }), withTiming(0, { duration: 200, easing: EASE_OUT }));
         titleOpacity.value = withSequence(withTiming(0.7, { duration: 60, easing: EASE_OUT }), withTiming(1, { duration: 180, easing: EASE_OUT }));

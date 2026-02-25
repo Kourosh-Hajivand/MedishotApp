@@ -8,7 +8,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 
 const { width, height } = Dimensions.get("window");
 
-/** ابعاد باکس لودینگ وسط با نسبت ۳:۲ (width : height) */
+/** Loading box dimensions center with 3:2 aspect ratio (width : height) */
 function getLoadingBoxSize(): { boxWidth: number; boxHeight: number } {
     const ratio = 2 / 3;
     let boxWidth = width;

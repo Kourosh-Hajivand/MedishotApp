@@ -617,7 +617,7 @@ export default function ImageEditorScreen() {
         [originalImageUri],
     );
 
-    // ✅ تبدیل عکس به base64
+    // Convert image to base64
     const convertImageToBase64 = useCallback(async (imageUri: string): Promise<string | null> => {
         try {
             if (imageUri.startsWith("http://") || imageUri.startsWith("https://")) {

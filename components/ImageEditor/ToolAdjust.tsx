@@ -262,7 +262,7 @@ export const ToolAdjust: React.FC<ImageEditorToolProps> = ({ onChange, onCancel,
         const newValues = { ...adjustmentValues, [selectedAdjustment]: value };
         setAdjustmentValues(newValues);
 
-        // Convert to AdjustChange format (exposure and brightness جدا تا هیچ‌کدوم دیگری را overwrite نکنند)
+        // Convert to AdjustChange format (exposure and brightness separate so neither overwrites the other)
         const adjustChange: AdjustChange = {
             exposure: newValues.exposure,
             brightness: newValues.brightness,

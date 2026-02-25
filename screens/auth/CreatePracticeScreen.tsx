@@ -56,7 +56,7 @@ export const CreatePracticeScreen: React.FC = () => {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
 
-    // Refs برای فیلدها
+    // Refs for fields
     const practiceNameRef = useRef<TextInput>(null);
     const websiteRef = useRef<TextInput>(null);
     const phoneNumberRef = useRef<TextInput>(null);

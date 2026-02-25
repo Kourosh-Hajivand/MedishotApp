@@ -7,9 +7,9 @@ export interface MagicGenerateMutationVariables {
 }
 
 /**
- * Mutation برای ارسال تصویر به API Magic و دریافت تصاویر پردازش‌شده.
- * با ارسال signal می‌توان درخواست را لغو کرد (مثلاً از AbortController).
- * خروجی: Record<string, string> (data.images)
+ * Mutation to send image to Magic API and receive processed images.
+ * Request can be cancelled via signal (e.g. AbortController).
+ * Returns: Record<string, string> (data.images)
  */
 export function useMagicGenerateMutation(): UseMutationResult<
     Record<string, string>,

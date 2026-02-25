@@ -83,13 +83,13 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
             return;
         }
 
-        // 1. اگر authenticated است و همه چیز کامل است → به tabs redirect کن (حتی اگر در auth باشد)
-        // اما اجازه بده به select-role و create-practice برود (برای ایجاد practice جدید)
+        // 1. If authenticated and profile complete → redirect to tabs (even if in auth)
+        // But allow select-role and create-practice (for creating new practice)
         if (isAuthenticated === true && profile && profile.first_name && profile.last_name) {
             if (!isPracticeListLoading && !isProfileLoading) {
                 if (practiceList?.data && practiceList.data.length > 0) {
-                    // همه چیز کامل است → به tabs redirect کن
-                    // اما اگر در select-role یا create-practice است، اجازه بده بماند (برای ایجاد practice جدید)
+                    // All complete → redirect to tabs
+                    // But if on select-role or create-practice, allow to stay (for creating practice)
                     if (isInAuthFlow && !isOnSelectRole && !isOnCreatePractice) {
                         if (__DEV__) console.warn(LOG_TAG, "redirect -> /(tabs)/patients (authenticated with complete profile and practice, leaving auth)");
                         router.replace("/(tabs)/patients");
@@ -99,27 +99,27 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
             }
         }
 
-        // 2. اگر authenticated است اما در welcome/login/signup است → به tabs redirect کن
+        // 2. If authenticated but on welcome/login/signup → redirect to tabs
         if (isAuthenticated === true && (isOnWelcome || isOnLogin || isOnSignup)) {
             if (__DEV__) console.warn(LOG_TAG, "redirect -> /(tabs)/patients (authenticated on welcome/login/signup)");
             router.replace("/(tabs)/patients");
             return;
         }
 
-        // 3. اگر authenticated نیست و در auth نیست → به welcome redirect کن
+        // 3. If not authenticated and not in auth → redirect to welcome
         if (isAuthenticated === false && !isInAuthFlow && !isPublicRoute) {
             if (__DEV__) console.warn(LOG_TAG, "redirect -> /welcome (not authenticated)");
             router.replace("/welcome");
             return;
         }
 
-        // 4. برای protected routes (غیر از auth و public)
+        // 4. For protected routes (other than auth and public)
         if (isPublicRoute || isInAuthFlow) {
-            // در auth flow، فقط چک می‌کنیم که آیا باید redirect شود (بالا انجام شد)
+            // In auth flow we only check if redirect needed (handled above)
             return;
         }
 
-        // 5. برای protected routes: چک profile و practice
+        // 5. For protected routes: check profile and practice
         // IMPORTANT: When in (tabs)/patients, let patients/_layout.tsx handle modal navigation
         // Don't redirect here - it causes navigation conflicts
         if (isAuthenticated === true && !isInTabs) {

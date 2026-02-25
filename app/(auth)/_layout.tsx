@@ -15,7 +15,7 @@ export default function AuthLayout() {
                     headerTitle: "",
                     headerShadowVisible: true,
                     headerTransparent: true,
-                    gestureEnabled: false, // غیرفعال کردن gesture برای کل فلوی ثبت‌نام
+                    gestureEnabled: false, // Disable gesture for entire signup flow
                     fullScreenGestureEnabled: false,
                     headerStyle: {
                         backgroundColor: "transparent",

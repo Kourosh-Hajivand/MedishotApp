@@ -218,7 +218,7 @@ export default function PatientDetailsScreen() {
                 const orig = templateMedia.original_media?.url;
                 if (orig) map.set(orig, orig);
                 if ((templateMedia as { edited_media?: { url?: string } }).edited_media?.url && orig) map.set((templateMedia as { edited_media: { url: string } }).edited_media.url, orig);
-                // هر سلول تمپلیت: اورجینال = همان image آن سلول (قبل از ادیت)، نه کامپوزیت
+                // Each template cell: original = that cell's image (before edit), not composite
                 templateMedia.images?.forEach((imageItem: PatientMediaImage) => {
                     const imageUrl = typeof imageItem.image === "string" ? imageItem.image : imageItem.image?.url;
                     const editedUrl = typeof imageItem.edited_image === "string" ? imageItem.edited_image : imageItem.edited_image?.url;
@@ -1141,7 +1141,7 @@ export default function PatientDetailsScreen() {
                 renderItem={renderRow}
                 scrollEventThrottle={16}
                 showsVerticalScrollIndicator={false}
-                stickyHeaderIndices={[1]} // «فضای مجازی» برای هدر شفاف
+                stickyHeaderIndices={[1]} // "Virtual" space for transparent header
                 contentInset={{ top: headerHeight }}
                 contentOffset={{ x: 0, y: -headerHeight }}
                 contentInsetAdjustmentBehavior="never"

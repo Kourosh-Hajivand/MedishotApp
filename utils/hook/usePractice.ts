@@ -29,10 +29,10 @@ export const useGetPracticeList = (enabled: boolean = true): UseQueryResult<Prac
         queryKey: ["GetPracticeList"],
         queryFn: () => PracticeService.getPracticeList(),
         enabled: isAuthenticated === true && enabled,
-        retry: 1, // فقط یک بار retry کن
-        retryDelay: 1000, // 1 ثانیه delay بین retry ها
-        staleTime: 2 * 60 * 1000, // 2 دقیقه
-        gcTime: 5 * 60 * 1000, // 5 دقیقه
+        retry: 1, // Retry once only
+        retryDelay: 1000, // 1s delay between retries
+        staleTime: 2 * 60 * 1000, // 2 minutes
+        gcTime: 5 * 60 * 1000, // 5 minutes
     });
 };
 
@@ -68,7 +68,7 @@ export const useGetPracticeById = (practiceId: number, enabled: boolean = true):
 
             if (hasChanged) {
                 // Update store directly without triggering another API call
-                // اما doctor را reset نکن چون practice عوض نشده (همان practice است)
+                // Do not reset doctor since practice has not changed
                 useProfileStore.setState({ selectedPractice: fetchedPractice });
                 // Persist the updated selection
                 persistProfileSelection();
@@ -182,11 +182,11 @@ export const useUpdatePractice = (onSuccess?: (data: PracticeDetailResponse) => 
                 queryKey: ["GetPracticeById", variables.id],
             });
 
-            // اگر practice اپدیت شده همان selectedPractice است، استور را اپدیت کن
+            // If updated practice is the selected one, update store
             const currentState = useProfileStore.getState();
             if (currentState.selectedPractice?.id === variables.id && data?.data) {
                 // Update store directly without triggering another API call
-                // اما doctor را reset نکن چون practice عوض نشده (همان practice است)
+                // Do not reset doctor since practice has not changed
                 useProfileStore.setState({ selectedPractice: data.data });
                 // Persist the updated selection
                 persistProfileSelection();

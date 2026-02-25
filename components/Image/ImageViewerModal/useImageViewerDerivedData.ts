@@ -233,7 +233,7 @@ export function useImageViewerDerivedData({
             if (media.original_media?.url) map.set(media.original_media.url, media.original_media.url);
             const withEdited = media as { edited_media?: { url?: string } };
             if (withEdited.edited_media?.url && orig) map.set(withEdited.edited_media.url, orig);
-            // هر سلول تمپلیت: اورجینال = همان image آن سلول، نه کامپوزیت
+            // Each template cell: original = that cell's image, not composite
             if (media.images?.length) {
                 media.images.forEach((img: { image?: { url?: string } | null; edited_image?: { url?: string } | null }) => {
                     if (img.image?.url) map.set(img.image.url, img.image.url);
@@ -541,7 +541,7 @@ export function useImageViewerDerivedData({
 
         // For single image with template (template without original_media): show compare and adjust; Magic only for magic templates
         const shouldShowCompare = compare && (isOriginalMedia || isFromTemplate);
-        // وقتی ورق می‌زنیم روی تصاویر composite و caller اجازه داده، در صورت خالی بودن بقیه حداقل Adjust نشان بده
+        // When swiping on composite images and caller allows, show at least Adjust if others are empty
         const forceShowEditWhenFromTemplate = edit && isFromTemplate && !shouldShowCompare;
             return {
                 showBookmark: bookmark,

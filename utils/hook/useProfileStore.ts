@@ -166,31 +166,31 @@ export const useProfileStore = create<ProfileStore>((set, get) => ({
 export const loadProfileSelection = async (practiceList?: Practice[]) => {
     const currentState = useProfileStore.getState();
 
-    // اگر در حال لود است، از فراخوانی مکرر جلوگیری کن
+    // Avoid repeated calls while loading
     if (currentState.isLoading) {
         return;
     }
 
-    // اگر practiceList وجود ندارد، صبر کن تا لود شود
+    // Wait for practiceList to load if missing
     if (!practiceList || practiceList.length === 0) {
         return;
     }
 
-    // اگر قبلاً لود شده و selectedPractice وجود دارد، بررسی کن که آیا هنوز معتبر است
-    // اما اگر practice در store وجود دارد و معتبر است، آن را نگه دار (کاربر قبلاً انتخاب کرده)
+    // If already loaded and selectedPractice exists, check if it is still valid
+    // If practice in store is valid, keep it (user already selected)
     if (currentState.isLoaded && currentState.selectedPractice) {
         const selectedId = normalizePracticeId(currentState.selectedPractice.id);
         const isValidPractice = practiceList.some((p) => normalizePracticeId(p.id) === selectedId);
         if (isValidPractice) {
-            // Practice معتبر است، آن را نگه دار
-            // Doctor را reset نکن چون practice عوض نشده است
+            // Practice is valid, keep it
+            // Do not reset doctor since practice has not changed
             return;
         } else {
             useProfileStore.setState({ isLoaded: false });
         }
     }
 
-    // اگر isLoaded است اما selectedPractice وجود ندارد، isLoaded را reset کن
+    // If isLoaded but no selectedPractice, reset isLoaded
     if (currentState.isLoaded && !currentState.selectedPractice) {
         useProfileStore.setState({ isLoaded: false });
     }
@@ -215,7 +215,7 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 let viewMode = parsed.viewMode ?? DEFAULT_VIEW_MODE;
                 let needsPersistence = false;
 
-                // بررسی اینکه آیا selectedPractice هنوز در لیست practiceList موجود است
+                // Check if selectedPractice is still in practiceList
                 if (selectedPractice) {
                     const practiceId = normalizePracticeId(selectedPractice.id);
                     const isValidPractice = practiceList.some((p) => normalizePracticeId(p.id) === practiceId);
@@ -224,10 +224,10 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                         viewMode = determineDefaultViewMode(selectedPractice);
                         needsPersistence = true;
                     }
-                    // اگر پرکتیس معتبر است و در store وجود دارد، آن را نگه دار (کاربر قبلاً انتخاب کرده)
-                    // دیگر اولین آیتم را ست نکن
+                    // If practice is valid and in store, keep it (user already selected)
+                    // Do not set first item again
                 } else {
-                    // فقط اگر هیچ پرکتیسی در store نبود (کاربر تازه وارد شده)، اولین پرکتیس را انتخاب کن
+                    // Only if no practice in store (new user), select first practice
                     if (practiceList && practiceList.length > 0) {
                         selectedPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
                         viewMode = determineDefaultViewMode(selectedPractice);
@@ -255,11 +255,11 @@ export const loadProfileSelection = async (practiceList?: Practice[]) => {
                 }
             }
         } else {
-            // اگر هیچ داده‌ای در store نبود، اولین پرکتیس را انتخاب کن
+            // If no data in store, select first practice
             await initializeDefaultSelection(practiceList);
         }
     } catch (error) {
-        // در صورت خطا، اولین پرکتیس را انتخاب کن
+        // On error, select first practice
         if (practiceList && practiceList.length > 0) {
             const defaultPractice = selectDefaultPractice(practiceList) ?? practiceList[0];
             const defaultViewMode = determineDefaultViewMode(defaultPractice);

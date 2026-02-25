@@ -176,7 +176,7 @@ function OTPBox({ index, value, filled, isFocused, error, disabled, inputRef, on
                         color: colors.text,
                     },
                 ]}
-                accessibilityLabel={`کد تایید رقم ${index + 1}`}
+                accessibilityLabel={`Verification code digit ${index + 1}`}
                 {...inputProps}
             />
         </View>

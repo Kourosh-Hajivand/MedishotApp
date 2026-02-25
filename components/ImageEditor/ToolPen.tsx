@@ -6,7 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "
 import Svg, { Defs, G, LinearGradient, Path, Rect, Stop } from "react-native-svg";
 import { ImageEditorToolProps } from "./types";
 
-// رنگ‌های iOS طبق دیزاین Figma
+// iOS colors per Figma design
 const PEN_COLORS = [
     { id: "red", color: "#FF3B30" },
     { id: "blue", color: "#007AFF" },
@@ -18,7 +18,7 @@ const PEN_COLORS = [
     { id: "white", color: "#FFFFFF" },
 ];
 
-// سایزهای استروک
+// Stroke sizes
 const STROKE_SIZES = [
     { id: "thin", width: 2, index: 0 },
     { id: "light", width: 4, index: 1 },
@@ -26,14 +26,14 @@ const STROKE_SIZES = [
     { id: "bold", width: 10, index: 3 },
 ];
 
-// آیکون خط‌خطی سایز ۱ - کمترین
+// Scribble icon size 1 – smallest
 const ScribbleIcon1: React.FC = () => (
     <Svg width={16} height={15} viewBox="0 0 16 15" fill="none">
         <Path d="M15.5933 13.1977C14.2526 14.1127 12.7084 15.4494 13.749 11.5659C14.7895 7.68248 12.94 9.14475 11.144 10.2057C8.55961 11.7324 5.82683 13.3255 9.19928 7.48424C13.4148 0.182658 11.4102 -2.68587 3.96096 4.76341C-1.99846 10.7228 0.84304 10.8747 3.00872 10.2057" stroke="black" strokeWidth={0.796449} strokeLinecap="round" />
     </Svg>
 );
 
-// آیکون خط‌خطی سایز ۲
+// Scribble icon size 2
 const ScribbleIcon2: React.FC = () => (
     <Svg width={17} height={16} viewBox="0 0 17 16" fill="none">
         <Path
@@ -43,7 +43,7 @@ const ScribbleIcon2: React.FC = () => (
     </Svg>
 );
 
-// آیکون خط‌خطی سایز ۳
+// Scribble icon size 3
 const ScribbleIcon3: React.FC = () => (
     <Svg width={17} height={16} viewBox="0 0 17 16" fill="none">
         <Path
@@ -53,7 +53,7 @@ const ScribbleIcon3: React.FC = () => (
     </Svg>
 );
 
-// آیکون خط‌خطی سایز ۴ - بیشترین
+// Scribble icon size 4 – largest
 const ScribbleIcon4: React.FC = () => (
     <Svg width={18} height={17} viewBox="0 0 18 17" fill="none">
         <Path
@@ -63,7 +63,7 @@ const ScribbleIcon4: React.FC = () => (
     </Svg>
 );
 
-// آیکون ماژیک/قلم - طبق SVG Figma
+// Pen/marker icon – per Figma SVG
 const PenMarkerSvg: React.FC<{ tipColor: string }> = ({ tipColor }) => (
     <Svg width={104} height={78} viewBox="0 0 104 78" fill="none">
         <Defs>
@@ -78,17 +78,17 @@ const PenMarkerSvg: React.FC<{ tipColor: string }> = ({ tipColor }) => (
                 <Stop offset="1" stopColor="#737373" />
             </LinearGradient>
         </Defs>
-        {/* نوک قلم */}
+        {/* Pen tip */}
         <Path d="M26.9757 35.0283L22.1432 36.3231C20.5522 36.7495 20.5522 39.0071 22.1432 39.4334L26.9757 40.7283C27.3641 40.8324 27.7456 40.5397 27.7456 40.1376L27.7456 35.619C27.7456 35.2169 27.3641 34.9242 26.9757 35.0283Z" fill={tipColor} />
         <Path d="M26.9757 35.0283L22.1432 36.3231C20.5522 36.7495 20.5522 39.0071 22.1432 39.4334L26.9757 40.7283C27.3641 40.8324 27.7456 40.5397 27.7456 40.1376L27.7456 35.619C27.7456 35.2169 27.3641 34.9242 26.9757 35.0283Z" fill="url(#paint0_linear)" fillOpacity={0.6} />
-        {/* بدنه قلم */}
+        {/* Pen body */}
         <G>
             <Path
                 d="M65.2646 49.8379L130.421 49.8379C130.871 49.8379 131.236 49.4728 131.236 49.0225L131.236 26.93C131.236 26.4797 130.871 26.1147 130.421 26.1147L65.2646 26.1147C64.7316 26.1147 64.2004 26.1761 63.6815 26.2979L27.5593 34.7724C27.1907 34.8589 26.9302 35.1876 26.9302 35.5662L26.9302 40.3863C26.9302 40.7649 27.1907 41.0937 27.5593 41.1802L63.6815 49.6547C64.2004 49.7764 64.7316 49.8379 65.2646 49.8379Z"
                 fill="#F3F3F3"
             />
         </G>
-        {/* خط رنگی روی بدنه */}
+        {/* Color stripe on body */}
         <Rect x="67.459" y="49.8379" width="23.9193" height="9.39339" transform="rotate(-90 67.459 49.8379)" fill={tipColor} />
         <Rect x="67.459" y="49.8379" width="23.9193" height="9.39339" transform="rotate(-90 67.459 49.8379)" fill="url(#paint1_linear)" fillOpacity={0.6} />
     </Svg>

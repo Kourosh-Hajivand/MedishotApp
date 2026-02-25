@@ -150,7 +150,7 @@ const GalleryImageItem: React.FC<GalleryImageItemProps> = React.memo(({ uri, ind
                         <IconSymbol name="heart.fill" size={16} color={colors.system.white as any} />
                     </View>
                 )}
-                {/* Before/After Badge – در البوم با showCompareBadgeOnThumbnails=false مخفی می‌شود */}
+                {/* Before/After Badge – hidden in album when showCompareBadgeOnThumbnails=false */}
                 {showCompareBadgeOnThumbnails && (imageUrlToIsAfterMap?.get(uri) || imageUrlToHasAfterMap?.get(uri)) && (
                     <View style={styles.badgeContainer}>
                         <IconSymbol name={imageUrlToIsAfterMap?.get(uri) ? "rectangle.lefthalf.filled" : "rectangle.righthalf.filled"} size={14} color={colors.system.gray as any} />
@@ -252,9 +252,9 @@ interface GalleryWithMenuProps {
     enableTakeAfterTemplate?: boolean;
     /** Callback when note icon is pressed in viewer (optional; showNote in actions must be true) */
     onNotePress?: (imageUri: string) => void;
-    /** در البوم false بگذار تا آیکون before/after روی thumbnailها نشان داده نشود */
+    /** Set false in album so before/after icon is not shown on thumbnails */
     showCompareBadgeOnThumbnails?: boolean;
-    /** بعد از Save ادیت: فقط همین یورای یک‌بار رفرش شود */
+    /** After edit Save: refresh only this URI once */
     imageRefreshKey?: number;
     imageSavedUri?: string | null;
 }
@@ -406,7 +406,7 @@ export const GalleryWithMenu: React.FC<GalleryWithMenuProps> = ({
         return imageSections.flatMap((section) => section.data);
     }, [imageSections]);
 
-    // لیست گسترش‌یافته: هر کامپوزیت به [کامپوزیت + سلول‌ها] باز می‌شود تا با تپ روی هر عکس (کامپوزیت یا نه) کاربر با سوایپ همه را ببیند
+    // Expanded list: each composite opens to [composite + cells] so user can tap any image (composite or not) and swipe through all
     const allImagesExpanded = useMemo(() => {
         return allImages.flatMap((uri) => originalMediaToAllImagesMap.get(uri) ?? [uri]);
     }, [allImages, originalMediaToAllImagesMap]);

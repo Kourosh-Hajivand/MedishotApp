@@ -6,9 +6,9 @@ const { height: screenHeight } = Dimensions.get("window");
 
 type Props = PropsWithChildren<{
     headerImage: ReactElement;
-    headerBackgroundColor?: string; // رنگ ساده برای light theme
-    contentBackgroundColor?: string; // رنگ پس‌زمینه محتوا
-    headerHeight?: number | string; // می‌تونه عدد (px) یا رشته درصدی باشه
+    headerBackgroundColor?: string; // Solid color for light theme
+    contentBackgroundColor?: string; // Content background color
+    headerHeight?: number | string; // Can be number (px) or percentage string
 }>;
 
 export default function ParallaxScrollView({ children, headerImage, headerBackgroundColor = "#FFFFFF", contentBackgroundColor = "#FFFFFF", headerHeight = 250 }: Props) {
@@ -21,7 +21,7 @@ export default function ParallaxScrollView({ children, headerImage, headerBackgr
         },
     });
 
-    // تبدیل headerHeight به عدد
+    // Convert headerHeight to number
     const calculateHeaderHeight = () => {
         if (typeof headerHeight === "string" && headerHeight.includes("%")) {
             const percentage = parseFloat(headerHeight.replace("%", ""));

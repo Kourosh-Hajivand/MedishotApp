@@ -1,5 +1,5 @@
-// TEMP: Route موقت برای تست template-select به صورت modal
-// بعد از تست، این فایل رو پاک کن و navigation رو به حالت قبل برگردون
+// TEMP: Temporary route to test template-select as modal
+// After testing, remove this file and restore navigation
 
 import TemplateSelectScreen from "@/app/camera/template-select";
 

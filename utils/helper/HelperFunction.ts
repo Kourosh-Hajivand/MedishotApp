@@ -20,9 +20,9 @@ export function formatUSPhoneNumber(value: string) {
     return `+1 ${formatted}`;
 }
 
-// فرمت شماره به صورت +1-555-123-4567
+// Format number as +1-555-123-4567
 export function formatUSPhoneWithDashes(value: string): string {
-    const digits = value.replace(/\D/g, "").replace(/^1/, ""); // حذف همه غیر از اعداد و حذف 1 اول
+    const digits = value.replace(/\D/g, "").replace(/^1/, ""); // Strip non-digits and leading 1
     if (digits.length === 0) return "+1";
 
     const match = digits.match(/^(\d{0,3})(\d{0,3})(\d{0,4})$/);
@@ -44,7 +44,7 @@ export function formatUSPhoneWithDashes(value: string): string {
     return formatted;
 }
 
-// تبدیل شماره به فرمت +1-555-123-4567 برای ارسال به بک‌اند
+// Convert number to +1-555-123-4567 format for backend
 export function normalizeUSPhoneToDashedFormat(value: string): string {
     const digits = value.replace(/\D/g, "");
     if (digits.length >= 10) {
@@ -146,7 +146,7 @@ export function parseUSIDCardData(ocrText: string, scannedImage?: string): Parse
         .filter((line) => line.length > 0);
     const text = ocrText.toLowerCase();
 
-    // --- California DL: LN/FN با یا بدون فاصله (LNCARDHOLDER, FNIMA یا LN CARDHOLDER, FN IMA) ---
+    // --- California DL: LN/FN with or without space (LNCARDHOLDER, FNIMA or LN CARDHOLDER, FN IMA) ---
     const lnNoSpace = ocrText.match(/\bLN([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);
     if (lnNoSpace) data.lastName = lnNoSpace[1].trim();
     const fnNoSpace = ocrText.match(/\bFN([A-Z][A-Za-z\-']+)(?:\s|$|\n)/i);

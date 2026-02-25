@@ -15,17 +15,17 @@ export const useAuth = () => {
     });
 
     const hasToken = !!tokens?.accessToken;
-    // tokens را به useGetMe پاس بده تا از duplicate query جلوگیری شود
+    // Pass tokens to useGetMe to avoid duplicate query
     const { data: me, isLoading: isMeLoading, error: meError, isError: isMeError } = useGetMe(hasToken && !isTokensLoading, tokens);
     const hasHandledError = useRef(false);
     
-    // اگر token وجود دارد اما API call fail شود، token را invalidate کن
+    // If token exists but API call fails, invalidate token
     useEffect(() => {
         if (hasToken && meError && !isMeLoading && !hasHandledError.current) {
             const axiosError = meError as AxiosError;
             const errorStatus = axiosError?.response?.status;
             if (errorStatus === 401 || errorStatus === 403) {
-                // Token منقضی شده یا نامعتبر است
+                // Token expired or invalid
                 hasHandledError.current = true;
                 removeTokens()
                     .then(() => {
@@ -39,7 +39,7 @@ export const useAuth = () => {
             }
         }
         
-        // Reset error handler اگر error برطرف شد
+        // Reset error handler when error is cleared
         if (!meError) {
             hasHandledError.current = false;
         }
@@ -62,11 +62,11 @@ export const useAuth = () => {
         router.replace("/welcome");
     };
 
-    // محاسبه isProfileLoading: اگر token وجود دارد اما profile هنوز لود نشده
-    // اگر query enabled نیست، نباید loading باشیم
+    // Compute isProfileLoading: token exists but profile not yet loaded
+    // If query not enabled, we should not be loading
     const isQueryEnabled = hasToken && !isTokensLoading;
-    // اگر query enabled است و هنوز در حال loading است
-    // اما اگر error داریم، نباید loading باشیم
+    // If query enabled and still loading
+    // But if we have error, do not show loading
     const isProfileLoading = isQueryEnabled && isMeLoading && !isMeError;
 
     return {

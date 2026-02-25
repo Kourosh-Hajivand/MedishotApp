@@ -1,6 +1,6 @@
 import { AestheticIcon, CosmeticSurgeryIcon, DentistryIcon, DermatologyIcon, GeneralPracticeIcon, OrthodonticsIcon } from "../../assets/icons";
 
-// Practice Type Enum - همگام با API
+// Practice Type Enum – in sync with API
 export enum PracticeType {
     AestheticMedicine = "Aesthetic Medicine",
     Dermatology = "Dermatology",

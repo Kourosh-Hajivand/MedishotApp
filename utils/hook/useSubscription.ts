@@ -39,8 +39,8 @@ export const useGetCurrentPlan = (practiceId: number, enabled: boolean = true): 
         queryKey: ["GetCurrentPlan", practiceId],
         queryFn: () => SubscriptionService.getCurrentPlan(practiceId),
         enabled: isAuthenticated === true && enabled && !!practiceId,
-        staleTime: 10 * 60 * 1000, // 10 دقیقه
-        gcTime: 15 * 60 * 1000, // 15 دقیقه
+        staleTime: 10 * 60 * 1000, // 10 minutes
+        gcTime: 15 * 60 * 1000, // 15 minutes
     });
 };
 

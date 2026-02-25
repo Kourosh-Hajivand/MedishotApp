@@ -40,10 +40,10 @@ export default function NewPassword() {
         },
     );
 
-    // انیمیشن برای دکمه Reset Password
+    // Animation for Reset Password button
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
 
-    // Refs برای فیلدها
+    // Refs for fields
     const passwordRef = useRef<TextInput>(null);
     const confirmPasswordRef = useRef<TextInput>(null);
 
@@ -51,7 +51,7 @@ export default function NewPassword() {
         const keyboardWillShow = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (event) => {
             const keyboardHeight = event.endCoordinates.height;
 
-            // محاسبه offset: چون دکمه در پایین صفحه است، offset بیشتری نیاز دارد
+            // Compute offset: button at bottom of screen needs larger offset
             const offset = Math.min(keyboardHeight * 0.7, 280) + 30;
 
             Animated.timing(bottomSectionTranslateY, {

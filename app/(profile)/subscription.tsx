@@ -621,7 +621,7 @@ export default function SubscriptionScreen() {
                 </View>
             </View>
 
-            {/* Premium Plans Section + Monthly / Yearly / Add-ons سگمنت */}
+            {/* Premium Plans Section + Monthly / Yearly / Add-ons segment */}
             <View style={styles.premiumSection}>
                 <BaseText type="Body" weight="400" color="labels.primary" style={styles.premiumTitle} align="center">
                     Access More With{" "}

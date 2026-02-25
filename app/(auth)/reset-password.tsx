@@ -38,7 +38,7 @@ export default function ResetPassword() {
         },
     );
 
-    // انیمیشن برای دکمه Reset Password
+    // Animation for Reset Password button
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {

@@ -31,14 +31,14 @@ module.exports = {
                     "text-secondary": "#a1a1aa",
                     border: "#3f3f46",
                 },
-                // رنگ‌های Labels - حالت لایت
+                // Labels colors – light mode
                 labels: {
                     primary: "#000000",
                     secondary: "rgba(60, 60, 67, 0.60)",
                     tertiary: "rgba(60, 60, 67, 0.30)",
                     quaternary: "rgba(60, 60, 67, 0.18)",
                 },
-                // رنگ‌های Labels - حالت دارک
+                // Labels colors – dark mode
                 "labels-dark": {
                     primary: "#ffffff",
                     secondary: "rgba(235, 235, 245, 0.60)",

@@ -1,4 +1,4 @@
-// تایپ‌های پایه برای رنگ‌ها
+// Base types for colors
 export type ColorToken = string;
 export type ColorShade =
   | 50
@@ -12,7 +12,7 @@ export type ColorShade =
   | 800
   | 900;
 
-// تایپ‌های خاص برای هر دسته رنگ
+// Types for each color group
 export type PrimaryColors = Record<ColorShade, ColorToken>;
 export type SystemColors = {
   red: ColorToken;
@@ -52,7 +52,7 @@ export type DarkColors = {
   border: ColorToken;
 };
 
-// تعریف کامل رنگ‌ها
+// Full color definitions
 export const colors = {
   primary: {
     50: '#eff6ff',
@@ -142,10 +142,10 @@ export const colors = {
   } as const satisfies SystemColors,
 } as const;
 
-// تایپ کامل رنگ‌ها
+// Full color type
 export type Colors = typeof colors;
 
-// Helper functions برای دسترسی آسان‌تر
+// Helper functions for easier access
 export const getColor = (path: string): ColorToken => {
   const keys = path.split('.');
   let value: unknown = colors;

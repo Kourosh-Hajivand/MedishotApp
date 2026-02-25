@@ -743,7 +743,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         transform: [{ scale: scale.value }],
     }));
 
-    // وقتی زوم فعال است (scale !== 1) نوت‌مارکرها و مگنایفر مخفی شوند تا بد دیده نشوند
+    // When zoom is active (scale !== 1), hide note markers and magnifier so they are not visible
     const overlayWhenZoomedHiddenStyle = useAnimatedStyle(() => {
         const s = scale.value;
         const isZoomed = s < 0.995 || s > 1.005;
@@ -786,7 +786,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                 return originalImageUri || imageUri;
             }
 
-            // exposure و brightness هر دو روی روشنایی؛ برای فیلتر نهایی ترکیب می‌شن
+            // exposure and brightness both affect brightness; combined for final filter
             const exposure = adjustments.exposure !== undefined ? adjustments.exposure / 100 : 0;
             const brightness = adjustments.brightness !== undefined ? adjustments.brightness / 100 : 0;
             const _effectiveBrightness = exposure + brightness;
@@ -994,12 +994,12 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         const normalizedModeKey = modeKey.toLowerCase();
         const entries = Object.entries(resultImages);
 
-        // API جدید: کلیدها orig_Mode_A1, pred_Mode_A1
+        // New API: keys orig_Mode_A1, pred_Mode_A1
         const newFormatKey = `${resultType}_${modeKey}`;
         const newMatch = resultImages[newFormatKey];
         if (newMatch) return newMatch;
 
-        // فرمت قدیمی
+        // Legacy format
         const expectedKey = `${resultType === "orig" ? "orig" : "pred"}_img_teeth_${modeKey}`.toLowerCase();
         const directMatch = entries.find(([key]) => key.toLowerCase() === expectedKey);
         if (directMatch?.[1]) return directMatch[1];
@@ -1075,7 +1075,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
         setIsLoading(false);
         setIsProcessing(false);
         setMagicCompleted(null);
-        // ابتدا مودال لودینگ بسته شود، بعد ادیتور تا از مشکی شدن اپ (تداخل دو مودال) جلوگیری شود
+        // Close loading modal first, then editor to avoid app going black (two modals overlapping)
         setTimeout(() => {
             magicCancelledRef.current = true;
             magicRequestInFlight = false;
@@ -1155,7 +1155,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     success = true;
                 }
             } catch {
-                // Error shown in UI (red state + Retry); یا لغو با AbortController
+                // Error shown in UI (red state + Retry); or cancelled via AbortController
             } finally {
                 magicAbortControllerRef.current = null;
                 magicRequestInFlight = false;
@@ -1635,7 +1635,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                     <DrawingCanvas width={imageContainerLayout.width} height={imageContainerLayout.height} strokes={penStrokesPixels} selectedColor={selectedPenColor} selectedStrokeWidth={selectedStrokeWidth} onStrokesChange={handlePenStrokesChange} enabled={activeTool === "Pen"} />
                                 </ViewShot>
 
-                                {/* Note Markers outside ViewShot – هنگام زوم مخفی می‌شوند */}
+                                {/* Note Markers outside ViewShot – hidden when zoomed */}
                                 {activeTool === "Note" && (
                                     <Animated.View style={[StyleSheet.absoluteFill, overlayWhenZoomedHiddenStyle]} pointerEvents="box-none">
                                         {notes.map((note, index) => (
@@ -1659,7 +1659,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                         </Animated.View>
                     </GestureDetector>
 
-                    {/* Magnifier – هنگام زوم مخفی می‌شود */}
+                    {/* Magnifier – hidden when zoomed */}
                     {activeTool === "Note" && magnifierState.visible && (
                         <Animated.View style={[StyleSheet.absoluteFill, overlayWhenZoomedHiddenStyle]} pointerEvents="none">
                             <NoteMagnifier
@@ -1697,8 +1697,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     {renderActiveToolPanel()}
                 </Animated.View>
 
-                <View className="flex-row items-center justify-center   w-full " style={{ position: "relative" }}>
-                    {/* {(() => {
+                <View className="flex-row items-center justify-center bg-red-400  w-full " style={{ position: "relative" }}>
+                    {(() => {
                         const activeIndex = tools.findIndex((t) => t.name === activeTool);
                         if (activeIndex < 0) return null;
                         const barWidth = 230;
@@ -1724,7 +1724,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                 <IconSymbol name={"chevron.up.fill" as SymbolViewProps["name"]} size={chevronSize} color="#FFCC00" />
                             </View>
                         );
-                    })()} */}
+                    })()}
                     <Host matchContents>
                         <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 16, vertical: 8 }), frame({ width: 230 }), glassEffect({ glass: { variant: "regular" } })]}>
                             {tools.map((t) => {
@@ -1734,11 +1734,6 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                                 return (
                                     <Button key={t.name} onPress={() => handleToolPress(t.name)} variant="plain">
                                         <VStack alignment="center" spacing={2}>
-                                            {/* {isActive && (
-                                                <Host style={{ position: "absolute", top: -10, left: 0, right: 0, alignItems: "center" }}>
-                                                    <SwiftUIImage systemName="arrowtriangle.down.fill" size={10} color="#FFCC00" />
-                                                </Host>
-                                            )} */}
                                             <SwiftUIImage systemName={iconName} size={iconSize} color={isActive ? colors.labels.primary : t.disabled ? colors.labels.tertiary : colors.labels.secondary} />
                                             <Text lineLimit={1} size={12} color={isActive ? "labels.primary" : t.disabled ? "labels.tertiary" : "labels.secondary"}>
                                                 {t.name}

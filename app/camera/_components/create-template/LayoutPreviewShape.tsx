@@ -12,7 +12,7 @@ interface LayoutPreviewShapeProps {
 export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternId, isSelected }) => {
     const renderShapes = () => {
         switch (patternId) {
-            // 2 عکس
+            // 2 images
             case "left-right":
                 return (
                     <>
@@ -21,7 +21,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 2 عکس
+            // 2 images
             case "top-bottom":
                 return (
                     <>
@@ -30,7 +30,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 3 عکس
+            // 3 images
             case "left-tall":
                 return (
                     <>
@@ -40,7 +40,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 3 عکس
+            // 3 images
             case "top-wide":
                 return (
                     <>
@@ -50,7 +50,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 3 عکس
+            // 3 images
             case "right-tall":
                 return (
                     <>
@@ -60,7 +60,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 3 عکس
+            // 3 images
             case "top-two":
                 return (
                     <>
@@ -70,7 +70,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 4 عکس
+            // 4 images
             case "grid-2x2":
                 return (
                     <>
@@ -81,7 +81,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 4 عکس
+            // 4 images
             case "grid-2x2-alt":
                 return (
                     <>
@@ -92,7 +92,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 4 عکس
+            // 4 images
             case "grid-2x2-vertical":
                 return (
                     <>
@@ -103,7 +103,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 5 عکس
+            // 5 images
             case "grid-2x3":
                 return (
                     <>
@@ -115,7 +115,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 5 عکس
+            // 5 images
             case "grid-2x3-alt":
                 return (
                     <>
@@ -127,7 +127,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 5 عکس
+            // 5 images
             case "grid-2x3-horizontal":
                 return (
                     <>
@@ -139,7 +139,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 6 عکس
+            // 6 images
             case "grid-3x2":
                 return (
                     <>
@@ -152,7 +152,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 7 عکس
+            // 7 images
             case "grid-3x3":
                 return (
                     <>
@@ -166,7 +166,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 7 عکس
+            // 7 images
             case "grid-3x3-alt":
                 return (
                     <>
@@ -180,7 +180,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 7 عکس
+            // 7 images
             case "grid-3x3-horizontal":
                 return (
                     <>
@@ -194,7 +194,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 8 عکس
+            // 8 images
             case "grid-4x2":
                 return (
                     <>
@@ -209,7 +209,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 8 عکس
+            // 8 images
             case "grid-2x4":
                 return (
                     <>
@@ -224,7 +224,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 9 عکس
+            // 9 images
             case "grid-3x3-full":
                 return (
                     <>
@@ -240,7 +240,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 9 عکس
+            // 9 images
             case "grid-3x3-full-alt":
                 return (
                     <>
@@ -256,7 +256,7 @@ export const LayoutPreviewShape: React.FC<LayoutPreviewShapeProps> = ({ patternI
                     </>
                 );
 
-            // 9 عکس
+            // 9 images
             case "grid-3x3-full-horizontal":
                 return (
                     <>

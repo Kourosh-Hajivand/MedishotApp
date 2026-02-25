@@ -36,10 +36,10 @@ export const LoginScreen: React.FC = () => {
     const insets = useSafeAreaInsets();
     const queryClient = useQueryClient();
 
-    // انیمیشن برای دکمه login
+    // Animation for login button
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
 
-    // Refs برای فیلدها
+    // Refs for fields
     const emailRef = useRef<TextInput>(null);
     const passwordRef = useRef<TextInput>(null);
 
@@ -47,7 +47,7 @@ export const LoginScreen: React.FC = () => {
         const keyboardWillShow = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (event) => {
             const keyboardHeight = event.endCoordinates.height;
 
-            // محاسبه offset: فقط بخشی از ارتفاع کیبورد (حدود 30% ارتفاع کیبورد) + 20 پیکسل اضافی
+            // Compute offset: portion of keyboard height (~30%) + 20px extra
             const offset = Math.min(keyboardHeight * 0.3, 120) + 10;
 
             Animated.timing(bottomSectionTranslateY, {

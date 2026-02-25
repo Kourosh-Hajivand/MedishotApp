@@ -45,10 +45,10 @@ export const SignUpScreen: React.FC = () => {
         },
     );
 
-    // انیمیشن برای دکمه Create Account
+    // Animation for Create Account button
     const bottomSectionTranslateY = useRef(new Animated.Value(0)).current;
 
-    // Refs برای فیلدها
+    // Refs for fields
     const emailRef = useRef<TextInput>(null);
     const passwordRef = useRef<TextInput>(null);
 
