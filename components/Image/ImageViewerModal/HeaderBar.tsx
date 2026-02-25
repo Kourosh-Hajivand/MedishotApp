@@ -1,12 +1,10 @@
 import { containerSize, iconSize } from "@/constants/theme";
-import colors from "@/theme/colors";
 import { getRelativeTime } from "@/utils/helper/dateUtils";
-import { Button, ContextMenu, Host, HStack, Spacer, Text, VStack } from "@expo/ui/swift-ui";
+import { Button, ContextMenu, Host, HStack, Image, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { IconSymbol } from "../../ui/icon-symbol";
 
 export interface HeaderBarProps {
     paddingTop: number;
@@ -90,9 +88,12 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
                                 }),
                             ]}
                         >
-                            <TouchableOpacity onPress={onClose} className="w-[44px] h-[44px]  items-center justify-center">
+                            <Button onPress={onClose} variant="plain">
+                                <Image systemName="chevron.left" size={iconSize} />
+                            </Button>
+                            {/* <TouchableOpacity onPress={onClose} className="w-[44px] h-[44px]  items-center justify-center">
                                 <IconSymbol size={iconSize} name="chevron.left" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                         </HStack>
                         <Spacer />
                         <VStack
@@ -167,7 +168,6 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
                                 <HStack
                                     alignment="center"
                                     modifiers={[
-                                        padding({ all: 10 }),
                                         frame({ width: containerSize, height: containerSize, alignment: "center" }),
                                         glassEffect({
                                             glass: {
@@ -176,9 +176,12 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
                                         }),
                                     ]}
                                 >
-                                    <TouchableOpacity>
+                                    <Button role="default" onPress={onClose} variant="plain">
+                                        <Image systemName="ellipsis" size={iconSize} />
+                                    </Button>
+                                    {/* <TouchableOpacity>
                                         <IconSymbol size={iconSize} name="ellipsis" color={colors.system.white as any} style={{ left: 1 }} />
-                                    </TouchableOpacity>
+                                    </TouchableOpacity> */}
                                 </HStack>
                             </ContextMenu.Trigger>
                         </ContextMenu>
@@ -196,7 +199,6 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         zIndex: 10,
-        overflow: "hidden",
     },
     actionButtonsContainer: {
         alignItems: "center",

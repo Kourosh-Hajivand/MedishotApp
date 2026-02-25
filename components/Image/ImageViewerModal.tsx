@@ -803,9 +803,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
         }
 
         // Index 0 = composite pair; 1+ = sub-item pairs. Open on composite if user was on composite, else on the matching sub-item.
-        const compareIndex = beforeCompositeUrl && afterCompositeUrl
-            ? (openedFromComposite ? 0 : 1 + currentPairIndex)
-            : currentPairIndex;
+        const compareIndex = beforeCompositeUrl && afterCompositeUrl ? (openedFromComposite ? 0 : 1 + currentPairIndex) : currentPairIndex;
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onClose();
@@ -1281,10 +1279,10 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     }, [showNote, showEdit, showCompare, showMagic]);
 
     const bottomActionWidth = React.useMemo(() => {
-        const SLOT = 48;
+        const SLOT = 40;
         const GAP = 1;
-        const PADDING_H = 24;
-        if (bottomActionCount === 0) return containerSize + 12;
+        const PADDING_H = 28;
+        if (bottomActionCount === 0) return containerSize;
         if (bottomActionCount === 1) return SLOT + PADDING_H;
         return SLOT * bottomActionCount + GAP * (bottomActionCount - 1) + PADDING_H;
     }, [bottomActionCount, containerSize]);
@@ -1292,7 +1290,7 @@ export const ImageViewerModal: React.FC<ImageViewerModalProps> = ({
     // Memoize modifiers to prevent re-rendering glass effect
     const bottomActionModifiers = React.useMemo(() => {
         return [
-            padding({ horizontal: 12 }),
+            padding({ horizontal: 16 }),
             frame({
                 height: containerSize,
                 alignment: "center",

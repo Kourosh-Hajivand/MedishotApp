@@ -1,11 +1,9 @@
 import { MINT_COLOR } from "@/app/camera/_components/create-template/constants";
 import { containerSize, iconSize } from "@/constants/theme";
-import colors from "@/theme/colors";
-import { Host, HStack, Spacer } from "@expo/ui/swift-ui";
+import { Button, Host, HStack, Image, Spacer } from "@expo/ui/swift-ui";
 import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import React from "react";
-import { StyleSheet, TouchableOpacity, View } from "react-native";
-import { IconSymbol } from "../../ui/icon-symbol";
+import { StyleSheet, View } from "react-native";
 
 export interface BottomActionBarProps {
     showShare: boolean;
@@ -64,12 +62,16 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                                     glass: {
                                         variant: "regular",
                                     },
+                                    shape: "circle",
                                 }),
                             ]}
                         >
-                            <TouchableOpacity onPress={onSharePress} className="  w-[48px] h-[48px] items-center justify-center">
+                            <Button onPress={onSharePress} variant="plain">
+                                <Image systemName="square.and.arrow.up" size={iconSize} />
+                            </Button>
+                            {/* <TouchableOpacity onPress={onSharePress} className="  w-[48px] h-[48px] items-center justify-center">
                                 <IconSymbol size={iconSize} name="square.and.arrow.up" color={colors.system.white as any} style={{ bottom: 2 }} />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                         </HStack>
                     )}
                     {(showNote || showEdit || showCompare || showMagic) && <Spacer />}
@@ -79,49 +81,72 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                             const centerGroupWidth = count * SLOT_SIZE + (count - 1) * SLOT_GAP;
                             return (
                                 <HStack alignment="center" modifiers={bottomActionModifiers as any}>
-                                    <View style={[styles.centerGroupRoot, { width: centerGroupWidth, height: SLOT_SIZE }]}>
-                                        {showNote && (
-                                            <TouchableOpacity onPress={onNotePress} style={[styles.slotTouchable, { backgroundColor: DEBUG.note }]}>
-                                                <View style={styles.slotIconWrap}>
-                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
-                                                        <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} />
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                        {showMagic && (
-                                            <TouchableOpacity onPress={onMagicPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.magic }]}>
-                                                <View style={styles.slotIconWrap}>
-                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
-                                                        <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} />
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                        {showCompare && (
-                                            <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.compareEdit }]}>
-                                                <View style={styles.slotIconWrap}>
-                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
-                                                        <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} />
-                                                    </View>
-                                                </View>
-                                                {!currentImageHasAfter && enableTakeAfterTemplate && (
-                                                    <View style={styles.compareBadge}>
-                                                        <IconSymbol name="plus" size={10} color={colors.system.white as any} />
-                                                    </View>
-                                                )}
-                                            </TouchableOpacity>
-                                        )}
-                                        {showEdit && (
-                                            <TouchableOpacity onPress={onAdjustPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.adjust }]}>
-                                                <View style={styles.slotIconWrap}>
-                                                    <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
-                                                        <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} />
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        )}
-                                    </View>
+                                    {/* <Host style={[styles.centerGroupRoot, { width: centerGroupWidth, height: SLOT_SIZE }]}> */}
+                                    {showNote && (
+                                        <>
+                                            <Button onPress={onNotePress} variant="plain">
+                                                <Image systemName="pin.circle" size={iconSize} />
+                                            </Button>
+                                            <Spacer />
+                                        </>
+                                        // <TouchableOpacity onPress={onNotePress} style={[styles.slotTouchable, { backgroundColor: DEBUG.note }]}>
+                                        //     <View style={styles.slotIconWrap}>
+                                        //         <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                        //             <IconSymbol size={iconSize} name="pin.circle" color={colors.system.white as any} />
+                                        //         </View>
+                                        //     </View>
+                                        // </TouchableOpacity>
+                                    )}
+                                    {showMagic && (
+                                        <>
+                                            <Button onPress={onMagicPress} variant="plain">
+                                                <Image systemName="sparkles" size={iconSize} />
+                                            </Button>
+                                            <Spacer />
+                                        </>
+                                        // <TouchableOpacity onPress={onMagicPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.magic }]}>
+                                        //     <View style={styles.slotIconWrap}>
+                                        //         <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                        //             <IconSymbol size={iconSize} name="sparkles" color={colors.system.white as any} />
+                                        //         </View>
+                                        //     </View>
+                                        // </TouchableOpacity>
+                                    )}
+                                    {showCompare && (
+                                        <>
+                                            <Button role="default" onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} variant="plain">
+                                                <Image systemName={!currentImageHasAfter && enableTakeAfterTemplate ? "plus.app" : "square.split.2x1"} size={iconSize} />
+                                            </Button>
+                                            <Spacer />
+                                        </>
+                                        // <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.compareEdit }]}>
+                                        //     <View style={styles.slotIconWrap}>
+                                        //         <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                        //             <IconSymbol size={iconSize} name="square.split.2x1" color={colors.system.white as any} />
+                                        //         </View>
+                                        //     </View>
+                                        //     {!currentImageHasAfter && enableTakeAfterTemplate && (
+                                        //         <View style={styles.compareBadge}>
+                                        //             <IconSymbol name="plus" size={10} color={colors.system.white as any} />
+                                        //         </View>
+                                        //     )}
+                                        // </TouchableOpacity>
+                                    )}
+                                    {showEdit && (
+                                        <>
+                                            <Button onPress={onAdjustPress} variant="plain">
+                                                <Image systemName="slider.horizontal.3" size={iconSize} />
+                                            </Button>
+                                        </>
+                                        // <TouchableOpacity onPress={onAdjustPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.adjust }]}>
+                                        //     <View style={styles.slotIconWrap}>
+                                        //         <View style={[styles.slotIconBox, { width: iconSize, height: iconSize }]}>
+                                        //             <IconSymbol size={iconSize} name="slider.horizontal.3" color={colors.system.white as any} />
+                                        //         </View>
+                                        //     </View>
+                                        // </TouchableOpacity>
+                                    )}
+                                    {/* </Host> */}
                                 </HStack>
                             );
                         })()}
@@ -135,13 +160,18 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                                 glassEffect({
                                     glass: {
                                         variant: "regular",
+                                        interactive: true,
+                                        tint: "rgba(0, 0, 0, 0.2)",
                                     },
                                 }),
                             ]}
                         >
-                            <TouchableOpacity onPress={onBookmarkPress} className="relative items-center justify-center w-[44px] h-[44px]">
+                            <Button onPress={onBookmarkPress} variant="plain">
+                                <Image systemName={isBookmarked ? "heart.fill" : "heart"} size={iconSize} />
+                            </Button>
+                            {/* <TouchableOpacity onPress={onBookmarkPress} className="relative items-center justify-center w-[44px] h-[44px]">
                                 <IconSymbol size={iconSize} name={isBookmarked ? "heart.fill" : "heart"} color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                         </HStack>
                     )}
                     {showRestore && <Spacer />}
@@ -158,9 +188,12 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                                 }),
                             ]}
                         >
-                            <TouchableOpacity onPress={onRestorePress} className="w-[44px] h-[44px]  items-center justify-center">
+                            <Button onPress={onRestorePress} variant="plain">
+                                <Image systemName="arrow.uturn.backward" size={iconSize} />
+                            </Button>
+                            {/* <TouchableOpacity onPress={onRestorePress} className="w-[44px] h-[44px]  items-center justify-center">
                                 <IconSymbol size={iconSize} name="arrow.uturn.backward" color={colors.system.white as any} style={{ bottom: -2, left: 2 }} />
-                            </TouchableOpacity>
+                            </TouchableOpacity> */}
                         </HStack>
                     )}
                 </HStack>

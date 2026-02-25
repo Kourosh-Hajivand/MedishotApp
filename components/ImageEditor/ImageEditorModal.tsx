@@ -903,7 +903,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
             setMagicSelection(null);
             savedEditorSnapshotRef.current = null;
         }
-        if (initialEditorState?.lastActiveTool) {
+        // When caller explicitly requests Adjust (e.g. from ImageViewer Adjust button), always open on Adjust and ignore previous tab
+        if (initialTool === "Adjust") {
+            setActiveTool("Adjust");
+        } else if (initialEditorState?.lastActiveTool) {
             const t = initialEditorState.lastActiveTool;
             setActiveTool(t === "Magic" && !showMagicTab ? "Adjust" : t);
         } else if (initialTool) {

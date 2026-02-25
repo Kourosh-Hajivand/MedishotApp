@@ -44,10 +44,12 @@ export async function magicGenerate(imageBase64: string, signal?: AbortSignal): 
         if (axios.isAxiosError(error) && error.code === "ERR_CANCELED") {
             throw error; // Canceled by user – throw the same error
         }
+
         if (axios.isAxiosError(error)) {
             const message = error.response?.data?.message ?? error.message ?? "Magic API request failed";
             throw new Error(message);
         }
+
         throw error;
     }
 }
