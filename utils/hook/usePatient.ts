@@ -67,6 +67,8 @@ export const useCreatePatient = (practiseId: string | number, onSuccess?: (data:
             // Invalidate practice queries to update counts (patients_count)
             queryClient.invalidateQueries({ queryKey: ["GetPracticeList"] });
             queryClient.invalidateQueries({ queryKey: ["GetPracticeById", practiseId] });
+            // Invalidate subscription status so current_patient_count / remaining_patient_slots update immediately (add-patient tab limit check)
+            queryClient.invalidateQueries({ queryKey: ["GetSubscriptionStatus", Number(practiseId)] });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -107,6 +109,7 @@ export const useDeletePatient = (onSuccess?: (data: ApiResponse<string>) => void
             queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
             queryClient.removeQueries({ queryKey: ["GetPatientById", patientId] });
             queryClient.removeQueries({ queryKey: ["GetPatientMedia", patientId] });
+            queryClient.invalidateQueries({ queryKey: ["GetSubscriptionStatus"] });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -124,6 +127,7 @@ export const useArchivePatient = (onSuccess?: (data: PatientDetailResponse) => v
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
             queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
             queryClient.invalidateQueries({ queryKey: ["GetPatientById", patientId] });
+            queryClient.invalidateQueries({ queryKey: ["GetSubscriptionStatus"] });
             onSuccess?.(data);
         },
         onError: (error) => {
@@ -141,6 +145,7 @@ export const useUnarchivePatient = (onSuccess?: (data: PatientDetailResponse) =>
             queryClient.invalidateQueries({ queryKey: ["GetPatients"] });
             queryClient.invalidateQueries({ queryKey: ["GetArchivedPatients"] });
             queryClient.invalidateQueries({ queryKey: ["GetPatientById", patientId] });
+            queryClient.invalidateQueries({ queryKey: ["GetSubscriptionStatus"] });
             onSuccess?.(data);
         },
         onError: (error) => {
