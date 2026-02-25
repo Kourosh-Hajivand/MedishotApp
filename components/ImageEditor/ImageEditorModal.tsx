@@ -3,11 +3,13 @@ import { AdjustChange, DrawingCanvas, EditorState, ImageChange, MagicChange, Pen
 import { Stroke } from "@/components/ImageEditor/DrawingCanvas";
 import { FilteredImage } from "@/components/ImageEditor/FilteredImage";
 import { IconSymbol } from "@/components/ui/icon-symbol.ios";
+import { iconSize } from "@/constants/theme";
 import colors from "@/theme/colors.shared";
 import { useMagicGenerateMutation } from "@/utils/hook/useMagicGenerate";
 import { useEditPatientMedia, useTempUpload, useUpdateMediaImage } from "@/utils/hook/useMedia";
 import { EditPatientMediaRequest, UpdateMediaImageRequest } from "@/utils/service/models/RequestModels";
-import { Button, Host, Text } from "@expo/ui/swift-ui";
+import { Button, Host, HStack, Image as SwiftUIImage, Text, VStack } from "@expo/ui/swift-ui";
+import { frame, glassEffect, padding } from "@expo/ui/swift-ui/modifiers";
 import { BlurView } from "expo-blur";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Haptics from "expo-haptics";
@@ -18,6 +20,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, Dimensions, Modal, Image as RNImage, SafeAreaView, StyleSheet, TouchableOpacity, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { Easing, FadeIn, FadeOut, interpolate, LinearTransition, runOnJS, useAnimatedProps, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from "react-native-svg";
 import ViewShot, { captureRef } from "react-native-view-shot";
 import { Note } from "./ToolNote";
@@ -549,6 +552,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const [magicRetryCount, setMagicRetryCount] = useState(0);
     const hasRequestedRef = useRef(false);
     const exportViewRef = useRef<ViewShot | null>(null);
+    const insets = useSafeAreaInsets();
     // Pen strokes are stored in normalized coords (0–1) so they stay correct when layout changes (tab switch / resize)
     const savedEditorSnapshotRef = useRef<string | null>(null);
     const magicCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -749,7 +753,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const allTools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
         { name: "Adjust", icon: "dial.min.fill" as SymbolViewProps["name"], disabled: false },
         // { name: "Crop", icon: "crop.rotate", disabled: false }, // TODO: not complete yet
-        { name: "Note", icon: "pin.circle.fill" as SymbolViewProps["name"], disabled: false },
+        { name: "Note", icon: "pin.circle" as SymbolViewProps["name"], disabled: false },
         { name: "Magic", icon: "sparkles" as SymbolViewProps["name"], disabled: false },
         { name: "Pen", icon: "pencil.tip.crop.circle" as SymbolViewProps["name"], disabled: false },
     ];
@@ -1357,21 +1361,17 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     }, [mediaId, mediaImageId, hasTemplate, originalUri, uri, tempUploadAsync, editPatientMediaAsync, updateMediaImageAsync, onClose, onSaveSuccess]);
 
     const handleConfirmRevert = useCallback(() => {
-        Alert.alert(
-            "Revert changes?",
-            "This will discard all edits and restore the original image. Do you want to continue?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Revert",
-                    style: "destructive",
-                    onPress: () => {
-                        // Revert all edits and save immediately
-                        void handleRevert();
-                    },
+        Alert.alert("Revert changes?", "This will discard all edits and restore the original image. Do you want to continue?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Revert",
+                style: "destructive",
+                onPress: () => {
+                    // Revert all edits and save immediately
+                    void handleRevert();
                 },
-            ],
-        );
+            },
+        ]);
     }, [handleRevert]);
 
     // Calculate dynamic image container style based on aspect ratio
@@ -1598,12 +1598,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                             height: isSaving || !hasUnsavedChanges ? 44 : 40,
                         }}
                     >
-                        <Button
-                            variant="glassProminent"
-                            color={!hasUnsavedChanges ? "#E53935" : "#FFCC00"}
-                            onPress={hasUnsavedChanges ? handleDone : handleConfirmRevert}
-                            disabled={isSaving}
-                        >
+                        <Button variant="glassProminent" color={!hasUnsavedChanges ? "#E53935" : "#FFCC00"} onPress={hasUnsavedChanges ? handleDone : handleConfirmRevert} disabled={isSaving}>
                             <Text color={!hasUnsavedChanges ? "white" : "black"}>{isSaving ? "Saving…" : hasUnsavedChanges ? "Done" : "Revert"}</Text>
                         </Button>
                     </Host>
@@ -1702,16 +1697,58 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     {renderActiveToolPanel()}
                 </Animated.View>
 
-                <View className="flex-row items-center justify-center gap-5">
-                    {tools.map((t) => (
-                        <TouchableOpacity disabled={t.disabled} key={t.name} onPress={() => handleToolPress(t.name)} className="items-center justify-center gap-1">
-                            <IconSymbol name={t.icon} size={24} color={activeTool === t.name ? colors.labels.primary : t.disabled ? colors.labels.tertiary : colors.labels.secondary} />
-
-                            <BaseText type="Caption1" color={activeTool === t.name ? "labels.primary" : t.disabled ? "labels.tertiary" : "labels.secondary"}>
-                                {t.name}
-                            </BaseText>
-                        </TouchableOpacity>
-                    ))}
+                <View className="flex-row items-center justify-center   w-full " style={{ position: "relative" }}>
+                    {/* {(() => {
+                        const activeIndex = tools.findIndex((t) => t.name === activeTool);
+                        if (activeIndex < 0) return null;
+                        const barWidth = 230;
+                        const paddingH = 16;
+                        const spacing = 20;
+                        const itemWidth = (barWidth - paddingH * 2 - (tools.length - 1) * spacing) / tools.length;
+                        const centerX = (width - barWidth) / 2 + paddingH + (itemWidth + spacing) * activeIndex + itemWidth / 2;
+                        const chevronSize = 12;
+                        return (
+                            <View
+                                style={{
+                                    position: "absolute",
+                                    top: -chevronSize - 8,
+                                    left: centerX - chevronSize / 2,
+                                    width: chevronSize,
+                                    height: chevronSize,
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    zIndex: 200,
+                                }}
+                                pointerEvents="none"
+                            >
+                                <IconSymbol name={"chevron.up.fill" as SymbolViewProps["name"]} size={chevronSize} color="#FFCC00" />
+                            </View>
+                        );
+                    })()} */}
+                    <Host matchContents>
+                        <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 16, vertical: 8 }), frame({ width: 230 }), glassEffect({ glass: { variant: "regular" } })]}>
+                            {tools.map((t) => {
+                                const isActive = activeTool === t.name;
+                                // Adjust (dial): use fill only when active; otherwise outline
+                                const iconName: SymbolViewProps["name"] = t.icon === "dial.min.fill" ? (isActive ? "dial.min.fill" : ("dial.min" as SymbolViewProps["name"])) : t.icon;
+                                return (
+                                    <Button key={t.name} onPress={() => handleToolPress(t.name)} variant="plain">
+                                        <VStack alignment="center" spacing={2}>
+                                            {/* {isActive && (
+                                                <Host style={{ position: "absolute", top: -10, left: 0, right: 0, alignItems: "center" }}>
+                                                    <SwiftUIImage systemName="arrowtriangle.down.fill" size={10} color="#FFCC00" />
+                                                </Host>
+                                            )} */}
+                                            <SwiftUIImage systemName={iconName} size={iconSize} color={isActive ? colors.labels.primary : t.disabled ? colors.labels.tertiary : colors.labels.secondary} />
+                                            <Text lineLimit={1} size={12} color={isActive ? "labels.primary" : t.disabled ? "labels.tertiary" : "labels.secondary"}>
+                                                {t.name}
+                                            </Text>
+                                        </VStack>
+                                    </Button>
+                                );
+                            })}
+                        </HStack>
+                    </Host>
                 </View>
             </SafeAreaView>
         </Modal>
@@ -1732,6 +1769,7 @@ const styles = StyleSheet.create({
     },
     canvasContainer: {
         flex: 1,
+
         alignItems: "center",
         justifyContent: "center",
     },
