@@ -102,8 +102,6 @@ export default function BeforeAfterCompareScreen() {
     const compositeVerticalShotRef = useRef<ViewShot>(null);
     const [isSavingComposite, setIsSavingComposite] = useState(false);
     const [pendingCapture, setPendingCapture] = useState(false);
-    /** When saving: true = capture vertical (composite pair), false = capture horizontal (sub-item pairs). */
-    const saveAsVerticalRef = useRef(false);
     const [compositeSizes, setCompositeSizes] = useState<{
         totalWidth: number;
         totalHeight: number;
@@ -290,35 +288,16 @@ export default function BeforeAfterCompareScreen() {
     // Vertical composite dimensions. Two images stacked (no gap); labels absolute at bottom of each image. Composite: square blocks; others: aspect ratio.
     const verticalCompositeSizes = useMemo(() => {
         const width = COMPOSITE_VERTICAL_WIDTH;
-        const isCompositePair = pair?.templateName === "Composite";
-        if (isCompositePair) {
-            const blockH = width;
-            return {
-                width,
-                beforeHeight: blockH,
-                afterHeight: blockH,
-                totalHeight: blockH * 2,
-            };
-        }
-        if (!compositeSizes?.beforeImageW || !compositeSizes?.beforeImageH || !compositeSizes?.afterImageW || !compositeSizes?.afterImageH) {
-            const fallbackH = 400;
-            return {
-                width,
-                beforeHeight: fallbackH,
-                afterHeight: fallbackH,
-                totalHeight: fallbackH * 2,
-            };
-        }
-        const { beforeImageW, beforeImageH, afterImageW, afterImageH } = compositeSizes;
-        const beforeHeight = Math.round(width * (beforeImageH / beforeImageW));
-        const afterHeight = Math.round(width * (afterImageH / afterImageW));
+        // Force final vertical composite to 2:3 aspect ratio with two equal blocks stacked (portrait)
+        const totalHeight = Math.round((width * 3) / 2);
+        const blockH = Math.round(totalHeight / 2);
         return {
             width,
-            beforeHeight,
-            afterHeight,
-            totalHeight: beforeHeight + afterHeight,
+            beforeHeight: blockH,
+            afterHeight: blockH,
+            totalHeight,
         };
-    }, [compositeSizes, pair?.templateName]);
+    }, []);
 
     const handleBack = useCallback(() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -340,15 +319,13 @@ export default function BeforeAfterCompareScreen() {
             return;
         }
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        const isCompositePair = pair.templateName === "Composite";
-        saveAsVerticalRef.current = isCompositePair;
+        // Directly trigger capture so we can test final image without preview modal
         setPendingCapture(true);
     }, [patientId, pair, beforeDisplay, afterDisplay]);
 
     useEffect(() => {
         if (!pendingCapture) return;
-        const useVertical = saveAsVerticalRef.current;
-        const ref = useVertical ? compositeVerticalShotRef.current : compositeShotRef.current;
+        const ref = compositeVerticalShotRef.current;
         if (!ref) return;
         const t = setTimeout(async () => {
             setPendingCapture(false);
@@ -501,8 +478,7 @@ export default function BeforeAfterCompareScreen() {
                     afterDisplay &&
                     (() => {
                         const { width: vW, beforeHeight: vBeforeH, afterHeight: vAfterH, totalHeight: vTotalH } = verticalCompositeSizes;
-                        const isCompositePair = pair?.templateName === "Composite";
-                        const imageFit = isCompositePair ? "cover" : "contain";
+                        const imageFit = "contain";
                         return (
                             <ViewShot
                                 ref={compositeVerticalShotRef}
@@ -636,56 +612,7 @@ export default function BeforeAfterCompareScreen() {
                 </View>
             </View>
 
-            {/* Save preview modal (test) – commented out; save runs directly on Save tap. */}
-            {/* <Modal visible={savePreviewModalVisible} transparent animationType="fade" onRequestClose={handleCancelSavePreview}>
-                <Pressable style={styles.savePreviewModalBackdrop} onPress={handleCancelSavePreview}>
-                    <Pressable style={[styles.savePreviewModalContent, { paddingBottom: insets.bottom + 16 }]} onPress={(e) => e.stopPropagation()}>
-                        <View style={styles.savePreviewModalPreview}>
-                            {(() => {
-                                const vW = verticalCompositeSizes.width;
-                                const vTotalH = verticalCompositeSizes.totalHeight;
-                                const vBeforeH = verticalCompositeSizes.beforeHeight;
-                                const vAfterH = verticalCompositeSizes.afterHeight;
-                                const previewWidth = SCREEN_WIDTH - 32;
-                                const previewTotalHeight = vTotalH > 0 ? (previewWidth * vTotalH) / vW : previewWidth;
-                                const previewBeforeH = vTotalH > 0 ? Math.round((previewTotalHeight * vBeforeH) / vTotalH) : Math.round(previewTotalHeight / 2);
-                                const previewAfterH = Math.round(previewTotalHeight - previewBeforeH);
-                                const imageFit = pair?.templateName === "Composite" ? "cover" : "contain";
-                                return (
-                                    <>
-                                        <View style={[styles.savePreviewModalImageBlock, { width: previewWidth, height: previewBeforeH }]}>
-                                            <Image key={`preview-before-${pairKey}`} source={{ uri: beforeDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
-                                            <View style={[styles.label, styles.labelBeforePill, styles.labelOnImage, styles.savePreviewModalLabelOverlay]}>
-                                                <BaseText type="Caption1" weight="600" color="labels.primary">Before</BaseText>
-                                                {pair?.beforeDate ? (
-                                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.beforeDate)}</BaseText>
-                                                ) : null}
-                                            </View>
-                                        </View>
-                                        <View style={[styles.savePreviewModalImageBlock, { width: previewWidth, height: previewAfterH }]}>
-                                            <Image key={`preview-after-${pairKey}`} source={{ uri: afterDisplay }} style={StyleSheet.absoluteFill} contentFit={imageFit as any} />
-                                            <View style={[styles.label, styles.labelAfterPill, styles.labelOnImage, styles.savePreviewModalLabelOverlay]}>
-                                                <BaseText type="Caption1" weight="600" color="system.blue">After</BaseText>
-                                                {pair?.afterDate ? (
-                                                    <BaseText type="Caption2" weight="400" color="labels.secondary" style={styles.labelDate}>{getShortDate(pair.afterDate)}</BaseText>
-                                                ) : null}
-                                            </View>
-                                        </View>
-                                    </>
-                                );
-                            })()}
-                        </View>
-                        <View style={[styles.savePreviewModalActions, { marginTop: 16 }]}>
-                            <TouchableOpacity style={styles.savePreviewModalButtonSecondary} onPress={handleCancelSavePreview} activeOpacity={0.8}>
-                                <BaseText type="Body" weight="600" color="labels.primary">Cancel</BaseText>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.savePreviewModalButtonPrimary} onPress={handleConfirmSaveComposite} activeOpacity={0.8}>
-                                <BaseText type="Body" weight="600" color="system.white">OK</BaseText>
-                            </TouchableOpacity>
-                        </View>
-                    </Pressable>
-                </Pressable>
-            </Modal> */}
+            {/* Save preview modal removed for testing; Save now captures directly */}
         </View>
     );
 }
@@ -1128,8 +1055,8 @@ const styles = StyleSheet.create({
     },
     compositeVerticalLabelOverlay: {
         position: "absolute",
-        bottom: 10,
-        left: 10,
+        bottom: 24,
+        left: 12,
     },
     savePreviewModalBackdrop: {
         flex: 1,
@@ -1157,8 +1084,8 @@ const styles = StyleSheet.create({
     },
     savePreviewModalLabelOverlay: {
         position: "absolute",
-        bottom: 8,
-        left: 8,
+        bottom: 20,
+        left: 12,
     },
     savePreviewModalLabelRow: {
         paddingHorizontal: 12,
