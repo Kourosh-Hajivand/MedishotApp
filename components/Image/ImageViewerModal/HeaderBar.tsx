@@ -165,24 +165,11 @@ export const HeaderBar = React.memo<HeaderBarProps>(function HeaderBar({
                                 )}
                             </ContextMenu.Items>
                             <ContextMenu.Trigger>
-                                <HStack
-                                    alignment="center"
-                                    modifiers={[
-                                        frame({ width: containerSize, height: containerSize, alignment: "center" }),
-                                        glassEffect({
-                                            glass: {
-                                                variant: "regular",
-                                            },
-                                        }),
-                                    ]}
-                                >
-                                    <Button role="default" onPress={onClose} variant="plain">
+                                <Button role="default" onPress={onClose} variant="glass">
+                                    <HStack alignment="center" modifiers={[frame({ width: 25, height: 35, alignment: "center" })]}>
                                         <Image systemName="ellipsis" size={iconSize} />
-                                    </Button>
-                                    {/* <TouchableOpacity>
-                                        <IconSymbol size={iconSize} name="ellipsis" color={colors.system.white as any} style={{ left: 1 }} />
-                                    </TouchableOpacity> */}
-                                </HStack>
+                                    </HStack>
+                                </Button>
                             </ContextMenu.Trigger>
                         </ContextMenu>
                     </HStack>
