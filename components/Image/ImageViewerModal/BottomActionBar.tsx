@@ -117,7 +117,7 @@ export const BottomActionBar = React.memo<BottomActionBarProps>(function BottomA
                                             <Button role="default" onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} variant="plain">
                                                 <Image systemName={!currentImageHasAfter && enableTakeAfterTemplate ? "plus.app" : "square.split.2x1"} size={iconSize} />
                                             </Button>
-                                            <Spacer />
+                                            {showMagic && showEdit && <Spacer />}
                                         </>
                                         // <TouchableOpacity onPress={currentImageHasAfter ? onSplitPress : enableTakeAfterTemplate ? onTakeAfterTemplatePress : onSplitPress} style={[styles.slotTouchable, { backgroundColor: DEBUG.compareEdit }]}>
                                         //     <View style={styles.slotIconWrap}>

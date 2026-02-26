@@ -518,8 +518,10 @@ interface ImageEditorModalProps {
 }
 
 export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri, originalUri, initialTool, mediaId, mediaImageId, hasTemplate, patientId, initialEditorState, onClose, onSaveSuccess, showOnlyNote = false, showMagicTab = true }) => {
-    const defaultTool = showMagicTab ? "Magic" : "Adjust";
-    const [activeTool, setActiveTool] = useState(initialTool || defaultTool);
+    // Default to Adjust for all entries, only start on Magic when caller explicitly requests it
+    const isInitialMagic = initialTool === "Magic";
+    const defaultTool = isInitialMagic ? "Magic" : "Adjust";
+    const [activeTool, setActiveTool] = useState(initialTool ?? defaultTool);
     const [isProcessing, setIsProcessing] = useState(false);
     const [imageChanges, setImageChanges] = useState<ImageChange[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -753,9 +755,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
     const allTools: { name: string; icon: SymbolViewProps["name"]; disabled: boolean }[] = [
         { name: "Adjust", icon: "dial.min.fill" as SymbolViewProps["name"], disabled: false },
         // { name: "Crop", icon: "crop.rotate", disabled: false }, // TODO: not complete yet
-        { name: "Note", icon: "pin.circle" as SymbolViewProps["name"], disabled: false },
+        { name: "Note", icon: "pin.circle.fill" as SymbolViewProps["name"], disabled: false },
         { name: "Magic", icon: "sparkles" as SymbolViewProps["name"], disabled: false },
-        { name: "Pen", icon: "pencil.tip.crop.circle" as SymbolViewProps["name"], disabled: false },
+        { name: "Pen", icon: "pencil.tip.crop.circle.fill" as SymbolViewProps["name"], disabled: false },
     ];
     const tools = showOnlyNote ? allTools.filter((tool) => tool.name === "Note") : showMagicTab ? allTools : allTools.filter((tool) => tool.name !== "Magic");
 
@@ -1697,7 +1699,7 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                     {renderActiveToolPanel()}
                 </Animated.View>
 
-                <View className="flex-row items-center justify-center bg-red-400  w-full " style={{ position: "relative" }}>
+                <View className="flex-row items-center justify-center  w-full " style={{ position: "relative" }}>
                     {(() => {
                         const activeIndex = tools.findIndex((t) => t.name === activeTool);
                         if (activeIndex < 0) return null;
@@ -1729,8 +1731,14 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({ visible, uri
                         <HStack alignment="center" spacing={20} modifiers={[padding({ horizontal: 16, vertical: 8 }), frame({ width: 230 }), glassEffect({ glass: { variant: "regular" } })]}>
                             {tools.map((t) => {
                                 const isActive = activeTool === t.name;
-                                // Adjust (dial): use fill only when active; otherwise outline
-                                const iconName: SymbolViewProps["name"] = t.icon === "dial.min.fill" ? (isActive ? "dial.min.fill" : ("dial.min" as SymbolViewProps["name"])) : t.icon;
+                                // For icons defined as *.fill: use filled version when active, outline when inactive
+                                let iconName: SymbolViewProps["name"];
+                                if (t.icon.endsWith(".fill")) {
+                                    const base = t.icon.replace(".fill", "") as SymbolViewProps["name"];
+                                    iconName = isActive ? t.icon : base;
+                                } else {
+                                    iconName = t.icon;
+                                }
                                 return (
                                     <Button key={t.name} onPress={() => handleToolPress(t.name)} variant="plain">
                                         <VStack alignment="center" spacing={2}>
